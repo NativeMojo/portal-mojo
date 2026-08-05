@@ -700,6 +700,32 @@ button { font: inherit; color: inherit; }
 }
 .group-header--rule th { border-top: 1px solid var(--line); }
 
+/* Expanding search (maestro .fsearch port): a 30px icon at rest, a real
+   input on focus, pinned open by .holding while it carries text. The "/"
+   kbd hint shows on hover only, never while open. */
+.fsearch { position: relative; display: flex; align-items: center; height: 30px; border: 1px solid transparent; border-radius: 9px; }
+.fsearch:hover { background: var(--surface2); }
+.fsearch:focus-within, .fsearch.holding { border-color: var(--line); background: var(--surface); }
+.fsearch .icon { position: absolute; left: 8px; color: var(--mute); pointer-events: none; font-size: 13px; }
+.fsearch input.text {
+    height: 100%; width: 30px; min-width: 0;
+    border: none; background: none; cursor: pointer; outline: none;
+    padding: 0 8px 0 30px; border-radius: 9px;
+    font-size: 13px; color: var(--ink);
+    transition: width 0.18s ease;
+}
+.fsearch:focus-within input.text, .fsearch.holding input.text { width: 220px; cursor: text; }
+.fsearch input.text::placeholder { color: transparent; }
+.fsearch:focus-within input.text::placeholder { color: var(--mute); opacity: 0.7; }
+.fsearch kbd {
+    position: absolute; right: 7px; font-size: 10px; padding: 1px 5px;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: var(--surface2); color: var(--mute);
+    opacity: 0; pointer-events: none; transition: opacity 0.12s;
+}
+.fsearch:hover:not(:focus-within):not(.holding) kbd { opacity: 0.75; }
+@media (prefers-reduced-motion: reduce) { .fsearch input.text { transition: none; } }
+
 /* Toolbar tool cluster — one joined icon group (web-mojo's compact button
    groups). Buttons are icon+tooltip; .btn-label text renders only on very
    wide screens. No overflow:hidden here — the dropdown menus render inside. */

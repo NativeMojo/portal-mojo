@@ -82,6 +82,48 @@ function pageWindow(current: number, total: number): (number | '…')[] {
     return out;
 }
 
+/**
+ * Expanding search (maestro's `.fsearch` port): a 30px icon at rest, a real
+ * input on focus, and PINNED open while it carries text — search is the one
+ * filter whose state has no pill, so the open input is its indicator. `/`
+ * focuses it from anywhere (maestro keyboard.js), hinted on hover.
+ */
+function ExpandingSearch({ value, onChange, placeholder }: {
+    value: string;
+    onChange: (term: string) => void;
+    placeholder?: string;
+}) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== '/') return;
+            const t = e.target as HTMLElement | null;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+            if (document.querySelector('dialog[open]')) return;
+            e.preventDefault();
+            inputRef.current?.focus();
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, []);
+    return (
+        <div className={`fsearch${value ? ' holding' : ''}`}>
+            <i className="bi bi-search icon" />
+            <input
+                ref={inputRef}
+                className="text"
+                type="search"
+                value={value}
+                placeholder={placeholder}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }}
+                aria-label="Search"
+            />
+            <kbd>/</kbd>
+        </div>
+    );
+}
+
 /** Shared dropdown shell (FilterBar's outside-click + Escape pattern). */
 function MenuDropdown({ button, children, align = 'end' }: {
     button: (open: boolean, toggle: () => void) => ReactNode;
@@ -447,15 +489,7 @@ export function ModelTable<T extends { id: number }>({
                     <h1 className="panel-title">{title}</h1>
                 </div>
                 <div className="toolbar-controls">
-                    <div className="search-box">
-                        <i className="bi bi-search" />
-                        <input
-                            value={p.search}
-                            placeholder={searchPlaceholder}
-                            onChange={(e) => p.setSearch(e.target.value)}
-                            aria-label="Search"
-                        />
-                    </div>
+                    <ExpandingSearch value={p.search} onChange={p.setSearch} placeholder={searchPlaceholder} />
                     {/* Tool cluster: one joined icon group (web-mojo's compact
                         toolbar). Icons + tooltips only; text labels appear
                         only on very wide screens via .btn-label. */}
