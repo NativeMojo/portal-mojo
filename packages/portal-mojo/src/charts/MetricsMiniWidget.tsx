@@ -476,7 +476,18 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
 
             <div className="mmw-head">
                 <div className="mmw-id">
-                    <div className="mmw-title">{title}</div>
+                    {/* The icon PREFIXES the title. Source hung it at the
+                        right of the header, which worked there because the
+                        card had a solid background color and the icon read
+                        as a watermark; this port replaced that with token
+                        tones, so on a plain surface a right-hand glyph sat
+                        next to the action buttons and read as a stray
+                        control. Prefixing binds it to the label and leaves
+                        the top-right corner meaning exactly one thing. */}
+                    <div className="mmw-title">
+                        {icon && <i className={`${icon} mmw-icon`} aria-hidden="true" />}
+                        {title}
+                    </div>
                     {subtitleNode != null && <div className="mmw-subtitle">{subtitleNode}</div>}
                     <div className="mmw-meta">
                         {showTrending && trendLabel != null && (
@@ -503,7 +514,6 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
                         )}
                     </div>
                 </div>
-                {icon && <i className={`${icon} mmw-icon`} aria-hidden="true" />}
             </div>
 
             {/* The picker is a POPOVER off the funnel button — a metrics card

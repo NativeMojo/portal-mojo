@@ -190,7 +190,11 @@ button.cprog { cursor: pointer; font: inherit; }
 }
 .mmw-trend-up { color: var(--ok); background: var(--ok-soft); }
 .mmw-trend-down { color: var(--bad); background: var(--bad-soft); }
-.mmw-icon { font-size: 20px; color: var(--mute); flex: none; margin-top: 2px; }
+/* Inline prefix on the title — sized to the text, tinted like a label,
+   never a control. */
+.mmw-icon { font-size: 13px; color: var(--mute); margin-right: 6px; vertical-align: baseline; }
+.mmw-title { display: flex; align-items: center; gap: 0; min-width: 0; }
+.mmw-title > i { flex: none; }
 /* Scope reads as a tiny LABEL under the subtitle — a metrics card carries
    no resting form control. The picker opens from the header funnel button. */
 .mmw-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
