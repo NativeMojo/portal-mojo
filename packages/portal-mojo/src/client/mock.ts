@@ -391,6 +391,32 @@ export interface MockFetchOpts {
     headers?: Record<string, string>;
 }
 
+/**
+ * Role → permissions, the way a django-mojo deployment typically grants
+ * them. The admin role carries the system `admin` wildcard as the loose `1`
+ * the backend stores (exercises the `== true` compatibility); staff gets the
+ * `users` CATEGORY (rollup demo: covers view_users/manage_users/view_members)
+ * plus view_admin. Nobody is is_superuser — that flag would short-circuit
+ * every permission path this mock exists to exercise.
+ */
+function meDict(user: User) {
+    const permissions =
+        user.role === 'admin' ? { admin: 1 }
+        : user.role === 'staff' ? { users: true, view_admin: true }
+        : {};
+    return { ...user, is_superuser: false, permissions };
+}
+
+/** The bearer's user, when a valid unexpired mock JWT is presented. */
+function userFromBearer(headers: Record<string, string> | undefined): User | undefined {
+    const bearer = (headers?.['Authorization'] ?? '').replace(/^Bearer /, '');
+    if (!bearer) return undefined;
+    const payload = decodeMockJwt(bearer);
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload || typeof payload.exp !== 'number' || now >= payload.exp) return undefined;
+    return db.users.find((u) => u.id === Number(payload.uid));
+}
+
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
     const key = `${opts.method ?? 'GET'} ${path}`;
@@ -398,6 +424,13 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     await new Promise((r) => setTimeout(r, LATENCY_MS));
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
         return authFetch(path, opts.body ?? {});
+    }
+    if (path === '/api/user/me' || path === '/api/account/user/me') {
+        // The first authed mock endpoint — meaningless without a session,
+        // exactly like the real backend's @requires_auth.
+        const user = userFromBearer(opts.headers);
+        if (!user) return { status: false, error: 'permission denied', error_code: 401 };
+        return { status: true, data: meDict(user) };
     }
     if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
     const one = path.match(/^\/api\/account\/user\/(\d+)$/);

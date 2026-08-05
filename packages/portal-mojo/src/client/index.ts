@@ -10,6 +10,7 @@ export * from './errors';
 export * from './auth';
 export * from './jwt';
 export * from './duid';
+export * from './me';
 export * from './hooks';
 export * from './params';
 export * from './lookups';

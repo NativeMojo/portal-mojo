@@ -3,6 +3,7 @@
 // semantic classes (panel, chip, tbl, …) styled by the consuming app's
 // theme.css tokens — light AND dark (reference set: apps/portal/src/theme.css).
 export * from './ThemeProvider';
+export * from './Guarded';
 export * from './modal';
 export * from './toast';
 export * from './ui';

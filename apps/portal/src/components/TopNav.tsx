@@ -1,9 +1,30 @@
 import { useLocation } from 'react-router-dom';
-import { useTheme, type ThemePref } from 'portal-mojo/ui';
+import { useAuthSnapshot, useMe } from 'portal-mojo/client';
+import { useTheme, type ThemePref, fmt } from 'portal-mojo/ui';
 
 const TITLES: Record<string, string> = { '/': 'Dashboard', '/users': 'Users', '/settings': 'Settings' };
 const NEXT: Record<ThemePref, ThemePref> = { light: 'dark', dark: 'system', system: 'light' };
 const PREF_ICON: Record<ThemePref, string> = { light: 'bi-sun', dark: 'bi-moon-stars', system: 'bi-circle-half' };
+
+/** Live identity chip: session-aware, name from /api/user/me. */
+function UserChip() {
+    const auth = useAuthSnapshot();
+    const { data: me } = useMe();
+    if (!auth.authenticated) {
+        return (
+            <span className="chip chip-muted" title="No session — log in via __mojo.login(email, 'mojo') until the login pages land">
+                <i className="bi bi-person-slash" /> Signed out
+            </span>
+        );
+    }
+    const name = me?.display_name ?? auth.email ?? '…';
+    return (
+        <div className="user-chip">
+            <span className="user-avatar">{fmt.initials(name)}</span>
+            <span className="user-name">{name}</span>
+        </div>
+    );
+}
 
 export function TopNav() {
     const { pathname } = useLocation();
@@ -19,10 +40,7 @@ export function TopNav() {
                 >
                     <i className={`bi ${PREF_ICON[pref]}`} />
                 </button>
-                <div className="user-chip">
-                    <span className="user-avatar">IS</span>
-                    <span className="user-name">Ian Starnes</span>
-                </div>
+                <UserChip />
             </div>
         </header>
     );
