@@ -1,7 +1,8 @@
-// Data demos: the server-driven Groups table (ModelTable at full feature
-// set against /api/group) + the filters explainer. Runs identically on the
-// mock and a live django-mojo — the transport badge in the sidebar footer
-// says which one is answering.
+// Data demos: the server-driven Groups table (ModelTable at full feature set
+// against /api/group). Runs identically on the mock and a live django-mojo —
+// the transport badge in the sidebar footer says which one is answering.
+// The filter system has its own test bed next door in demos-filters.tsx
+// (it used to be two paragraphs of prose here, which is not a test bed).
 import { type Group } from 'portal-mojo/client';
 import { Badge, fmt, groupByField, ModelTable, type Column, type FilterDef } from 'portal-mojo/ui';
 import { GroupModel, GROUP_KIND_OPTIONS } from '../../models';
@@ -74,24 +75,5 @@ export function TableDemo() {
             )}
             {...groupByField<GroupRow>('kind', { format: (k) => `${k.charAt(0).toUpperCase()}${k.slice(1)}s` })}
         />
-    );
-}
-
-export function FiltersNote() {
-    return (
-        <div className="panel panel-pad">
-            <p>
-                Filters are exercised live on the <b>ModelTable</b> demo (and the Users page):
-                the Add-Filter menu opens a type-appropriate dialog — text (<code>__icontains</code>),
-                select, <b>multiselect</b> (collapses to <code>field__in=a,b</code>, single value
-                to <code>field</code>), boolean, number (<code>__gte</code>), and daterange
-                (the <code>dr_field/dr_start/dr_end</code> triple — one active range by construction).
-            </p>
-            <p className="dim">
-                Applied filters become editable pills, deep-link in the URL, and are <b>server-side
-                always</b>: the params store writes wire params; django-mojo answers. No table in a
-                portal-mojo app filters rows client-side.
-            </p>
-        </div>
     );
 }

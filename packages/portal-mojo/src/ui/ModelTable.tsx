@@ -24,6 +24,7 @@ import { useModelList } from '../client/hooks';
 import { mojoDownload } from '../client/client';
 import type { ModelDef } from '../client/model';
 import { FilterBar, FilterPills, type FilterDef } from './FilterBar';
+import { busyWhile } from './loading';
 import { modal } from './modal';
 import { toast } from './toast';
 
@@ -412,9 +413,17 @@ export function ModelTable<T extends { id: number }>({
     }, [autoRefreshMs]);
 
     // ── Export ───────────────────────────────────────────────────────────
+    // The one table action with NO feedback: the menu closes and the browser
+    // download appears whenever the server finishes building the whole
+    // filtered result set (seconds on a six-figure Logs table). busyWhile
+    // blocks for exactly that long — and the anti-flash delay means the
+    // instant mock export still shows nothing at all. See docs/loading.md.
     const runExport = useCallback(async (format: 'csv' | 'json') => {
         try {
-            await mojoDownload(resolvedEndpoint, p.wire, format);
+            await busyWhile(
+                `Preparing ${format.toUpperCase()} export…`,
+                () => mojoDownload(resolvedEndpoint, p.wire, format),
+            );
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Export failed');
         }

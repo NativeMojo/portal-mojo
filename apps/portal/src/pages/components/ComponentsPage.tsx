@@ -9,12 +9,14 @@
 // /api/group on whichever transport the app is using (mock or live).
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { TableDemo, FiltersNote } from './demos-data';
+import { TableDemo } from './demos-data';
+import { FiltersDemo } from './demos-filters';
+import { SearchDemo } from './demos-search';
 import { ChartsDemo } from './demos-charts';
 import { FormsDemo, ModalsDemo, ToastsDemo } from './demos-feedback';
 import { DetailViewFullDemo } from './demos-detailview';
 import { DataViewDemo } from './demos-dataview';
-import { DisplayDemo, SearchDemo, SkeletonDemo, AccessDemo } from './demos-display';
+import { DisplayDemo, SkeletonDemo, AccessDemo } from './demos-display';
 import { PopoverDemo } from './demos-popover';
 import { TagInputDemo } from './demos-taginput';
 import { DrawerDemo } from './demos-drawer';
@@ -61,12 +63,12 @@ const GROUPS: DemoGroup[] = [
             },
             {
                 key: 'filters', title: 'Filters', icon: 'bi-funnel',
-                blurb: 'Add-Filter menu, typed dialogs, editable pills — all writing Django lookups into the params store.',
-                render: () => <FiltersNote />,
+                blurb: 'Every filter type against a live table, with the exact wire params printed as you go: text, select, multiselect (field__in), boolean, number, and the dr_* daterange triple.',
+                render: () => <FiltersDemo />,
             },
             {
                 key: 'search', title: 'Expanding search', icon: 'bi-search',
-                blurb: 'maestro fsearch: icon at rest, input on focus, pinned while holding text, "/" to focus, 300ms debounce to the wire.',
+                blurb: 'maestro fsearch: a 30px ICON at rest — all three states shown side by side, the 300ms debounce logged keystroke-by-keystroke, and the committed term driving a real server query.',
                 render: () => <SearchDemo />,
             },
         ],

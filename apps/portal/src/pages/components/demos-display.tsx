@@ -1,8 +1,9 @@
-// Display demos: badges + formatters, the expanding search, the skeleton
-// silhouette, and permission gates against the live session.
-import { useState } from 'react';
+// Display demos: badges + formatters, the skeleton silhouette, and permission
+// gates against the live session. (ExpandingSearch moved to its own test bed
+// in demos-search.tsx — mounted bare it is a single icon, which read as an
+// empty page.)
 import { useCan, useMe, type Me } from 'portal-mojo/client';
-import { Badge, ExpandingSearch, Guarded, fmt, type Tone } from 'portal-mojo/ui';
+import { Badge, Guarded, fmt, type Tone } from 'portal-mojo/ui';
 
 const TONES: Tone[] = ['success', 'warning', 'danger', 'info', 'muted', 'primary'];
 const NOW_SEC = Math.floor(Date.now() / 1000);
@@ -27,23 +28,6 @@ export function DisplayDemo() {
                     <tr><td><code>fmt.initials(null)</code></td><td>{fmt.initials(null)} (never throws — live rows carry nulls)</td></tr>
                 </tbody>
             </table>
-        </div>
-    );
-}
-
-export function SearchDemo() {
-    const [term, setTerm] = useState('');
-    return (
-        <div className="panel panel-pad">
-            <div className="demo-row">
-                <ExpandingSearch value={term} onChange={setTerm} placeholder="Type, then pause…" />
-                <span className="dim">committed (after 300ms debounce): <code>{JSON.stringify(term)}</code></span>
-            </div>
-            <p className="dim" style={{ marginTop: 12 }}>
-                Icon at rest → input on focus → pinned open while it holds text. Press <kbd>/</kbd> anywhere
-                to focus it; Enter commits immediately; Escape blurs. In ModelTable the committed value is a
-                server wire param.
-            </p>
         </div>
     );
 }

@@ -57,6 +57,23 @@ const RANGE_KEYS = new Set(['dr_field', 'dr_start', 'dr_end']);
 export const PAGE_SIZES = [5, 10, 25, 50, 100];
 const DEFAULT_SIZE = 10;
 
+// ── Host-page params (not filters) ────────────────────────────────────
+// Every non-reserved URL key is treated as a Django lookup — that is what
+// lets any `field__lookup=` filter deep-link without a client-side schema.
+// But the PAGE around a table can own query params too (the component
+// playground's `?demo=`, a tab id, a wizard step). Those are not filters:
+// they must never reach the wire (`?demo=filters` on /api/group is a lookup
+// on a field that does not exist — django-mojo raises, the mock returns zero
+// rows), never render as a pill, and never break preset matching — yet they
+// MUST survive every params write, since each write rebuilds the whole query
+// string. Apps declare them once, at module load, before any table renders.
+const NON_FILTER = new Set<string>();
+
+/** Declare URL params the host page owns, so tables carry them without filtering on them. */
+export function registerNonFilterParams(...keys: string[]): void {
+    for (const key of keys) NON_FILTER.add(key);
+}
+
 // ── View persistence (WM-035 port) ────────────────────────────────────
 // One localStorage blob per table remembers how each user likes it — sort,
 // page size, search + filters (field__in / dr_* triples verbatim), hidden
@@ -118,7 +135,7 @@ export function useTableParams(defaults: Partial<TableParams> = {}): TableParams
     const filters = useMemo(() => {
         const out: Record<string, string> = {};
         for (const [key, value] of sp.entries()) {
-            if (!RESERVED.has(key)) out[key] = value;
+            if (!RESERVED.has(key) && !NON_FILTER.has(key)) out[key] = value;
         }
         return out;
     }, [sp]);
@@ -139,8 +156,14 @@ export function useTableParams(defaults: Partial<TableParams> = {}): TableParams
         for (const [key, value] of Object.entries(nextFilters)) {
             if (value !== '') out.set(key, value);
         }
+        // Host-page params ride through untouched — not ours to filter on,
+        // not ours to drop either.
+        for (const key of NON_FILTER) {
+            const carried = sp.get(key);
+            if (carried != null) out.set(key, carried);
+        }
         setSp(out, { replace: true });
-    }, [setSp]);
+    }, [setSp, sp]);
 
     const wire = useMemo<Params>(() => ({
         start: (state.page - 1) * state.size,
