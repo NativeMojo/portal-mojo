@@ -1,0 +1,230 @@
+/* ======================================================== DateTimePicker
+   Layout glue for portal-mojo <DateTimePicker>
+   (packages/portal-mojo/src/ui/date/DateTimePicker.tsx). Ported from the
+   `.mojo-datetime-*` block of web-mojo calendar.css; Bootstrap vars map onto
+   theme.css tokens (--bs-secondary-color→--mute, --bs-border-color→--line,
+   --bs-tertiary-bg→--surface, --bs-primary→--accent, --bs-danger→--bad).
+
+   Deliberately thin: theme/calendar.css already styles the grid,
+   theme/timepicker.css the steppers, theme/combobox.css the zone picker and
+   theme/popover.css the floating shell. What lives here is the two-column
+   popover, the timezone row, the footer, and the trigger.
+
+   NOT imported by theme.css yet — the orchestrator adds
+   `@import "./theme/datetimepicker.css";` at merge. */
+
+.mojo-datetime-picker {
+    position: relative;      /* the clear ✕ is absolutely placed over the trigger */
+    display: inline-block;
+    width: 100%;
+}
+
+/* ── Trigger ──────────────────────────────────────────────────── */
+/* Same house control metrics as the Date/Time triggers so the three line up
+   in one form grid. */
+
+.mojo-datetime-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 10px;
+    background: var(--surface2);
+    color: var(--ink-strong);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mojo-datetime-trigger:hover:not(:disabled):not(.is-readonly) { border-color: var(--mute); }
+/* Focus ring on the WRAPPER so it also shows while the clear ✕ holds focus. */
+.mojo-datetime-picker:focus-within .mojo-datetime-trigger {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.mojo-datetime-trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.mojo-datetime-trigger.is-readonly { cursor: default; }
+.mojo-datetime-trigger.is-invalid { border-color: var(--bad); }
+.mojo-datetime-trigger.has-clear { padding-right: 32px; }
+
+.mojo-datetime-trigger > i {
+    flex: none;
+    color: var(--mute);
+    font-size: 14.5px;
+}
+
+.mojo-datetime-trigger-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-feature-settings: "tnum" on;
+    font-variant-numeric: tabular-nums;
+}
+.mojo-datetime-trigger-text.is-empty { color: var(--mute); }
+
+/* Sibling of the trigger (nesting buttons is invalid HTML), overlaid on its
+   right edge; the wrapper carries the reveal so the pointer sitting on the ✕
+   keeps it visible. */
+.mojo-datetime-trigger-clear {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    color: var(--mute);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+}
+.mojo-datetime-picker:hover .mojo-datetime-trigger-clear,
+.mojo-datetime-picker:focus-within .mojo-datetime-trigger-clear {
+    display: inline-flex;
+}
+.mojo-datetime-trigger-clear:hover { background: var(--line-soft); color: var(--ink-strong); }
+
+/* ── Panel shell ──────────────────────────────────────────────── */
+/* The shared .mojo-popover shell is unpadded/unsized on purpose — the content
+   brings the padding and the floor that keeps calendar + time side by side
+   (~260 calendar + ~230 time + gap, source's numbers). */
+
+.mojo-popover.mojo-datetime-popover .mojo-datetime-popover-inner {
+    padding: 16px 18px;
+    min-width: 520px;
+}
+
+.mojo-datetime-picker-inline {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+}
+.mojo-datetime-picker-inline .mojo-datetime-popover-inner {
+    padding: 16px 18px;
+    min-width: 520px;
+}
+.mojo-datetime-picker-inline.is-invalid { border-color: var(--bad); }
+.mojo-datetime-picker-inline.is-disabled { opacity: 0.55; }
+
+/* ── Two-column row: calendar left, time right ────────────────── */
+
+.mojo-datetime-row {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 18px;
+}
+
+.mojo-datetime-cal-col {
+    flex: 0 0 auto;
+    min-width: 250px;
+}
+
+.mojo-datetime-time-col {
+    flex: 1 1 auto;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+}
+
+.mojo-datetime-time-head {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mute);
+}
+
+/* The embedded TimePicker is a card in its own right — drop its chrome so it
+   reads as this popover's right-hand column, and let it fill the column so
+   the steppers sit against the calendar grid rather than at its top edge. */
+.mojo-datetime-time-col .mojo-time-picker {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+.mojo-datetime-time-col .mojo-time-picker-inline {
+    flex: 1;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+/* ── Full-width timezone row ──────────────────────────────────── */
+/* Below the pair so the IANA combobox can use the whole popover width. */
+
+.mojo-datetime-tz-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.mojo-datetime-tz-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mute);
+}
+
+.mojo-datetime-tz-host { width: 100%; }
+/* The zone picker's own dropdown spans the row (it is locally positioned;
+   .mojo-popover is overflow:visible so it is never clipped). */
+.mojo-datetime-tz-host .combo-pop { min-width: 100%; }
+
+/* ── Footer ───────────────────────────────────────────────────── */
+
+.mojo-datetime-foot {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+/* "Now" is the source's btn-link: quiet until hovered. */
+.mojo-datetime-now {
+    background: transparent;
+    border-color: transparent;
+    color: var(--accent);
+}
+.mojo-datetime-now:hover { background: var(--accent-soft); border-color: transparent; }
+.mojo-datetime-now:disabled:hover { background: transparent; }
+
+/* Narrow viewports: stack the columns rather than overflow the screen. The
+   popover is portal-mounted and sizes to its own content, so this is the only
+   place the layout can break. */
+@media (max-width: 620px) {
+    .mojo-popover.mojo-datetime-popover .mojo-datetime-popover-inner,
+    .mojo-datetime-picker-inline .mojo-datetime-popover-inner {
+        min-width: 0;
+    }
+    .mojo-datetime-row { flex-direction: column; gap: 14px; }
+    .mojo-datetime-cal-col { min-width: 0; }
+    .mojo-datetime-time-col { min-width: 0; }
+}
