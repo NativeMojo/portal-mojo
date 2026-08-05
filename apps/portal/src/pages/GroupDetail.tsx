@@ -1,258 +1,92 @@
-// GroupDetail — the GroupView.js port (web-mojo admin/account/groups/
-// GroupView.js, read in full 2026-08-05): DetailView modal with Overview /
-// Identity / Members / Sub-groups / Audit, kind-aware header, the hierarchy
-// mini-tree with cross-record navigation (parent + sub-group links open a
-// STACKED GroupDetail — native <dialog> stacking), and the disable/
-// reactivate POST_SAVE_ACTIONS with the group reason set (admin | abuse |
-// archived — measured in django-mojo services/disable.py).
+// GroupDetail — the FULL GroupView.js port (web-mojo admin/account/groups/
+// GroupView.js, all 2243 lines read 2026-08-05; parity pass over the earlier
+// subset build): DetailView modal with the complete section map —
+//   Overview · Identity · ─Membership─ Members · Sub-Groups · ─Access─
+//   API Keys · Webhooks(manage_group) · Geofencing(geofence perms) ·
+//   ─Activity─ Events · Audit(view_logs…) · ─Detail─ Metadata
+// — kind-aware header (icon/noun/chips), rail count badges, active toggle
+// gated to manage_groups (the source hid it below that tier), kebab context
+// menu (Invite Member · Add Sub-{Noun} · Configure Auth · View Parent ·
+// Deactivate/Activate), and cross-record navigation (parent/sub-group links
+// open a STACKED GroupDetail — native <dialog> stacking).
 //
-// Fidelity notes vs the source:
-//   · Identity's pencil-prompt-per-row grid becomes ONE FormView autosave
-//     surface — name/kind plus the metadata.* settings rows (dotted names →
-//     the backend's JSONField dict-merge, so editing timezone never clobbers
-//     the rest of metadata).
-//   · Members is the ListView port scoped down: server search (the model's
-//     SEARCH_FIELDS sweep user__username/email/display_name), card rows with
-//     permission chips. Membership WRITES stay off this screen until the
-//     admin program's Members domain lands (#1260) — no phantom flows.
-//   · API Keys / Webhooks sections are deliberately absent: the live
-//     backend's /api/group/apikey 500s (measured), and webhook endpoints
-//     aren't mounted on this deployment. The user-key surface lives on the
-//     API Keys page instead.
-import { useState } from 'react';
+// Deviations from source, all deliberate and documented in-section:
+//   · "Edit {Noun}" (the GroupForms.detailed modal) is not carried — the
+//     Identity section IS that form, as an autosave surface covering every
+//     field it had except avatar (no upload pipeline in portal-mojo yet).
+//   · The header aux meta line ("Last activity 50m ago" under the toggle)
+//     folds into the chips row — DetailView has no right-gutter meta slot;
+//     Overview's KPI carries the same fact.
+//   · Member row click opens the member's UserDetail (no MemberView in the
+//     portal yet — the admin program owns it).
+//   · Deactivate collects the REQUIRED reason (admin | abuse | archived —
+//     django-mojo services/disable.py GROUP_REST_REASONS); web-mojo's bare
+//     confirm predates that backend rule.
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import {
-    Badge, DetailView, Eyebrow, FlatRow, FormView, MetricCard, SecurityItem, Timeline,
-    fmt, formModal, modal, toast,
-    type DetailMenuEntry, type Field, type TimelineItem, type Tone,
+    DetailView, JsonBlock, MetadataSection, formModal, modal, toast,
+    type DetailMenuEntry,
 } from 'portal-mojo/ui';
-import { GroupModel, LogModel, MemberModel, GROUP_KIND_OPTIONS, memberParamsFor, type GroupRow } from '../models';
+import { mojoList, useCan, type Params } from 'portal-mojo/client';
+import { GroupModel, LogModel, MemberModel, type GroupRow } from '../models';
+import {
+    GROUP_ACCESS_MANAGE_PERMS, GROUP_ADMIN_PERMS, GROUP_AUTH_PERMS,
+    GROUP_DESTRUCTIVE_PERMS, GroupApiKeyModel, WebhookSubscriptionModel,
+    iconForKind, kindLabel,
+} from './group-sections/models';
+import { GEOFENCE_VIEW_PERMS } from './group-sections/geofence-data';
+import { groupAuditParams } from './group-sections/shared';
+import { openAuthConfigDialog } from './group-sections/AuthConfigDialog';
+import { OverviewSection } from './group-sections/OverviewSection';
+import { IdentitySection } from './group-sections/IdentitySection';
+import { MembersSection, runInviteMemberFlow } from './group-sections/MembersSection';
+import { SubGroupsSection, runAddSubGroupFlow } from './group-sections/SubGroupsSection';
+import { ApiKeysSection } from './group-sections/ApiKeysSection';
+import { WebhooksSection } from './group-sections/WebhooksSection';
+import { GeofenceSection } from './group-sections/GeofenceSection';
+import { EventsSection } from './group-sections/EventsSection';
+import { AuditSection } from './group-sections/AuditSection';
 
-const LOG_TONE: Record<string, Tone> = {
-    error: 'danger',
-    critical: 'danger',
-    warning: 'warning',
-    info: 'info',
-};
-
-/** Kind → header icon (GroupView.iconForKind port, trimmed to seen kinds). */
-export function iconForKind(kind: string | null | undefined): string {
-    const k = String(kind ?? '').toLowerCase();
-    if (k === 'org' || k === 'organization' || k === 'division' || k === 'department') return 'bi-buildings';
-    if (k === 'region' || k === 'location') return 'bi-geo-alt';
-    if (k === 'project') return 'bi-kanban';
-    if (k === 'merchant' || k === 'partner' || k === 'client' || k === 'reseller') return 'bi-shop';
-    if (k === 'route') return 'bi-signpost-2';
-    if (k === 'inventory') return 'bi-box-seam';
-    if (k === 'qa' || k === 'test' || k === 'testing') return 'bi-clipboard-check';
-    return 'bi-people-fill';
-}
-
-/** Kind → capitalized noun for copy ("Don't hardcode 'group' in copy"). */
-function kindLabel(kind: string | null | undefined): string {
-    if (!kind) return '';
-    const s = String(kind);
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
+export { iconForKind } from './group-sections/models';
 
 /** Open another group's detail as a stacked modal (source _openGroupById). */
 function openGroupById(id: number) {
     void modal.detail((close) => <GroupDetail id={id} onClose={() => close(null)} />);
 }
 
-// ── Sections ──────────────────────────────────────────────────────────
-
-function OverviewSection({ group }: { group: GroupRow }) {
-    const { data: subs } = GroupModel.useList({ parent: group.id, size: 25, sort: 'name' });
-    const { data: logs } = LogModel.useList({ gid: group.id, size: 5, sort: '-id' });
-    const subGroups = subs?.rows ?? [];
-    const items: TimelineItem[] = (logs?.rows ?? []).map((l) => ({
-        tone: LOG_TONE[l.level] ?? 'muted',
-        title: l.kind ?? l.level,
-        body: l.log ? <span className="dim">{fmt.truncate(l.log, 90)}</span> : undefined,
-        meta: fmt.relative(l.created),
-    }));
-    return (
-        <>
-            <div className="grid gap-3 grid-cols-2 xl:grid-cols-4" style={{ marginBottom: 14 }}>
-                <MetricCard label="Members" value={group.member_count} />
-                <MetricCard label="Sub-groups" value={subs?.count ?? '—'} />
-                <MetricCard label="Last activity" value={fmt.relative(group.last_activity, '—')} />
-                <MetricCard label="Created" value={fmt.date(group.created)} />
-            </div>
-
-            <Eyebrow>This group</Eyebrow>
-            <FlatRow label="Name">{group.name}</FlatRow>
-            <FlatRow label="Kind">
-                {group.kind ? <Badge tone="primary">{kindLabel(group.kind)}</Badge> : <span className="dim-italic">Not set</span>}
-            </FlatRow>
-            <FlatRow label="Status"><Badge>{group.is_active ? 'Active' : 'Inactive'}</Badge></FlatRow>
-            <FlatRow label="Parent">
-                {group.parent?.id
-                    ? <a href="#" onClick={(e) => { e.preventDefault(); openGroupById(group.parent!.id); }}>{group.parent.name ?? `#${group.parent.id}`}</a>
-                    : <span className="dim-italic">None — top-level group</span>}
-            </FlatRow>
-
-            <Eyebrow>Hierarchy</Eyebrow>
-            {/* GroupHierarchyTree port — small monospace mini-tree; the └─/├─
-                rules are decorative, the links are the cross-record nav. */}
-            <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, lineHeight: 1.9 }}>
-                {group.parent?.id ? (
-                    <a href="#" className="dim" onClick={(e) => { e.preventDefault(); openGroupById(group.parent!.id); }}>
-                        {group.parent.name ?? `#${group.parent.id}`}
-                    </a>
-                ) : (
-                    <span className="dim">Top-level group</span>
-                )}
-                <div>
-                    └─ <b>{group.name}</b>
-                    <span className="dim"> · {group.member_count} member{group.member_count === 1 ? '' : 's'} · {subGroups.length} sub-group{subGroups.length === 1 ? '' : 's'}</span>
-                </div>
-                {subGroups.length > 0 && (
-                    <div style={{ marginLeft: 22 }}>
-                        {subGroups.map((sg, i) => (
-                            <div key={sg.id}>
-                                {i === subGroups.length - 1 ? '└─' : '├─'}{' '}
-                                <a href="#" onClick={(e) => { e.preventDefault(); openGroupById(sg.id); }}>{sg.name}</a>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <Eyebrow>Recent activity</Eyebrow>
-            <Timeline items={items} emptyText="No recorded activity for this group yet." />
-        </>
-    );
-}
-
 /**
- * Identity — autosave over name/kind + the metadata.* settings the source
- * edited via per-row prompts. Dotted names merge into the JSONField.
+ * count-only peek sharing useModelList's exact cache key ([endpoint,
+ * params]), so a section mounting the same list dedupes with the badge.
+ * `enabled:false` for gated surfaces (a non-manager's webhook badge must
+ * not fire a guaranteed-403 request per open).
  */
-const IDENTITY_FIELDS: Field[] = [
-    { name: 'name', type: 'text', label: 'Name', columns: 6 },
-    {
-        name: 'kind', type: 'combo', label: 'Kind', columns: 6,
-        options: GROUP_KIND_OPTIONS, placeholder: 'Type or pick a kind…',
-        help: 'Drives sidebar context; free-typed kinds are allowed.',
-    },
-    { name: 'metadata.timezone', type: 'timezone', label: 'Timezone', columns: 6 },
-    { name: 'metadata.short_name', type: 'text', label: 'Short name', columns: 6 },
-    { name: 'metadata.domain', type: 'text', label: 'Domain', columns: 6, placeholder: 'example.com' },
-    { name: 'metadata.portal', type: 'text', label: 'Portal URL', columns: 6, placeholder: 'https://…' },
-];
-
-function IdentitySection({ group }: { group: GroupRow }) {
-    return (
-        <>
-            <Eyebrow>Profile &amp; settings</Eyebrow>
-            <p className="dim" style={{ margin: '0 0 12px' }}>Edits save on commit — no save button. Metadata fields merge server-side.</p>
-            <FormView model={GroupModel} row={group} fields={IDENTITY_FIELDS} />
-
-            <Eyebrow>Record</Eyebrow>
-            <FlatRow label="ID"><code>{group.id}</code></FlatRow>
-            <FlatRow label="UUID">
-                {group.uuid ? <code>{group.uuid}</code> : <span className="dim-italic">Not set</span>}
-            </FlatRow>
-            <FlatRow label="Auth domain">
-                {group.auth_domain ? <code>{group.auth_domain}</code> : <span className="dim-italic">Not set</span>}
-            </FlatRow>
-            <FlatRow label="Created"><code>{fmt.datetime(group.created)}</code></FlatRow>
-            <FlatRow label="Modified"><code>{fmt.datetime(group.modified)}</code></FlatRow>
-        </>
-    );
+function useCountPeek(endpoint: string, params: Params, enabled = true): number | null {
+    const q = useQuery({
+        queryKey: [endpoint, params],
+        queryFn: () => mojoList(endpoint, params),
+        enabled,
+    });
+    return q.data?.count ?? null;
 }
-
-function MembersSection({ group }: { group: GroupRow }) {
-    const [search, setSearch] = useState('');
-    const { data } = MemberModel.useList(memberParamsFor(group.id, search));
-    const members = data?.rows ?? [];
-    return (
-        <>
-            <Eyebrow>Members</Eyebrow>
-            <input
-                className="input"
-                type="search"
-                placeholder="Search members…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ marginBottom: 12 }}
-            />
-            {members.length === 0 && <p className="dim-italic">No members{search ? ' match this search' : ' yet'}.</p>}
-            {members.map((m) => {
-                const grants = Object.entries(m.permissions ?? {}).filter(([, v]) => v === true || v === 1).map(([k]) => k);
-                const u = m.user;
-                return (
-                    <SecurityItem
-                        key={m.id}
-                        icon="bi-person-circle"
-                        title={u?.display_name || u?.email || u?.username || `User #${u?.id ?? '?'}`}
-                        desc={`${u?.email ?? ''} · Joined ${fmt.date(m.created)}`}
-                    >
-                        <span className="chip-row">
-                            {grants.map((g) => <Badge key={g} tone="info">{g}</Badge>)}
-                            <Badge tone={m.is_active ? 'success' : 'muted'}>{m.is_active ? 'Active' : 'Disabled'}</Badge>
-                        </span>
-                    </SecurityItem>
-                );
-            })}
-            {(data?.count ?? 0) > members.length && (
-                <p className="dim" style={{ marginTop: 8 }}>{data!.count - members.length} more — refine the search.</p>
-            )}
-        </>
-    );
-}
-
-function SubGroupsSection({ group }: { group: GroupRow }) {
-    const { data } = GroupModel.useList({ parent: group.id, size: 25, sort: 'name' });
-    const subs = data?.rows ?? [];
-    return (
-        <>
-            <Eyebrow>Sub-groups</Eyebrow>
-            {subs.length === 0 && <p className="dim-italic">No sub-groups.</p>}
-            {subs.map((sg) => (
-                <SecurityItem
-                    key={sg.id}
-                    icon={iconForKind(sg.kind)}
-                    title={sg.name}
-                    desc={`${kindLabel(sg.kind) || 'Group'} · ${sg.member_count} member${sg.member_count === 1 ? '' : 's'} · Created ${fmt.date(sg.created)}`}
-                >
-                    <Badge tone={sg.is_active ? 'success' : 'muted'}>{sg.is_active ? 'Active' : 'Inactive'}</Badge>
-                    <button className="btn btn-compact" onClick={() => openGroupById(sg.id)}>Open</button>
-                </SecurityItem>
-            ))}
-        </>
-    );
-}
-
-function AuditSection({ group }: { group: GroupRow }) {
-    const { data } = LogModel.useList({ gid: group.id, size: 15, sort: '-id' });
-    const items: TimelineItem[] = (data?.rows ?? []).map((l) => ({
-        tone: LOG_TONE[l.level] ?? 'muted',
-        title: l.kind ?? l.level,
-        body: (
-            <span className="dim">
-                {l.log ? fmt.truncate(l.log, 110) : ''}
-                {l.username && <> · <code>{l.username}</code></>}
-            </span>
-        ),
-        meta: fmt.relative(l.created),
-    }));
-    return (
-        <>
-            <Eyebrow>Audit</Eyebrow>
-            <Timeline items={items} emptyText="No audit entries recorded for this group yet." />
-        </>
-    );
-}
-
-// ── The assembled detail modal ────────────────────────────────────────
 
 export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }) {
+    const qc = useQueryClient();
     const { data: group, isPending } = GroupModel.useOne(id);
+    const groupSave = GroupModel.useSave();
     const disable = GroupModel.useAction('disable');
     const reactivate = GroupModel.useAction('reactivate');
-    const { data: memberPeek } = MemberModel.useList({ group: id, size: 1 });
+    const { can: canDestroy } = useCan(GROUP_DESTRUCTIVE_PERMS);
+    const { can: canAccessManage } = useCan(GROUP_ACCESS_MANAGE_PERMS);
+    const { can: canViewAudit } = useCan(['view_logs', 'manage_logs', 'security']);
+
+    // Rail count badges (source setBadge wiring, as controlled props). The
+    // member/apikey peeks share Overview's keys and dedupe; the gated ones
+    // hold off until the caller could actually open the section.
+    const memberCount = useCountPeek(MemberModel.endpoint, { group: id, size: 1, is_active: true });
+    const subCount = useCountPeek(GroupModel.endpoint, { parent: id, size: 1 });
+    const keyCount = useCountPeek(GroupApiKeyModel.endpoint, { group: id, size: 1 }, canAccessManage);
+    const hookCount = useCountPeek(WebhookSubscriptionModel.endpoint, { group: id, size: 1 }, canAccessManage);
+    const auditCount = useCountPeek(LogModel.endpoint, { ...groupAuditParams(id), size: 1 }, canViewAudit);
 
     if (isPending || !group) {
         return <div className="detail-loading"><span className="skel skel-block" /></div>;
@@ -287,24 +121,44 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
         }
     };
 
+    // Kebab — the source contextItems (GroupView.js:1361-1373) minus "Edit
+    // {Noun}" (Identity autosave replaces it — see the header comment).
     const MENU: DetailMenuEntry<GroupRow>[] = [
         {
-            label: 'View parent', icon: 'bi-arrow-up-right-square',
+            label: 'Invite Member', icon: 'bi-person-plus',
+            permissions: GROUP_ADMIN_PERMS,
+            onSelect: () => { void runInviteMemberFlow(group, qc); },
+        },
+        {
+            label: `Add Sub-${noun}`, icon: 'bi-diagram-3',
+            permissions: GROUP_ADMIN_PERMS,
+            onSelect: () => { void runAddSubGroupFlow(group, groupSave.mutateAsync); },
+        },
+        {
+            label: 'Configure Auth', icon: 'bi-box-arrow-in-right',
+            permissions: GROUP_AUTH_PERMS,
+            onSelect: () => { openAuthConfigDialog(group); },
+        },
+        {
+            label: 'View Parent', icon: 'bi-arrow-up-right-square',
             when: (g) => Boolean(g?.parent?.id),
             onSelect: () => { if (group.parent?.id) openGroupById(group.parent.id); },
         },
         { divider: true },
         {
-            label: group.is_active ? `Deactivate ${noun.toLowerCase()}` : `Activate ${noun.toLowerCase()}`,
+            label: group.is_active ? `Deactivate ${noun}` : `Activate ${noun}`,
             icon: group.is_active ? 'bi-toggle-off' : 'bi-toggle-on',
             danger: group.is_active,
-            permissions: 'manage_groups',
+            permissions: GROUP_DESTRUCTIVE_PERMS,
             onSelect: () => { void (group.is_active ? deactivate() : activate()); },
         },
     ];
 
-    const memberCount = memberPeek?.count ?? group.member_count;
+    const shownMembers = memberCount ?? group.member_count;
     const timezone = typeof group.metadata?.timezone === 'string' ? group.metadata.timezone : null;
+    const eodRaw = group.metadata?.eod_hour;
+    const eodChip = eodRaw !== undefined && eodRaw !== null && eodRaw !== ''
+        ? `EOD ${String(eodRaw).padStart(2, '0')}:00` : null;
 
     return (
         <DetailView<GroupRow>
@@ -313,26 +167,76 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
             subtitle={group.parent?.name ?? undefined}
             chips={[
                 ...(group.kind ? [{ text: kindLabel(group.kind), tone: 'primary' as const }] : []),
-                ...(memberCount > 0 ? [{ icon: 'bi-people', text: `${memberCount} member${memberCount === 1 ? '' : 's'}`, tone: 'muted' as const }] : []),
+                ...(shownMembers > 0 ? [{ icon: 'bi-people', text: `${shownMembers} member${shownMembers === 1 ? '' : 's'}`, tone: 'muted' as const }] : []),
+                ...(subCount != null && subCount > 0 ? [{ icon: 'bi-diagram-3', text: `${subCount} sub-group${subCount === 1 ? '' : 's'}`, tone: 'muted' as const }] : []),
                 ...(timezone ? [{ text: timezone, tone: 'muted' as const }] : []),
+                ...(eodChip ? [{ text: eodChip, tone: 'muted' as const }] : []),
+                ...(group.metadata?.portal ? [{ icon: 'bi-globe', text: 'Has portal', tone: 'muted' as const }] : []),
             ]}
-            // Off → deactivate action (cancel leaves it on); on → reactivate.
-            active={{ value: group.is_active, onChange: (next) => { void (next ? activate() : deactivate()); } }}
+            // Toggle hidden below manage_groups (source _buildHeaderAux gate).
+            // Off → deactivate flow (cancel leaves it on); on → reactivate.
+            active={canDestroy
+                ? { value: group.is_active, onChange: (next) => { void (next ? activate() : deactivate()); } }
+                : undefined}
             contextMenu={MENU}
             menuContext={group}
-            badges={{ Members: memberCount > 0 ? memberCount : null }}
+            badges={{
+                Members: shownMembers > 0 ? shownMembers : null,
+                SubGroups: subCount != null && subCount > 0 ? subCount : null,
+                ApiKeys: keyCount != null && keyCount > 0 ? keyCount : null,
+                Webhooks: hookCount != null && hookCount > 0 ? hookCount : null,
+                Audit: auditCount != null && auditCount > 0 ? auditCount : null,
+            }}
             onClose={onClose}
             sections={[
-                { key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <OverviewSection group={group} /> },
+                { key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <OverviewSection group={group} openGroup={openGroupById} /> },
                 { key: 'Identity', label: 'Identity', icon: 'bi-card-text', render: () => <IdentitySection group={group} /> },
                 { divider: 'Membership' },
                 { key: 'Members', label: 'Members', icon: 'bi-people', render: () => <MembersSection group={group} /> },
-                { key: 'SubGroups', label: 'Sub-groups', icon: 'bi-diagram-3', render: () => <SubGroupsSection group={group} /> },
+                { key: 'SubGroups', label: 'Sub-Groups', icon: 'bi-diagram-3', render: () => <SubGroupsSection group={group} openGroup={openGroupById} /> },
+                { divider: 'Access' },
+                { key: 'ApiKeys', label: 'API Keys', icon: 'bi-key', render: () => <ApiKeysSection group={group} /> },
+                {
+                    key: 'Webhooks', label: 'Webhooks', icon: 'bi-broadcast',
+                    permissions: 'manage_group',
+                    render: () => <WebhooksSection group={group} />,
+                },
+                {
+                    key: 'Geofencing', label: 'Geofencing', icon: 'bi-globe-americas',
+                    permissions: GEOFENCE_VIEW_PERMS,
+                    render: () => <GeofenceSection group={group} />,
+                },
                 { divider: 'Activity' },
+                { key: 'Events', label: 'Events', icon: 'bi-calendar-event', render: () => <EventsSection group={group} /> },
                 {
                     key: 'Audit', label: 'Audit', icon: 'bi-clock-history',
+                    // Wider than the source's bare 'view_logs': the fetch
+                    // itself needs logit's VIEW_PERMS, so the gate matches
+                    // what can actually load (fail-closed alignment).
                     permissions: ['view_logs', 'manage_logs', 'security'],
                     render: () => <AuditSection group={group} />,
+                },
+                { divider: 'Detail' },
+                {
+                    key: 'Metadata', label: 'Metadata', icon: 'bi-braces',
+                    render: () => (
+                        <>
+                            <MetadataSection
+                                endpoint={GroupModel.endpoint}
+                                id={group.id}
+                                metadata={group.metadata ?? {}}
+                                onSaved={(next) => {
+                                    // Owner write-through + refetch (the primitive is
+                                    // controlled — it never mirrors server state).
+                                    qc.setQueryData(GroupModel.keys.one(group.id), { ...group, metadata: next });
+                                    void GroupModel.invalidate(qc);
+                                }}
+                            />
+                            <div style={{ marginTop: 16 }}>
+                                <JsonBlock value={group.metadata ?? {}} label="Raw metadata (JSON)" collapsible defaultOpen={false} />
+                            </div>
+                        </>
+                    ),
                 },
             ]}
         />
