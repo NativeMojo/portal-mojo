@@ -691,8 +691,6 @@ button { font: inherit; color: inherit; }
 .expand-grid .eyebrow { margin-bottom: 4px; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 
-.auto-refresh-dot { display: inline-flex; align-items: center; color: var(--mute); font-size: 13px; }
-.auto-refresh-dot.is-refreshing i { animation: rot 0.6s ease; }
 @media (prefers-reduced-motion: reduce) {
-    .auto-refresh-dot.is-refreshing i, .expand-toggle i { animation: none; transition: none; }
+    .expand-toggle i { transition: none; }
 }

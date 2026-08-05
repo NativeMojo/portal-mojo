@@ -311,12 +311,16 @@ export function ModelTable<T extends { id: number }>({
         });
     };
 
-    // ── Auto-refresh (WM-034): interval + smart-skip + focus resume ─────
+    // ── Auto-refresh (WM-034): interval + smart-skip predicate ──────────
+    // Interval ONLY — no focus/visibility listeners. Stacking a resume-tick
+    // on top of TanStack's own focus handling double-fetched every time the
+    // window regained focus (report: "multiple fetches per next page" with
+    // devtools open). Ticks simply skip while the tab is hidden/blurred and
+    // the next on-interval tick catches up.
     const refetchRef = useRef(query.refetch);
     refetchRef.current = query.refetch;
     const selectedRef = useRef(selected);
     selectedRef.current = selected;
-    const [refreshPulse, setRefreshPulse] = useState(false);
     const autoRefreshMs = autoRefresh > 0 ? Math.max(5, autoRefresh) * 1000 : 0;
     useEffect(() => {
         if (!autoRefreshMs) return;
@@ -327,27 +331,11 @@ export function ModelTable<T extends { id: number }>({
             // (web-mojo paused for cell edits + open menus).
             || document.querySelector('dialog[open]') != null
             || selectedRef.current.size > 0;
-        let pulseTimer: ReturnType<typeof setTimeout> | null = null;
-        const tick = () => {
+        const interval = setInterval(() => {
             if (skip()) return;
-            void refetchRef.current().then(() => {
-                setRefreshPulse(true);
-                if (pulseTimer) clearTimeout(pulseTimer);
-                pulseTimer = setTimeout(() => setRefreshPulse(false), 600);
-            });
-        };
-        const interval = setInterval(tick, autoRefreshMs);
-        // Regaining focus/visibility fires an immediate guarded refetch.
-        const onFocus = () => tick();
-        const onVisibility = () => { if (!document.hidden) tick(); };
-        window.addEventListener('focus', onFocus);
-        document.addEventListener('visibilitychange', onVisibility);
-        return () => {
-            clearInterval(interval);
-            if (pulseTimer) clearTimeout(pulseTimer);
-            window.removeEventListener('focus', onFocus);
-            document.removeEventListener('visibilitychange', onVisibility);
-        };
+            void refetchRef.current();
+        }, autoRefreshMs);
+        return () => clearInterval(interval);
     }, [autoRefreshMs]);
 
     // ── Export ───────────────────────────────────────────────────────────
@@ -511,15 +499,14 @@ export function ModelTable<T extends { id: number }>({
                             ))}
                         </MenuDropdown>
                     )}
-                    {autoRefreshMs > 0 && (
-                        <span
-                            className={`auto-refresh-dot${refreshPulse ? ' is-refreshing' : ''}`}
-                            title={`Auto-refresh: ${Math.round(autoRefreshMs / 1000)}s`}
-                        >
-                            <i className="bi bi-arrow-repeat" />
-                        </span>
-                    )}
-                    <button className="btn-icon" title="Refresh" onClick={() => query.refetch()}>
+                    {/* One refresh affordance: the button spins on ANY fetch
+                        (manual, page change, auto-tick) — a second identical
+                        indicator icon read as a duplicate control. */}
+                    <button
+                        className="btn-icon"
+                        title={autoRefreshMs > 0 ? `Refresh · auto every ${Math.round(autoRefreshMs / 1000)}s` : 'Refresh'}
+                        onClick={() => query.refetch()}
+                    >
                         <i className={`bi bi-arrow-repeat${query.isFetching ? ' spin' : ''}`} />
                     </button>
                     {onAdd && (

@@ -11,6 +11,9 @@ import App from './App';
 // Wire the auth gate + Authorization/DUID headers into the client and start
 // session upkeep (single-flight refresh watcher) if a session exists.
 mojo.initAuth();
+// Returning from the hosted /auth pages: exchange ?auth_code= for a session
+// (no-op when the param is absent — i.e. every normal load).
+void mojo.handleAuthCodeFromURL();
 // Dev console handle: drive auth flows before the C3 login pages exist —
 // e.g. __mojo.login('ian@mojoverify.com', 'mojo'), __mojo.logout().
 if (import.meta.env.DEV) {
@@ -44,6 +47,12 @@ const queryClient = new QueryClient({
 if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__qc = queryClient;
 }
+
+// Identity changed → every cached answer is suspect. Refetching here is what
+// turns a sign-in into live tables without a manual Retry (and a sign-out
+// into fresh 401 error states instead of stale rows).
+mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
+mojo.onAuth('logout', () => { void queryClient.invalidateQueries(); });
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>

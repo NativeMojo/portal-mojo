@@ -29,6 +29,11 @@ export function usingMockTransport(): boolean {
     return !API_BASE;
 }
 
+/** The configured django-mojo origin ('' under the mock transport). */
+export function apiOrigin(): string {
+    return API_BASE;
+}
+
 /**
  * TanStack Query defaults tuned for the mojo protocol — spread these into the
  * app's QueryClient:
@@ -46,6 +51,11 @@ export function mojoQueryDefaults() {
                 if (error instanceof MojoError && error.status >= 400 && error.status < 500) return false;
                 return failureCount < 1;
             },
+            // No refetch storm on window focus (web-mojo parity: freshness
+            // comes from explicit refresh + the opt-in autoRefresh interval).
+            // With it on, every hop back from devtools/another window refired
+            // EVERY active query — read as phantom duplicate fetches.
+            refetchOnWindowFocus: false,
         },
     };
 }

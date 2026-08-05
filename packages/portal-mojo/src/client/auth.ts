@@ -24,7 +24,7 @@
 //     silently promoted remember-me=false sessions to localStorage
 import { AuthRequiredError } from './errors';
 import { tokenInfo } from './jwt';
-import { installAuthHooks, mojoCall } from './client';
+import { apiOrigin, installAuthHooks, mojoCall } from './client';
 
 const ACCESS_KEY = 'access_token';
 const REFRESH_KEY = 'refresh_token';
@@ -330,7 +330,7 @@ export function handleMagicTokenFromURL(): Promise<AuthUser> | null {
     const token = params.get('token');
     if (!token || !token.startsWith('ml:')) return null;
     params.delete('token');
-    scrubUrl(params);
+    scrubUrl(params, window.location.hash || '');
     return loginWithMagicToken(token);
 }
 
@@ -442,22 +442,93 @@ async function doExchange(code: string): Promise<AuthUser | null> {
  * Read `?auth_code=` from the URL and exchange it. The scrub happens
  * synchronously, BEFORE any await, so a slow exchange cannot leak the code.
  * Resolves null when no code is present or the exchange fails.
+ *
+ * Two landing shapes are handled, because the hosted auth page string-appends
+ * `?auth_code=` to whatever `?redirect=` carried:
+ *   · the real search string (`/?auth_code=x#/route`) — what
+ *     redirectToHostedAuth() produces by sending a hash-free return URL;
+ *   · inside the hash query (`/#/route?auth_code=x`) — a deployment that
+ *     passed a full hash-router URL as the redirect.
+ * After a successful exchange the stashed return route (if any) is restored.
  */
 export function handleAuthCodeFromURL(): Promise<AuthUser | null> {
     if (typeof window === 'undefined' || !window.location) return Promise.resolve(null);
     if (exchangePromise) return exchangePromise;
+
     const params = new URLSearchParams(window.location.search);
-    const code = params.get(AUTH_CODE_PARAM);
-    if (!code) return Promise.resolve(null);
-    params.delete(AUTH_CODE_PARAM);
-    scrubUrl(params);
-    return exchangeAuthCode(code);
+    let code = params.get(AUTH_CODE_PARAM);
+    if (code) {
+        params.delete(AUTH_CODE_PARAM);
+        scrubUrl(params, window.location.hash || '');
+    } else {
+        // Hash-embedded: '#/route?auth_code=x&…'
+        const hash = window.location.hash || '';
+        const qIndex = hash.indexOf('?');
+        if (qIndex === -1) return Promise.resolve(null);
+        const hashParams = new URLSearchParams(hash.slice(qIndex + 1));
+        code = hashParams.get(AUTH_CODE_PARAM);
+        if (!code) return Promise.resolve(null);
+        hashParams.delete(AUTH_CODE_PARAM);
+        const rest = hashParams.toString();
+        scrubUrl(params, hash.slice(0, qIndex) + (rest ? `?${rest}` : ''));
+    }
+
+    return exchangeAuthCode(code).then((user) => {
+        if (user) restoreReturnRoute();
+        return user;
+    });
 }
 
-function scrubUrl(params: URLSearchParams): void {
+function scrubUrl(params: URLSearchParams, hash: string): void {
     const remaining = params.toString();
-    const clean = window.location.pathname + (remaining ? `?${remaining}` : '') + (window.location.hash || '');
+    const clean = window.location.pathname + (remaining ? `?${remaining}` : '') + hash;
     window.history.replaceState({}, '', clean);
+}
+
+// ── Hosted auth pages (the django-mojo /auth "bouncer" pages) ─────────
+// The backend serves themed login/register pages at <origin>/auth. A portal
+// sends the user there with ?redirect=<return url>; after sign-in the page
+// mints a single-use handoff code (60s TTL) and navigates to
+// <redirect>?auth_code=<code>, which handleAuthCodeFromURL() exchanges.
+
+const RETURN_ROUTE_KEY = 'mojo:auth-return-route';
+
+/**
+ * The hosted auth page URL for this deployment, or null under the mock
+ * transport (there is no page to host). `returnTo` defaults to a HASH-FREE
+ * form of the current URL — the auth page appends `?auth_code=` with plain
+ * string concatenation, and a hash in the redirect would swallow it.
+ */
+export function hostedAuthUrl(returnTo?: string): string | null {
+    const origin = apiOrigin();
+    if (!origin || typeof window === 'undefined') return null;
+    const target = returnTo ?? window.location.origin + window.location.pathname + window.location.search;
+    return `${origin}/auth?redirect=${encodeURIComponent(target)}`;
+}
+
+/**
+ * Send the user to the hosted auth page, remembering the current in-app
+ * (hash) route so the post-exchange boot can put them back where they were.
+ */
+export function redirectToHostedAuth(): boolean {
+    const url = hostedAuthUrl();
+    if (!url) return false;
+    try {
+        const route = window.location.hash;
+        if (route && route !== '#/') sessionStorage.setItem(RETURN_ROUTE_KEY, route);
+    } catch { /* storage denied — land on the default route */ }
+    window.location.href = url;
+    return true;
+}
+
+function restoreReturnRoute(): void {
+    try {
+        const route = sessionStorage.getItem(RETURN_ROUTE_KEY);
+        if (route) {
+            sessionStorage.removeItem(RETURN_ROUTE_KEY);
+            window.location.hash = route;
+        }
+    } catch { /* storage denied */ }
 }
 
 // ── Logout + boot wiring ──────────────────────────────────────────────
