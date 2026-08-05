@@ -1,0 +1,92 @@
+/* ============================================================
+   MultiSelectDropdown — the static-options checkbox dropdown
+   (packages/portal-mojo/src/ui/MultiSelectDropdown.tsx).
+   Tokens only — light AND dark ride the theme.css variables.
+   Reuses house primitives: .tbl-check, .btn/.btn-primary/.btn-compact,
+   .field-label / .field-help / .field-error.
+   The menu mounts in <Popover>, so .mojo-popover already brings the
+   surface, border, radius and shadow — these rules only fill it.
+
+   NOT imported by theme.css yet — the orchestrator adds
+   `@import "./theme/multiselect-dropdown.css";` at merge time.
+   ============================================================ */
+.multiselect-dropdown { max-width: 420px; }
+
+/* ── The trigger: an .input-shaped button with a summary + chevron ── */
+.multiselect-trigger {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; box-sizing: border-box;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 10px; font-size: 13.5px; font-weight: 550;
+    text-align: left; cursor: pointer;
+}
+.multiselect-trigger:hover { border-color: var(--mute); }
+.multiselect-trigger:focus-visible {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Open state reads like a focused field so the trigger and its menu are
+   visibly one surface. */
+.multiselect-trigger.is-open {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.multiselect-trigger.is-open i { transform: rotate(180deg); }
+.multiselect-trigger:disabled { opacity: 0.55; cursor: default; }
+.multiselect-trigger:disabled:hover { border-color: var(--line); }
+.multiselect-trigger i {
+    flex: none; font-size: 11px; color: var(--mute);
+    transition: transform 0.15s ease;
+}
+.multiselect-trigger-text {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--ink-strong);
+}
+/* Nothing picked — the summary is the placeholder, muted (source parity). */
+.multiselect-trigger-text.is-placeholder { color: var(--mute); font-weight: 500; }
+
+.multiselect-dropdown.is-disabled .field-label { opacity: 0.7; }
+
+/* ── The menu (inside .mojo-popover) ── */
+.multiselect-menu {
+    /* Clip the list/footer to the shell's corners; the shell is unpadded. */
+    border-radius: inherit; overflow: hidden;
+}
+.multiselect-list { overflow-y: auto; }
+
+.multiselect-item {
+    display: flex; align-items: center; gap: 10px;
+    box-sizing: border-box; min-height: 38px; padding: 4px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13.5px; color: var(--ink);
+    cursor: pointer; user-select: none;
+}
+.multiselect-item:last-child { border-bottom: none; }
+.multiselect-item:hover { background: var(--surface2); }
+.multiselect-item:focus-visible {
+    outline: none; background: var(--surface2);
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+.multiselect-item.is-selected { background: var(--accent-soft); }
+.multiselect-item.is-selected .multiselect-item-label { color: var(--ink-strong); font-weight: 600; }
+.multiselect-item.is-disabled { opacity: 0.55; cursor: default; }
+.multiselect-item.is-disabled:hover { background: none; }
+.multiselect-item.is-selected.is-disabled:hover { background: var(--accent-soft); }
+/* The checkbox is display-only — every click must land on the row, so the
+   box can never diverge from the controlled value. */
+.multiselect-item .tbl-check { pointer-events: none; }
+.multiselect-item-label {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Done — closes the menu; ticking rows never does (the whole point). */
+.multiselect-footer { border-top: 1px solid var(--line); padding: 8px; }
+.multiselect-done { width: 100%; justify-content: center; }
+
+.multiselect-empty {
+    padding: 18px 16px; text-align: center;
+    color: var(--mute); font-size: 12.5px;
+}
