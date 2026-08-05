@@ -1,0 +1,209 @@
+/* Charts completion (C2, board #1258) — stats/data dialogs, custom-range
+   dialog, MiniChart sparkline, PieChart, KPI tiles, CircularProgress, and
+   the MetricsMiniWidget card. Tokens only: every color rides the theme
+   variables, so light AND dark come from the same rules (web-mojo needed
+   hand-tuned dark overrides for its hardcoded rgba tints — the *-soft
+   tokens replace them). */
+
+/* ── Chart dialogs (stats summary / view data) ─────────────────────── */
+.chart-dialog-sub { color: var(--mute); font-size: 12.5px; margin-bottom: 10px; }
+.chart-dialog-scroll { overflow: auto; max-height: 46vh; border: 1px solid var(--line); border-radius: 9px; }
+.chart-dialog-scroll-tall { max-height: 60vh; }
+.chart-stats-table, .chart-data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.chart-stats-table th, .chart-data-table th {
+    position: sticky; top: 0; z-index: 1;
+    background: var(--surface2); color: var(--mute);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; font-weight: 600;
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+.chart-stats-table td, .chart-data-table td {
+    padding: 7px 12px; border-bottom: 1px solid var(--line-soft);
+    color: var(--ink); white-space: nowrap;
+}
+.chart-stats-table tbody tr:last-child td, .chart-data-table tbody tr:last-child td { border-bottom: none; }
+.chart-data-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface2) 45%, transparent); }
+.chart-stats-table .num, .chart-data-table .num {
+    text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-strong);
+}
+.chart-stats-table th.num, .chart-data-table th.num { color: var(--mute); }
+
+/* ── Custom-range dialog + active-range chip ───────────────────────── */
+.chart-range-dialog .mojo-daterange-inline { margin-top: 4px; }
+.chart-range-chip {
+    margin-left: 10px; vertical-align: middle;
+    display: inline-flex; align-items: center;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 999px; padding: 2px 9px;
+}
+
+/* ── MiniChart sparkline ───────────────────────────────────────────── */
+.minichart { position: relative; width: 100%; }
+.minichart-svg { display: block; overflow: visible; }
+.minichart-crosshair { stroke: var(--mute); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.minichart-tip {
+    position: absolute; top: -6px; transform: translate(-50%, -100%);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: var(--shadow-pop); padding: 5px 9px; pointer-events: none;
+    font-size: 12px; color: var(--ink-strong); white-space: nowrap; z-index: 5;
+    font-variant-numeric: tabular-nums;
+}
+.minichart-tip-label { font-size: 10.5px; color: var(--mute); font-family: ui-monospace, Menlo, monospace; }
+/* pathLength=1 normalizes the dash math — no JS measuring. */
+.minichart-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: minichart-draw 300ms ease-out forwards; }
+@keyframes minichart-draw { to { stroke-dashoffset: 0; } }
+.minichart-grow { transform-origin: bottom; transform-box: fill-box; transform: scaleY(0); animation: minichart-grow 300ms ease-out forwards; }
+@keyframes minichart-grow { to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+    .minichart-draw, .minichart-grow { animation: none; stroke-dashoffset: 0; transform: none; }
+}
+
+/* ── PieChart ──────────────────────────────────────────────────────── */
+.pie-chart { display: flex; align-items: center; gap: 16px; }
+.pie-chart.pie-layout-bottom { flex-direction: column; }
+.pie-svg-area { position: relative; flex: none; }
+.pie-svg { display: block; }
+.pie-segment { cursor: pointer; transition: opacity 120ms ease; }
+.pie-segment-hot { opacity: 0.82; }
+.pie-empty {
+    height: 100%; display: flex; align-items: center; justify-content: center;
+    color: var(--mute); font-size: 13px;
+}
+.pie-edge-label { font-size: 10px; fill: var(--ink); }
+.pie-center-label { font-size: 20px; font-weight: 550; fill: var(--ink-strong); }
+.pie-center-sub { font-size: 9px; letter-spacing: 0.12em; fill: var(--mute); }
+.pie-tip {
+    position: absolute; z-index: 6; pointer-events: none;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: var(--shadow-pop); padding: 6px 10px; font-size: 12.5px;
+    color: var(--ink); white-space: nowrap;
+}
+.pie-tip strong { display: block; color: var(--ink-strong); font-size: 12px; }
+.pie-tip span { font-variant-numeric: tabular-nums; }
+.pie-legend { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--mute); min-width: 0; }
+.pie-layout-bottom .pie-legend { flex-direction: row; flex-wrap: wrap; gap: 6px 14px; }
+.pie-legend-item { display: flex; align-items: center; gap: 6px; border-radius: 6px; padding: 1px 4px; }
+.pie-legend-hot { background: var(--surface2); color: var(--ink-strong); }
+.pie-legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.pie-legend-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pie-legend-value { font-variant-numeric: tabular-nums; opacity: 0.85; }
+
+/* ── KPI strip + tile ──────────────────────────────────────────────── */
+.kpi-strip { width: 100%; }
+.kpi-strip-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1100px) { .kpi-strip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .kpi-strip-grid { grid-template-columns: 1fr; } }
+.kpi-strip-error {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    background: var(--bad-soft); color: var(--bad);
+    border-radius: 9px; padding: 8px 12px; font-size: 13px;
+}
+.kpi-tile {
+    display: grid; grid-template-rows: auto auto auto 1fr;
+    text-align: left; width: 100%; min-height: 128px;
+    padding: 14px 14px 8px; overflow: hidden; position: relative;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: var(--shadow); color: var(--ink);
+    transition: border-color 120ms ease, transform 120ms ease;
+}
+button.kpi-tile { cursor: pointer; font: inherit; }
+.kpi-tile-clickable:hover { border-color: var(--mute); transform: translateY(-1px); }
+/* severity stripe — the 3px left bar */
+.kpi-tile-critical { box-shadow: inset 3px 0 0 var(--bad), var(--shadow); }
+.kpi-tile-high     { box-shadow: inset 3px 0 0 var(--warn), var(--shadow); }
+.kpi-tile-warn     { box-shadow: inset 3px 0 0 var(--warn), var(--shadow); }
+.kpi-tile-info     { box-shadow: inset 3px 0 0 var(--info), var(--shadow); }
+.kpi-tile-good     { box-shadow: inset 3px 0 0 var(--ok), var(--shadow); }
+.kpi-tile-label {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--mute);
+}
+.kpi-tile-value {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 28px; font-weight: 500; line-height: 1.05;
+    letter-spacing: -0.01em; margin-top: 6px; color: var(--ink-strong);
+}
+.kpi-tile-delta {
+    display: inline-flex; align-items: center; width: fit-content;
+    margin-top: 6px; padding: 2px 9px; border-radius: 999px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600;
+    line-height: 1.4; letter-spacing: 0.01em;
+}
+.kpi-tile-delta-neutral { color: var(--mute); background: var(--surface2); }
+.kpi-tile-delta-flat { color: var(--mute); background: var(--surface2); }
+.kpi-tile-delta-bad { color: var(--bad); background: var(--bad-soft); }
+.kpi-tile-delta-good { color: var(--ok); background: var(--ok-soft); }
+.kpi-tile-hint { font-size: 11.5px; color: var(--mute); margin-top: 4px; }
+.kpi-tile-spark { margin-top: auto; display: block; min-height: 0; }
+
+/* ── CircularProgress ──────────────────────────────────────────────── */
+.cprog { position: relative; display: inline-flex; flex: none; padding: 0; border: 0; background: none; }
+button.cprog { cursor: pointer; font: inherit; }
+.cprog-svg { display: block; }
+.cprog-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; pointer-events: none; color: var(--ink-strong);
+}
+.cprog-value { font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.cprog-label {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute);
+}
+.cprog-center i { color: var(--mute); }
+.cprog-xs .cprog-value { font-size: 10px; } .cprog-xs .cprog-label { display: none; } .cprog-xs .cprog-center i { font-size: 14px; }
+.cprog-sm .cprog-value { font-size: 13px; } .cprog-sm .cprog-label { font-size: 8px; } .cprog-sm .cprog-center i { font-size: 18px; }
+.cprog-md .cprog-value { font-size: 17px; } .cprog-md .cprog-center i { font-size: 24px; }
+.cprog-lg .cprog-value { font-size: 24px; } .cprog-lg .cprog-label { font-size: 10px; } .cprog-lg .cprog-center i { font-size: 34px; }
+.cprog-xl .cprog-value { font-size: 34px; } .cprog-xl .cprog-label { font-size: 11px; } .cprog-xl .cprog-center i { font-size: 48px; }
+
+/* ── MetricsMiniWidget card ────────────────────────────────────────── */
+.mmw { position: relative; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+.mmw-actions {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    display: flex; align-items: center; gap: 1px;
+    opacity: 0.55; transition: opacity 120ms ease;
+}
+.mmw:hover .mmw-actions, .mmw:focus-within .mmw-actions { opacity: 1; }
+.mmw-head { display: flex; align-items: flex-start; gap: 10px; padding-right: 84px; }
+.mmw-id { flex: 1; min-width: 0; }
+.mmw-title { font-size: 13.5px; font-weight: 650; color: var(--ink-strong); }
+.mmw-subtitle { font-size: 12.5px; color: var(--mute); margin-top: 1px; }
+.mmw-subtitle b, .mmw-subtitle strong { color: var(--ink-strong); font-variant-numeric: tabular-nums; }
+.mmw-trend {
+    display: inline-flex; align-items: center; gap: 3px; margin-top: 4px;
+    font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums;
+    border-radius: 999px; padding: 1.5px 8px;
+}
+.mmw-trend-up { color: var(--ok); background: var(--ok-soft); }
+.mmw-trend-down { color: var(--bad); background: var(--bad-soft); }
+.mmw-icon { font-size: 20px; color: var(--mute); flex: none; margin-top: 2px; }
+.mmw-search { position: relative; }
+.mmw-chart { position: relative; display: flex; align-items: center; }
+.mmw-skel { display: block; width: 100%; border-radius: 8px; }
+.mmw-empty { width: 100%; text-align: center; color: var(--mute); font-size: 12.5px; padding: 12px 0; }
+.mmw-error {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: var(--bad-soft); color: var(--bad);
+    border-radius: 8px; padding: 8px 10px; font-size: 12.5px;
+}
+/* Token-tinted variants (replace web-mojo's raw background/textColor). */
+.mmw-tone-accent { background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface)); }
+.mmw-tone-ok { background: color-mix(in srgb, var(--ok-soft) 60%, var(--surface)); }
+.mmw-tone-warn { background: color-mix(in srgb, var(--warn-soft) 60%, var(--surface)); }
+.mmw-tone-bad { background: color-mix(in srgb, var(--bad-soft) 60%, var(--surface)); }
+.mmw-tone-info { background: color-mix(in srgb, var(--info-soft) 60%, var(--surface)); }
+.mmw-tone-accent .mmw-icon { color: var(--accent); }
+.mmw-tone-ok .mmw-icon { color: var(--ok); }
+.mmw-tone-warn .mmw-icon { color: var(--warn); }
+.mmw-tone-bad .mmw-icon { color: var(--bad); }
+.mmw-tone-info .mmw-icon { color: var(--info); }
+
+/* Settings dialog fields */
+.mmw-settings { display: flex; flex-direction: column; gap: 12px; }
