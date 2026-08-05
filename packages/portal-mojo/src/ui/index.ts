@@ -10,6 +10,7 @@ export * from './menu-registry';
 export * from './SidebarNav';
 export * from './CollectionMultiSelect';
 export * from './ComboBox';
+export * from './detail';
 export * from './modal';
 export * from './Popover';
 export * from './TagInput';

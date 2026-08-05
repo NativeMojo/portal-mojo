@@ -17,6 +17,7 @@ import { DrawerDemo } from './demos-drawer';
 import { ComboBoxDemo } from './demos-combobox';
 import { FormatDemo } from './demos-format';
 import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
+import { DetailPrimitivesDemo } from './demos-detail-primitives';
 
 interface DemoSection {
     key: string;
@@ -86,6 +87,11 @@ const SECTIONS: DemoSection[] = [
         key: 'detail', title: 'DetailView', icon: 'bi-person-badge',
         blurb: 'The UserView house style: header chips + active switch over a section rail.',
         render: () => <DetailViewDemo />,
+    },
+    {
+        key: 'detail-primitives', title: 'Detail primitives', icon: 'bi-layout-text-window-reverse',
+        blurb: 'StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — ReactNode slots, both trace dialects, failure unmissable.',
+        render: () => <DetailPrimitivesDemo />,
     },
     {
         key: 'charts', title: 'Charts', icon: 'bi-graph-up',

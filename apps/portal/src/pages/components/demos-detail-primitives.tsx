@@ -8,11 +8,10 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { mojoCall, useModel, type User } from 'portal-mojo/client';
 import { fmt, toast } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui
 import {
     FlowStrip, KnownFieldsCard, MetadataSection, StackTraceView, StatusPanel, Timeline,
     type FlowStep, type KnownField, type TimelineItem,
-} from '../../../../../packages/portal-mojo/src/ui/detail';
+} from 'portal-mojo/ui';
 
 const NOW = Math.floor(Date.now() / 1000);
 
