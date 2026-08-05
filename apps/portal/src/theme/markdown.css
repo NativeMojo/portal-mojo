@@ -1,0 +1,192 @@
+/* ============================================================
+   Rendered markdown (MarkdownView) — the `.md` wrapper.
+
+   Both render paths land here: sanitized server HTML and the client
+   fallback's React elements produce the SAME element set, so one stylesheet
+   dresses both and swapping between them cannot shift the layout.
+
+   Everything is a token, so light and dark are the same rules. Tailwind's
+   preflight strips heading sizes, list markers, table borders and quote
+   indents — this file puts them back, scoped so nothing leaks into the app.
+
+   Not imported here: the orchestrator adds `@import "./theme/markdown.css";`
+   to theme.css at merge.
+   ============================================================ */
+
+.md {
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.62;
+    overflow-wrap: break-word;
+}
+/* An empty document must not take vertical space. */
+.md:empty { display: none; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+
+/* Painted from the client fallback while the server render is in flight.
+   The delay means a fast answer never flickers; only a genuinely slow one
+   dims, and even then the CONTENT never moves. */
+.md-pending { animation: md-settle 0.9s ease-out 0.25s backwards; }
+@keyframes md-settle {
+    from { opacity: 0.55; }
+    to   { opacity: 1; }
+}
+
+/* ── Headings ─────────────────────────────────────────────── */
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
+    color: var(--ink-strong);
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.012em;
+    margin: 20px 0 8px;
+}
+.md h1 { font-size: 21px; }
+.md h2 { font-size: 18px; }
+.md h3 { font-size: 16px; }
+.md h4 { font-size: 14.5px; }
+.md h5, .md h6 { font-size: 13.5px; }
+.md h6 { color: var(--mute); }
+.md h1, .md h2 { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+
+/* ── Text ─────────────────────────────────────────────────── */
+.md p { margin: 0 0 10px; }
+.md strong { font-weight: 700; color: var(--ink-strong); }
+.md em { font-style: italic; }
+.md del { color: var(--mute); text-decoration: line-through; }
+.md mark { background: var(--warn-soft); color: var(--ink-strong); padding: 0 3px; border-radius: 3px; }
+.md sup, .md sub { font-size: 0.75em; line-height: 0; }
+.md sup { vertical-align: super; }
+.md sub { vertical-align: sub; }
+.md hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+/* A link the sanitizer stripped renders as plain text — it must not keep
+   looking clickable. */
+.md a:not([href]) { color: inherit; cursor: default; }
+
+.md img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    margin: 6px 0;
+}
+
+/* ── Lists ────────────────────────────────────────────────── */
+.md ul, .md ol { margin: 0 0 10px; padding-left: 22px; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md ul ul { list-style: circle; }
+.md ul ul ul { list-style: square; }
+.md li { margin: 2px 0; }
+.md li > ul, .md li > ol { margin: 2px 0 2px; }
+.md li::marker { color: var(--mute); }
+
+/* Task lists: rendered markdown is never interactive. */
+.md li:has(> input[type="checkbox"]) { list-style: none; margin-left: -18px; }
+.md input[type="checkbox"] {
+    appearance: none;
+    width: 13px; height: 13px;
+    vertical-align: -1px;
+    margin-right: 6px;
+    border: 1.5px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface2);
+    cursor: default;
+}
+.md input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+    /* The tick is drawn, not fetched — no external asset, both themes. */
+    background-image: linear-gradient(45deg, transparent 42%, #fff 42%, #fff 56%, transparent 56%),
+                      linear-gradient(-45deg, transparent 58%, #fff 58%, #fff 72%, transparent 72%);
+    background-size: 100% 100%;
+}
+
+/* ── Code ─────────────────────────────────────────────────── */
+.md code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.87em;
+    background: var(--surface2);
+    border: 1px solid var(--line-soft);
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: var(--ink-strong);
+}
+.md pre {
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0 0 12px;
+    overflow-x: auto;
+    line-height: 1.5;
+}
+.md pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12.5px;
+    color: var(--ink);
+    white-space: pre;
+}
+
+/* ── Quotes ───────────────────────────────────────────────── */
+.md blockquote {
+    margin: 0 0 12px;
+    padding: 2px 0 2px 14px;
+    border-left: 3px solid var(--accent-soft);
+    color: var(--mute);
+}
+.md blockquote > :last-child { margin-bottom: 0; }
+
+/* ── Tables ───────────────────────────────────────────────── */
+/* Wide tables scroll inside the block instead of stretching the page. */
+.md table {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 0 0 12px;
+}
+.md th, .md td {
+    border: 1px solid var(--line);
+    padding: 6px 11px;
+    text-align: left;
+    vertical-align: top;
+}
+.md th {
+    background: var(--surface2);
+    color: var(--mute);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.md tbody tr:nth-child(even) td { background: var(--line-soft); }
+
+/* ── Playground only ──────────────────────────────────────── */
+/* Source | result, side by side in the Components demo; stacks when narrow. */
+.md-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+.md-split > .md {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface2);
+    padding: 14px 16px;
+    min-height: 420px;
+    overflow: auto;
+}
+@media (max-width: 1100px) {
+    .md-split { grid-template-columns: minmax(0, 1fr); }
+}

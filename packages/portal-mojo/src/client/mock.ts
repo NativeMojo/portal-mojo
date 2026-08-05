@@ -13,6 +13,7 @@
 //     field so they are drivable end-to-end in dev (a real server never does)
 // Data endpoints stay open (no auth required) until the portal grows login
 // pages (Chunk C3) — then they 401 without a bearer, like the real backend.
+import { markdownToHtml } from './markdown-parse';
 import type { Params, User } from './types';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
@@ -670,6 +671,19 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return listRows(db.groups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
     }
     if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
+    if (path === '/api/docit/render') {
+        // Backend parity — mojo/apps/docit/rest/render.py: POST only, the
+        // `markdown` field is required, 400KB cap, and the handler returns a
+        // bare dict so the framework wraps it as {status, data:{html}}.
+        // markdownToHtml is the SAME parser the client fallback renders from,
+        // so mock and live differ in fidelity, not in shape — and its output
+        // goes through the sanitizer on the way in like any server HTML.
+        if (opts.method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const markdown = opts.body?.markdown;
+        if (typeof markdown !== 'string' || !markdown) return { status: false, error: 'markdown field is required', error_code: 400 };
+        if (new TextEncoder().encode(markdown).length > 400_000) return { status: false, error: 'markdown input too large', error_code: 413 };
+        return { status: true, data: { html: markdownToHtml(markdown) } };
+    }
     const one = path.match(/^\/api\/user\/(\d+)$/);
     if (one) {
         const id = Number(one[1]);
