@@ -3,8 +3,7 @@
 // disabled. Each panel prints the CSV string the component emits, because THAT
 // string (not the array) is what django-mojo stores and re-splits.
 import { useState } from 'react';
-// MERGE-WIRE: portal-mojo/ui
-import { TagInput } from '../../../../../packages/portal-mojo/src/ui/TagInput';
+import { TagInput } from 'portal-mojo/ui';
 
 /** The parent side of the contract: hold the CSV, keep the array if handy. */
 function useTagState(initial: string, separator = ',') {

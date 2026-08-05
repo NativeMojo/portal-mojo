@@ -10,6 +10,7 @@ export * from './menu-registry';
 export * from './SidebarNav';
 export * from './modal';
 export * from './Popover';
+export * from './TagInput';
 export * from './toast';
 export * from './ui';
 export * from './FormFields';

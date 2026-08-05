@@ -12,6 +12,7 @@ import { ChartsDemo } from './demos-charts';
 import { FormsDemo, ModalsDemo, ToastsDemo, DetailViewDemo } from './demos-feedback';
 import { DisplayDemo, SearchDemo, SkeletonDemo, AccessDemo } from './demos-display';
 import { PopoverDemo } from './demos-popover';
+import { TagInputDemo } from './demos-taginput';
 
 interface DemoSection {
     key: string;
@@ -41,6 +42,11 @@ const SECTIONS: DemoSection[] = [
         key: 'forms', title: 'SchemaForm', icon: 'bi-ui-checks',
         blurb: 'The field-definition language: fields are data, inputs are controlled, selects can never show what state doesn\'t hold.',
         render: () => <FormsDemo />,
+    },
+    {
+        key: 'taginput', title: 'TagInput', icon: 'bi-tags',
+        blurb: 'Chip entry with the full keyboard flow — Enter/Tab/comma commit, roving chip focus. Emits the CSV string django-mojo stores.',
+        render: () => <TagInputDemo />,
     },
     {
         key: 'popover', title: 'Popover', icon: 'bi-front',

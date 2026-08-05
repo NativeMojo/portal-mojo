@@ -1,6 +1,7 @@
 @import "tailwindcss";
 /* Per-component styles from the parallel migration (wave merges append here). */
 @import "./theme/popover.css";
+@import "./theme/taginput.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";
