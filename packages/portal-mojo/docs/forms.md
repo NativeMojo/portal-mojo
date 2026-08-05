@@ -22,21 +22,28 @@ Two surfaces over ONE field language:
 ```ts
 interface Field {
     name: string;              // wire key; DOTTED names read/write nested dicts
-    type: 'text' | 'email' | 'tel' | 'select' | 'switch' | 'textarea';
+    type: FieldType;           // 6 builtins + every registry type (below) + (string & {})
     label: string;
     placeholder?: string;
     required?: boolean;        // SchemaForm submit validation
     help?: string;
     columns?: 6 | 12;          // grid halves / full row
-    options?: { value: string; label: string }[];   // select
+    options?: FieldOption[];   // select/multiselect/combo: {value, label, description?, disabled?}
     showWhen?: ShowWhen;       // conditional visibility (both surfaces)
     schema?: ZodType;          // per-field zod validation (FormView commits)
+    disabled?: boolean;        // registry types
+    // …plus the registry-type props (precision, outputFormat, presets,
+    // model/endpoint, timezone, maxTags, …) — see "Field-type registry".
 }
-type FormData    = Record<string, string | boolean>;         // SchemaForm values
-type FieldValue  = string | number | boolean | null;
+type FormData    = Record<string, FieldValue>;               // SchemaForm values
+type FieldValue  = string | number | boolean | null | Array<string | number>;
 type FieldValues = Record<string, FieldValue>;               // FormView values
 type ShowWhen    = { field; value; negate? } | ((values: FieldValues) => boolean);
 ```
+
+**Builtins** — rendered inline by both surfaces, byte-for-byte the pre-B4
+behavior: `text` `email` `tel` `select` `switch` `textarea`. Every other
+type resolves through the **field-type registry** (below).
 
 `ModelForm = { title, fields, submitText? }` — the shape `defineModel`
 carries (`UserModel.forms.create`) and `formModal` renders.
@@ -152,6 +159,122 @@ registerFormTabs('user.permissions', [
 The machine spans ALL tabs' fields — a batch may carry fields from several
 tabs; switching tabs loses nothing.
 
+## Field-type registry (board #1278)
+
+```ts
+import {
+    registerFieldType, resolveFieldRenderer, registeredFieldTypes,
+    warnUnknownFieldType,                       // the shared unknown-type warn
+    fieldToWire, wireToField,                   // the epoch boundary (field-wire)
+    emptyFieldValue, fieldPrecision,
+    type RegistryFieldProps, type FieldTypeRenderer,
+} from 'portal-mojo/ui';
+```
+
+`ui/field-registry` maps every non-builtin `Field.type` string to a renderer
+that binds the Field def + the form's controlled value/commit pipeline to
+the real component — web-mojo's `INPUT_TYPES`/`createInput` +
+FormBuilder's field-type switch, carried as a registry (also the FormPlugins
+replacement: apps extend with `registerFieldType`). **Both surfaces consult
+it**: SchemaForm and FormView render any registered type from the same
+schema, with the same commit semantics (every registry component fires on
+COMMIT, so each change is one autosave gesture).
+
+### The registry API
+
+```ts
+// Renderers are function components — they may hold hooks/state.
+type FieldTypeRenderer = ComponentType<RegistryFieldProps>;
+interface RegistryFieldProps {
+    field: Field;
+    value: FieldValue;              // form-state value (WIRE-shaped — below)
+    invalid?: boolean;              // paint the error border (text is the surface's)
+    disabled?: boolean;
+    commit: (value: FieldValue) => void;   // THE change pipeline, once per commit
+}
+registerFieldType('rating', RatingField);       // add / replace (HMR-safe)
+registerFieldType(['a', 'b'], SharedField);     // aliases share one renderer
+resolveFieldRenderer('rating');                 // renderer | null
+registeredFieldTypes();                         // names, registration order
+```
+
+Names match **exactly** (no case folding): a typo'd type must fall through
+to the loud fallback, not silently half-match.
+
+**Unknown-type rule** (house rule 4): a type with no renderer renders a
+**text input** and `console.warn`s ONCE per (field, type) — never "render
+nothing". Both surfaces enforce it (`warnUnknownFieldType` carries the
+shared warn-once set).
+
+### The value-shape table
+
+**State holds the WIRE shape.** The registry renderer converts at its own
+edge — render through `wireToField(field, value)`, commit through
+`fieldToWire(field, value)` — so SchemaForm's submit payload and FormView's
+autosave batches carry wire-ready values without either surface knowing
+dates exist. This is the ONE conversion point.
+
+| `Field.type` (aliases) | Component | Control (what the picker holds) | State = wire (what the save body carries) | Empty |
+|---|---|---|---|---|
+| `tag`, `tags` | TagInput | chip list | **CSV string** `'a,b'` (django-mojo models split it) | `''` |
+| `multiselect` | MultiSelectDropdown | checked options | **array** of option values | `[]` |
+| `collection` | CollectionSelect | one picked row | the row's **id** (`string \| number`); `null` clears | `null` |
+| `collectionmultiselect`, `collection-multiselect` | CollectionMultiSelect | checked rows | **array of ids** | `[]` |
+| `combo`, `combobox`, `autocomplete` | ComboBox | committed option/text | the committed value (`string \| number`; free text iff `allowCustom`) | `''` |
+| `datepicker`, `monthpicker`, `yearpicker` | DatePicker | canonical `YYYY-MM-DD` / `YYYY-MM` / `YYYY` | **epoch seconds** at UTC midnight (number); `outputFormat:'date'` → the canonical string | `null` |
+| `daterange`, `monthrange`, `yearrange` | DateRangePicker | canonical `[start, end]` pair | **`[startEpoch, endEpoch]`** (numbers); `outputFormat:'date'` → canonical pair | `null` |
+| `timepicker` | TimePicker (+ the REAL TimezoneSelect in its slot) | HH:MM (+ zone) | serialized **string** — `'iso'` (default) `'14:30-07:00'`, `'iana'` `'14:30 America/…'`; times are never epochs | `''` |
+| `datetimepicker` | DateTimePicker (#1273 — seam until merged) | `'YYYY-MM-DD HH:MM'` local | **epoch seconds** (exact instant); `outputFormat:'date'` → the string | `null` |
+| `timezone` | TimezoneSelect | IANA zone | the IANA **string** | `''` (picker displays the local zone; `resolveTimezone` computes that effective default when a form must post it) |
+
+Alias precision mapping (web-mojo `PRECISION_ALIASES`): `monthpicker`/
+`monthrange` → `'month'`, `yearpicker`/`yearrange` → `'year'`; an
+**explicit `Field.precision` wins** over the alias (`createInput` parity).
+
+Registry-type Field props (all optional, additive): `precision`,
+`outputFormat`, `displayFormat`, `min`/`max`, `presets`, `months`,
+`separator` (tag CSV joiner / daterange display), `timeFormat`, `step`,
+`timezone`/`timezones`, `model`/`endpoint`, `labelField`/`valueField`,
+`maxItems`, `emptyFetch`, `debounceMs`, `requiresActiveGroup`,
+`defaultParams`, `enableSearch`, `maxTags`, `allowDuplicates`,
+`allowCustom`, `showDescription`, `maxSuggestions`, `disabled`. Component
+knobs a Field doesn't carry (locale, firstDay, disabledDates, …) are
+reachable only by using the component directly.
+
+### The epoch-seconds save boundary (`ui/field-wire`)
+
+The measured django-mojo contract (serializer.py:380-389 +
+rest.py:1888-1892 / `dates.parse_datetime`): **DateTimeField serializes OUT
+as epoch seconds** and the save path parses epochs back in; DateField
+serializes OUT as `'YYYY-MM-DD'` but its save path ALSO accepts epochs
+(naive/UTC-parsed — a UTC-midnight epoch lands on the same day). Hence:
+
+- `fieldToWire(field, control)` — canonical picker strings → **epoch
+  seconds** (UTC midnight for date-only precisions; datetimes honor an
+  explicit offset/IANA zone, else the browser's local wall time).
+  `outputFormat:'date'` opts a field into canonical-string output for
+  DateField columns that should round-trip exactly as the server emits.
+- `wireToField(field, raw)` — accepts **both** shapes regardless (epoch
+  numbers, epoch strings, canonical strings), so rows mixing `last_login`
+  epochs and `dob` strings flow through one path. Unparseable stored values
+  warn once and read as empty.
+- **`dr_field/dr_start/dr_end` filter params are NOT this boundary** — they
+  stay `YYYY-MM-DD` strings and belong to FilterBar/params (rest.py parses
+  dr_* itself). Untouched.
+
+Every other type passes through both functions unchanged — its control
+shape IS its wire shape, per the table.
+
+### Kitchen sink
+
+The playground's **Field registry kitchen sink** section renders EVERY
+registered type (all aliases) from one schema on both surfaces — FormView
+autosave against the mock user (saves land in `metadata.*`, live
+control-vs-wire panel per field) and SchemaForm submit (exact payload
+shown) — plus the explicit-precision override, `outputFormat:'date'`, the
+#1273 seam, and the deliberate unknown type.
+(`apps/portal/src/pages/components/demos-kitchen-sink.tsx`)
+
 ## Pitfalls
 
 - Never uncontrolled inputs, never a second value pipeline — the
@@ -165,5 +288,65 @@ tabs; switching tabs loses nothing.
   UX, the reject/revert path is the safety net — don't try to out-validate
   the backend.
 - FormView needs a LOADED row — gate on `useOne`'s `isPending` first.
-- The richer field set (~45 web-mojo types: collection pickers, tags,
-  dates, …) arrives with B4 — extend THIS language; don't fork it.
+- The rich field set (collection pickers, tags, dates, …) lives in the
+  field-type registry above — extend THIS language via `registerFieldType`;
+  don't fork it. New renderers must fire on COMMIT only and keep state
+  wire-shaped (convert in the renderer, like the date bindings do).
+- `daterange` here is ONE field name whose value is a `[start, end]` pair —
+  NOT web-mojo's `startName`/`endName` twin wire keys. A model with two
+  separate date COLUMNS should use two `datepicker` fields.
+- `timepicker`'s `outputFormat:'object'` (component-level) is not a form
+  shape — form state is JSON-scalar/array; the registry always serializes
+  to the string forms.
+
+## Simple-types parity audit
+
+Every `case` in web-mojo `FormBuilder.js`'s field-type switch (the ~45-type
+FieldTypes list), vs this package. **Gaps are recorded, not built** — the
+orchestrator files follow-ups.
+
+| FormBuilder case | SchemaForm/FormView | Registry | Status / note |
+|---|---|---|---|
+| `text` | builtin | — | OK |
+| `email` | builtin (+ format validation) | — | OK |
+| `password` | — | — | **GAP** — C3 auth pages own password UX (strength/generator, board #1259) |
+| `number` | — | — | **GAP** — obvious next builtin (min/max/step props already exist on Field) |
+| `tel` | builtin | — | OK |
+| `url` | — | — | **GAP** — trivial builtin (text + `type="url"`) |
+| `search` | — | — | **GAP** as a FORM field; the live-search UX exists as the params-store search (ModelTable) |
+| `hex` | — | — | **GAP** — pattern-validated text; zod `schema` covers it today |
+| `textarea` | builtin | — | OK |
+| `htmlpreview` | — | — | **GAP** — sweep verdict: PATTERN (iframe preview), rebuild small when needed |
+| `json` | — | — | **GAP** — textarea + zod covers today; DataView/JSON viewer (#1303) is the read side |
+| `select` | builtin (SchemaSelect) | — | OK (placeholder + unknown-value warn beat source) |
+| `multiselect` | — | MultiSelectDropdown | OK |
+| `checkbox` | — | — | **GAP** — portal has `switch` only; plain-checkbox look absent (use `switch`) |
+| `toggle` / `switch` | builtin `switch` | — | OK |
+| `radio` | — | — | **GAP** — use `select`; radio-group component unfiled |
+| `date` (native input) | — | — | superseded by `datepicker` (registry) — native input not carried |
+| `datetime` (native) | — | — | superseded by `datetimepicker` |
+| `time` (native) | — | — | superseded by `timepicker` |
+| `file` | — | — | **GAP** — 3-stage fileman uploads are board #1264; FileView #1298 |
+| `image` | — | — | **GAP** — same upload dependency (#1264); renditions ride the avatar pattern |
+| `color` | — | — | **GAP** — native `<input type=color>` wrapper unfiled |
+| `range` | — | — | **GAP** — native `<input type=range>` wrapper unfiled |
+| `hidden` | — | — | N/A by design — controlled forms post state, not hidden DOM inputs |
+| `button` | — | — | N/A by design — SchemaForm owns submit/cancel; FormView has no buttons |
+| `divider` | — | — | **GAP** — layout-only field (FormWizard/Tabs #1305 is the structure story) |
+| `html` | — | — | N/A by design — trusted-HTML slots became ReactNode (architecture rule 6) |
+| `heading` / `header` | — | — | **GAP** — layout-only field, same #1305 story |
+| `tag` / `tags` | — | TagInput | OK (CSV wire shape) |
+| `collection` | — | CollectionSelect | OK |
+| `collectionmultiselect` / `collection-multiselect` | — | CollectionMultiSelect | OK |
+| `datepicker` | — | DatePicker | OK (epoch wire; `outputFormat:'date'` opt-out) |
+| `monthpicker` | — | DatePicker | OK (alias → precision `month`; explicit `precision` wins) |
+| `yearpicker` | — | DatePicker | OK (alias → precision `year`) |
+| `daterange` | — | DateRangePicker | OK — deviation: ONE name, `[start, end]` value; no `startName`/`endName` twin keys (use two datepickers for split columns) |
+| `monthrange` | — | DateRangePicker | OK (alias → precision `month`) |
+| `yearrange` | — | DateRangePicker | OK (alias → precision `year`) |
+| `timepicker` | — | TimePicker | OK (real TimezoneSelect in the slot; string wire) |
+| `datetimepicker` | — | seam → DateTimePicker | OK once #1273 merges (alias + epoch boundary live now; interim text input) |
+| `checklistdropdown` | — | — | folded into `multiselect` (sweep: ONE implementation) — alias deliberately NOT registered |
+| `buttongroup` | — | — | **GAP** — segmented control; source was the split-pipeline bug family (do-not-recreate), needs a fresh build |
+| `combo` / `combobox` / `autocomplete` | — | ComboBox | OK (ComboInput feature spec, commit-only) |
+| `tabset` | FormView `tabs` prop | — | OK — tabsets are FORM STRUCTURE here (registry-of-tabs + permissions), not a field type |
