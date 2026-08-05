@@ -7,6 +7,7 @@
 // lockstep with the client.
 export * from './client';
 export * from './errors';
+export * from './model';
 export * from './auth';
 export * from './jwt';
 export * from './duid';

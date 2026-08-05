@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import { PAGE_SIZES, useTableParams } from '../client/params';
 import { useModelList } from '../client/hooks';
+import type { ModelDef } from '../client/model';
 import { FilterBar, FilterPills, type FilterDef } from './FilterBar';
 
 export interface Column<T> {
@@ -37,10 +38,13 @@ function pageWindow(current: number, total: number): (number | '…')[] {
 }
 
 export function ModelTable<T extends { id: number }>({
-    endpoint, columns, filters = [], presets = [], eyebrow, title,
+    model, endpoint, columns, filters = [], presets = [], eyebrow, title,
     searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd,
 }: {
-    endpoint: string;
+    /** A defineModel definition — supplies the endpoint (and, come B2, schema). */
+    model?: ModelDef<T>;
+    /** Bare endpoint, for tables without a model definition. */
+    endpoint?: string;
     columns: Column<T>[];
     filters?: FilterDef[];
     presets?: Preset[];
@@ -51,8 +55,10 @@ export function ModelTable<T extends { id: number }>({
     addLabel?: string;
     onAdd?: () => void;
 }) {
+    const resolvedEndpoint = model?.endpoint ?? endpoint;
+    if (!resolvedEndpoint) throw new Error('ModelTable: pass `model` or `endpoint`');
     const p = useTableParams();
-    const query = useModelList<T>(endpoint, p.wire);
+    const query = useModelList<T>(resolvedEndpoint, p.wire);
     const rows = query.data?.rows ?? [];
     const count = query.data?.count ?? 0;
     const totalPages = Math.max(1, Math.ceil(count / p.size));

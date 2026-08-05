@@ -4,9 +4,9 @@
 shipped with every django-mojo deployment. Succeeds `web-mojo`, which goes to
 maintenance mode and keeps serving its three existing portals untouched.
 
-**Status:** Chunk A COMPLETE — A0–A4 shipped 2026-08-04 (workspace extraction;
-auth client; Me + permissions; group context; sidebar engine — see rows).
-Next up: **B1** (`defineModel`).
+**Status:** Chunk A COMPLETE (A0–A4, 2026-08-04). Chunk B started: B1
+(`defineModel`) shipped 2026-08-04 — see row. Next up: **B2** (TableView to
+full fidelity).
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
@@ -127,7 +127,7 @@ Port from source, not memory: each item lists its web-mojo source. Read it first
 ### Chunk B — data + the crown jewels
 | # | Item | web-mojo source | Notes |
 |---|---|---|---|
-| B1 | `defineModel` definition layer + `fetchOne` + POST actions (`POST_SAVE_ACTION` pattern) | `src/core/Model.js`, `Collection.js`, `models/*.js` | Definitions + hooks, no stateful instances |
+| B1 ✓ | `defineModel` definition layer + `fetchOne` + POST actions (`POST_SAVE_ACTION` pattern) | `src/core/Model.js`, `Collection.js`, `models/*.js` | Done 2026-08-04: `client/model.ts` — `defineModel({name, endpoint, permissions, forms, actions})` → stateless def + hooks; `useList`/`useOne` reuse the generic hooks' cache keys so ModelTable shares one cache; `useSave` write-through (server row → one-cache) + invalidate; `useDelete` (`{status:"deleted"}` string-status parity; first UI consumer C4); `useAction`; `fetchOne(qc,id)` via fetchQuery (prefetch+hook dedupe browser-proven: 1 GET); `invalidate`. Action wire verified in django-mojo `mojo/models/rest.py` `on_rest_save`: `POST <endpoint>/<id>` `{key: payload}`, fields save before handlers; row-vs-payload response is DECLARED per action (`response:'row'|'payload'` — `revoke_sessions` payload message toasts verbatim), never sniffed. Mock: user save pipeline + disable (reason REQUIRED ∈ abuse\|admin per `services/disable.py` — web-mojo's optional-reason UI was stale)/reactivate/send_invite/revoke_sessions + DELETE. App: `models.ts` UserModel (forms.create/disable); ModelTable `model` prop; UserDetail action flows (`when`-gated invite). Fixed in passing (rule-4 class): SchemaForm controlled select showed first option while state held `''` — placeholder option + unknown-value console.warn (`SchemaSelect`); `Field`/`FormData` types moved to client/types (ui re-exports) so defs carry forms. Browser-verified both themes, console clean. |
 | B2 | TableView to full fidelity: column chooser (`hideable`), persistState (v2 blob, URL > saved > defaults, saved `size` wins), selection + batch bar (`Promise.allSettled` + partial-result toasts), autoRefresh collection mode (`refetchInterval` + skip predicate), row expand (single-open default), groupBy header interleaving, export | `src/core/views/list/ListView.js`, `table/TableView.js`, `pages/TablePage.js`, `grouping.js` | Ian: "solid solid piece of UI/UX" — port at fidelity incl. skeleton loader |
 | B3 | FormView with **inline autosave** ("no save buttons"): 300ms batch window → one save → per-field saved/error indicators → revert-on-fail; `showWhen`; permission tabsets as a registry (not live-mutated arrays); zod validation (Validation.md documents a phantom API — build, don't port) | `src/core/forms/FormView.js:904-1050` (autosave), `FormBuilder.js:863-888` (showWhen), `models/Member.js:80-170` + `User.js:160-347` (tabsets) | Fix buttongroup/checklistdropdown class by construction |
 | B4 | Remaining field components in FieldTypes order (~45 types; collection/tag/pickers per the `data-field-config` contracts) | `src/core/forms/inputs/*`, manifest §07 | |

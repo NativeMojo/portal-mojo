@@ -1,10 +1,11 @@
-// Users — a full ModelTable page in ~80 declarative lines: columns, filters,
-// presets, add form. This is the per-screen authoring cost of the toolkit.
-import { useSaveModel, type User } from 'portal-mojo/client';
+// Users — a full ModelTable page in ~70 declarative lines: columns, filters,
+// presets, add form. The endpoint, form config and save/action wiring all
+// come from the UserModel definition (models.ts) — the page is presentation.
+import { useQueryClient } from '@tanstack/react-query';
+import { type User } from 'portal-mojo/client';
 import { Badge, fmt, formModal, modal, toast, ModelTable, type Column, type FilterDef } from 'portal-mojo/ui';
+import { UserModel } from '../models';
 import { UserDetail } from './UserDetail';
-
-const ENDPOINT = '/api/account/user';
 
 const COLUMNS: Column<User>[] = [
     {
@@ -47,37 +48,32 @@ const FILTERS: FilterDef[] = [
 ];
 
 export function UsersPage() {
-    const save = useSaveModel<User>(ENDPOINT);
+    const qc = useQueryClient();
+    const save = UserModel.useSave();
 
     const addUser = async () => {
-        const data = await formModal({
-            title: 'Add user',
-            submitText: 'Create',
-            fields: [
-                { name: 'display_name', type: 'text', label: 'Display name', required: true, placeholder: 'Jane Cooper' },
-                { name: 'email', type: 'email', label: 'Email', required: true, placeholder: 'jane@example.com' },
-                { name: 'phone', type: 'tel', label: 'Phone', columns: 6 },
-                {
-                    name: 'role', type: 'select', label: 'Role', columns: 6, options: [
-                        { value: 'user', label: 'User' },
-                        { value: 'staff', label: 'Staff' },
-                        { value: 'admin', label: 'Admin' },
-                    ],
-                },
-            ],
-        });
+        const form = UserModel.forms.create!;
+        const data = await formModal(form);
         if (!data) return;
         try {
             await save.mutateAsync({ id: null, changes: data });
-            toast.success(`${data.display_name} created`);
+            toast.success(`${String(data.display_name)} created`);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Create failed');
         }
     };
 
+    const openUser = (u: User) => {
+        // Prefetch through the shared cache key: the modal's useOne attaches
+        // to this in-flight request instead of issuing its own (one GET total
+        // — visible in getMockCallCounts()).
+        void UserModel.fetchOne(qc, u.id).catch(() => {});
+        void modal.detail((close) => <UserDetail id={u.id} onClose={() => close(null)} />);
+    };
+
     return (
         <ModelTable<User>
-            endpoint={ENDPOINT}
+            model={UserModel}
             eyebrow="Account"
             title="Users"
             searchPlaceholder="Search name or email…"
@@ -89,7 +85,7 @@ export function UsersPage() {
                 { key: 'admins', label: 'Admins', params: { role: 'admin' } },
                 { key: 'inactive', label: 'Inactive', params: { is_active: 'false' } },
             ]}
-            onRowClick={(u) => { void modal.detail((close) => <UserDetail id={u.id} onClose={() => close(null)} />); }}
+            onRowClick={openUser}
             addLabel="Add User"
             onAdd={addUser}
         />

@@ -1,14 +1,19 @@
 // UserDetail — the DetailView proof: recreates the web-mojo UserView modal
 // (header with chips + active switch; Profile / Security / Sessions rail;
 // flat rows with edit pencils; danger action) as schema + small components.
-import { useModel, useSaveModel, type User } from 'portal-mojo/client';
+// Field edits go through UserModel.useSave; the disable / reactivate /
+// send_invite / revoke_sessions flows are the backend's POST_SAVE_ACTIONS,
+// driven through UserModel.useAction (B1).
 import { Badge, DetailView, Eyebrow, FlatRow, SecurityItem, fmt, formModal, modal, toast } from 'portal-mojo/ui';
-
-const ENDPOINT = '/api/account/user';
+import { UserModel } from '../models';
 
 export function UserDetail({ id, onClose }: { id: number; onClose: () => void }) {
-    const { data: user, isPending } = useModel<User>(ENDPOINT, id);
-    const save = useSaveModel<User>(ENDPOINT);
+    const { data: user, isPending } = UserModel.useOne(id);
+    const save = UserModel.useSave();
+    const disable = UserModel.useAction('disable');
+    const reactivate = UserModel.useAction('reactivate');
+    const sendInvite = UserModel.useAction('send_invite');
+    const revokeSessions = UserModel.useAction('revoke_sessions');
 
     if (isPending || !user) {
         return <div className="detail-loading"><span className="skel skel-block" /></div>;
@@ -36,14 +41,65 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
         if (data) await saveFields(data, 'Contact updated');
     };
 
-    const deactivate = async () => {
+    /** Disable flow (UserView parity): collect reason + note, POST the action. */
+    const disableUser = async (): Promise<boolean> => {
+        const data = await formModal({
+            ...UserModel.forms.disable!,
+            intro: <>Disable <b>{user.display_name}</b>? They will no longer be able to sign in.</>,
+        });
+        if (!data) return false;
+        const payload: Record<string, unknown> = { reason: data.reason };
+        if (data.note) payload.note = data.note;
+        try {
+            await disable.mutateAsync({ id: user.id, payload });
+            toast.success('User disabled');
+            return true;
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Disable failed');
+            return false;
+        }
+    };
+
+    const reactivateUser = async () => {
+        try {
+            await reactivate.mutateAsync({ id: user.id });
+            toast.success('User reactivated');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Reactivate failed');
+        }
+    };
+
+    const resendInvite = async () => {
         const ok = await modal.confirm({
-            title: 'Deactivate account',
-            message: <>Deactivate <b>{user.display_name}</b>? They will no longer be able to sign in.</>,
-            confirmText: 'Deactivate',
+            title: 'Resend invite',
+            message: <>Resend the invite email to <b>{user.email}</b>?</>,
+            confirmText: 'Send',
+        });
+        if (!ok) return;
+        try {
+            await sendInvite.mutateAsync({ id: user.id });
+            toast.success('Invite sent');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to send invite');
+        }
+    };
+
+    const revokeAllSessions = async () => {
+        const ok = await modal.confirm({
+            title: 'Revoke all sessions',
+            message: 'Revoke all sessions? The user will be signed out of all devices immediately.',
+            confirmText: 'Revoke',
             danger: true,
         });
-        if (ok) await saveFields({ is_active: false }, 'Account deactivated');
+        if (!ok) return;
+        try {
+            // A `response: 'payload'` action — the toast text IS the server's
+            // action response, not client copy.
+            const outcome = await revokeSessions.mutateAsync({ id: user.id });
+            toast.success(String(outcome.body.message ?? 'Sessions revoked'));
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to revoke sessions');
+        }
     };
 
     return (
@@ -57,7 +113,8 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
                     : { icon: 'bi-exclamation-circle', text: 'Unverified', tone: 'warning' },
                 ...(user.role !== 'user' ? [{ text: user.role, tone: fmt.inferTone(user.role) }] : []),
             ]}
-            active={{ value: user.is_active, onChange: (next) => saveFields({ is_active: next }, next ? 'Activated' : 'Deactivated') }}
+            // Off → disable action (cancel leaves the switch on); on → reactivate.
+            active={{ value: user.is_active, onChange: (next) => { void (next ? reactivateUser() : disableUser()); } }}
             onClose={onClose}
             sections={[
                 {
@@ -83,8 +140,8 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
 
                             {user.is_active && (
                                 <div className="danger-zone">
-                                    <button className="danger-link" onClick={deactivate}>
-                                        <i className="bi bi-exclamation-triangle" /> Deactivate Account
+                                    <button className="danger-link" onClick={() => void disableUser()}>
+                                        <i className="bi bi-exclamation-triangle" /> Disable Account
                                     </button>
                                 </div>
                             )}
@@ -105,6 +162,13 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
                             <SecurityItem icon="bi-fingerprint" title="Passkeys" desc={user.passkeys > 0 ? `${user.passkeys} registered` : 'None registered'}>
                                 <Badge tone={user.passkeys > 0 ? 'success' : 'muted'}>{user.passkeys}</Badge>
                             </SecurityItem>
+                            {user.last_login == null && (
+                                // `when` gate (UserView parity): only a user who has
+                                // never signed in gets the resend-invite affordance.
+                                <SecurityItem icon="bi-envelope-paper" title="Invite" desc="Never signed in">
+                                    <button className="btn btn-compact" onClick={() => void resendInvite()}>Resend invite</button>
+                                </SecurityItem>
+                            )}
                         </>
                     ),
                 },
@@ -117,8 +181,13 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
                                 <Badge tone="success">Current</Badge>
                             </SecurityItem>
                             <SecurityItem icon="bi-phone" title="iPhone · Mojo App" desc="San Francisco, US · 2 months ago">
-                                <button className="btn btn-compact" onClick={() => toast.success('Session revoked')}>Revoke</button>
+                                <Badge tone="muted">2 mo</Badge>
                             </SecurityItem>
+                            <div className="danger-zone">
+                                <button className="danger-link" onClick={() => void revokeAllSessions()}>
+                                    <i className="bi bi-x-octagon" /> Revoke All Sessions
+                                </button>
+                            </div>
                         </>
                     ),
                 },

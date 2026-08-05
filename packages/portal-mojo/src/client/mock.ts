@@ -192,6 +192,62 @@ function listUsers(params: Params) {
     return listRows(db.users as unknown as Record<string, unknown>[], params, (u) => `${u.display_name} ${u.email}`);
 }
 
+// ── POST_SAVE_ACTIONS (User) ──────────────────────────────────────────
+// Mirrors mojo/models/rest.py on_rest_save: action keys are pulled OUT of the
+// save body, plain fields save first, then each action handler runs — and the
+// response is the refreshed row UNLESS a handler returned its own payload
+// (action_resp wins verbatim). The mocked subset matches django-mojo
+// account/models/user.py RestMeta.POST_SAVE_ACTIONS (which also declares
+// change_username + the TOTP trio — unmocked until a screen needs them).
+const USER_ACTIONS = new Set(['send_invite', 'disable', 'reactivate', 'revoke_sessions']);
+const USER_DISABLE_REASONS = new Set(['abuse', 'admin']); // services/disable.py USER_REST_REASONS
+
+function runUserAction(user: User, action: string, value: unknown): Record<string, unknown> | null {
+    const dict = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+    switch (action) {
+        case 'disable': {
+            // Backend parity: reason is REQUIRED and validated against the
+            // service's frozenset; a bad one rejects the whole save.
+            const reason = String(dict.reason ?? '');
+            if (!USER_DISABLE_REASONS.has(reason)) {
+                return { status: false, error: `reason must be one of: ${[...USER_DISABLE_REASONS].sort().join(', ')}`, error_code: 400 };
+            }
+            user.is_active = false;
+            return null;
+        }
+        case 'reactivate':
+            user.is_active = true;
+            return null;
+        case 'send_invite':
+            // Sends mail server-side; the REST-visible effect is just the row.
+            return null;
+        case 'revoke_sessions':
+            // Handler returns its own payload — the response is NOT the row.
+            return { status: true, message: 'Sessions revoked. Re-authenticate to continue.' };
+        default:
+            return null;
+    }
+}
+
+function saveUser(user: User, body: Record<string, unknown>): unknown {
+    const fields: Record<string, unknown> = {};
+    const actionEntries: [string, unknown][] = [];
+    for (const [key, value] of Object.entries(body)) {
+        if (USER_ACTIONS.has(key)) actionEntries.push([key, value]);
+        else fields[key] = value;
+    }
+    Object.assign(user, fields);
+    let actionResp: Record<string, unknown> | null = null;
+    for (const [action, value] of actionEntries) {
+        const resp = runUserAction(user, action, value);
+        if (resp) {
+            if (resp.status === false) return resp; // action error rejects the request
+            actionResp = resp;
+        }
+    }
+    return actionResp ?? { status: true, data: { ...user } };
+}
+
 // ── /api/metrics/fetch ────────────────────────────────────────────────
 // Bucketed multi-series time data. Bucket size comes from the granularity,
 // count from the range — the same shape django-mojo's metrics app returns.
@@ -537,9 +593,14 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const id = Number(one[1]);
         const user = db.users.find((u) => u.id === id);
         if (!user) return { status: false, error: 'User not found', error_code: 404 };
+        if (opts.method === 'DELETE') {
+            db.users = db.users.filter((u) => u.id !== id);
+            // Backend parity (mojo/models/rest.py on_rest_delete): status is
+            // the STRING "deleted" — the envelope's one non-boolean status.
+            return { status: 'deleted' };
+        }
         if (opts.method === 'POST' && opts.body) {
-            Object.assign(user, opts.body);
-            return { status: true, data: { ...user } };
+            return saveUser(user, opts.body);
         }
         return { status: true, data: { ...user } };
     }
@@ -551,7 +612,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                 display_name: String(opts.body.display_name ?? 'New User'),
                 email: String(opts.body.email ?? `user${id}@nativemojo.com`),
                 phone: (opts.body.phone as string) || null,
-                role: (opts.body.role as User['role']) ?? 'user',
+                role: (opts.body.role as User['role']) || 'user', // '' (unset select) falls to default
                 is_active: true,
                 email_verified: false,
                 mfa_enabled: false,

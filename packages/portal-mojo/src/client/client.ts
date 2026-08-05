@@ -179,3 +179,12 @@ export async function mojoSave<T>(endpoint: string, id: number | string | null, 
     const body = await unwrap(path, { method: 'POST', body: changes });
     return body.data as T;
 }
+
+/**
+ * Delete a record. django-mojo answers `{status: "deleted"}` (a string — the
+ * envelope's only non-boolean status; it passes the unwrap's `=== false`
+ * failure check by design). Failures reject like every other call.
+ */
+export async function mojoDelete(endpoint: string, id: number | string): Promise<void> {
+    await unwrap(`${endpoint}/${id}`, { method: 'DELETE' });
+}

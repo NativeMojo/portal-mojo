@@ -4,21 +4,49 @@
 // path (the buttongroup/checklistdropdown bug family is impossible here).
 import { useState, type ReactNode } from 'react';
 import { modal } from './modal';
+// The field-language TYPES live in client/types so model definitions can
+// carry form configs as data (defineModel forms); re-exported here so the
+// ui-side API is unchanged.
+import type { Field, FormData } from '../client/types';
 
-export interface Field {
-    name: string;
-    type: 'text' | 'email' | 'tel' | 'select' | 'switch' | 'textarea';
-    label: string;
-    placeholder?: string;
-    required?: boolean;
-    help?: string;
-    columns?: 6 | 12;
-    options?: { value: string; label: string }[];
-}
-
-export type FormData = Record<string, string | boolean>;
+export type { Field, FormData } from '../client/types';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// One warn per (field, value) — a mismatch is a config bug, not a render event.
+const warnedSelectValues = new Set<string>();
+
+/**
+ * Controlled select whose DISPLAY always equals its state. A bare native
+ * select with value='' silently shows its first option while the controlled
+ * state stays '' — the submit then fails "required" under a filled-looking
+ * field (the buttongroup/checklistdropdown display≠state class). While the
+ * value is unset (or unknown — warned, per the unknown-option rule) a
+ * disabled placeholder option is rendered and selected instead.
+ */
+function SchemaSelect({ field, value, invalid, onChange }: {
+    field: Field;
+    value: string;
+    invalid: boolean;
+    onChange: (v: string) => void;
+}) {
+    const options = field.options ?? [];
+    const known = value === '' || options.some((o) => o.value === value);
+    if (!known) {
+        const key = `${field.name}:${value}`;
+        if (!warnedSelectValues.has(key)) {
+            warnedSelectValues.add(key);
+            console.warn(`SchemaForm: select "${field.name}" value "${value}" is not among its options — showing placeholder`);
+        }
+    }
+    const shown = known ? value : '';
+    return (
+        <select className={`input${invalid ? ' input-invalid' : ''}`} value={shown} onChange={(e) => onChange(e.target.value)}>
+            {shown === '' && <option value="" disabled>{field.placeholder ?? 'Select…'}</option>}
+            {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+    );
+}
 
 function validate(fields: Field[], data: FormData): Record<string, string> {
     const errors: Record<string, string> = {};
@@ -88,9 +116,7 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
                             <label className="field">
                                 <span className="field-label">{f.label}{f.required && <em> *</em>}</span>
                                 {f.type === 'select' ? (
-                                    <select className="input" value={String(data[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)}>
-                                        {(f.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
+                                    <SchemaSelect field={f} value={String(data[f.name] ?? '')} invalid={!!errors[f.name]} onChange={(v) => set(f.name, v)} />
                                 ) : f.type === 'textarea' ? (
                                     <textarea className="input" rows={3} placeholder={f.placeholder} value={String(data[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} />
                                 ) : (
