@@ -1,0 +1,63 @@
+/* ============================================================
+   CollectionSelect — the single-record server picker
+   (packages/portal-mojo/src/ui/CollectionSelect.tsx).
+   Tokens only — light AND dark ride the theme.css variables.
+   Reuses house primitives: .input, .field-label / .field-help /
+   .field-error, .input-invalid, .spin, .btn.
+   The dropdown mounts in the shared .mojo-popover shell (top
+   layer); .collection-select-pop is the CONTENT — it brings its
+   own padding, scroll cap and width (the shell is bare). The
+   component sets the width inline to match the field.
+   NOT imported by theme.css yet — the orchestrator adds the
+   @import at merge time.
+   ============================================================ */
+.collection-select { max-width: 460px; }
+.collection-select .field-label { margin-bottom: 5px; }
+
+.collection-select-field { position: relative; }
+/* Room for the ✕ while a selection exists (source: pe-5). */
+.collection-select-field.has-clear .collection-select-input { padding-right: 34px; }
+.collection-select-input:disabled { opacity: 0.55; cursor: default; }
+.collection-select-clear {
+    position: absolute; top: 50%; right: 5px; transform: translateY(-50%);
+    width: 24px; height: 24px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: none; border-radius: 6px;
+    color: var(--mute); cursor: pointer; font-size: 13px; padding: 0;
+}
+.collection-select-clear:hover { background: var(--line-soft); color: var(--ink-strong); }
+
+/* Dropdown content — the source's 250px scroll cap, combo-family rows. */
+.collection-select-pop {
+    box-sizing: border-box;
+    min-width: 220px; max-height: 250px; overflow-y: auto;
+    padding: 5px;
+}
+.collection-select-option {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    border: none; background: none; cursor: pointer;
+    padding: 7px 10px; border-radius: 7px;
+    font-size: 13.5px; color: var(--ink); font-weight: 550;
+}
+/* Keyboard walk (.is-focused) and hover share one look — there is only
+   one "pointed at" state (ComboBox parity). */
+.collection-select-option:hover,
+.collection-select-option.is-focused { background: var(--surface2); color: var(--ink-strong); }
+.collection-select-option.is-selected { color: var(--accent); font-weight: 650; }
+.collection-select-option-label {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.collection-select-check { flex: none; color: var(--accent); font-size: 13px; }
+
+/* State rows: loading spinner / empty / error / held group fetch. */
+.collection-select-state {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 10px; color: var(--mute); font-size: 12.5px;
+}
+.collection-select-state i { flex: none; font-size: 13px; }
+.collection-select-state-error { color: var(--bad); }
+.collection-select-state-error span { flex: 1; min-width: 0; }
+.collection-select-state-error .btn { flex: none; }
+
+.collection-select-disabled .field-label { opacity: 0.7; }
