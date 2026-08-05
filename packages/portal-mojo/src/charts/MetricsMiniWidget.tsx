@@ -205,6 +205,13 @@ export interface MetricsMiniWidgetProps<T extends { id: number | string }> {
     defaultRange?: string | null;
     chartType?: MiniChartType;
     height?: number;
+    /**
+     * Uniform-height cards: the card fills its grid row and the chart GROWS
+     * into the slack (default). `false` makes the card hug its content, so a
+     * row of cards ends up ragged but compact. `height` is the chart's
+     * minimum either way.
+     */
+    stretch?: boolean;
     /** Sparkline color. Default: the tone's token, else var(--accent). */
     color?: string;
     /** Token-tinted card variant (replaces the source's raw background). */
@@ -248,6 +255,7 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
     defaultRange = '24h',
     chartType: chartTypeProp = 'line',
     height = 72,
+    stretch = true,
     color,
     tone = null,
     subtitle,
@@ -436,7 +444,7 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
     const anyAction = showStats || showDataTable || showRefresh || showSettings;
 
     return (
-        <div className={`mmw panel${tone ? ` mmw-tone-${tone}` : ''}${className ? ` ${className}` : ''}`}>
+        <div className={`mmw panel${stretch ? ' mmw-stretch' : ' mmw-fit'}${tone ? ` mmw-tone-${tone}` : ''}${className ? ` ${className}` : ''}`}>
             {anyAction && (
                 <div className="mmw-actions">
                     {showStats && (
@@ -475,6 +483,7 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
             )}
 
             <div className="mmw-head">
+                {icon && <i className={`${icon} mmw-icon`} aria-hidden="true" />}
                 <div className="mmw-id">
                     {/* The icon PREFIXES the title. Source hung it at the
                         right of the header, which worked there because the
@@ -484,10 +493,7 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
                         next to the action buttons and read as a stray
                         control. Prefixing binds it to the label and leaves
                         the top-right corner meaning exactly one thing. */}
-                    <div className="mmw-title">
-                        {icon && <i className={`${icon} mmw-icon`} aria-hidden="true" />}
-                        {title}
-                    </div>
+                    <div className="mmw-title">{title}</div>
                     {subtitleNode != null && <div className="mmw-subtitle">{subtitleNode}</div>}
                     <div className="mmw-meta">
                         {showTrending && trendLabel != null && (
@@ -568,7 +574,7 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
                         data={series}
                         labels={labels}
                         chartType={chartType}
-                        height={height}
+                        height={stretch ? 'fill' : height}
                         color={chartColor}
                         fill={fill}
                         smoothing={smoothing}

@@ -21,7 +21,8 @@ export interface MiniChartProps {
     labels?: readonly string[];
     /** 'line' | 'bar'. Unknown values warn and fall back to 'line'. */
     chartType?: MiniChartType;
-    height?: number;
+    /** px, or 'fill' to take the container's height (uniform-height cards). */
+    height?: number | 'fill';
     /** Stroke / bar color — any CSS color incl. var() tokens. */
     color?: string;
     /** Area fill under the line. Default: `color` at 0.12 opacity. */
@@ -69,7 +70,7 @@ export function MiniChart({
     data: dataProp,
     labels,
     chartType = 'line',
-    height = 48,
+    height: heightProp = 48,
     color = 'var(--accent)',
     fillColor,
     fill = true,
@@ -104,6 +105,7 @@ export function MiniChart({
 
     const wrapRef = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(120);
+    const [fillH, setFillH] = useState(72);
     const [hover, setHover] = useState<number | null>(null);
 
     useLayoutEffect(() => {
@@ -112,10 +114,17 @@ export function MiniChart({
         const ro = new ResizeObserver(([entry]) => {
             const w = entry?.contentRect.width ?? 0;
             if (w > 0) setWidth(w);
+            // 'fill' cards take their height from the box too, so a chart can
+            // grow into a stretched card instead of leaving a void under it.
+            const h = entry?.contentRect.height ?? 0;
+            if (h > 0) setFillH(h);
         });
         ro.observe(node);
         return () => ro.disconnect();
     }, []);
+
+    // Resolve 'fill' to the measured box height.
+    const height = heightProp === 'fill' ? fillH : heightProp;
 
     const n = values.length;
     const dataMin = n ? Math.min(...values) : 0;
@@ -182,7 +191,7 @@ export function MiniChart({
         <div
             ref={wrapRef}
             className={`minichart${className ? ` ${className}` : ''}`}
-            style={{ height }}
+            style={{ height: heightProp === 'fill' ? '100%' : height }}
             onMouseLeave={() => setHover(null)}
         >
             <svg width={width} height={height} className="minichart-svg" role="img" key={animate ? dataKey : 'static'}>

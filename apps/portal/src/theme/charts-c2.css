@@ -190,11 +190,16 @@ button.cprog { cursor: pointer; font: inherit; }
 }
 .mmw-trend-up { color: var(--ok); background: var(--ok-soft); }
 .mmw-trend-down { color: var(--bad); background: var(--bad-soft); }
-/* Inline prefix on the title — sized to the text, tinted like a label,
-   never a control. */
-.mmw-icon { font-size: 13px; color: var(--mute); margin-right: 6px; vertical-align: baseline; }
-.mmw-title { display: flex; align-items: center; gap: 0; min-width: 0; }
-.mmw-title > i { flex: none; }
+/* Leading GUTTER icon, spanning the title + value lines. Source used fs-4
+   (~24px): the icon was meant to be prominent — only its placement (hard
+   right, beside the actions) was wrong once the card lost its solid
+   background. Top-aligned at a fixed box so a wrapping subtitle can never
+   orphan it, and so every card shares one text edge. */
+.mmw-icon {
+    flex: none; align-self: flex-start;
+    width: 22px; font-size: 21px; line-height: 1.15;
+    color: var(--mute); opacity: 0.9; text-align: center;
+}
 /* Scope reads as a tiny LABEL under the subtitle — a metrics card carries
    no resting form control. The picker opens from the header funnel button. */
 .mmw-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
@@ -214,6 +219,13 @@ button.cprog { cursor: pointer; font: inherit; }
    sitting on the bottom edge — a metric card reads top-down and the
    sparkline is its floor. `margin-top: auto` claims the slack. */
 .mmw-chart { position: relative; display: flex; align-items: center; margin-top: auto; }
+/* Uniform-height cards (default): the card fills its grid row and the chart
+   GROWS into the slack, so a stretched card has no void under its header.
+   `stretch={false}` hugs content instead — a ragged but compact row. */
+.mmw-stretch { height: 100%; }
+.mmw-stretch .mmw-chart { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.mmw-stretch .minichart { height: 100%; }
+.mmw-fit { align-self: start; }
 .mmw-skel { display: block; width: 100%; border-radius: 8px; }
 .mmw-empty { width: 100%; text-align: center; color: var(--mute); font-size: 12.5px; padding: 12px 0; }
 .mmw-error {
