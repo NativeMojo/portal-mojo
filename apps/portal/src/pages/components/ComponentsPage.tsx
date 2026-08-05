@@ -11,6 +11,7 @@ import { TableDemo, FiltersNote } from './demos-data';
 import { ChartsDemo } from './demos-charts';
 import { FormsDemo, ModalsDemo, ToastsDemo, DetailViewDemo } from './demos-feedback';
 import { DisplayDemo, SearchDemo, SkeletonDemo, AccessDemo } from './demos-display';
+import { PopoverDemo } from './demos-popover';
 
 interface DemoSection {
     key: string;
@@ -40,6 +41,11 @@ const SECTIONS: DemoSection[] = [
         key: 'forms', title: 'SchemaForm', icon: 'bi-ui-checks',
         blurb: 'The field-definition language: fields are data, inputs are controlled, selects can never show what state doesn\'t hold.',
         render: () => <FormsDemo />,
+    },
+    {
+        key: 'popover', title: 'Popover', icon: 'bi-front',
+        blurb: 'Anchored top-layer primitive every dropdown control mounts in — stacks above native-<dialog> modals via the HTML Popover API.',
+        render: () => <PopoverDemo />,
     },
     {
         key: 'modals', title: 'Modals', icon: 'bi-window-stack',

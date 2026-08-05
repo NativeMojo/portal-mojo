@@ -15,6 +15,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal` |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
 | [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
+| [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart`, the metrics wire shape |
 | [menus-and-access.md](menus-and-access.md) | Menu registry + SidebarNav; `useMe`/`useCan`/`Guarded`; group context |
 | [grouping-and-fmt.md](grouping-and-fmt.md) | `groupBy*` helpers, `fmt.*` formatters |

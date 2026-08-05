@@ -5,9 +5,7 @@
 // stacking is the point of the component), and repositioning inside a
 // scrolling container.
 import { useRef, useState, type MouseEvent } from 'react';
-import { Popover, type PopoverPlacement } from '../../../../../packages/portal-mojo/src/ui/Popover'; // MERGE-WIRE: portal-mojo/ui
-import { modal } from '../../../../../packages/portal-mojo/src/ui/modal'; // MERGE-WIRE: portal-mojo/ui
-import { toast } from '../../../../../packages/portal-mojo/src/ui/toast'; // MERGE-WIRE: portal-mojo/ui
+import { Popover, type PopoverPlacement, modal, toast } from 'portal-mojo/ui';
 
 /** A menu-shaped filling so the shell reads as a real dropdown. */
 function MenuContent({ onPick }: { onPick: (label: string) => void }) {
