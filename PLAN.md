@@ -12,7 +12,13 @@ list (search/sort/lookups/`dr_*` triple/`__isnull`/paging) → save →
 all four user POST_SAVE_ACTIONS, plus reject-on-failure surfacing real
 server errors (bad phone format). Contract corrections from measurement:
 account app mounts at **`/api/user`** (not `/api/account/user`); datetimes
-are **epoch seconds**; list rows have **no `role`/`created`/passkey fields**
+are **epoch seconds** on DateTimeField columns but the shape is
+**per-column, not global** — DateField emits `'YYYY-MM-DD'`, JSONFields
+carry whatever a producer wrote (ISO strings, occasionally epoch millis),
+so every date surface reads through `date/fns detectTemporal` and the form
+wire boundary **answers in the shape it read** (`Field.outputFormat`
+overrides; unread fields default to epoch seconds) — cb1fb23; list rows
+have **no `role`/`created`/passkey fields**
 (`display_name` nullable; `permissions` dict rides the row; me-graph adds
 `has_passkey`/`requires_mfa`); metrics wire is a **slug-keyed map**
 `{data:{slug:[…]}, labels}` normalized at the one boundary; backend
