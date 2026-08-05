@@ -18,6 +18,7 @@ import { ComboBoxDemo } from './demos-combobox';
 import { FormatDemo } from './demos-format';
 import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
 import { DetailPrimitivesDemo } from './demos-detail-primitives';
+import { CalendarDemo } from './demos-calendar';
 
 interface DemoSection {
     key: string;
@@ -47,6 +48,11 @@ const SECTIONS: DemoSection[] = [
         key: 'forms', title: 'SchemaForm', icon: 'bi-ui-checks',
         blurb: 'The field-definition language: fields are data, inputs are controlled, selects can never show what state doesn\'t hold.',
         render: () => <FormsDemo />,
+    },
+    {
+        key: 'calendar', title: 'Calendar', icon: 'bi-calendar3',
+        blurb: 'The picker engine: one grid, three precisions, range anchor + hover preview, drill-down zoom — canonical YYYY-MM-DD strings out.',
+        render: () => <CalendarDemo />,
     },
     {
         key: 'combobox', title: 'ComboBox', icon: 'bi-input-cursor-text',

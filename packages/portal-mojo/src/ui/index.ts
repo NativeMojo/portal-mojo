@@ -10,6 +10,9 @@ export * from './menu-registry';
 export * from './SidebarNav';
 export * from './CollectionMultiSelect';
 export * from './ComboBox';
+export * from './date/Calendar';
+// Date math shares fmt's namespace pattern — collision-prone names stay scoped.
+export * as dateFns from './date/fns';
 export * from './detail';
 export * from './modal';
 export * from './Popover';

@@ -3,10 +3,9 @@
 // Every commit is a canonical string (YYYY-MM-DD / YYYY-MM / YYYY) shown
 // live, with a rolling log proving the callback surface.
 import { useState } from 'react';
-// MERGE-WIRE: portal-mojo/ui
-import { Calendar } from '../../../../../packages/portal-mojo/src/ui/date/Calendar';
-// MERGE-WIRE: portal-mojo/ui (dateFns namespace)
-import { addMonths, daysInMonth, formatYmd, today } from '../../../../../packages/portal-mojo/src/ui/date/fns';
+import { Calendar, dateFns } from 'portal-mojo/ui';
+
+const { addMonths, daysInMonth, formatYmd, today } = dateFns;
 
 function useEventLog(): [string[], (line: string) => void] {
     const [lines, setLines] = useState<string[]>([]);

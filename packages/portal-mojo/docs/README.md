@@ -18,6 +18,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |
+| [calendar.md](calendar.md) | The picker engine + `dateFns` namespace — three precisions, range anchor/preview, drill-down zoom |
 | [collection-multiselect.md](collection-multiselect.md) | Server-backed checkbox panel — model binding, 400ms search, select/deselect-all, shift-click ranges |
 | [detail-primitives.md](detail-primitives.md) | StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — the detail-page pack |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart`, the metrics wire shape |

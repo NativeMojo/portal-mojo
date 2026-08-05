@@ -6,6 +6,7 @@
 @import "./theme/combobox.css";
 @import "./theme/collection-multiselect.css";
 @import "./theme/detail-primitives.css";
+@import "./theme/calendar.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";
