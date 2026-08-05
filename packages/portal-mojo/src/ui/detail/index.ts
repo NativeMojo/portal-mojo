@@ -7,5 +7,6 @@ export * from './StatusPanel';
 export * from './FlowStrip';
 export * from './Timeline';
 export * from './KnownFieldsCard';
+export * from './DataView';
 export * from './MetadataSection';
 export * from './StackTraceView';

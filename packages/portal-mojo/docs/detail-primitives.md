@@ -96,6 +96,13 @@ to the first N ("recent activity" mode). The empty state renders inside the
 - The raw blob goes in a collapsed `<details>` below (`showRaw={false}` to
   drop it, `rawCollapsed={false}` to start open). Skipped for an empty blob.
 
+**Not to be confused with `DataView`** ([dataview.md](dataview.md)):
+KnownFieldsCard takes one **blob** column and promotes a **curated** list of
+known keys, leaving the rest in the raw `<details>`; DataView takes a
+**whole record** and **infers** a renderer for every key from its name and
+value. They coexist happily — `<DataView data={record} />` for the record,
+`<KnownFieldsCard data={record.metadata} known={…} />` for its blob.
+
 ## MetadataSection — editable key/value CRUD (writes)
 
 ```tsx
@@ -162,4 +169,6 @@ any `at …` line → context. Non-string traces are JSON-pretty-printed first.
   pass them through `fmt.*` before handing them to `Timeline.meta`.
 - `KnownFieldsCard` and `MetadataSection` both render a `metadata` blob and
   are easy to confuse: the card is read-only with promoted known keys; the
-  section is the editor. A detail page often wants both.
+  section is the editor. A detail page often wants both. `DataView` is the
+  third member of that family — whole-record inference rather than a
+  curated key list over one blob.
