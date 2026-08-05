@@ -1,0 +1,228 @@
+/* ============================================================
+   Calendar engine — ported from web-mojo calendar.css (engine
+   subset: grid/cells/head/nav; popover + preset + time shells
+   arrive with their own components). All colors ride theme.css
+   tokens so both themes hold; the source's Bootstrap vars map
+   --bs-emphasis-color→--ink-strong, --bs-secondary-color→--mute,
+   --bs-secondary-bg→--surface2, --bs-body-color→--ink,
+   --bs-danger→--bad, --bs-primary→--accent.
+   Range-fill ratios follow source: 10%/18% accent in light,
+   18%/30% in dark (accent-soft IS the 10%/13% tint).
+   ============================================================ */
+
+:root {
+    --mojo-cal-radius-sm: 6px;
+    --mojo-cal-anchor-fill: var(--accent);
+    --mojo-cal-anchor-text: #ffffff;
+    --mojo-cal-range-fill: var(--accent-soft);
+    --mojo-cal-range-fill-hover: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+:root[data-theme="dark"] {
+    --mojo-cal-range-fill: color-mix(in srgb, var(--accent) 18%, transparent);
+    --mojo-cal-range-fill-hover: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ── Calendar grid ────────────────────────────────────────────── */
+
+.mojo-calendar {
+    font-feature-settings: "tnum" on;
+    font-variant-numeric: tabular-nums;
+}
+.mojo-calendar-multi {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+}
+.mojo-calendar-pane { display: flex; flex-direction: column; gap: 10px; }
+
+.mojo-calendar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+.mojo-calendar-head-label {
+    background: transparent;
+    border: 0;
+    padding: 4px 6px;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--ink-strong);
+    border-radius: var(--mojo-cal-radius-sm);
+    cursor: pointer;
+}
+.mojo-calendar-head-label:hover { background: var(--surface2); }
+.mojo-calendar-head-label .mojo-calendar-year {
+    color: var(--mute);
+    font-weight: 500;
+    margin-left: 6px;
+}
+
+.mojo-calendar-nav { display: inline-flex; gap: 2px; }
+.mojo-calendar-nav-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--mojo-cal-radius-sm);
+    color: var(--mute);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+.mojo-calendar-nav-btn:hover {
+    background: var(--surface2);
+    color: var(--ink-strong);
+}
+
+.mojo-calendar-grid { display: grid; gap: 0; }
+.mojo-calendar-grid-day { grid-template-columns: repeat(7, 1fr); }
+.mojo-calendar-grid-month { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.mojo-calendar-grid-year { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+.mojo-calendar-weekday {
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--mute);
+    text-align: center;
+    padding: 8px 0 6px;
+    font-weight: 500;
+}
+
+.mojo-calendar-cell {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+.mojo-calendar-grid-month .mojo-calendar-cell,
+.mojo-calendar-grid-year .mojo-calendar-cell {
+    aspect-ratio: 5 / 3;
+    border-radius: var(--mojo-cal-radius-sm);
+}
+.mojo-calendar-cell-blank { cursor: default; }
+.mojo-calendar-cell-disabled {
+    color: var(--mute);
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.mojo-calendar-cell-inner {
+    /* Scale the pill to the cell — cap at 32px so it doesn't get oversized in
+       wide layouts, but never overflow the cell when space is tight. */
+    width: min(32px, 100%);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    position: relative;
+    z-index: 2;
+    transition: background 0.10s ease, color 0.10s ease;
+}
+.mojo-calendar-grid-month .mojo-calendar-cell-inner,
+.mojo-calendar-grid-year .mojo-calendar-cell-inner {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: var(--mojo-cal-radius-sm);
+}
+
+/* Hover only paints the inner pill on cells that aren't already part of a range
+   or an anchor. Otherwise the gray hover would sit on top of the accent range
+   fill and read as an off-color blob. NOTE: no whitespace between :not() —
+   chaining class selectors on the same element, not descendant selectors. */
+.mojo-calendar-cell:not(.mojo-calendar-cell-blank):not(.mojo-calendar-cell-disabled):not(.mojo-calendar-cell-in-range):not(.mojo-calendar-cell-in-preview):not(.mojo-calendar-cell-anchor):not(.mojo-calendar-cell-selected):hover .mojo-calendar-cell-inner {
+    background: var(--surface2);
+}
+
+/* For cells that ARE in-range, the hover deepens the accent tint slightly
+   instead of swapping to gray — keeps the range visually continuous. */
+.mojo-calendar-cell-in-range:not(.mojo-calendar-cell-anchor):hover::before,
+.mojo-calendar-cell-in-preview:not(.mojo-calendar-cell-anchor):hover::before {
+    background: var(--mojo-cal-range-fill-hover);
+}
+
+/* Today */
+.mojo-calendar-cell-today .mojo-calendar-cell-inner {
+    color: var(--bad);
+    font-weight: 600;
+}
+
+/* Range fill (committed) */
+.mojo-calendar-cell-in-range::before {
+    content: "";
+    position: absolute;
+    inset: 4px 0;
+    background: var(--mojo-cal-range-fill);
+    z-index: 1;
+}
+/* Range preview (in-progress) */
+.mojo-calendar-cell-in-preview::before {
+    content: "";
+    position: absolute;
+    inset: 4px 0;
+    background: var(--mojo-cal-range-fill-hover);
+    z-index: 1;
+}
+
+/* Anchor cells */
+.mojo-calendar-cell-anchor .mojo-calendar-cell-inner {
+    background: var(--mojo-cal-anchor-fill);
+    color: var(--mojo-cal-anchor-text);
+    font-weight: 600;
+}
+.mojo-calendar-cell-selected .mojo-calendar-cell-inner {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Anchor chevrons — day grid only.
+   Small triangle pointing OUTSIDE the cell, into the adjacent cell where the
+   range fill lives. Solid anchor-accent on the lighter range fill (z-index:3)
+   so it reads as a directional accent. */
+.mojo-calendar-grid-day .mojo-calendar-cell-anchor-start::after,
+.mojo-calendar-grid-day .mojo-calendar-cell-anchor-end::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    z-index: 3;
+}
+.mojo-calendar-grid-day .mojo-calendar-cell-anchor-start::after {
+    right: -4px;
+    transform: translateY(-50%);
+    border-width: 7px 0 7px 8px;
+    border-color: transparent transparent transparent var(--mojo-cal-anchor-fill);
+}
+.mojo-calendar-grid-day .mojo-calendar-cell-anchor-end::after {
+    left: -4px;
+    transform: translateY(-50%);
+    border-width: 7px 8px 7px 0;
+    border-color: transparent var(--mojo-cal-anchor-fill) transparent transparent;
+}
+.mojo-calendar-cell-anchor-solo::after { display: none !important; }
+
+/* Month / year ranges fill the rounded tile */
+.mojo-calendar-grid-month .mojo-calendar-cell-in-range::before,
+.mojo-calendar-grid-year .mojo-calendar-cell-in-range::before,
+.mojo-calendar-grid-month .mojo-calendar-cell-in-preview::before,
+.mojo-calendar-grid-year .mojo-calendar-cell-in-preview::before {
+    inset: 2px;
+    border-radius: var(--mojo-cal-radius-sm);
+}
