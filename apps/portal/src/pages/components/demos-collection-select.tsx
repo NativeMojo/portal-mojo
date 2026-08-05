@@ -8,8 +8,7 @@
 import { useState } from 'react';
 import { type Group, type User } from 'portal-mojo/client';
 import { GroupModel } from '../../models';
-// MERGE-WIRE: portal-mojo/ui
-import { CollectionSelect, type CollectionSelectValue } from '../../../../../packages/portal-mojo/src/ui/CollectionSelect';
+import { CollectionSelect, type CollectionSelectValue } from 'portal-mojo/ui';
 
 type GroupRow = Group & { id: number };
 

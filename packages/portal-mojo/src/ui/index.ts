@@ -9,9 +9,12 @@ export * from './RequiresGroup';
 export * from './menu-registry';
 export * from './SidebarNav';
 export * from './CollectionMultiSelect';
+export * from './CollectionSelect';
 export * from './ComboBox';
 export * from './date/Calendar';
 export * from './date/DatePicker';
+export * from './date/TimePicker';
+export * from './date/TimezoneSelect';
 export * from './MarkdownView';
 export * from './MultiSelectDropdown';
 // Date math shares fmt's namespace pattern — collision-prone names stay scoped.

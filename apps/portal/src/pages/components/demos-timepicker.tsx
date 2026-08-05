@@ -6,8 +6,7 @@
 // change log, so the commit-only pipeline is visible: typing changes nothing
 // until Enter/blur.
 import { useState, type ReactNode } from 'react';
-// MERGE-WIRE: portal-mojo/ui
-import { TimePicker, type TimeOutputFormat, type TimeValue } from '../../../../../packages/portal-mojo/src/ui/date/TimePicker';
+import { TimePicker, type TimeOutputFormat, type TimeValue } from 'portal-mojo/ui';
 
 function useEventLog(): [string[], (line: string) => void] {
     const [lines, setLines] = useState<string[]>([]);

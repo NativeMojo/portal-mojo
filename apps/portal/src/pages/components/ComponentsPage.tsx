@@ -25,6 +25,9 @@ import { MarkdownDemo } from './demos-markdown';
 import { DatePickerDemo } from './demos-datepicker';
 import { MultiSelectDropdownDemo } from './demos-multiselect-dropdown';
 import { AutosaveDemo } from './demos-autosave';
+import { TimezoneSelectDemo } from './demos-timezone-select';
+import { TimePickerDemo } from './demos-timepicker';
+import { CollectionSelectDemo } from './demos-collection-select';
 
 interface DemoSection {
     key: string;
@@ -69,6 +72,21 @@ const SECTIONS: DemoSection[] = [
         key: 'datepicker', title: 'DatePicker', icon: 'bi-calendar-date',
         blurb: 'Single-value picker over the Calendar engine — day/month/year precision, trigger or inline, clear ✕ governed by required/disabled/readOnly.',
         render: () => <DatePickerDemo />,
+    },
+    {
+        key: 'timepicker', title: 'TimePicker', icon: 'bi-clock',
+        blurb: 'Stepper time entry — typed digits, arrow steps, AM/PM, minute step with midnight wrap, min/max clamp, ISO/IANA/object serialization.',
+        render: () => <TimePickerDemo />,
+    },
+    {
+        key: 'collection-select', title: 'CollectionSelect', icon: 'bi-menu-button-wide',
+        blurb: 'Single record picker over any model — 400ms server search, bare-id → label hydration through the shared cache, commit-only change.',
+        render: () => <CollectionSelectDemo />,
+    },
+    {
+        key: 'timezone', title: 'TimezoneSelect', icon: 'bi-globe-americas',
+        blurb: 'IANA zone picker over ComboBox — offset labels with the Unicode minus, local-zone default, Python↔ICU alias tolerance, commit-only.',
+        render: () => <TimezoneSelectDemo />,
     },
     {
         key: 'multiselect-dropdown', title: 'MultiSelectDropdown', icon: 'bi-check2-square',

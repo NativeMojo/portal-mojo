@@ -3,13 +3,12 @@
 // blur onto an exact zone name): typed filter text is a draft that reverts,
 // which is the web-mojo bug this port makes impossible.
 import { useState } from 'react';
-// MERGE-WIRE: portal-mojo/ui — relative until the orchestrator adds the export.
 import {
     TimezoneSelect,
     localTimezone,
     resolveTimezone,
     type TimezoneChangeEvent,
-} from '../../../../../packages/portal-mojo/src/ui/date/TimezoneSelect';
+} from 'portal-mojo/ui';
 
 // Module constants: a fixed list identity must be stable, or the labels
 // re-map on every render (harmless, but pointless work).
