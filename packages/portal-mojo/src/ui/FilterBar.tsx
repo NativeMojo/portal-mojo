@@ -193,8 +193,11 @@ export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TablePa
                 className={`btn btn-compact${active.length ? ' btn-has-filters' : ''}`}
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
+                title="Filter"
             >
-                <i className="bi bi-funnel" /> Filter
+                {/* Label collapses on normal widths (tool-group icon mode);
+                    the active-count badge stays visible either way. */}
+                <i className="bi bi-funnel" /> <span className="btn-label">Filter</span>
                 {active.length > 0 && <span className="filter-count">{active.length}</span>}
             </button>
             {open && (

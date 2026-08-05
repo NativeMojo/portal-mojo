@@ -342,6 +342,19 @@ button { font: inherit; color: inherit; }
 }
 .skel-block { width: 260px; height: 15px; }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+/* Column-matched silhouette (web-mojo TableView skeleton): cycled widths,
+   avatar + stacked lines in the identity column, pill for badge columns. */
+.skel-w-90 { width: 90%; }
+.skel-w-75 { width: 75%; }
+.skel-w-60 { width: 60%; }
+.skel-w-40 { width: 40%; }
+.skel-w-25 { width: 25%; }
+.skel-pill { width: 54px; height: 18px; border-radius: 999px; }
+.skel-user { display: flex; align-items: center; gap: 10px; }
+.skel-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; }
+.skel-stack { display: flex; flex-direction: column; gap: 6px; flex: 1; max-width: 220px; }
+.skel-stack .skel { display: block; height: 10px; }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 .empty-state { text-align: center; padding: 46px 20px; color: var(--mute); }
 .empty-state i { font-size: 26px; display: block; margin-bottom: 8px; }
 .empty-state h3 { margin: 0 0 12px; font-size: 14.5px; font-weight: 650; color: var(--ink); }
@@ -686,6 +699,25 @@ button { font: inherit; color: inherit; }
     width: 6px; height: 6px; background: var(--accent); border-radius: 1.5px;
 }
 .group-header--rule th { border-top: 1px solid var(--line); }
+
+/* Toolbar tool cluster — one joined icon group (web-mojo's compact button
+   groups). Buttons are icon+tooltip; .btn-label text renders only on very
+   wide screens. No overflow:hidden here — the dropdown menus render inside. */
+.tool-group { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.tool-group > * + * { border-left: 1px solid var(--line); }
+.tool-group .btn, .tool-group .btn-icon {
+    border: 0; border-radius: 0; background: transparent; box-shadow: none;
+    width: auto; height: 100%; min-height: 30px; padding: 5px 11px;
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--mute); font-size: 13px;
+}
+.tool-group .btn:hover, .tool-group .btn-icon:hover { background: var(--surface2); color: var(--ink-strong); }
+.tool-group .btn-has-filters { color: var(--accent); }
+.tool-group > :first-child .btn, .tool-group > .btn:first-child, .tool-group > .btn-icon:first-child { border-radius: 8px 0 0 8px; }
+.tool-group > :last-child .btn, .tool-group > .btn:last-child, .tool-group > .btn-icon:last-child { border-radius: 0 8px 8px 0; }
+.tool-group > :only-child .btn { border-radius: 8px; }
+.tool-group .btn-label { display: none; }
+@media (min-width: 1600px) { .tool-group .btn-label { display: inline; } }
 
 .expand-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; font-size: 13px; }
 .expand-grid .eyebrow { margin-bottom: 4px; }

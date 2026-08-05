@@ -63,6 +63,10 @@ export interface BatchAction<T> {
 const GROUP_HEADER_STYLES = ['banner', 'mark', 'band', 'rule'] as const;
 export type GroupHeaderStyle = (typeof GROUP_HEADER_STYLES)[number];
 
+// Cell widths echo the real columns (web-mojo _buildSkeletonHtml's cycled
+// w-* classes) so the shimmer silhouette lines up with the eventual rows.
+const SKEL_WIDTHS = ['skel-w-90', 'skel-w-75', 'skel-w-60', 'skel-w-40', 'skel-w-25'];
+
 /** Page-number window: {1, total, current±1} with … for the gaps. */
 function pageWindow(current: number, total: number): (number | '…')[] {
     const keep = new Set<number>([1, total]);
@@ -452,63 +456,67 @@ export function ModelTable<T extends { id: number }>({
                             aria-label="Search"
                         />
                     </div>
-                    {filters.length > 0 && <FilterBar defs={filters} params={p} />}
-                    {columnChooser && (
-                        <MenuDropdown button={(open, toggle) => (
-                            <button className="btn btn-compact" onClick={toggle} aria-expanded={open} title="Choose columns">
-                                <i className="bi bi-layout-three-columns" /> <span className="btn-label">Columns</span>
-                            </button>
-                        )}>
-                            <div className="filter-menu-header">Show columns</div>
-                            {columns.map((col) => {
-                                const locked = col.hideable === false;
-                                return (
-                                    <label key={col.key} className={`chooser-item${locked ? ' chooser-locked' : ''}`} title={locked ? 'Always shown' : undefined}>
-                                        <input
-                                            type="checkbox"
-                                            className="tbl-check"
-                                            checked={locked || !hiddenCols.has(col.key)}
-                                            disabled={locked}
-                                            onChange={() => toggleColumn(col.key)}
-                                        />
-                                        <span>{col.label}</span>
-                                        {locked && <i className="bi bi-lock-fill chooser-lock" />}
-                                    </label>
-                                );
-                            })}
-                            <div className="filter-menu-sep" />
-                            <button className="filter-menu-item" onClick={resetColumns}>
-                                <i className="bi bi-arrow-counterclockwise" /> Reset to defaults
-                            </button>
-                            {persistState && (
-                                <div className="chooser-persist"><i className="bi bi-check2-circle" /> Saved for this table</div>
-                            )}
-                        </MenuDropdown>
-                    )}
-                    {exportFormats.length > 0 && (
-                        <MenuDropdown button={(open, toggle) => (
-                            <button className="btn btn-compact" onClick={toggle} aria-expanded={open} title="Export">
-                                <i className="bi bi-download" /> <span className="btn-label">Export</span>
-                            </button>
-                        )}>
-                            {exportFormats.map((format) => (
-                                <button key={format} className="filter-menu-item" onClick={() => void runExport(format)}>
-                                    <i className={`bi ${format === 'csv' ? 'bi-filetype-csv' : 'bi-filetype-json'}`} />
-                                    Export as {format.toUpperCase()}
+                    {/* Tool cluster: one joined icon group (web-mojo's compact
+                        toolbar). Icons + tooltips only; text labels appear
+                        only on very wide screens via .btn-label. */}
+                    <div className="tool-group">
+                        {filters.length > 0 && <FilterBar defs={filters} params={p} />}
+                        {columnChooser && (
+                            <MenuDropdown button={(open, toggle) => (
+                                <button className="btn btn-compact" onClick={toggle} aria-expanded={open} title="Choose columns">
+                                    <i className="bi bi-layout-three-columns" /> <span className="btn-label">Columns</span>
                                 </button>
-                            ))}
-                        </MenuDropdown>
-                    )}
-                    {/* One refresh affordance: the button spins on ANY fetch
-                        (manual, page change, auto-tick) — a second identical
-                        indicator icon read as a duplicate control. */}
-                    <button
-                        className="btn-icon"
-                        title={autoRefreshMs > 0 ? `Refresh · auto every ${Math.round(autoRefreshMs / 1000)}s` : 'Refresh'}
-                        onClick={() => query.refetch()}
-                    >
-                        <i className={`bi bi-arrow-repeat${query.isFetching ? ' spin' : ''}`} />
-                    </button>
+                            )}>
+                                <div className="filter-menu-header">Show columns</div>
+                                {columns.map((col) => {
+                                    const locked = col.hideable === false;
+                                    return (
+                                        <label key={col.key} className={`chooser-item${locked ? ' chooser-locked' : ''}`} title={locked ? 'Always shown' : undefined}>
+                                            <input
+                                                type="checkbox"
+                                                className="tbl-check"
+                                                checked={locked || !hiddenCols.has(col.key)}
+                                                disabled={locked}
+                                                onChange={() => toggleColumn(col.key)}
+                                            />
+                                            <span>{col.label}</span>
+                                            {locked && <i className="bi bi-lock-fill chooser-lock" />}
+                                        </label>
+                                    );
+                                })}
+                                <div className="filter-menu-sep" />
+                                <button className="filter-menu-item" onClick={resetColumns}>
+                                    <i className="bi bi-arrow-counterclockwise" /> Reset to defaults
+                                </button>
+                                {persistState && (
+                                    <div className="chooser-persist"><i className="bi bi-check2-circle" /> Saved for this table</div>
+                                )}
+                            </MenuDropdown>
+                        )}
+                        {exportFormats.length > 0 && (
+                            <MenuDropdown button={(open, toggle) => (
+                                <button className="btn btn-compact" onClick={toggle} aria-expanded={open} title="Export">
+                                    <i className="bi bi-download" /> <span className="btn-label">Export</span>
+                                </button>
+                            )}>
+                                {exportFormats.map((format) => (
+                                    <button key={format} className="filter-menu-item" onClick={() => void runExport(format)}>
+                                        <i className={`bi ${format === 'csv' ? 'bi-filetype-csv' : 'bi-filetype-json'}`} />
+                                        Export as {format.toUpperCase()}
+                                    </button>
+                                ))}
+                            </MenuDropdown>
+                        )}
+                        {/* One refresh affordance: it spins on ANY fetch
+                            (manual, page change, auto-tick). */}
+                        <button
+                            className="btn-icon"
+                            title={autoRefreshMs > 0 ? `Refresh · auto every ${Math.round(autoRefreshMs / 1000)}s` : 'Refresh'}
+                            onClick={() => query.refetch()}
+                        >
+                            <i className={`bi bi-arrow-repeat${query.isFetching ? ' spin' : ''}`} />
+                        </button>
+                    </div>
                     {onAdd && (
                         <button className="btn btn-primary btn-compact" onClick={onAdd}>
                             <i className="bi bi-plus-lg" /> <span className="btn-label">{addLabel ?? 'Add'}</span>
@@ -590,12 +598,31 @@ export function ModelTable<T extends { id: number }>({
                         </tr>
                     </thead>
                     <tbody>
-                        {query.isPending || !hydrated ? (
+                        {/* Skeleton whenever THIS query's rows aren't on screen
+                            yet: cold load, restore gate, or a page/sort/filter
+                            change still serving the previous key's rows
+                            (isPlaceholderData). Background refetches of the
+                            SAME key (autoRefresh) keep the live rows. */}
+                        {query.isPending || query.isPlaceholderData || !hydrated ? (
                             Array.from({ length: Math.min(p.size, 8) }).map((_, i) => (
-                                <tr key={i} className="skel-row">
+                                <tr key={i} className="skel-row" aria-hidden="true">
                                     {expandEnabled && <td className="col-expand" />}
                                     {selectable && <td className="col-select" />}
-                                    {visibleColumns.map((col) => <td key={col.key}><span className="skel" /></td>)}
+                                    {visibleColumns.map((col, ci) => (
+                                        <td key={col.key} className={col.align ? `text-${col.align}` : undefined}>
+                                            {ci === 0 ? (
+                                                <span className="skel-user">
+                                                    <span className="skel skel-avatar" />
+                                                    <span className="skel-stack">
+                                                        <span className="skel skel-w-60" />
+                                                        <span className="skel skel-w-90" />
+                                                    </span>
+                                                </span>
+                                            ) : (
+                                                <span className={`skel ${col.align === 'center' ? 'skel-pill' : SKEL_WIDTHS[ci % SKEL_WIDTHS.length]}`} />
+                                            )}
+                                        </td>
+                                    ))}
                                 </tr>
                             ))
                         ) : query.isError ? (
