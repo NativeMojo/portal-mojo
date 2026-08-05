@@ -1,0 +1,189 @@
+/* ============================================================ UserView parity
+   Chrome for the UserDetail section pack (apps/portal/src/pages/user-sections)
+   — device/login/audit feed rows, day-group headers, the section tab row,
+   compact pager, notification-preference grid, disable-history accordion,
+   and the show-once API-key token banner.
+
+   Tokens only; both themes come from the token flip in theme.css.
+   NOT imported anywhere yet — the orchestrator adds the @import to
+   theme.css at merge time. */
+
+/* ── Section list scaffolding ─────────────────────────────────────── */
+.us-list-head { display: flex; gap: 10px; margin: 0 0 12px; }
+.us-search { max-width: 340px; }
+
+.us-empty {
+    text-align: center; padding: 26px 12px; color: var(--mute);
+    font-size: 13px;
+}
+.us-empty i { display: block; font-size: 26px; margin-bottom: 6px; color: var(--line); }
+
+.us-pager {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 12px; font-size: 12.5px;
+}
+.us-pager-count { margin-left: auto; }
+
+.us-day-head {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--mute);
+    margin: 14px 0 2px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+/* ── Section tabs (in-section TabView port) ───────────────────────── */
+.us-tabs {
+    display: flex; gap: 2px; margin: 0 0 12px;
+    border-bottom: 1px solid var(--line);
+}
+.us-tab {
+    appearance: none; border: none; background: none; cursor: pointer;
+    padding: 7px 12px 8px; font-size: 13px; font-weight: 550;
+    color: var(--mute); border-bottom: 2px solid transparent;
+    margin-bottom: -1px; display: inline-flex; align-items: center; gap: 7px;
+}
+.us-tab:hover { color: var(--ink-strong); }
+.us-tab-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 650; }
+.us-tab-badge {
+    font-size: 10px; font-weight: 650; padding: 1px 7px;
+    border-radius: 999px; background: var(--surface2); color: var(--mute);
+}
+
+/* ── Generic feed rows (devices / api keys / oauth / passkeys) ────── */
+.us-device-row, .us-key-row, .us-oauth-row, .us-passkey-row, .us-audit-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--line-soft);
+}
+.us-row-icon {
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface2); color: var(--mute); font-size: 15px;
+}
+.us-row-info { flex: 1; min-width: 0; }
+.us-row-title {
+    font-size: 13.5px; font-weight: 600; color: var(--ink-strong);
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.us-row-meta { font-size: 12px; color: var(--mute); margin-top: 1px; }
+.us-row-meta code { font-size: 11px; }
+.us-row-path { margin-top: 3px; font-size: 11.5px; }
+.us-row-path code { color: var(--mute); }
+.us-row-when { font-size: 12px; color: var(--mute); flex: none; }
+.us-row-actions { display: flex; align-items: center; gap: 7px; flex: none; }
+.us-danger, .us-danger i { color: var(--bad); }
+.us-cap { text-transform: capitalize; }
+.us-mono-sm { font-size: 11.5px; }
+
+/* Audit rows carry a tone rail on the icon. */
+.us-audit-row.tone-danger .us-row-icon { background: var(--bad-soft); color: var(--bad); }
+.us-audit-row.tone-warning .us-row-icon { background: var(--warn-soft); color: var(--warn); }
+.us-audit-row.tone-info .us-row-icon { background: var(--info-soft); color: var(--info); }
+.us-audit-row.tone-success .us-row-icon { background: var(--ok-soft); color: var(--ok); }
+
+/* ── Groups membership cards ──────────────────────────────────────── */
+.us-feed-row {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    appearance: none; border: none; background: none; color: inherit;
+    padding: 10px 8px; border-radius: 9px;
+    border-bottom: 1px solid var(--line-soft);
+}
+.us-feed-row:hover { background: var(--surface2); }
+.us-feed-top {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 13.5px; color: var(--ink-strong);
+}
+.us-feed-when { margin-left: auto; font-size: 12px; }
+.us-feed-body { margin-top: 6px; }
+
+/* ── Logins ───────────────────────────────────────────────────────── */
+.us-login-row {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 0; border-bottom: 1px solid var(--line-soft);
+}
+.us-login-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex: none;
+    background: var(--mute);
+}
+.us-login-dot.tone-success { background: var(--ok); }
+.us-login-dot.tone-danger { background: var(--bad); }
+.us-login-dot.tone-warning { background: var(--warn); }
+.us-login-dot.tone-info { background: var(--info); }
+.us-chip-sm { font-size: 10px; padding: 1px 7px; }
+
+/* ── Disable-history accordion (native <details>) ─────────────────── */
+.us-history { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.us-history-item {
+    border: 1px solid var(--line); border-radius: 9px;
+    background: var(--surface);
+}
+.us-history-item summary {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    padding: 9px 12px; cursor: pointer; list-style: none;
+    font-size: 13px; color: var(--ink);
+}
+.us-history-item summary::-webkit-details-marker { display: none; }
+.us-history-flag { margin-left: auto; }
+.us-history-chev { color: var(--mute); font-size: 12px; transition: transform 0.15s ease; }
+.us-history-item summary .us-history-chev { margin-left: 4px; }
+.us-history-item .us-history-flag + .us-history-chev { margin-left: 0; }
+.us-history-item[open] .us-history-chev { transform: rotate(180deg); }
+.us-history-body {
+    padding: 4px 12px 11px; font-size: 12.5px; color: var(--ink);
+    display: flex; flex-direction: column; gap: 4px;
+}
+.us-history-react {
+    margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line-soft);
+    display: flex; flex-direction: column; gap: 4px;
+}
+
+/* ── API-key show-once token banner ───────────────────────────────── */
+.us-token-banner {
+    border: 1px solid var(--ok); border-radius: 10px;
+    background: var(--ok-soft); padding: 12px 14px; margin: 0 0 14px;
+}
+.us-token-title { font-size: 13px; font-weight: 650; color: var(--ink-strong); margin-bottom: 7px; }
+.us-token-row { display: flex; align-items: center; gap: 9px; }
+.us-token {
+    flex: 1; min-width: 0; overflow-wrap: anywhere;
+    font-size: 12px; padding: 6px 9px; border-radius: 7px;
+    background: var(--surface); border: 1px solid var(--line);
+}
+.us-token-warn {
+    margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--bad);
+    display: flex; align-items: center; gap: 6px;
+}
+
+/* ── Notification-preference grid ─────────────────────────────────── */
+.us-prefs-table { width: 100%; border-collapse: collapse; }
+.us-prefs-table th {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--mute);
+    padding: 7px 10px; border-bottom: 2px solid var(--line);
+    text-align: center; width: 84px;
+}
+.us-prefs-table th:first-child { text-align: left; width: auto; }
+.us-prefs-table td {
+    padding: 9px 10px; border-bottom: 1px solid var(--line-soft);
+    text-align: center;
+}
+.us-prefs-table td:first-child {
+    text-align: left; font-size: 13px; font-weight: 550;
+    color: var(--ink-strong); text-transform: capitalize;
+}
+.us-prefs-table tr:last-child td { border-bottom: none; }
+
+/* ── Profile identity cards / misc ────────────────────────────────── */
+.us-id-value { font-size: 12.5px; }
+.us-eyebrow-action { margin-left: 8px; vertical-align: middle; }
+.us-inline-link { font-size: 12px; margin-left: 10px; }
+
+/* Avatar preview inside the Avatar… modal. */
+.ua-avatar-preview {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 84px; border: 1px dashed var(--line); border-radius: 12px;
+    background: var(--surface2); padding: 12px;
+}
+.ua-avatar-preview img {
+    width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+    box-shadow: var(--shadow);
+}
