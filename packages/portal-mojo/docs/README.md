@@ -20,6 +20,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |
 | [calendar.md](calendar.md) | The picker engine + `dateFns` namespace — three precisions, range anchor/preview, drill-down zoom |
 | [datepicker.md](datepicker.md) | Single-value picker shell — precisions, display-format stripping, clear/required/inline states |
+| [daterange.md](daterange.md) | Range picker + PresetRail — quick ranges, precision modes, the FilterBar daterange dialog |
 | [timezone-select.md](timezone-select.md) | IANA zone picker over ComboBox — offset labels, local default, alias tolerance, commit-only |
 | [timepicker.md](timepicker.md) | Stepper time entry — 12h/24h, minute step math, min/max, ISO/IANA/object serialization, embed mode |
 | [collection-select.md](collection-select.md) | Single record picker — server search, id→label hydration, null sentinel, shared cache keys |

@@ -27,6 +27,7 @@ import { MultiSelectDropdownDemo } from './demos-multiselect-dropdown';
 import { AutosaveDemo } from './demos-autosave';
 import { TimezoneSelectDemo } from './demos-timezone-select';
 import { TimePickerDemo } from './demos-timepicker';
+import { DateRangeDemo } from './demos-daterange';
 import { CollectionSelectDemo } from './demos-collection-select';
 
 interface DemoSection {
@@ -72,6 +73,11 @@ const SECTIONS: DemoSection[] = [
         key: 'datepicker', title: 'DatePicker', icon: 'bi-calendar-date',
         blurb: 'Single-value picker over the Calendar engine — day/month/year precision, trigger or inline, clear ✕ governed by required/disabled/readOnly.',
         render: () => <DatePickerDemo />,
+    },
+    {
+        key: 'daterange', title: 'DateRangePicker', icon: 'bi-calendar3-range',
+        blurb: 'Two-pane range picker with the quick-range presets rail — day/month/year modes, cross-page anchor, and the FilterBar daterange dialog now uses it.',
+        render: () => <DateRangeDemo />,
     },
     {
         key: 'timepicker', title: 'TimePicker', icon: 'bi-clock',

@@ -3,10 +3,7 @@
 // (the FilterBar daterange dialog shape), and the trigger states.
 import { useState } from 'react';
 import { dateFns } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui
-import { DateRangePicker } from '../../../../../packages/portal-mojo/src/ui/date/DateRangePicker';
-// MERGE-WIRE: portal-mojo/ui
-import type { PresetEntry } from '../../../../../packages/portal-mojo/src/ui/date/PresetRail';
+import { DateRangePicker, type PresetEntry } from 'portal-mojo/ui';
 
 const { formatYmd, today } = dateFns;
 

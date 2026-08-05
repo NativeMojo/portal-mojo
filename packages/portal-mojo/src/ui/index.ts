@@ -13,6 +13,8 @@ export * from './CollectionSelect';
 export * from './ComboBox';
 export * from './date/Calendar';
 export * from './date/DatePicker';
+export * from './date/DateRangePicker';
+export * from './date/PresetRail';
 export * from './date/TimePicker';
 export * from './date/TimezoneSelect';
 export * from './MarkdownView';
