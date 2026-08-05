@@ -14,8 +14,7 @@
 //     permission arrays)
 import { useState } from 'react';
 import { z } from 'zod';
-// MERGE-WIRE: portal-mojo/ui
-import { FormView, registerFormTabs } from '../../../../../packages/portal-mojo/src/ui/FormView';
+import { FormView, registerFormTabs } from 'portal-mojo/ui';
 import type { Field } from 'portal-mojo/ui';
 import { UserModel } from '../../models';
 

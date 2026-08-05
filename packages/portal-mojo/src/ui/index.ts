@@ -23,6 +23,8 @@ export * from './TagInput';
 export * from './toast';
 export * from './ui';
 export * from './FormFields';
+export * from './FormView';
+export * from './form-autosave';
 export * from './DetailView';
 export * from './FilterBar';
 export * from './ModelTable';

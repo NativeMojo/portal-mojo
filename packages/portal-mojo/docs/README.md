@@ -12,7 +12,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [params.md](params.md) | `useTableParams` — the single source of truth for table state; persistence blob |
 | [auth.md](auth.md) | Login flows, token upkeep, hosted-auth (bouncer page) bridge, auth events |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
-| [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal` |
+| [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
 | [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |

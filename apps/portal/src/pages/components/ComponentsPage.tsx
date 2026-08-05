@@ -22,6 +22,7 @@ import { CalendarDemo } from './demos-calendar';
 import { MarkdownDemo } from './demos-markdown';
 import { DatePickerDemo } from './demos-datepicker';
 import { MultiSelectDropdownDemo } from './demos-multiselect-dropdown';
+import { AutosaveDemo } from './demos-autosave';
 
 interface DemoSection {
     key: string;
@@ -46,6 +47,11 @@ const SECTIONS: DemoSection[] = [
         key: 'search', title: 'Expanding search', icon: 'bi-search',
         blurb: 'maestro fsearch: icon at rest, input on focus, pinned while holding text, "/" to focus, 300ms debounce to the wire.',
         render: () => <SearchDemo />,
+    },
+    {
+        key: 'autosave', title: 'FormView autosave', icon: 'bi-magic',
+        blurb: 'No save buttons: edits batch 300ms into ONE save, per-field saved/error indicators, revert-on-fail from the server snapshot, showWhen, permission tabsets.',
+        render: () => <AutosaveDemo />,
     },
     {
         key: 'forms', title: 'SchemaForm', icon: 'bi-ui-checks',
