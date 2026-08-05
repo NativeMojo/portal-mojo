@@ -86,8 +86,8 @@ function smoothPath(pts: [number, number][], tension: number): string {
 }
 
 export function SeriesChart({
-    labels,
-    datasets,
+    labels: labelsProp,
+    datasets: datasetsProp,
     chartType = 'line',
     stacked = 'auto',
     height = 260,
@@ -101,6 +101,16 @@ export function SeriesChart({
     showDots = true,
     emptyText = 'No data for this range',
 }: SeriesChartProps) {
+    // Malformed feed data must degrade to the empty state, not take down the
+    // route (a live-backend shape drift did exactly that once) — warn + empty,
+    // per the unknown-value rule.
+    const validShape = Array.isArray(labelsProp) && Array.isArray(datasetsProp);
+    if (!validShape) {
+        console.warn('SeriesChart: labels/datasets are not arrays — rendering empty state', { labels: labelsProp, datasets: datasetsProp });
+    }
+    const labels = validShape ? labelsProp : [];
+    const datasets = validShape ? datasetsProp : [];
+
     const wrapRef = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(600);
     const [hover, setHover] = useState<number | null>(null);

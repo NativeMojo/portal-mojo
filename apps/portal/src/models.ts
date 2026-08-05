@@ -7,7 +7,7 @@ import { defineModel, type User } from 'portal-mojo/client';
 
 export const UserModel = defineModel<User>({
     name: 'user',
-    endpoint: '/api/account/user',
+    endpoint: '/api/user',
     // Category-or-granular pairs, exactly the any-of lists the backend gates
     // its user actions with (account/models/user.py: ["users", "manage_users"]).
     permissions: {
@@ -18,17 +18,13 @@ export const UserModel = defineModel<User>({
         create: {
             title: 'Add user',
             submitText: 'Create',
+            // Real save contract: username derives from the email localpart
+            // server-side when omitted; there is no `role` field in mojo.
             fields: [
                 { name: 'display_name', type: 'text', label: 'Display name', required: true, placeholder: 'Jane Cooper' },
                 { name: 'email', type: 'email', label: 'Email', required: true, placeholder: 'jane@example.com' },
-                { name: 'phone', type: 'tel', label: 'Phone', columns: 6 },
-                {
-                    name: 'role', type: 'select', label: 'Role', columns: 6, options: [
-                        { value: 'user', label: 'User' },
-                        { value: 'staff', label: 'Staff' },
-                        { value: 'admin', label: 'Admin' },
-                    ],
-                },
+                { name: 'phone_number', type: 'tel', label: 'Phone', columns: 6 },
+                { name: 'username', type: 'text', label: 'Username', columns: 6, placeholder: 'Defaults from email', help: 'Leave blank to derive from email' },
             ],
         },
         // Disable collects the reason the backend REQUIRES (services/disable.py

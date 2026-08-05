@@ -3,7 +3,8 @@
 // flat rows with edit pencils; danger action) as schema + small components.
 // Field edits go through UserModel.useSave; the disable / reactivate /
 // send_invite / revoke_sessions flows are the backend's POST_SAVE_ACTIONS,
-// driven through UserModel.useAction (B1).
+// driven through UserModel.useAction (B1). Fields are the REAL default-graph
+// row — no role/passkey/MFA fields here (those ride only the `me` graph).
 import { Badge, DetailView, Eyebrow, FlatRow, SecurityItem, fmt, formModal, modal, toast } from 'portal-mojo/ui';
 import { UserModel } from '../models';
 
@@ -34,9 +35,9 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
             fields: [
                 { name: 'display_name', type: 'text', label: 'Display name', required: true },
                 { name: 'email', type: 'email', label: 'Email', required: true },
-                { name: 'phone', type: 'tel', label: 'Phone', placeholder: '+1 (555) 0100' },
+                { name: 'phone_number', type: 'tel', label: 'Phone', placeholder: '+1 (555) 0100' },
             ],
-            initial: { display_name: user.display_name, email: user.email, phone: user.phone ?? '' },
+            initial: { display_name: user.display_name ?? '', email: user.email, phone_number: user.phone_number ?? '' },
         });
         if (data) await saveFields(data, 'Contact updated');
     };
@@ -45,7 +46,7 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
     const disableUser = async (): Promise<boolean> => {
         const data = await formModal({
             ...UserModel.forms.disable!,
-            intro: <>Disable <b>{user.display_name}</b>? They will no longer be able to sign in.</>,
+            intro: <>Disable <b>{user.display_name || user.username}</b>? They will no longer be able to sign in.</>,
         });
         if (!data) return false;
         const payload: Record<string, unknown> = { reason: data.reason };
@@ -104,14 +105,15 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
 
     return (
         <DetailView
-            avatarName={user.display_name}
-            title={user.display_name}
+            avatarName={user.display_name || user.username}
+            title={user.display_name || user.username}
             subtitle={user.email}
             chips={[
-                user.email_verified
+                user.is_email_verified
                     ? { icon: 'bi-patch-check-fill', text: 'Email', tone: 'success' }
                     : { icon: 'bi-exclamation-circle', text: 'Unverified', tone: 'warning' },
-                ...(user.role !== 'user' ? [{ text: user.role, tone: fmt.inferTone(user.role) }] : []),
+                ...(user.is_superuser ? [{ text: 'superuser', tone: 'primary' as const }] : []),
+                ...(user.is_online ? [{ icon: 'bi-circle-fill', text: 'Online', tone: 'success' as const }] : []),
             ]}
             // Off → disable action (cancel leaves the switch on); on → reactivate.
             active={{ value: user.is_active, onChange: (next) => { void (next ? reactivateUser() : disableUser()); } }}
@@ -122,21 +124,23 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
                         <>
                             <Eyebrow>Contact</Eyebrow>
                             <FlatRow label="Email" action={editContact}>
-                                {user.email} {user.email_verified && <Badge tone="success">Verified</Badge>}
+                                {user.email} {user.is_email_verified && <Badge tone="success">Verified</Badge>}
                             </FlatRow>
-                            <FlatRow label="Phone" action={editContact} actionIcon={user.phone ? 'bi-pencil' : 'bi-plus-lg'}>
-                                {user.phone ?? <span className="dim-italic">Not set</span>}
+                            <FlatRow label="Phone" action={editContact} actionIcon={user.phone_number ? 'bi-pencil' : 'bi-plus-lg'}>
+                                {user.phone_number ?? <span className="dim-italic">Not set</span>}
+                                {user.phone_number && user.is_phone_verified && <> <Badge tone="success">Verified</Badge></>}
                             </FlatRow>
 
                             <Eyebrow>Account</Eyebrow>
-                            <FlatRow label="Username">{user.email}</FlatRow>
+                            <FlatRow label="Username">{user.username}</FlatRow>
                             <FlatRow label="Status"><Badge>{user.is_active ? 'Active' : 'Inactive'}</Badge></FlatRow>
-                            <FlatRow label="Role"><span className="cap">{user.role}</span></FlatRow>
-                            <FlatRow label="MFA">
-                                {user.mfa_enabled ? <Badge tone="success">Enabled</Badge> : <Badge tone="muted">Not required</Badge>}
+                            <FlatRow label="Access">
+                                {user.is_superuser ? <Badge tone="primary">Superuser</Badge>
+                                    : Object.keys(user.permissions ?? {}).length > 0 ? <Badge tone="warning">Staff</Badge>
+                                    : <span className="dim">Standard</span>}
                             </FlatRow>
-                            <FlatRow label="Member Since">{fmt.date(user.created)}</FlatRow>
                             <FlatRow label="Last Login">{fmt.relative(user.last_login)}</FlatRow>
+                            <FlatRow label="Last Activity">{fmt.relative(user.last_activity, '—')}</FlatRow>
 
                             {user.is_active && (
                                 <div className="danger-zone">
@@ -152,15 +156,17 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
                 {
                     key: 'security', label: 'Security', icon: 'bi-shield-check', render: () => (
                         <>
-                            <Eyebrow>Sign-in methods</Eyebrow>
-                            <SecurityItem icon="bi-key" title="Password" desc="Last changed over a year ago">
+                            <Eyebrow>Verification</Eyebrow>
+                            <SecurityItem icon="bi-envelope-check" title="Email" desc={user.email}>
+                                <Badge tone={user.is_email_verified ? 'success' : 'muted'}>{user.is_email_verified ? 'Verified' : 'Unverified'}</Badge>
+                            </SecurityItem>
+                            <SecurityItem icon="bi-phone" title="Phone" desc={user.phone_number ?? 'No phone on file'}>
+                                <Badge tone={user.is_phone_verified ? 'success' : 'muted'}>{user.is_phone_verified ? 'Verified' : 'Unverified'}</Badge>
+                            </SecurityItem>
+
+                            <Eyebrow>Sign-in</Eyebrow>
+                            <SecurityItem icon="bi-key" title="Password" desc="Send a password reset link">
                                 <button className="btn btn-compact" onClick={() => toast.info('Reset link sent')}>Send reset</button>
-                            </SecurityItem>
-                            <SecurityItem icon="bi-phone" title="Two-factor authentication" desc={user.mfa_enabled ? 'TOTP app configured' : 'Not configured'}>
-                                <Badge tone={user.mfa_enabled ? 'success' : 'muted'}>{user.mfa_enabled ? 'On' : 'Off'}</Badge>
-                            </SecurityItem>
-                            <SecurityItem icon="bi-fingerprint" title="Passkeys" desc={user.passkeys > 0 ? `${user.passkeys} registered` : 'None registered'}>
-                                <Badge tone={user.passkeys > 0 ? 'success' : 'muted'}>{user.passkeys}</Badge>
                             </SecurityItem>
                             {user.last_login == null && (
                                 // `when` gate (UserView parity): only a user who has
@@ -176,12 +182,9 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
                 {
                     key: 'sessions', label: 'Sessions', icon: 'bi-clock-history', render: () => (
                         <>
-                            <Eyebrow>Recent sessions</Eyebrow>
-                            <SecurityItem icon="bi-laptop" title="MacBook Pro · Safari" desc={`San Francisco, US · ${fmt.relative(user.last_login)}`}>
-                                <Badge tone="success">Current</Badge>
-                            </SecurityItem>
-                            <SecurityItem icon="bi-phone" title="iPhone · Mojo App" desc="San Francisco, US · 2 months ago">
-                                <Badge tone="muted">2 mo</Badge>
+                            <Eyebrow>Sessions</Eyebrow>
+                            <SecurityItem icon="bi-laptop" title="Active sessions" desc={`Last seen ${fmt.relative(user.last_activity, 'never')}`}>
+                                <Badge tone={user.is_online ? 'success' : 'muted'}>{user.is_online ? 'Online' : 'Offline'}</Badge>
                             </SecurityItem>
                             <div className="danger-zone">
                                 <button className="danger-link" onClick={() => void revokeAllSessions()}>

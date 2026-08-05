@@ -40,9 +40,16 @@ const TYPES: { value: ChartType; icon: string; title: string }[] = [
     { value: 'area', icon: 'bi-graph-up-arrow', title: 'Area' },
 ];
 
-export function MetricsChart({ title, slugs, defaultRange = '24h', defaultGranularity = 'hours', defaultType = 'line', height = 280 }: {
+/** 'api_calls' → 'Api Calls' — the default legend name for an unmapped slug. */
+function humanizeSlug(slug: string): string {
+    return slug.split(/[_-]/).map((w) => (w ? w[0]!.toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+export function MetricsChart({ title, slugs, seriesLabels = {}, defaultRange = '24h', defaultGranularity = 'hours', defaultType = 'line', height = 280 }: {
     title: string;
     slugs: string[];
+    /** Display names per slug — the wire only carries raw slugs. */
+    seriesLabels?: Record<string, string>;
     defaultRange?: string;
     defaultGranularity?: string;
     defaultType?: ChartType;
@@ -58,6 +65,10 @@ export function MetricsChart({ title, slugs, defaultRange = '24h', defaultGranul
     const query = useQuery({
         queryKey: ['metrics', slugs, range, effective],
         queryFn: () => mojoMetrics({ slugs: slugs.join(','), range, granularity: effective }),
+        select: (res) => ({
+            ...res,
+            datasets: res.datasets.map((d) => ({ ...d, label: seriesLabels[d.label] ?? humanizeSlug(d.label) })),
+        }),
     });
 
     // Switching range re-points granularity at the nearest sensible bucket

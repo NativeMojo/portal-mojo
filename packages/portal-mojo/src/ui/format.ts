@@ -6,22 +6,25 @@ const DATETIME_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'nu
 
 function toDate(value: string | number | Date | null | undefined): Date | null {
     if (value == null || value === '') return null;
-    const d = value instanceof Date ? value : new Date(value);
+    // django-mojo serializes datetimes as epoch SECONDS; JS Date takes ms.
+    // <1e11 distinguishes them until the year 5138 (web-mojo's Job heuristic).
+    const normalized = typeof value === 'number' && value < 1e11 ? value * 1000 : value;
+    const d = normalized instanceof Date ? normalized : new Date(normalized);
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export function date(value: string | null | undefined, fallback = '—'): string {
+export function date(value: string | number | null | undefined, fallback = '—'): string {
     const d = toDate(value);
     return d ? DATE_FMT.format(d) : fallback;
 }
 
-export function datetime(value: string | null | undefined, fallback = '—'): string {
+export function datetime(value: string | number | null | undefined, fallback = '—'): string {
     const d = toDate(value);
     return d ? DATETIME_FMT.format(d) : fallback;
 }
 
 /** '3 weeks ago' style. Ports web-mojo's `relative` pipe behavior. */
-export function relative(value: string | null | undefined, fallback = 'Never'): string {
+export function relative(value: string | number | null | undefined, fallback = 'Never'): string {
     const d = toDate(value);
     if (!d) return fallback;
     const secs = Math.round((Date.now() - d.getTime()) / 1000);
@@ -40,8 +43,9 @@ export function relative(value: string | null | undefined, fallback = 'Never'): 
     return `${count} ${unit}${count === 1 ? '' : 's'} ago`;
 }
 
-export function initials(name: string): string {
-    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
+export function initials(name: string | null | undefined): string {
+    // Real rows can carry display_name: null — a formatter degrades, never throws.
+    return (name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || '?';
 }
 
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'primary';

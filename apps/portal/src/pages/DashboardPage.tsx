@@ -5,7 +5,7 @@ import { Badge, MetricCard, fmt, modal } from 'portal-mojo/ui';
 import { MetricsChart } from 'portal-mojo/charts';
 import { UserDetail } from './UserDetail';
 
-const ENDPOINT = '/api/account/user';
+const ENDPOINT = '/api/user';
 
 function useCount(filters: Record<string, string>) {
     const q = useModelList<User>(ENDPOINT, { size: 0, ...filters });
@@ -15,8 +15,8 @@ function useCount(filters: Record<string, string>) {
 export function DashboardPage() {
     const total = useCount({});
     const active = useCount({ is_active: 'true' });
-    const admins = useCount({ role: 'admin' });
-    const mfa = useCount({ mfa_enabled: 'true' });
+    const superusers = useCount({ is_superuser: 'true' });
+    const verified = useCount({ is_email_verified: 'true' });
 
     const recent = useModelList<User>(ENDPOINT, { size: 6, sort: '-created' });
 
@@ -27,8 +27,8 @@ export function DashboardPage() {
             <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
                 <MetricCard label="Total Users" value={total ?? '—'} icon="bi-people" hint="All accounts" />
                 <MetricCard label="Active" value={active ?? '—'} icon="bi-person-check" hint={total ? `${Math.round(((active ?? 0) / total) * 100)}% of total` : undefined} />
-                <MetricCard label="Admins" value={admins ?? '—'} icon="bi-shield-lock" hint="System-wide access" />
-                <MetricCard label="MFA Enabled" value={mfa ?? '—'} icon="bi-phone" hint={total ? `${Math.round(((mfa ?? 0) / total) * 100)}% adoption` : undefined} />
+                <MetricCard label="Superusers" value={superusers ?? '—'} icon="bi-shield-lock" hint="System-wide access" />
+                <MetricCard label="Email Verified" value={verified ?? '—'} icon="bi-patch-check" hint={total ? `${Math.round(((verified ?? 0) / total) * 100)}% of total` : undefined} />
             </div>
 
             <MetricsChart
@@ -57,10 +57,10 @@ export function DashboardPage() {
                     <div className="feed">
                         {(recent.data?.rows ?? []).map((u) => (
                             <button key={u.id} className="feed-row" onClick={() => openUser(u.id)}>
-                                <span className="cell-avatar">{fmt.initials(u.display_name)}</span>
+                                <span className="cell-avatar">{fmt.initials(u.display_name || u.username)}</span>
                                 <span className="feed-main">
-                                    <span className="cell-name">{u.display_name}</span>
-                                    <span className="cell-sub">joined {fmt.relative(u.created)}</span>
+                                    <span className="cell-name">{u.display_name || u.username}</span>
+                                    <span className="cell-sub">last active {fmt.relative(u.last_activity, 'never')}</span>
                                 </span>
                                 <Badge>{u.is_active ? 'Active' : 'Inactive'}</Badge>
                             </button>

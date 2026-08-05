@@ -328,6 +328,7 @@ button { font: inherit; color: inherit; }
 .cell-name { display: block; font-weight: 600; color: var(--ink-strong); }
 .cell-sub { display: block; font-size: 12px; color: var(--mute); }
 .text-ok { color: var(--ok); }
+.online-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-left: 6px; vertical-align: middle; }
 .dim { color: var(--mute); }
 .dim-italic { color: var(--mute); font-style: italic; }
 .cap { text-transform: capitalize; }

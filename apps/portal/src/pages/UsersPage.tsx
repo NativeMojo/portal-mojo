@@ -1,6 +1,8 @@
 // Users — a full ModelTable page in ~70 declarative lines: columns, filters,
 // presets, add form. The endpoint, form config and save/action wiring all
 // come from the UserModel definition (models.ts) — the page is presentation.
+// Columns and filters target the REAL /api/user default-graph row (no role,
+// no created; epoch timestamps; verified live against a django-mojo server).
 import { useQueryClient } from '@tanstack/react-query';
 import { type User } from 'portal-mojo/client';
 import { Badge, fmt, formModal, modal, toast, ModelTable, type Column, type FilterDef } from 'portal-mojo/ui';
@@ -11,40 +13,47 @@ const COLUMNS: Column<User>[] = [
     {
         key: 'display_name', label: 'User', render: (u) => (
             <div className="cell-user">
-                <span className="cell-avatar">{fmt.initials(u.display_name)}</span>
+                <span className="cell-avatar">{fmt.initials(u.display_name || u.username)}</span>
                 <span>
-                    <span className="cell-name">{u.display_name}</span>
+                    <span className="cell-name">
+                        {u.display_name || u.username}
+                        {u.is_online && <span className="online-dot" title="Online" />}
+                    </span>
                     <span className="cell-sub">{u.email}</span>
                 </span>
             </div>
         ),
     },
-    { key: 'role', label: 'Role', render: (u) => <Badge>{u.role}</Badge> },
+    { key: 'username', label: 'Username', render: (u) => <span className="dim">{u.username}</span> },
+    {
+        key: 'is_superuser', label: 'Access', render: (u) =>
+            u.is_superuser ? <Badge tone="primary">superuser</Badge>
+            : Object.keys(u.permissions ?? {}).length > 0 ? <Badge tone="warning">staff</Badge>
+            : <span className="dim">—</span>,
+    },
     { key: 'is_active', label: 'Status', render: (u) => <Badge>{u.is_active ? 'Active' : 'Inactive'}</Badge> },
-    { key: 'mfa_enabled', label: 'MFA', align: 'center', render: (u) => u.mfa_enabled ? <i className="bi bi-shield-check text-ok" /> : <span className="dim">—</span> },
+    {
+        key: 'is_email_verified', label: 'Verified', align: 'center', render: (u) =>
+            u.is_email_verified ? <i className="bi bi-patch-check-fill text-ok" /> : <span className="dim">—</span>,
+    },
     { key: 'last_login', label: 'Last Login', render: (u) => fmt.relative(u.last_login) },
-    { key: 'created', label: 'Joined', render: (u) => fmt.date(u.created) },
+    { key: 'last_activity', label: 'Last Activity', render: (u) => fmt.relative(u.last_activity, '—') },
 ];
 
 // Adding a filter is one entry. Every type the framework supports is here:
-// text (icontains), select, multiselect (__in), boolean, number (gte), and
-// two dateranges — only one range can be active at a time by construction.
+// text (icontains), boolean, and dateranges — all real Django lookups the
+// live server answers (multiselect returns with a real __in field on C4's
+// Groups page — user rows have no enum-ish field to feed it).
 const FILTERS: FilterDef[] = [
     { key: 'display_name', label: 'Name', type: 'text', placeholder: 'Contains…' },
     { key: 'email', label: 'Email', type: 'text', placeholder: 'Contains…' },
-    {
-        key: 'role', label: 'Role', type: 'multiselect', options: [
-            { value: 'user', label: 'User' },
-            { value: 'staff', label: 'Staff' },
-            { value: 'admin', label: 'Admin' },
-        ],
-    },
+    { key: 'username', label: 'Username', type: 'text', placeholder: 'Contains…' },
     { key: 'is_active', label: 'Status', type: 'boolean', trueLabel: 'Active', falseLabel: 'Inactive' },
-    { key: 'mfa_enabled', label: 'MFA', type: 'boolean', trueLabel: 'Enabled', falseLabel: 'Disabled' },
-    { key: 'email_verified', label: 'Email verified', type: 'boolean', trueLabel: 'Verified', falseLabel: 'Unverified' },
-    { key: 'passkeys', label: 'Passkeys', type: 'number' },
-    { key: 'created', label: 'Joined', type: 'daterange' },
+    { key: 'is_email_verified', label: 'Email verified', type: 'boolean', trueLabel: 'Verified', falseLabel: 'Unverified' },
+    { key: 'is_phone_verified', label: 'Phone verified', type: 'boolean', trueLabel: 'Verified', falseLabel: 'Unverified' },
+    { key: 'is_superuser', label: 'Superuser', type: 'boolean', trueLabel: 'Yes', falseLabel: 'No' },
     { key: 'last_login', label: 'Last login', type: 'daterange' },
+    { key: 'last_activity', label: 'Last activity', type: 'daterange' },
 ];
 
 export function UsersPage() {
@@ -55,9 +64,12 @@ export function UsersPage() {
         const form = UserModel.forms.create!;
         const data = await formModal(form);
         if (!data) return;
+        // Optional blanks stay client-side; the backend derives username
+        // from the email localpart when it is absent.
+        const changes = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== ''));
         try {
-            await save.mutateAsync({ id: null, changes: data });
-            toast.success(`${String(data.display_name)} created`);
+            const created = await save.mutateAsync({ id: null, changes });
+            toast.success(`${created.display_name || created.username} created`);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Create failed');
         }
@@ -76,13 +88,14 @@ export function UsersPage() {
             model={UserModel}
             eyebrow="Account"
             title="Users"
-            searchPlaceholder="Search name or email…"
+            searchPlaceholder="Search name, username, email…"
             columns={COLUMNS}
             filters={FILTERS}
             presets={[
                 { key: 'all', label: 'All', params: {} },
                 { key: 'active', label: 'Active', params: { is_active: 'true' } },
-                { key: 'admins', label: 'Admins', params: { role: 'admin' } },
+                { key: 'superusers', label: 'Superusers', params: { is_superuser: 'true' } },
+                { key: 'never', label: 'Never signed in', params: { last_login__isnull: 'true' } },
                 { key: 'inactive', label: 'Inactive', params: { is_active: 'false' } },
             ]}
             onRowClick={openUser}

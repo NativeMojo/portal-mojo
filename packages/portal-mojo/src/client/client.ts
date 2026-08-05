@@ -163,14 +163,22 @@ export async function mojoGet<T>(endpoint: string, id: number | string): Promise
 export interface MetricsResponse {
     labels: string[];
     datasets: { label: string; data: number[] }[];
-    granularity: string;
-    range: string;
 }
 
-/** django-mojo metrics: bucketed multi-series time data. */
+/**
+ * django-mojo metrics. The wire shape (verified live) is
+ * `{data: {<slug>: number[]}, labels: string[]}` — a slug-keyed map with NO
+ * granularity/range echo. Normalized HERE (the one boundary) into the
+ * datasets array the chart components consume; display names for slugs are a
+ * presentation concern (MetricsChart), not a wire fact.
+ */
 export async function mojoMetrics(params: Params): Promise<MetricsResponse> {
     const body = await unwrap('/api/metrics/fetch', { params });
-    return body.data as MetricsResponse;
+    const raw = (body.data ?? {}) as { data?: Record<string, number[]>; labels?: string[] };
+    return {
+        labels: raw.labels ?? [],
+        datasets: Object.entries(raw.data ?? {}).map(([slug, data]) => ({ label: slug, data: data ?? [] })),
+    };
 }
 
 /** Create (no id) or update (with id). Rejects on any failure. */

@@ -5,8 +5,21 @@ shipped with every django-mojo deployment. Succeeds `web-mojo`, which goes to
 maintenance mode and keeps serving its three existing portals untouched.
 
 **Status:** Chunk A COMPLETE (A0–A4, 2026-08-04). Chunk B started: B1
-(`defineModel`) shipped 2026-08-04 — see row. Next up: **B2** (TableView to
-full fidelity).
+(`defineModel`) shipped 2026-08-04 — see row. **Live-backend validated
+2026-08-04** against a real django-mojo (mverify dev @ :9009, `npm run
+dev:live` / preview config "portal-live"): login → me → groups → member →
+list (search/sort/lookups/`dr_*` triple/`__isnull`/paging) → save →
+all four user POST_SAVE_ACTIONS, plus reject-on-failure surfacing real
+server errors (bad phone format). Contract corrections from measurement:
+account app mounts at **`/api/user`** (not `/api/account/user`); datetimes
+are **epoch seconds**; list rows have **no `role`/`created`/passkey fields**
+(`display_name` nullable; `permissions` dict rides the row; me-graph adds
+`has_passkey`/`requires_mfa`); metrics wire is a **slug-keyed map**
+`{data:{slug:[…]}, labels}` normalized at the one boundary; backend
+`has_permission` has **no `admin` wildcard** (only `is_superuser` +
+category rollup — client stays deliberately more permissive; server
+authoritative). Mock realigned to all of it. Next up: **B2** (TableView to
+full fidelity) — now against a validated contract.
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.

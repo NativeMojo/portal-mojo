@@ -36,16 +36,36 @@ export interface ModelForm {
     submitText?: string;
 }
 
+/**
+ * django-mojo datetimes serialize as EPOCH SECONDS (measured against a live
+ * server, not assumed) — fmt.date/relative accept them directly.
+ */
+export type MojoTimestamp = number | null;
+
+/**
+ * The default-graph user row exactly as /api/user serializes it (verified
+ * live against mverify 2026-08-04). Note what is NOT here: no `role`, no
+ * `created`, no passkey/MFA fields (those ride only the `me` graph).
+ */
 export interface User {
     id: number;
-    display_name: string;
+    display_name: string | null; // null on real rows (system/deleted accounts)
+    username: string;
     email: string;
-    phone: string | null;
-    role: 'user' | 'staff' | 'admin';
+    phone_number: string | null;
+    first_name?: string;
+    last_name?: string;
     is_active: boolean;
-    email_verified: boolean;
-    mfa_enabled: boolean;
-    passkeys: number;
-    last_login: string | null; // ISO
-    created: string; // ISO
+    is_superuser: boolean;
+    is_email_verified: boolean;
+    is_phone_verified: boolean;
+    is_dob_verified?: boolean;
+    is_online: boolean;
+    last_login: MojoTimestamp;
+    last_activity: MojoTimestamp;
+    permissions: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    dob?: string | null;
+    avatar?: { url?: string } | string | null;
+    org?: { id: number; name: string } | number | null;
 }

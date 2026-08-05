@@ -18,8 +18,9 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
   checks the package, then the app.
 - `apps/portal` — the base admin portal app (Vite/React 19/TS strict). Dev:
   `npm run dev` (preview config "portal"; port 5199, autoPort picks another
-  via PORT when taken). Mock django-mojo API by default; `VITE_MOJO_API=<origin>`
-  targets a real backend.
+  via PORT when taken). Mock django-mojo API by default; `npm run dev:live`
+  (preview config "portal-live", `apps/portal/.env.live`) targets a real
+  backend. Pre-C3 sign-in: `__mojo.login(user, pass)` in the console.
 - `packages/portal-mojo` — the toolkit: TS-source subpath exports
   `portal-mojo/client`, `/ui`, `/charts`, `/admin`; no build step. The app
   imports the package, never the reverse. Its README lists what consuming

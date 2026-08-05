@@ -11,7 +11,9 @@ function Overview() {
     const perms = Object.entries((member?.permissions as Record<string, unknown>) ?? {})
         .filter(([, v]) => v === true || v === 1)
         .map(([k]) => k);
-    const memberRole = (member as { role?: string } | null)?.role;
+    // Real member rows carry no role field — the member `admin` permission IS
+    // the role signal (verified against a live /api/group/<id>/member).
+    const memberRole = perms.includes('admin') ? 'admin' : 'member';
     return (
         <div className="panel panel-pad max-w-2xl">
             <div className="eyebrow">Active group</div>
@@ -32,7 +34,7 @@ function Overview() {
                 <>
                     <div className="flat-row">
                         <span className="flat-label">Role</span>
-                        <span className="flat-value"><Badge>{memberRole ?? 'member'}</Badge></span>
+                        <span className="flat-value"><Badge>{memberRole}</Badge></span>
                     </div>
                     <div className="flat-row">
                         <span className="flat-label">Permissions</span>
@@ -44,7 +46,7 @@ function Overview() {
                     {group.created != null && (
                         <div className="flat-row">
                             <span className="flat-label">Created</span>
-                            <span className="flat-value">{fmt.date(String(group.created))}</span>
+                            <span className="flat-value">{fmt.date(group.created as number | string)}</span>
                         </div>
                     )}
                 </>

@@ -28,32 +28,79 @@ function mulberry32(seed: number) {
 const FIRST = ['Ian', 'Maya', 'Jordan', 'Priya', 'Marcus', 'Elena', 'Tom', 'Aisha', 'Diego', 'Nora', 'Sam', 'Lena', 'Victor', 'Ruth', 'Omar', 'Grace', 'Felix', 'Dana', 'Kai', 'June'];
 const LAST = ['Starnes', 'Chen', 'Alvarez', 'Patel', 'Reed', 'Kovacs', 'Nguyen', 'Okafor', 'Ramos', 'Lindqvist', 'Barnes', 'Moreau', 'Ito', 'Novak', 'Haddad', 'Kim', 'Weber', 'Silva', 'Fontaine'];
 
-function buildUsers(): User[] {
+/**
+ * Internal user record: the serialized row (real /api/user default-graph
+ * shape, epoch-second datetimes) PLUS server-private fields the wire never
+ * carries — `created` exists on the model (so `sort=-created` works, exactly
+ * like the real backend) but is NOT in the default graph; serializeUser
+ * strips it.
+ */
+export type MockUser = User & { created: number };
+
+const PRIVATE_USER_FIELDS = new Set(['created']);
+
+function serializeUser(u: MockUser): User {
+    const row: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(u)) {
+        if (!PRIVATE_USER_FIELDS.has(k)) row[k] = v;
+    }
+    return row as unknown as User;
+}
+
+function buildUsers(): MockUser[] {
     const rand = mulberry32(20260804);
-    const now = Date.now();
-    const users: User[] = [];
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const users: MockUser[] = [];
     for (let i = 1; i <= 57; i++) {
         const fn = FIRST[Math.floor(rand() * FIRST.length)];
         const ln = LAST[Math.floor(rand() * LAST.length)];
         const createdDays = Math.floor(rand() * 380) + 3;
         const active = rand() > 0.14;
         const loggedInDays = Math.floor(rand() * createdDays);
+        const lastLogin = active && rand() > 0.1 ? nowSec - loggedInDays * DAY - Math.floor(rand() * DAY) : null;
+        const username = `${fn.toLowerCase()}.${ln.toLowerCase()}${i}`;
+        // Permission spread mirrors a real deployment: a few superusers, a
+        // band of users-category admins (staff-equivalent), most unprivileged.
+        const r = rand();
+        const isSuper = r > 0.95;
+        // The loose `1` (not `true`) is deliberate — the backend stores both;
+        // A2's `== true`-compatible checks must keep being exercised.
+        const permissions = !isSuper && r > 0.8 ? { users: 1, view_admin: 1 } : {};
         users.push({
             id: i,
+            first_name: fn,
+            last_name: ln,
             display_name: `${fn} ${ln}`,
-            email: `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@nativemojo.com`,
-            phone: rand() > 0.55 ? `+1 (555) 0${String(100 + Math.floor(rand() * 899))}` : null,
-            role: rand() > 0.92 ? 'admin' : rand() > 0.78 ? 'staff' : 'user',
+            username,
+            email: `${username}@nativemojo.com`,
+            phone_number: rand() > 0.55 ? `+1 (555) 0${String(100 + Math.floor(rand() * 899))}` : null,
             is_active: active,
-            email_verified: rand() > 0.18,
-            mfa_enabled: rand() > 0.6,
-            passkeys: rand() > 0.7 ? Math.ceil(rand() * 3) : 0,
-            last_login: active && rand() > 0.1 ? new Date(now - loggedInDays * 864e5 - rand() * 864e5).toISOString() : null,
-            created: new Date(now - createdDays * 864e5).toISOString(),
+            is_superuser: isSuper,
+            is_email_verified: rand() > 0.18,
+            is_phone_verified: rand() > 0.65,
+            is_dob_verified: false,
+            is_online: active && rand() > 0.85,
+            last_login: lastLogin,
+            last_activity: lastLogin ? lastLogin + Math.floor(rand() * DAY) : null,
+            permissions,
+            metadata: {},
+            dob: null,
+            avatar: null,
+            org: null,
+            created: nowSec - createdDays * DAY,
         });
     }
     // Row 1 mirrors the reference screenshot.
-    users[0] = { ...users[0], display_name: 'Ian Starnes', email: 'ian@mojoverify.com', phone: null, role: 'user', is_active: true, email_verified: true, mfa_enabled: false, passkeys: 1, created: '2026-07-10T14:00:00Z', last_login: new Date(now - 21 * 864e5).toISOString() };
+    users[0] = {
+        ...users[0]!,
+        first_name: 'Ian', last_name: 'Starnes', display_name: 'Ian Starnes',
+        username: 'ian', email: 'ian@mojoverify.com', phone_number: null,
+        is_active: true, is_superuser: false, is_email_verified: true,
+        is_phone_verified: false, is_online: true, permissions: {},
+        created: Math.floor(Date.parse('2026-07-10T14:00:00Z') / 1000),
+        last_login: nowSec - 21 * DAY, last_activity: nowSec - 20 * DAY,
+    };
     return users;
 }
 
@@ -66,7 +113,7 @@ export interface MockGroup {
     name: string;
     kind: string;
     parent: { id: number; name: string; kind: string } | null;
-    created: string;
+    created: number; // epoch seconds, like every mojo datetime
     [field: string]: unknown;
 }
 
@@ -81,7 +128,7 @@ function buildGroups(): MockGroup[] {
     ORG_NAMES.forEach((orgName, oi) => {
         const org: MockGroup = {
             id: id++, name: orgName, kind: 'org', parent: null,
-            created: new Date(now - (420 - oi * 40) * 864e5).toISOString(),
+            created: Math.floor((now - (420 - oi * 40) * 864e5) / 1000),
         };
         groups.push(org);
         const teamCount = 2 + (oi % 2);
@@ -89,7 +136,7 @@ function buildGroups(): MockGroup[] {
             const team: MockGroup = {
                 id: id++, name: TEAM_NAMES[t]!, kind: 'team',
                 parent: { id: org.id, name: org.name, kind: 'org' },
-                created: new Date(now - (400 - oi * 40 - t * 5) * 864e5).toISOString(),
+                created: Math.floor((now - (400 - oi * 40 - t * 5) * 864e5) / 1000),
             };
             groups.push(team);
             if (t === 0) engineeringTeams.push(team);
@@ -100,7 +147,7 @@ function buildGroups(): MockGroup[] {
         groups.push({
             id: id++, name, kind: 'project',
             parent: { id: team.id, name: team.name, kind: 'team' },
-            created: new Date(now - (120 - pi * 30) * 864e5).toISOString(),
+            created: Math.floor((now - (120 - pi * 30) * 864e5) / 1000),
         });
     }
     return groups;
@@ -189,7 +236,14 @@ function listRows<T extends Record<string, unknown>>(
 }
 
 function listUsers(params: Params) {
-    return listRows(db.users as unknown as Record<string, unknown>[], params, (u) => `${u.display_name} ${u.email}`);
+    // Search matches the model's real SEARCH_FIELDS: username, email,
+    // display_name, phone_number (account/models/user.py RestMeta).
+    const result = listRows(
+        db.users as unknown as Record<string, unknown>[],
+        params,
+        (u) => `${u.username} ${u.email} ${u.display_name} ${u.phone_number ?? ''}`,
+    );
+    return { ...result, data: (result.data as unknown as MockUser[]).map(serializeUser) };
 }
 
 // ── POST_SAVE_ACTIONS (User) ──────────────────────────────────────────
@@ -202,7 +256,7 @@ function listUsers(params: Params) {
 const USER_ACTIONS = new Set(['send_invite', 'disable', 'reactivate', 'revoke_sessions']);
 const USER_DISABLE_REASONS = new Set(['abuse', 'admin']); // services/disable.py USER_REST_REASONS
 
-function runUserAction(user: User, action: string, value: unknown): Record<string, unknown> | null {
+function runUserAction(user: MockUser, action: string, value: unknown): Record<string, unknown> | null {
     const dict = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
     switch (action) {
         case 'disable': {
@@ -229,7 +283,7 @@ function runUserAction(user: User, action: string, value: unknown): Record<strin
     }
 }
 
-function saveUser(user: User, body: Record<string, unknown>): unknown {
+function saveUser(user: MockUser, body: Record<string, unknown>): unknown {
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
     for (const [key, value] of Object.entries(body)) {
@@ -245,7 +299,7 @@ function saveUser(user: User, body: Record<string, unknown>): unknown {
             actionResp = resp;
         }
     }
-    return actionResp ?? { status: true, data: { ...user } };
+    return actionResp ?? { status: true, data: serializeUser(user) };
 }
 
 // ── /api/metrics/fetch ────────────────────────────────────────────────
@@ -315,15 +369,21 @@ function fetchMetrics(params: Params) {
         labels.push(bucketLabel(new Date(t), granularity));
     }
 
-    const picked = wanted.length ? SERIES.filter((s) => wanted.includes(s.slug)) : SERIES;
+    if (wanted.length === 0) {
+        // Backend parity: slug(s) are required, not defaulted.
+        return { status: false, error: 'missing required parameter: slug, slugs, or category', error_code: 400 };
+    }
+    const picked = SERIES.filter((s) => wanted.includes(s.slug));
     // Longer buckets aggregate more events — scale so totals stay coherent.
     const scale = bucket / 3600e3;
-    const datasets = picked.map((s, i) => ({
-        label: s.label,
-        data: times.map((t) => Math.round(sample(i, t, s.base, s.spread) * Math.max(0.15, scale))),
-    }));
+    // Real wire shape (verified live): a slug-keyed series map + labels. No
+    // datasets array, no granularity/range echo — the client normalizes.
+    const data: Record<string, number[]> = {};
+    picked.forEach((s, i) => {
+        data[s.slug] = times.map((t) => Math.round(sample(i, t, s.base, s.spread) * Math.max(0.15, scale)));
+    });
 
-    return { status: true, data: { labels, datasets, granularity, range } };
+    return { status: true, data: { data, labels } };
 }
 
 // ── Auth endpoints ────────────────────────────────────────────────────
@@ -367,7 +427,7 @@ function decodeMockJwt(token: string): Record<string, unknown> | null {
     }
 }
 
-function findByEmail(email: unknown): User | undefined {
+function findByEmail(email: unknown): MockUser | undefined {
     const needle = String(email ?? '').toLowerCase();
     return db.users.find((u) => u.email.toLowerCase() === needle);
 }
@@ -398,7 +458,7 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
         case '/api/login': {
             const user = findByEmail(body.username);
             if (!user || !user.is_active || body.password !== MOCK_PASSWORD) return invalidCreds();
-            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         case '/api/token/refresh': {
             const payload = decodeMockJwt(String(body.refresh_token ?? ''));
@@ -430,13 +490,13 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
                 return { status: false, error: 'invalid or expired reset code', error_code: 401 };
             }
             pendingResetCodes.delete(user.email.toLowerCase());
-            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         case '/api/auth/password/reset/token': {
             const m = String(body.token ?? '').match(/^pr:mock-(\d+)$/);
             const user = m && db.users.find((u) => u.id === Number(m[1]));
             if (!user) return { status: false, error: 'invalid or expired reset token', error_code: 401 };
-            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         case '/api/auth/magic/send': {
             const user = findByEmail(body.email);
@@ -449,13 +509,13 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
             const m = String(body.token ?? '').match(/^ml:mock-(\d+)$/);
             const user = m && db.users.find((u) => u.id === Number(m[1]));
             if (!user) return { status: false, error: 'invalid or expired magic link', error_code: 401 };
-            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         case '/api/auth/exchange': {
             const m = String(body.code ?? '').match(/^mock-handoff-(\d+)$/);
             const user = m && db.users.find((u) => u.id === Number(m[1]));
             if (!user) return { status: false, error: 'invalid or expired auth code', error_code: 401 };
-            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         case '/api/auth/passkeys/login/begin': {
             // Shape-level mock: a real assertion needs a registered credential
@@ -481,7 +541,7 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
             if (!m || !body.credential) return { status: false, error: 'invalid passkey assertion', error_code: 401 };
             const user = m[1] === 'any' ? db.users[0]! : db.users.find((u) => u.id === Number(m[1]));
             if (!user) return { status: false, error: 'invalid passkey assertion', error_code: 401 };
-            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         default:
             return { status: false, error: `No mock for ${path}`, error_code: 404 };
@@ -507,23 +567,17 @@ export interface MockFetchOpts {
 }
 
 /**
- * Role → permissions, the way a django-mojo deployment typically grants
- * them. The admin role carries the system `admin` wildcard as the loose `1`
- * the backend stores (exercises the `== true` compatibility); staff gets the
- * `users` CATEGORY (rollup demo: covers view_users/manage_users/view_members)
- * plus view_admin. Nobody is is_superuser — that flag would short-circuit
- * every permission path this mock exists to exercise.
+ * The `me` graph = the default row plus me-only fields (verified live:
+ * has_passkey + requires_mfa ride only /api/user/me). Permissions come from
+ * the row itself now — buildUsers seeds the spread (superusers, users-category
+ * admins with the loose `1`-style truthy values, unprivileged rest).
  */
-function meDict(user: User) {
-    const permissions =
-        user.role === 'admin' ? { admin: 1 }
-        : user.role === 'staff' ? { users: true, view_admin: true }
-        : {};
-    return { ...user, is_superuser: false, permissions };
+function meDict(user: MockUser) {
+    return { ...serializeUser(user), has_passkey: false, requires_mfa: false };
 }
 
 /** The bearer's user, when a valid unexpired mock JWT is presented. */
-function userFromBearer(headers: Record<string, string> | undefined): User | undefined {
+function userFromBearer(headers: Record<string, string> | undefined): MockUser | undefined {
     const bearer = (headers?.['Authorization'] ?? '').replace(/^Bearer /, '');
     if (!bearer) return undefined;
     const payload = decodeMockJwt(bearer);
@@ -540,7 +594,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
         return authFetch(path, opts.body ?? {});
     }
-    if (path === '/api/user/me' || path === '/api/account/user/me') {
+    if (path === '/api/user/me') {
         // The first authed mock endpoint — meaningless without a session,
         // exactly like the real backend's @requires_auth.
         const user = userFromBearer(opts.headers);
@@ -558,23 +612,26 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { status: false, error: 'Group not found', error_code: 404 };
         }
         // Deterministic per (user, group) so group-context behavior is
-        // demoable: user 1 (Ian, plain role) is GROUP ADMIN of odd-id groups
-        // and a bare member of even ones — picking an odd group lights up
-        // member-admin-gated UI; staff manage their groups; admin-role users
-        // are group admins everywhere.
+        // demoable: user 1 (Ian, unprivileged) is GROUP ADMIN of odd-id
+        // groups and a bare member of even ones — picking an odd group
+        // lights up member-admin-gated UI; users-category holders manage
+        // their groups; superusers are group admins everywhere.
         const permissions =
-            user.role === 'admin' ? { admin: 1 }
-            : user.role === 'staff' ? { manage_group: true, view_members: true }
+            user.is_superuser ? { admin: 1 }
+            : user.permissions['users'] ? { manage_group: true, view_members: true }
             : user.id === 1 && groupId % 2 === 1 ? { admin: true }
             : {};
         return {
             status: true,
             data: {
                 id: groupId * 1000 + user.id,
-                user_id: user.id,
-                group_id: groupId,
-                role: 'admin' in permissions ? 'admin' : 'member',
+                created: Math.floor(Date.now() / 1000),
+                modified: Math.floor(Date.now() / 1000),
+                is_active: true,
                 permissions,
+                metadata: {},
+                user: serializeUser(user),
+                group: groupId,
             },
         };
     }
@@ -588,7 +645,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return listRows(db.groups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
     }
     if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
-    const one = path.match(/^\/api\/account\/user\/(\d+)$/);
+    const one = path.match(/^\/api\/user\/(\d+)$/);
     if (one) {
         const id = Number(one[1]);
         const user = db.users.find((u) => u.id === id);
@@ -602,26 +659,40 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (opts.method === 'POST' && opts.body) {
             return saveUser(user, opts.body);
         }
-        return { status: true, data: { ...user } };
+        return { status: true, data: serializeUser(user) };
     }
-    if (path === '/api/account/user') {
+    if (path === '/api/user') {
         if (opts.method === 'POST' && opts.body) {
             const id = Math.max(...db.users.map((u) => u.id)) + 1;
-            const user: User = {
+            const email = String(opts.body.email ?? `user${id}@nativemojo.com`);
+            // Backend parity: username derives from the email localpart when
+            // the body omits it (verified live: portal_victim@… → portal_victim).
+            const username = String(opts.body.username ?? '') || email.split('@')[0]!;
+            const user: MockUser = {
                 id,
+                first_name: '',
+                last_name: '',
                 display_name: String(opts.body.display_name ?? 'New User'),
-                email: String(opts.body.email ?? `user${id}@nativemojo.com`),
-                phone: (opts.body.phone as string) || null,
-                role: (opts.body.role as User['role']) || 'user', // '' (unset select) falls to default
+                username,
+                email,
+                phone_number: (opts.body.phone_number as string) || null,
                 is_active: true,
-                email_verified: false,
-                mfa_enabled: false,
-                passkeys: 0,
+                is_superuser: false,
+                is_email_verified: false,
+                is_phone_verified: false,
+                is_dob_verified: false,
+                is_online: false,
                 last_login: null,
-                created: new Date().toISOString(),
+                last_activity: null,
+                permissions: {},
+                metadata: {},
+                dob: null,
+                avatar: null,
+                org: null,
+                created: Math.floor(Date.now() / 1000),
             };
             db.users.unshift(user);
-            return { status: true, data: { ...user } };
+            return { status: true, data: serializeUser(user) };
         }
         return listUsers(opts.params ?? {});
     }
