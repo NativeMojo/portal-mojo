@@ -1,0 +1,38 @@
+/* ============================================================ DetailView C1
+   Chrome for the C1 additions ONLY — rail badges, the header kebab menu,
+   and the keep-alive wrappers. The base .detail / .detail-rail / .rail-item
+   styles stay in theme.css. Tokens only; both themes come from the token
+   flip. NOT imported by theme.css yet — the orchestrator adds the @import
+   at merge time. */
+
+/* Rail badges — a placement-only wrapper pinned to the rail item's right
+   edge. Primitive badge values arrive pre-wrapped in .chip.chip-muted
+   (web-mojo's muted default); rich nodes style themselves. */
+.rail-badge { margin-left: auto; display: inline-flex; align-items: center; flex: none; }
+.rail-badge .chip { font-size: 10px; padding: 1px 7px; font-weight: 650; }
+/* The dot idiom — attention without a count. */
+.rail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+/* Header kebab — .btn-icon carries the base look; hold the hover state
+   while the menu is open so the trigger reads as "on". */
+.dv-kebab[aria-expanded="true"] { background: var(--surface2); color: var(--ink-strong); }
+
+/* Kebab menu (inside the unpadded .mojo-popover shell — content brings its
+   own padding/width, per the Popover contract). */
+.dv-menu { padding: 5px; min-width: 200px; }
+.dv-menu-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 7px 9px; border: none; background: none; border-radius: 7px;
+    text-align: left; cursor: pointer;
+    font-size: 13.5px; font-weight: 550; color: var(--ink);
+}
+.dv-menu-item:hover { background: var(--surface2); color: var(--ink-strong); }
+.dv-menu-item i { color: var(--mute); font-size: 13.5px; width: 16px; text-align: center; flex: none; }
+.dv-menu-item.dv-danger, .dv-menu-item.dv-danger i { color: var(--bad); }
+.dv-menu-item.dv-danger:hover { background: var(--bad-soft); }
+.dv-menu-sep { height: 1px; background: var(--line); margin: 5px 0; }
+
+/* Keep-alive wrappers: inactive sections stay mounted but hidden. The
+   [hidden] guard is explicit + !important so no future display rule on
+   .dv-keep can accidentally resurrect a hidden section's pixels. */
+.dv-keep[hidden] { display: none !important; }
