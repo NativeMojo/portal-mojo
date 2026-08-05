@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as mojo from 'portal-mojo/client';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './theme.css';
+import './menus';
 import App from './App';
 
 // Wire the auth gate + Authorization/DUID headers into the client and start
@@ -19,6 +20,7 @@ import { ThemeProvider } from 'portal-mojo/ui';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { GroupOverviewPage } from './pages/GroupOverviewPage';
 
 // Hash routing so the built dist works from any static mount (including
 // served by django-mojo) with zero server rewrite config.
@@ -30,6 +32,7 @@ const router = createHashRouter([
             { index: true, element: <DashboardPage /> },
             { path: 'users', element: <UsersPage /> },
             { path: 'settings', element: <SettingsPage /> },
+            { path: 'group', element: <GroupOverviewPage /> },
         ],
     },
 ]);

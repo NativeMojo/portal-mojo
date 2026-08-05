@@ -15,6 +15,7 @@
 // pick up admin updates via `npm update portal-mojo` — clone the shell,
 // never the admin.
 import type { ComponentType } from 'react';
+import type { MenuConfig, MenuItem } from '../ui/menu-registry';
 
 /** One mountable admin area: pages + routes + sidebar contribution + gates. */
 export interface AdminSection {
@@ -42,3 +43,33 @@ export interface AdminRoute {
 
 /** Registry of every shipped admin section. Empty until Phase 2 pages stabilize. */
 export const ADMIN_SECTIONS: readonly AdminSection[] = [];
+
+/**
+ * Bridge admin sections into the A4 sidebar registry — sections CONTRIBUTE
+ * menu entries; they never own the sidebar. `mount` prefixes every route:
+ * '' for the standalone back office (section routes at root), '/system' when
+ * embedded in a product portal. Permission gates carry over per item;
+ * capability filtering slots in here when the Phase 2 endpoint lands.
+ */
+export function adminSectionsMenu(
+    sections: readonly AdminSection[],
+    opts: { name?: string; mount?: string; divider?: string } = {},
+): MenuConfig {
+    const mount = (opts.mount ?? '').replace(/\/$/, '');
+    const items: MenuItem[] = [];
+    if (opts.divider) items.push({ divider: opts.divider });
+    for (const section of sections) {
+        const labeled = section.routes.filter((r) => r.label);
+        const base = `${mount}/${section.id}`.replace(/\/+/g, '/');
+        items.push({
+            label: section.title,
+            icon: section.icon,
+            permissions: section.permissions,
+            route: base,
+            children: labeled
+                .filter((r) => r.path !== '')
+                .map((r) => ({ label: r.label!, route: `${base}/${r.path}`.replace(/\/+/g, '/') })),
+        });
+    }
+    return { name: opts.name ?? 'admin', items };
+}

@@ -108,6 +108,8 @@ button { font: inherit; color: inherit; }
     content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px;
     width: 3px; border-radius: 2px; background: var(--accent);
 }
+.nav-child { padding-left: 34px; font-size: 13px; }
+.nav-badge { margin-left: auto; }
 .side-foot {
     margin-top: auto; display: flex; align-items: center; justify-content: space-between;
     padding: 12px 10px; border-top: 1px solid var(--line-soft);

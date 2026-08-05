@@ -89,7 +89,12 @@ function TreeLines({ node }: { node: FlatNode }) {
     );
 }
 
-export function GroupSwitcher() {
+export function GroupSwitcher({ onSelected, onCleared }: {
+    /** After a group activates — e.g. navigate into the group menu's home. */
+    onSelected?: (group: Group) => void;
+    /** After the active group clears — e.g. navigate back to the main menu. */
+    onCleared?: () => void;
+} = {}) {
     const { group, loading, setActiveGroup, clearActiveGroup } = useActiveGroup();
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState('');
@@ -131,6 +136,7 @@ export function GroupSwitcher() {
         setActiveGroup(g);
         setOpen(false);
         setInput('');
+        onSelected?.(g);
     };
 
     return (
@@ -162,7 +168,7 @@ export function GroupSwitcher() {
                     </div>
                     <div className="group-menu-list">
                         {group && (
-                            <button className="group-row group-row-clear" onClick={() => { clearActiveGroup(); setOpen(false); }}>
+                            <button className="group-row group-row-clear" onClick={() => { clearActiveGroup(); setOpen(false); onCleared?.(); }}>
                                 <i className="bi bi-x-circle" /> Clear active group
                             </button>
                         )}

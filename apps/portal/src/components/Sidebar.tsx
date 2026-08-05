@@ -1,58 +1,30 @@
-// Sidebar — the mission-control band. Menu is data (label/icon/route),
-// exactly like web-mojo's sidebar config; rendering is a map. The System
-// section is permission-gated with <Guarded> (view_admin; `admin` and
-// superuser pass implicitly) — the A4 sidebar engine turns this into a
-// registry keyed by context.
-import { NavLink } from 'react-router-dom';
+// Sidebar — the mission-control band. The shell (brand, group switcher,
+// footer) is app-owned; the nav itself renders from the A4 menu registry
+// (see src/menus.ts) — active menu derived from route + group + me.
+// Picking a group navigates into the group menu's home; clearing returns
+// to the main menu (navigation drives menu switching, not hidden state).
+import { useNavigate } from 'react-router-dom';
 import { useAuthSnapshot } from 'portal-mojo/client';
-import { Guarded, GroupSwitcher } from 'portal-mojo/ui';
-
-interface Item { label: string; icon: string; to: string }
-
-const MAIN: Item[] = [
-    { label: 'Dashboard', icon: 'bi-grid-1x2', to: '/' },
-    { label: 'Users', icon: 'bi-people', to: '/users' },
-];
-const SYSTEM: Item[] = [
-    { label: 'Settings', icon: 'bi-gear', to: '/settings' },
-];
+import { GroupSwitcher, SidebarNav } from 'portal-mojo/ui';
 
 const USING_MOCK = !import.meta.env.VITE_MOJO_API;
 
-function NavItems({ items }: { items: Item[] }) {
-    return (
-        <>
-            {items.map((item) => (
-                <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.to === '/'}
-                    className={({ isActive }) => `nav-item${isActive ? ' nav-active' : ''}`}
-                >
-                    <i className={`bi ${item.icon}`} /> {item.label}
-                </NavLink>
-            ))}
-        </>
-    );
-}
-
 export function Sidebar() {
     const auth = useAuthSnapshot();
+    const navigate = useNavigate();
     return (
         <aside className="sidebar">
             <div className="side-brand">
                 <span className="brand-dot" />
                 <span className="brand-name">MOJO&nbsp;Portal</span>
             </div>
-            {auth.authenticated && <GroupSwitcher />}
-            <nav className="side-nav">
-                <div className="side-label">Main</div>
-                <NavItems items={MAIN} />
-                <Guarded permission="view_admin">
-                    <div className="side-label">System</div>
-                    <NavItems items={SYSTEM} />
-                </Guarded>
-            </nav>
+            {auth.authenticated && (
+                <GroupSwitcher
+                    onSelected={() => navigate('/group')}
+                    onCleared={() => navigate('/')}
+                />
+            )}
+            <SidebarNav />
             <div className="side-foot">
                 <span className={`mode-chip${USING_MOCK ? '' : ' mode-live'}`}>
                     <i className={`bi ${USING_MOCK ? 'bi-database' : 'bi-broadcast'}`} />
