@@ -1,0 +1,236 @@
+/* group-admin.css — styles for the full GroupDetail section set (the
+   GroupView.js parity port): hierarchy mini-tree, card rows (API keys /
+   webhooks / members), the signing-secret panel, show-once secret dialogs,
+   geofence clause cards, the auth-config registration grid, and the
+   day-grouped audit timeline. Tokens only — reads correctly under
+   data-theme="light" AND "dark". NOT imported yet: the orchestrator wires
+   the @import into theme.css at merge. */
+
+/* ── Hierarchy mini-tree (Overview) ─────────────────────────────────── */
+.ga-tree {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+}
+.ga-tree-children { margin-left: 22px; }
+
+/* ── Section toolbars + filter rows ─────────────────────────────────── */
+.ga-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+}
+.ga-filter-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 12px;
+}
+.ga-filter-row .input[type="search"] { flex: 1; }
+.ga-section-gap { height: 18px; }
+
+/* ── Card rows (API keys / webhook subscriptions) ───────────────────── */
+.ga-card-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--line-soft);
+}
+.ga-card-row:last-of-type { border-bottom: none; }
+.ga-card-icon { font-size: 20px; color: var(--accent); flex-shrink: 0; }
+.ga-card-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.ga-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+.ga-card-meta { font-size: 12.5px; }
+.ga-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.ga-url {
+    background: transparent;
+    word-break: break-all;
+    color: var(--ink-strong);
+}
+
+/* Clickable rows (member rows, editable key rows) */
+.ga-click-row { cursor: pointer; }
+.ga-click-row:hover { background: var(--accent-soft); }
+.ga-click-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: 6px;
+}
+
+/* Sub-groups table rows are links */
+.ga-row-link { cursor: pointer; }
+.ga-row-link:hover td { background: var(--accent-soft); }
+
+/* ── Signing-secret panel (Webhooks) ────────────────────────────────── */
+.ga-secret-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.ga-secret-panel-info { min-width: 0; display: grid; gap: 3px; font-size: 12.5px; }
+.ga-secret-panel-title {
+    font-weight: 600;
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+.ga-secret-panel-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ── Show-once secret dialog ────────────────────────────────────────── */
+.ga-secret-intro { margin: 0 0 10px; }
+.ga-secret-warning {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    border-radius: 8px;
+    background: var(--warn-soft);
+    color: var(--warn);
+    font-size: 13px;
+}
+.ga-secret-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    overflow-x: auto;
+}
+.ga-secret-value {
+    flex: 1;
+    background: transparent;
+    color: var(--ink-strong);
+    font-size: 13.5px;
+    line-height: 1.4;
+    word-break: break-all;
+    user-select: all;
+}
+.ga-secret-footnote { margin-top: 12px; font-size: 12.5px; }
+
+/* ── Identity extras ────────────────────────────────────────────────── */
+.ga-parent-row { margin-top: 12px; max-width: 420px; }
+.ga-eod-row { margin-top: 12px; max-width: 420px; }
+
+/* ── Geofence cards + clauses ───────────────────────────────────────── */
+.ga-geo-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 0 0 14px;
+    overflow: hidden;
+}
+.ga-geo-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink-strong);
+}
+.ga-geo-eyebrow {
+    margin-left: auto;
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--mute);
+}
+.ga-geo-card-body { padding: 12px 14px; display: grid; gap: 8px; }
+.ga-clause {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    min-width: 0;
+}
+.ga-clause i { flex-shrink: 0; }
+.ga-clause-block i { color: var(--bad); }
+.ga-clause-warn i { color: var(--warn); }
+.ga-clause-ok i { color: var(--ok); }
+.ga-geo-form { display: grid; gap: 12px; }
+.ga-geo-flags { display: grid; gap: 8px; }
+.ga-geo-json { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.ga-geo-advanced-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin: 0 0 10px;
+    border-radius: 8px;
+    background: var(--warn-soft);
+    color: var(--warn);
+    font-size: 12.5px;
+}
+.ga-geo-save-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line-soft);
+}
+.ga-geo-status { font-size: 12.5px; }
+.ga-status-ok { color: var(--ok); }
+.ga-status-bad { color: var(--bad); }
+
+/* ── Auth-config dialog ─────────────────────────────────────────────── */
+.ga-auth-config { max-height: min(78vh, 860px); overflow-y: auto; }
+.ga-reg-grid { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.ga-reg-grid-head,
+.ga-reg-grid-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 1fr) 70px 80px minmax(110px, 140px);
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+}
+.ga-reg-grid-head {
+    background: var(--surface2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--mute);
+    font-weight: 600;
+}
+.ga-reg-grid-row { border-top: 1px solid var(--line-soft); }
+.ga-reg-grid-label { font-size: 13px; color: var(--ink-strong); }
+
+/* ── Day-grouped audit timeline ─────────────────────────────────────── */
+.ga-audit-day { margin: 0 0 14px; }
+.ga-audit-day-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--mute);
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line-soft);
+}
