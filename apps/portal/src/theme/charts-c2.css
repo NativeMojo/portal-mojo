@@ -171,7 +171,14 @@ button.cprog { cursor: pointer; font: inherit; }
     opacity: 0.55; transition: opacity 120ms ease;
 }
 .mmw:hover .mmw-actions, .mmw:focus-within .mmw-actions { opacity: 1; }
+/* The action row is absolutely positioned in the corner, so the header has
+   to RESERVE its width. 84px fits three buttons — a card that also gets the
+   settings gear has four, and the row then overran the reserve and printed
+   itself on top of .mmw-icon. Reserve by actual count instead of a single
+   magic number. */
 .mmw-head { display: flex; align-items: flex-start; gap: 10px; padding-right: 84px; }
+.mmw:has(.mmw-actions > :nth-child(4)) .mmw-head { padding-right: 112px; }
+.mmw:has(.mmw-actions > :nth-child(5)) .mmw-head { padding-right: 140px; }
 .mmw-id { flex: 1; min-width: 0; }
 .mmw-title { font-size: 13.5px; font-weight: 650; color: var(--ink-strong); }
 .mmw-subtitle { font-size: 12.5px; color: var(--mute); margin-top: 1px; }
