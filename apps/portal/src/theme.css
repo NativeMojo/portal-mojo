@@ -21,6 +21,7 @@
 @import "./theme/idioms.css";
 @import "./theme/charts-c2.css";
 @import "./theme/group-admin.css";
+@import "./theme/user-admin.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";
