@@ -29,10 +29,16 @@ board carries the queue — item ids in the rows below). The full
 `forms/inputs` survey (5.5k lines + the calendar engine, every file read)
 expanded B4 into two small epics + plain tasks under Ian's **component value
 bar** (see Working agreements), and the **admin program was elevated** from
-Phase 2 to an accepted epic (#1260): ALL admin domains port, use-case driven,
-with two analyses (web-mojo admin inventory; django-mojo admin surface +
-recorded-metrics inventory) filing its children. Next build item: **B3 =
-board #1256**.
+Phase 2 to an accepted epic (#1260): ALL admin domains port, use-case driven.
+Three analyses ran and landed the same day: the web-mojo admin inventory
+(18 domains, port-vs-redesign verdicts) and the django-mojo admin-surface +
+recorded-metrics map filed the epic's children **#1282–#1300**; the
+component value-sweep filed **#1301–#1308** (chat feed, detail primitives,
+DataView, fmt completion, FormWizard/Tabs, AddressField, MarkdownView,
+drawer — see "Component sweep verdicts" under the B4 breakdown) and three
+backend gaps went to NativeMojo Inbox as django-mojo items (**#1309–#1311**:
+scheduled-task run-now REST, SES send-quota, realtime presence REST). Next
+build item: **B3 = board #1256**.
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
@@ -190,11 +196,33 @@ Survey finds that shape the port (details in the workspecs):
 - The **popover primitive** (#1271) must prove itself against native
   `<dialog>` top-layer stacking (pickers open inside modals).
 
+#### Component sweep verdicts (2026-08-05, all of `src/core` + `src/extensions` rated)
+
+Everything not already ported/planned was rated against the value bar.
+**PORT** (board-filed): chat/comments feed + adapters #1301 · detail
+primitives pack (StatusPanel/FlowStrip/Timeline/KnownFieldsCard/
+AdminMetadataSection/StackTraceView) #1302 · DataView + JSON viewer #1303 ·
+fmt completion (typed functions from `DataFormatter.js` — never the
+pipe-string engine) #1304 · FormWizard/Tabs (`SectionedFormView.js`) #1305 ·
+LocationClient + AddressField #1306 · MarkdownView (`/api/docit/render`)
+#1307 · Modal drawer #1308 · PieChart+exportPng (→ C2 #1258) ·
+MetricsCountryMapView + centroids (→ #1291) · FileView (→ #1298) ·
+ProgressView/`useFileDrop` (→ #1264) · password strength/generator (→ C3
+#1259). **SKIP** (fails the bar — recorded per the value-bar agreement):
+Leaflet/MapLibre wrappers, TabView engine (its variant CSS vocabulary
+survives as pattern), SimpleSearchView, TopNav/PageHeader/SegmentControl,
+BusyIndicator (global-overlay anti-pattern), CodeViewer, timeline
+extension, EventBus/EventDelegate/EventEmitter, mustache/TemplateResolver,
+MOJOUtils bulk, ConsoleSilencer, mojo-auth shim. **PATTERN** (rebuild
+small, don't port): HtmlPreview iframe, FormPlugins (→ #1278 registry),
+Error/Denied/NotFound pages (copy the recovery-action UX), loader splash
+(use file as-is), dashboard panel-grid CSS.
+
 ### Chunk C — finish the shell
 | # | Item | web-mojo source | Notes |
 |---|---|---|---|
 | C1 | DetailView: permission-gated sections (fail-closed, orphan-divider drop, active self-heal), rail badges + `setBadge`, kebab `contextMenu` with `permissions`/`when` | `src/core/views/navigation/SideNavView.js:115-160,328-438`, `ContextMenu.js:102-116` | Lazy mount / unmount-not-destroy. **Board #1257** |
-| C2 | Charts: stats summary + data-table modal, custom date-range dialog, searchable-server-data mini widget, KPI tiles / CircularProgress as needed | `src/extensions/charts/MetricsChart.js`, `MetricsMiniChartWidget.js` | **Board #1258** (custom-range dialog depends on #1268) |
+| C2 | Charts: stats summary + data-table modal, custom date-range dialog, searchable-server-data mini widget, KPI tiles / CircularProgress as needed | `src/extensions/charts/MetricsChart.js`, `MetricsMiniChartWidget.js` | **Board #1258** (custom-range dialog depends on #1268). Sweep additions to scope: **PieChart** (`charts/PieChart.js`, 546 — the only chart primitive the plan had missed) + `exportChartPng` (`charts/exportChart.js`) |
 | C3 | Auth pages on A1 flows; login/forgot/reset/magic/passkey | `src/extensions/auth/` (UI reference only — half-built there) | PARTIAL 2026-08-05: the django-mojo HOSTED auth pages ("bouncer" pages at `<origin>/auth`) are bridged — TopNav Sign in → `/auth?redirect=<hash-free url>` (hash-free because the page string-appends `?auth_code=`; the in-app route rides sessionStorage and is restored post-exchange); `handleAuthCodeFromURL` on boot handles BOTH landing shapes (real search + hash-embedded) and scrubs the code; `onAuth login/logout → invalidateQueries` makes sign-in light the tables without a manual Retry. Sign out button on the identity chip. Also fixed while Ian poked: duplicate refresh/indicator icon (merged — the refresh button spins on any fetch) and multi-fetch-per-page (autoRefresh's focus-resume tick stacked on TanStack focus refetch; both gone — `refetchOnWindowFocus: false` in mojoQueryDefaults, interval+skip only). Note: cross-origin dev shows an OPTIONS preflight per GET in devtools — not a duplicate fetch. In-app login/forgot/reset/magic/passkey PAGES (for deployments serving the portal same-origin) remain C3's build. **Board #1259** |
 | C4 | First real screens vs a live backend: Users, Groups, ApiKeys, Logs + workspaces-portal idioms into ui: `armedButton`, `undoToast`, progress toast | UserView/GroupView (schemas), `maestro/api/aws/www/workspaces/js/dom.js:84-260` | **Board #1281**; seeds the admin program #1260 |
 
@@ -208,9 +236,11 @@ autosave editing, permission-gated UI, live metrics dashboard.
   longer parked): ALL admin domains port, per-domain verdict = direct port vs
   redesign, oriented around operator use cases (incident triage, tickets,
   the metrics the backend actually records, users/permissions, keys, files,
-  email, DNS — "administer django-mojo + AWS" for real). Two analyses (web-mojo
-  admin inventory; django-mojo admin surface + recorded-metrics inventory) file
-  the epic's children. Stabilized pages still migrate into `portal-mojo/admin`.
+  email, DNS — "administer django-mojo + AWS" for real). The two analyses
+  landed 2026-08-05 and filed the epic's 19 children (#1282–#1300, incl. the
+  new Metrics Explorer); three backend gaps filed to NativeMojo Inbox as
+  django-mojo items (#1309–#1311). Stabilized pages still migrate into
+  `portal-mojo/admin`.
 - user-profile sections as the DetailView/forms proving ground. Board #1261
   (parked).
 - Lightbox: extract canvas math (crop/transform/filters) to framework-free TS
