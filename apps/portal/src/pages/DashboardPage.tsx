@@ -5,7 +5,7 @@
 // the same count queries.
 import { useModelList, type User } from 'portal-mojo/client';
 import { Badge, fmt, modal } from 'portal-mojo/ui';
-import { CircularProgress, KPIStrip, MetricsChart, MetricsMiniWidget, PieChart } from 'portal-mojo/charts';
+import { KPIStrip, MetricsChart, MetricsMiniWidget, PieChart } from 'portal-mojo/charts';
 import { GroupModel } from '../models';
 import { UserDetail } from './UserDetail';
 
@@ -102,14 +102,19 @@ export function DashboardPage() {
                             centerSubLabel="users"
                             emptyText="Loading…"
                         />
-                        <CircularProgress
-                            value={verified ?? 0}
-                            max={Math.max(1, total ?? 1)}
-                            size="md"
-                            variant="success"
-                            label="verified"
-                            title={verifiedPct != null ? `${verifiedPct}% of accounts have a verified email` : undefined}
-                        />
+                        {/* Verified is ONE number, not a composition — a second
+                            ring beside the donut read as "two pie charts" and
+                            made this the tallest card in the row. A stat says
+                            it in less ink. */}
+                        <div>
+                            <div className="eyebrow">Email verified</div>
+                            <div className="kpi-tile-value" style={{ marginTop: 2 }}>
+                                {verifiedPct != null ? `${verifiedPct}%` : '—'}
+                            </div>
+                            <div className="dim" style={{ fontSize: 12.5 }}>
+                                {verified ?? 0} of {total ?? 0} accounts
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
