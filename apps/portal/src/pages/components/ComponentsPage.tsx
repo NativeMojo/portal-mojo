@@ -13,6 +13,7 @@ import { FormsDemo, ModalsDemo, ToastsDemo, DetailViewDemo } from './demos-feedb
 import { DisplayDemo, SearchDemo, SkeletonDemo, AccessDemo } from './demos-display';
 import { PopoverDemo } from './demos-popover';
 import { TagInputDemo } from './demos-taginput';
+import { DrawerDemo } from './demos-drawer';
 
 interface DemoSection {
     key: string;
@@ -57,6 +58,11 @@ const SECTIONS: DemoSection[] = [
         key: 'modals', title: 'Modals', icon: 'bi-window-stack',
         blurb: 'Awaitable native-<dialog> manager: confirm, form, detail — stacking for free.',
         render: () => <ModalsDemo />,
+    },
+    {
+        key: 'drawer', title: 'Drawer', icon: 'bi-layout-sidebar-inset-reverse',
+        blurb: 'Right slide-over on the same awaitable <dialog> manager: width presets, eyebrow/title/meta header, stacking over a modal, awaited result.',
+        render: () => <DrawerDemo />,
     },
     {
         key: 'toasts', title: 'Toasts', icon: 'bi-chat-square-dots',

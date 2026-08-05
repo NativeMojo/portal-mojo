@@ -2,11 +2,7 @@
 // Every button here exercises one contract point — width presets, the
 // eyebrow/title/meta header, stacking over a modal, the awaited result, and
 // the non-dismissable case where the body owns the only way out.
-import { toast } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui — must become `import { modal, toast } from
-// 'portal-mojo/ui'`. The modal manager's stack is a MODULE SINGLETON shared
-// with <ModalHost/>; two import paths = two stacks = nothing renders.
-import { modal } from '../../../../../packages/portal-mojo/src/ui/modal';
+import { modal, toast } from 'portal-mojo/ui';
 
 const ROWS = [
     { at: '09:41', what: 'Session opened', who: 'jane@example.com' },
