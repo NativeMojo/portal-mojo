@@ -6,7 +6,7 @@
 // Two things are made observable rather than described: the 300ms debounce
 // (an event log of every keystroke vs. the one commit that follows) and the
 // wire (the params object the committed term becomes).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useModelList, type Params, type User } from 'portal-mojo/client';
 import { ExpandingSearch, fmt } from 'portal-mojo/ui';
 import { WireParams } from './demo-wire';
@@ -59,14 +59,9 @@ function useKeystrokeLog() {
     };
 }
 
-function Stage({ label, note, muted = false, children }: {
-    label: string;
-    note: React.ReactNode;
-    muted?: boolean;
-    children: React.ReactNode;
-}) {
+function Stage({ label, note, children }: { label: string; note: ReactNode; children: ReactNode }) {
     return (
-        <div className={`sdemo-stage${muted ? ' sdemo-stage--off' : ''}`}>
+        <div className="sdemo-stage">
             <div className="sdemo-stage-head">
                 <span className="sdemo-stage-label">{label}</span>
             </div>
@@ -151,9 +146,10 @@ export function SearchDemo() {
             <div className="panel panel-pad">
                 <div className="eyebrow">Live · the committed term is a server param</div>
                 <p className="dim" style={{ margin: '4px 0 14px', maxWidth: 700 }}>
-                    Type below. Keystrokes buffer for <b>300ms</b>; one commit then goes to the wire.{' '}
-                    <kbd>Enter</kbd> commits immediately (watch the log delta collapse),{' '}
-                    <kbd>Esc</kbd> blurs, and <kbd>/</kbd> from anywhere on the page focuses this one —
+                    Type below. Keystrokes buffer for <b>300ms</b>; one commit then goes to the wire —
+                    the log shows every keystroke it swallowed and the <code>+Δms</code> gap before
+                    the commit. <kbd>Enter</kbd> commits without waiting out the window (its Δ lands
+                    under 300ms), <kbd>Esc</kbd> blurs, and <kbd>/</kbd> from anywhere focuses this one —
                     it is the last-mounted instance, and the shortcut is per-instance, so on a real
                     page (exactly one search) it is unambiguous.
                 </p>
@@ -210,6 +206,11 @@ export function SearchDemo() {
                                 <span className="skel skel-w-40" />
                             </div>
                         ))
+                    ) : list.isError ? (
+                        <div className="sdemo-log-empty">
+                            {list.error instanceof Error ? list.error.message : 'Request failed'} —{' '}
+                            <button className="btn btn-compact" onClick={() => list.refetch()}>Retry</button>
+                        </div>
                     ) : rows.length === 0 ? (
                         <div className="sdemo-log-empty">
                             No users match {JSON.stringify(term)} — the SERVER said so, not a filter

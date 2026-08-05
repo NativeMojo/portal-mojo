@@ -1,7 +1,10 @@
 # params — the table-state store (single source of truth)
 
 ```ts
-import { useTableParams, PAGE_SIZES, readTableState, writeTableState, clearTableState } from 'portal-mojo/client';
+import {
+    useTableParams, PAGE_SIZES, registerNonFilterParams,
+    readTableState, writeTableState, clearTableState,
+} from 'portal-mojo/client';
 ```
 
 **THE architecture rule:** one flat params object owns search, sort,
@@ -30,6 +33,26 @@ unless `defaults.sort`), `page` (1-based), `size`.
 
 Every write goes through the URL (`replace`), so table state deep-links and
 survives reloads by construction.
+
+## `registerNonFilterParams(...keys)` — params the PAGE owns
+
+Everything in the query string that isn't `search/sort/page/size` is treated
+as a Django lookup. That is deliberate (any `field__lookup=` deep-links with
+no client schema), but it means a **host page's own query param becomes a
+filter**: `#/components?demo=filters` shipped `demo=filters` to
+`/api/group` — zero rows on the mock, `FieldError` on a live backend — and
+kept the "All" preset from ever matching.
+
+Declare such keys once, at module load, before any table renders:
+
+```ts
+registerNonFilterParams('demo');   // the component playground's rail key
+```
+
+Registered keys are excluded from `filters`, `wire` and the pills, and are
+**re-emitted on every write** (each write rebuilds the whole query string,
+so without this they would silently vanish the first time a filter changed).
+Do not register a name that is also a model field.
 
 ## Persistence blob (used by ModelTable's `persistState`)
 

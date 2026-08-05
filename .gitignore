@@ -4,3 +4,10 @@ dist/
 .env.*.local
 *.log
 .DS_Store
+.worktrees
+
+
+# Vite files
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.vite/
