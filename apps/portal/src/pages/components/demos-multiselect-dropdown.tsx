@@ -5,12 +5,11 @@
 // options menu, and a keyboard-only run that proves the row click and
 // keyboard Space drive ONE controlled state (the web-mojo desync bug).
 import { useState } from 'react';
-// MERGE-WIRE: portal-mojo/ui
 import {
     MultiSelectDropdown,
     type MultiSelectOption,
     type MultiSelectValue,
-} from '../../../../../packages/portal-mojo/src/ui/MultiSelectDropdown';
+} from 'portal-mojo/ui';
 
 // Bare strings — the normalization path ({ value: s, label: s }).
 const REGIONS = ['us-east-1', 'us-west-2', 'eu-central-1', 'ap-southeast-2'];

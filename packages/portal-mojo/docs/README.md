@@ -19,6 +19,8 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |
 | [calendar.md](calendar.md) | The picker engine + `dateFns` namespace — three precisions, range anchor/preview, drill-down zoom |
+| [datepicker.md](datepicker.md) | Single-value picker shell — precisions, display-format stripping, clear/required/inline states |
+| [multiselect-dropdown.md](multiselect-dropdown.md) | Static checkbox dropdown — summarized trigger, Done footer, disabled options |
 | [collection-multiselect.md](collection-multiselect.md) | Server-backed checkbox panel — model binding, 400ms search, select/deselect-all, shift-click ranges |
 | [detail-primitives.md](detail-primitives.md) | StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — the detail-page pack |
 | [markdown.md](markdown.md) | MarkdownView — server render via docit, allowlist sanitizer trust model, client fallback |

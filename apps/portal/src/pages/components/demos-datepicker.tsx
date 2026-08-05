@@ -7,8 +7,7 @@
 // calendar pick or the clear button), which is the whole pipeline.
 import { useState } from 'react';
 import { dateFns } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui
-import { DatePicker, type DatePickerChangeEvent } from '../../../../../packages/portal-mojo/src/ui/date/DatePicker';
+import { DatePicker, type DatePickerChangeEvent } from 'portal-mojo/ui';
 
 const { addMonths, daysInMonth, formatYm, formatYmd, today } = dateFns;
 

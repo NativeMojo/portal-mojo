@@ -11,7 +11,9 @@ export * from './SidebarNav';
 export * from './CollectionMultiSelect';
 export * from './ComboBox';
 export * from './date/Calendar';
+export * from './date/DatePicker';
 export * from './MarkdownView';
+export * from './MultiSelectDropdown';
 // Date math shares fmt's namespace pattern — collision-prone names stay scoped.
 export * as dateFns from './date/fns';
 export * from './detail';

@@ -8,6 +8,8 @@
 @import "./theme/detail-primitives.css";
 @import "./theme/calendar.css";
 @import "./theme/markdown.css";
+@import "./theme/multiselect-dropdown.css";
+@import "./theme/datepicker.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";

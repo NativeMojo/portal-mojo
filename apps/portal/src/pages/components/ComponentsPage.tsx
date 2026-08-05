@@ -20,6 +20,8 @@ import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
 import { DetailPrimitivesDemo } from './demos-detail-primitives';
 import { CalendarDemo } from './demos-calendar';
 import { MarkdownDemo } from './demos-markdown';
+import { DatePickerDemo } from './demos-datepicker';
+import { MultiSelectDropdownDemo } from './demos-multiselect-dropdown';
 
 interface DemoSection {
     key: string;
@@ -54,6 +56,16 @@ const SECTIONS: DemoSection[] = [
         key: 'calendar', title: 'Calendar', icon: 'bi-calendar3',
         blurb: 'The picker engine: one grid, three precisions, range anchor + hover preview, drill-down zoom — canonical YYYY-MM-DD strings out.',
         render: () => <CalendarDemo />,
+    },
+    {
+        key: 'datepicker', title: 'DatePicker', icon: 'bi-calendar-date',
+        blurb: 'Single-value picker over the Calendar engine — day/month/year precision, trigger or inline, clear ✕ governed by required/disabled/readOnly.',
+        render: () => <DatePickerDemo />,
+    },
+    {
+        key: 'multiselect-dropdown', title: 'MultiSelectDropdown', icon: 'bi-check2-square',
+        blurb: 'Static-options checkbox dropdown — trigger summarizes picks, menu stays open while ticking, Done closes. Row/checkbox desync killed by construction.',
+        render: () => <MultiSelectDropdownDemo />,
     },
     {
         key: 'combobox', title: 'ComboBox', icon: 'bi-input-cursor-text',
