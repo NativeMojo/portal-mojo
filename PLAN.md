@@ -69,14 +69,38 @@ PieChart, exportChartPng; Dashboard showcase) · C4 first live screens
 #1281 (Users/Groups/ApiKeys/Logs + ArmedButton/undoToast/progressToast;
 mock parity rebuilt — dr_* epoch compare, FK id lookups, `graph` echo;
 live-verified: 970 users/574 groups/97,514 logs as portal_test via the new
-in-app login; ApiKeys ride `/api/account/api_keys` because
-`/api/group/apikey` 500s live → django-mojo item #1313). **REVIEW:** C3
+in-app login; ApiKeys ride `/api/account/api_keys` — the `/api/group/apikey`
+500s were NOT an endpoint bug (#1313, since rewritten as an ops note): the
+Jul 27–Aug 2 ApiKey hardening added a `user` FK and @9009 had migrations
+0048/0049 unapplied, so `account_apikey.user_id` did not exist; applied, the
+endpoint answers 200 with 111 group keys). **REVIEW:** C3
 in-app auth pages #1259 (login/forgot/reset/magic/passkey on A1 flows,
 fresh-auth 440 step-up modal, MFA panel, password strength+generator,
 `VITE_MOJO_AUTH` switch — awaiting Ian's real-authenticator passkey touch;
 OAuth redirect re-deferred with the wire documented in-seam). Mock parity
 follow-ups filed as #1314. **Remaining Phase 1:** land #1259 after the
 passkey touch — then the admin program epic #1260 (19 accepted children).
+
+**2026-08-05, wave 4 (detail-view parity):** C4's first-screens pass
+under-built the two flagship detail views — it read the sources but judged
+several sections endpoint-less during the exact window the @9009 migration
+drift made the backend look broken. Both re-ported from source at full
+inventory, two worktree agents, merged individually (25 conflict-free merges
+total). **GroupView 11 sections** (Overview · Identity · Members · Sub-Groups ·
+API Keys · Webhooks · Geofencing · Events · Audit · Metadata + Configure Auth),
+found in passing: web-mojo rendered the webhook secret's ISO timestamps as
+garbage epochs, and its centroid table had a duplicated country key; key
+rotate is apikey-auth-only while managers read tokens via `?graph=token`.
+**UserView 14 sections** (Overview · Profile · Personal · Security · OAuth ·
+Groups · Sys/App Perms · API Keys · Devices · Logins · Audit · Notifications ·
+Metadata) plus the header lifecycle (avatar, org chip, login-throttle badge,
+presence, disable reasons + history accordion, full kebab). Two documented
+seams: the Logins **Map** tab (web-mojo used MapLibre — list ships at parity,
+map awaits a dependency sanction like zod's) and avatar upload (multipart
+POST). Mock-verified dark+light, console clean, perm-gating exercised from
+both a plain and a superuser session (sys-perm autosave re-badges the header
+live). `dev:live` @9009 pass is BLOCKED: the browser hits the mverify bouncer's
+"Are you human?" interstitial, which an agent must not click through.
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
