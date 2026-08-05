@@ -1,0 +1,162 @@
+/* ============================================================
+   Auth pages (C3, board #1259) — the in-app login/forgot/reset/
+   magic surfaces + the fresh-auth (step-up) modal + the password
+   strength meter. Layout voice from web-mojo extensions/auth
+   (centered card), re-expressed in mission-control tokens ONLY —
+   both themes come from the token flip, no literal colors here.
+   ============================================================ */
+
+/* ── Shell: full-viewport centered card ─────────────────────── */
+.auth-shell {
+    min-height: 100dvh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; padding: 24px 16px;
+    background: var(--bg);
+}
+.auth-card {
+    width: min(400px, 94vw);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow-pop);
+    padding: 26px 26px 24px;
+}
+.auth-brand {
+    display: flex; align-items: center; gap: 9px;
+    padding-bottom: 18px;
+}
+.auth-brand-name {
+    font-weight: 750; font-size: 14.5px; letter-spacing: -0.01em;
+    color: var(--ink-strong);
+}
+.auth-foot {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--mute);
+}
+.auth-foot-hint {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+/* ── Card content ───────────────────────────────────────────── */
+.auth-stack { display: flex; flex-direction: column; gap: 14px; }
+.auth-title {
+    margin: 0; font-size: 19px; font-weight: 750;
+    color: var(--ink-strong); letter-spacing: -0.015em;
+}
+.auth-sub { margin: 3px 0 0; font-size: 13.5px; color: var(--mute); }
+.auth-sub .auth-email, .auth-email { color: var(--ink-strong); font-weight: 650; }
+.auth-submit { justify-content: center; width: 100%; padding: 8.5px 13px; }
+.auth-center { align-items: center; text-align: center; padding: 10px 0; }
+.auth-spinner { font-size: 26px; color: var(--accent); }
+
+.auth-links {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+}
+.auth-link {
+    border: none; background: none; cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--accent); font-size: 12.5px; font-weight: 600;
+    text-decoration: none;
+}
+.auth-link:hover { text-decoration: underline; }
+.auth-link:disabled { opacity: 0.55; cursor: default; text-decoration: none; }
+
+.auth-divider {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--mute); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.auth-divider::before, .auth-divider::after {
+    content: ""; flex: 1; border-top: 1px solid var(--line);
+}
+
+.auth-remember {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.auth-method { border: none; margin: 0; padding: 0; }
+.auth-method legend { padding: 0; }
+.auth-radio {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 0; font-size: 13.5px; color: var(--ink); cursor: pointer;
+}
+.auth-radio input { accent-color: var(--accent); margin: 0; }
+
+.auth-code-input {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    letter-spacing: 0.22em; font-size: 15px;
+}
+
+.auth-mock-hint {
+    margin: 0; padding: 8px 11px;
+    background: var(--info-soft); color: var(--info);
+    border-radius: 8px; font-size: 12px; line-height: 1.5;
+}
+.auth-mock-hint code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 650; }
+
+/* ── Password input row + strength meter ────────────────────── */
+.pw-input-row { display: flex; align-items: center; gap: 6px; }
+.pw-input-row .input { flex: 1; min-width: 0; }
+.pw-input-row .btn-icon { flex: none; }
+.pw-input-row .btn { flex: none; white-space: nowrap; }
+
+.pw-meter { display: flex; flex-direction: column; gap: 5px; }
+.pw-meter-bars { display: flex; gap: 4px; }
+.pw-meter-seg {
+    flex: 1; height: 5px; border-radius: 3px;
+    background: var(--line);
+    transition: background 0.15s ease;
+}
+/* Lit color rides the class band via data-strength on the wrapper. */
+.pw-meter[data-strength="very-weak"] .pw-meter-lit,
+.pw-meter[data-strength="weak"] .pw-meter-lit { background: var(--bad); }
+.pw-meter[data-strength="fair"] .pw-meter-lit { background: var(--warn); }
+.pw-meter[data-strength="good"] .pw-meter-lit { background: var(--info); }
+.pw-meter[data-strength="strong"] .pw-meter-lit { background: var(--ok); }
+.pw-meter-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.pw-meter-label { font-size: 12px; font-weight: 650; color: var(--mute); }
+.pw-meter[data-strength="very-weak"] .pw-meter-label,
+.pw-meter[data-strength="weak"] .pw-meter-label { color: var(--bad); }
+.pw-meter[data-strength="fair"] .pw-meter-label { color: var(--warn); }
+.pw-meter[data-strength="good"] .pw-meter-label { color: var(--info); }
+.pw-meter[data-strength="strong"] .pw-meter-label { color: var(--ok); }
+.pw-meter-score {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; color: var(--mute); font-variant-numeric: tabular-nums;
+}
+.pw-meter-feedback {
+    margin: 0; padding-left: 16px;
+    display: flex; flex-direction: column; gap: 2px;
+    font-size: 12px; color: var(--mute);
+}
+
+/* ── MFA panel ──────────────────────────────────────────────── */
+.mfa-methods { align-self: flex-start; }
+.mfa-methods .seg-btn { display: inline-flex; align-items: center; gap: 6px; }
+.mfa-expiry {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; color: var(--mute); font-variant-numeric: tabular-nums;
+}
+.mfa-expired { color: var(--bad); font-weight: 650; }
+
+/* ── Fresh-auth (step-up) modal bits ────────────────────────── */
+.fresh-auth-id {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 11px;
+    background: var(--surface2); border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13.5px; font-weight: 600; color: var(--ink-strong);
+}
+.fresh-auth-id > i:first-child { color: var(--accent); font-size: 15px; }
+.fresh-auth-id span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fresh-auth-lock { color: var(--mute); font-size: 11.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .pw-meter-seg { transition: none; }
+}

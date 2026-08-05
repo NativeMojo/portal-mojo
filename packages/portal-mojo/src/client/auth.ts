@@ -22,7 +22,15 @@
 //     localStorage token can never shadow a fresh sessionStorage session
 //   · a refresh re-stores into the storage the session came from — web-mojo
 //     silently promoted remember-me=false sessions to localStorage
-import { AuthRequiredError } from './errors';
+//
+// C3 additions (board #1259), same wire authority (django-mojo account app):
+//   · MFA completion — totp/verify, totp/recover, sms/send (which CONSUMES
+//     and RE-ISSUES the mfa_token), sms/verify (account/rest/totp.py, sms.py)
+//   · fresh-auth (step-up) challenge surface — HTTP 440 / 'reauth_required'
+//     (mojo/errors.py ReauthRequiredException, services/fresh_auth.py). A
+//     refresh can NEVER satisfy it: auth_time is carried forward unchanged
+//     across refreshes by design — only a genuine re-login mints a new one.
+import { AuthRequiredError, MojoError } from './errors';
 import { tokenInfo } from './jwt';
 import { apiOrigin, installAuthHooks, mojoCall } from './client';
 
@@ -43,8 +51,12 @@ export function getRefreshToken(): string | null {
     return localStorage.getItem(REFRESH_KEY) ?? sessionStorage.getItem(REFRESH_KEY);
 }
 
-/** Which storage the current session lives in (refresh keeps it there). */
-function sessionIsPersistent(): boolean {
+/**
+ * Which storage the current session lives in (refresh keeps it there).
+ * Public since C3: a fresh-auth re-login must keep the session in the
+ * storage the user originally chose (remember-me), not silently promote it.
+ */
+export function sessionIsPersistent(): boolean {
     return localStorage.getItem(REFRESH_KEY) != null || localStorage.getItem(ACCESS_KEY) != null;
 }
 
@@ -251,10 +263,21 @@ export function stopAutoRefresh(): void {
 /** django-mojo user dict (`to_dict("basic")`). Typed properly in Chunk A2. */
 export type AuthUser = Record<string, unknown>;
 
+/**
+ * The MFA challenge a password login can answer with. `methods` come from
+ * the server's get_mfa_methods: 'totp' | 'sms' | 'passkey' (a deployment may
+ * grow more — treat unknown entries as unofferable, never as fatal).
+ */
+export interface MfaChallenge {
+    mfaToken: string;
+    methods: string[];
+    expiresIn: number;
+}
+
 export type LoginResult =
     | { kind: 'authenticated'; user: AuthUser }
     /** Password accepted but MFA is required — no tokens issued yet. */
-    | { kind: 'mfa'; mfaToken: string; methods: string[]; expiresIn: number };
+    | ({ kind: 'mfa' } & MfaChallenge);
 
 export interface LoginOptions {
     /** true (default) → localStorage; false → sessionStorage. */
@@ -290,6 +313,61 @@ export async function login(username: string, password: string, opts: LoginOptio
     }
     return { kind: 'authenticated', user: adoptGrant(data, opts.remember ?? true) };
 }
+
+// ── MFA completion (deferred from A1; landed with the C3 pages) ───────
+// Each completion consumes the mfa_token and answers with a full TokenGrant
+// (django-mojo jwt_login) — adopted here exactly like a password login.
+// `remember` mirrors LoginOptions: the MFA step continues the login the
+// user began, so the page passes the same remember-me choice through.
+
+export interface MfaCompletionOptions {
+    /** true (default) → localStorage; false → sessionStorage. */
+    remember?: boolean;
+}
+
+/** Second factor: TOTP code (`POST /api/auth/totp/verify`). */
+export async function completeMfaTotp(mfaToken: string, code: string, opts: MfaCompletionOptions = {}): Promise<AuthUser> {
+    const body = await mojoCall('/api/auth/totp/verify', { method: 'POST', body: { mfa_token: mfaToken, code } });
+    return adoptGrant(body.data as TokenGrant, opts.remember ?? true);
+}
+
+/** Second factor: one single-use TOTP recovery code (`POST /api/auth/totp/recover`). */
+export async function completeMfaRecovery(mfaToken: string, recoveryCode: string, opts: MfaCompletionOptions = {}): Promise<AuthUser> {
+    const body = await mojoCall('/api/auth/totp/recover', { method: 'POST', body: { mfa_token: mfaToken, recovery_code: recoveryCode } });
+    return adoptGrant(body.data as TokenGrant, opts.remember ?? true);
+}
+
+/**
+ * Send the SMS one-time code for an `sms` MFA challenge. The server CONSUMES
+ * the mfa_token and RE-ISSUES a fresh one in the response — the caller must
+ * replace its stored token with the returned `mfaToken` or the verify step
+ * will fail with "Invalid or expired MFA token".
+ */
+export async function sendMfaSms(mfaToken: string): Promise<{ mfaToken: string; expiresIn: number }> {
+    const body = await mojoCall('/api/auth/sms/send', { method: 'POST', body: { mfa_token: mfaToken } });
+    const data = body.data as { mfa_token: string; expires_in?: number };
+    return { mfaToken: data.mfa_token, expiresIn: data.expires_in ?? 300 };
+}
+
+/** Second factor: the SMS code (`POST /api/auth/sms/verify` with mfa_token). */
+export async function completeMfaSms(mfaToken: string, code: string, opts: MfaCompletionOptions = {}): Promise<AuthUser> {
+    const body = await mojoCall('/api/auth/sms/verify', { method: 'POST', body: { mfa_token: mfaToken, code } });
+    return adoptGrant(body.data as TokenGrant, opts.remember ?? true);
+}
+
+// TODO(C3-deferred) OAuth redirect flows: django-mojo ships the full wire —
+//   GET  /api/auth/oauth/<provider>/begin?redirect_uri=…  → {auth_url, state}
+//   (browser navigates to auth_url; provider → backend callback → 302 back
+//   to redirect_uri with ?code=&state= merged into its query)
+//   POST /api/auth/oauth/<provider>/complete {code, state} → TokenGrant.
+// Deferred with the workspec's blessing: redirect_uri must be allowlisted
+// server-side (ALLOWED_REDIRECT_URLS), providers are deployment-specific
+// (GET /api/auth/config → login.methods), and the round-trip cannot be
+// exercised against the mock or without real provider credentials. The
+// hosted /auth pages cover OAuth deployments today. Seam: add
+// `beginOAuth(provider, redirectUri)` + `completeOAuth(provider, code,
+// state)` here, and an `?code=&state=` landing branch beside
+// handleAuthCodeFromURL().
 
 /** Request a reset email: `code` → 6-digit code, `link` → `pr:` token link. */
 export async function forgotPassword(email: string, method: 'code' | 'link' = 'code'): Promise<void> {
@@ -408,6 +486,92 @@ export async function loginWithPasskey(username?: string): Promise<AuthUser> {
         },
     });
     return adoptGrant(body.data as TokenGrant);
+}
+
+// ── Fresh-auth (step-up) challenges ───────────────────────────────────
+// django-mojo's freshness gate (account/services/fresh_auth.py): sensitive
+// operations can require that the JWT's `auth_time` claim — stamped at the
+// last GENUINE login — is younger than FRESH_AUTH_WINDOW. A stale call gets
+// HTTP 440 / reason 'reauth_required' (mojo/errors.py, deliberately NOT 401:
+// a token refresh carries auth_time forward unchanged and can never satisfy
+// the gate). The only cure is a real re-login (password / MFA / passkey),
+// which the UI presents as a modal OVER the current screen — page state is
+// never thrown away for a redirect.
+//
+// Wiring: the app registers ONE UI handler (setFreshAuthHandler → the C3
+// fresh-auth modal). Call sites wrap sensitive operations in
+// `withFreshAuth(fn)` — on a 440 the handler prompts, and a successful
+// re-login (new tokens stored by the normal login flows) retries fn once.
+
+/** HTTP status + envelope error_code of a step-up challenge. */
+export const REAUTH_STATUS = 440;
+
+/** True when an error is django-mojo's fresh-auth (step-up) challenge. */
+export function isReauthRequired(error: unknown): boolean {
+    return error instanceof MojoError
+        && (error.status === REAUTH_STATUS || error.message === 'reauth_required');
+}
+
+/**
+ * Resolve true when the user completed a fresh re-login, false when they
+ * dismissed the prompt (or no prompt is wired).
+ */
+export type FreshAuthHandler = () => Promise<boolean>;
+
+let freshAuthHandler: FreshAuthHandler | null = null;
+let freshAuthPromise: Promise<boolean> | null = null;
+
+/**
+ * Register the UI that answers step-up challenges (one per app — the C3
+ * FreshAuthHost). Pass null to unregister. The handler re-authenticates via
+ * the normal login flows, so the fresh tokens (and their new auth_time) are
+ * stored before it resolves true; keep the session's storage by passing
+ * `{remember: sessionIsPersistent()}` to the login call.
+ */
+export function setFreshAuthHandler(handler: FreshAuthHandler | null): void {
+    freshAuthHandler = handler;
+}
+
+/**
+ * Prompt for a fresh re-login. Single-flight: concurrent 440s (a burst of
+ * gated saves) share ONE prompt and all observe its outcome. Resolves false
+ * — with a console.warn, never a throw — when no handler is registered.
+ */
+export function requestFreshAuth(): Promise<boolean> {
+    if (!freshAuthHandler) {
+        console.warn('requestFreshAuth: no fresh-auth handler registered (setFreshAuthHandler) — challenge cannot be answered');
+        return Promise.resolve(false);
+    }
+    if (!freshAuthPromise) {
+        const handler = freshAuthHandler;
+        freshAuthPromise = handler()
+            .catch((error) => {
+                // A handler bug must not wedge the single-flight forever.
+                console.warn('fresh-auth handler threw', error);
+                return false;
+            })
+            .finally(() => {
+                freshAuthPromise = null;
+            });
+    }
+    return freshAuthPromise;
+}
+
+/**
+ * Run a sensitive operation with step-up handling: on a 440 reject, prompt
+ * (requestFreshAuth) and retry ONCE after a successful re-login. Any other
+ * failure — and a dismissed prompt — rejects with the ORIGINAL error, so
+ * failure stays unmissable at the call site.
+ */
+export async function withFreshAuth<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+        return await fn();
+    } catch (error) {
+        if (!isReauthRequired(error)) throw error;
+        const ok = await requestFreshAuth();
+        if (!ok) throw error;
+        return fn();
+    }
 }
 
 // ── Cross-origin auth handoff ─────────────────────────────────────────
