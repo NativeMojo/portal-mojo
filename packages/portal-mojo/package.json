@@ -1,0 +1,29 @@
+{
+    "name": "portal-mojo",
+    "version": "0.1.0",
+    "private": true,
+    "description": "React portal toolkit for django-mojo — typed client + params store, mission-control UI, dependency-free SVG charts, admin section bundles.",
+    "type": "module",
+    "exports": {
+        "./client": "./src/client/index.ts",
+        "./ui": "./src/ui/index.ts",
+        "./charts": "./src/charts/index.ts",
+        "./admin": "./src/admin/index.ts"
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit"
+    },
+    "peerDependencies": {
+        "@tanstack/react-query": "^5",
+        "react": "^19",
+        "react-router-dom": "^7"
+    },
+    "devDependencies": {
+        "@tanstack/react-query": "^5.62.0",
+        "@types/react": "^19.2.7",
+        "react": "^19.2.0",
+        "react-router-dom": "^7.6.1",
+        "typescript": "~5.9.3",
+        "vite": "^7.1.0"
+    }
+}

@@ -4,8 +4,10 @@
 shipped with every django-mojo deployment. Succeeds `web-mojo`, which goes to
 maintenance mode and keeps serving its three existing portals untouched.
 
-**Status:** scaffolded 2026-08-04. `apps/portal` contains the verified baseline
-(see "Already built"). Next up: **Chunk A**.
+**Status:** A0 shipped 2026-08-04 — npm workspaces; `packages/portal-mojo`
+extracted with TS-source subpath exports (`/client`, `/ui`, `/charts`, `/admin`
+incl. the dual-mount `AdminSection` contract); the app consumes the package;
+browser-verified both themes. Next up: **A1**.
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
@@ -19,7 +21,7 @@ The web-mojo source of record is `/Users/ians/Projects/mojo/nativemojo/web-mojo`
 ```
 portal-mojo/
   packages/portal-mojo   ← the toolkit (npm: `portal-mojo`, subpath exports like web-mojo:
-                            portal-mojo/client, /ui, /charts, /admin …)  [created in Chunk A]
+                            portal-mojo/client, /ui, /charts, /admin …)  [shipped in A0]
   apps/portal            ← the base admin portal app: shell, auth, prebuilt pages,
                             page registry. First consumer + test bed of the package,
                             and the template `create-portal-mojo` clones per deployment.
@@ -73,7 +75,8 @@ Design constraints this puts on Chunk A (build them in from the start):
 
 1. **`params` is the single source of truth** for search/sort/filters/paging —
    URL-synced, drives the server query, pills, presets, persistence. Components
-   read it; nothing else owns table state. (`apps/portal/src/lib/params.ts`)
+   read it; nothing else owns table state.
+   (`packages/portal-mojo/src/client/params.ts`)
 2. **One envelope-unwrap boundary** in the client. Documented exceptions only
    (the flat `_mode=count` stats body).
 3. **Failure is unmissable:** a failed save REJECTS or returns a typed error.
@@ -116,7 +119,7 @@ Port from source, not memory: each item lists its web-mojo source. Read it first
 ### Chunk A — context spine
 | # | Item | web-mojo source | Notes |
 |---|---|---|---|
-| A0 | Extract `packages/portal-mojo` from `apps/portal/src/lib` + `components`; npm workspaces | — | Package skeleton with subpath exports |
+| A0 ✓ | Extract `packages/portal-mojo` from `apps/portal/src/lib` + `components`; npm workspaces | — | Done 2026-08-04: TS-source subpath exports; mock ships with the client; `AdminSection` contract stub; Tailwind `@source` scan |
 | A1 | Auth client: password / magic / passkey flows, forgot/reset, single-flight refresh, DUID header, logout | `src/core/services/TokenManager.js` (629), `src/core/Rest.js:16-48,379-446`, `src/extensions/mojo-auth/mojo-auth.js:53-64` | Synthetic-401 short-circuit; refresh-path recursion guard |
 | A2 | `Me` + permissions: `useMe()`, `can()`, `<Guarded>` | `src/core/models/User.js:13-61` (hasPermission: `admin` wildcard, `is_superuser` literal, `sys.*`, `CATEGORY_GRANULAR_MAP` rollup), `Member.js:15-28` | Client errs permissive; server authoritative |
 | A3 | Group context: `GroupProvider`, active group storage + `?group=` param, searchable switcher, `requiresGroup` guard | `src/core/PortalApp.js:230-348`, `GroupSearchView.js` | Heavily group-driven is the product's spine |

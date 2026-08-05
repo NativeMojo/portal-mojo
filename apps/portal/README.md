@@ -1,10 +1,12 @@
-# mojo-portal-baseline
+# portal — the base admin portal app
 
-A runnable baseline for the React-era mojo portal — the reference answer to
-"grab the portal, point it at a django-mojo instance, off to the races."
+The runnable base portal for django-mojo — the reference answer to "grab the
+portal, point it at a django-mojo instance, off to the races." It is the first
+consumer and test bed of the `portal-mojo` package, and the shell that
+`create-portal-mojo` will clone per deployment.
 
 ```bash
-npm install
+npm install        # at the repo root (npm workspaces)
 npm run dev        # http://localhost:5199 — runs on the built-in mock API
 ```
 
@@ -14,11 +16,26 @@ Point it at a real backend by setting one env var (`.env.local`):
 VITE_MOJO_API=https://api.example.com
 ```
 
-With it unset, `src/lib/mock.ts` serves an in-memory dataset through the
-**exact django-mojo wire contract** — envelope `{status, data, count, size,
-start}`, `start`/`size` paging, `'-field'` sort, `search`, and Django lookups
-(`role__in`, `is_active`, `created__gte`, `__icontains`, `__isnull`) — so the
-client code above it is the real thing, not a demo shim.
+With it unset, the toolkit's mock (`packages/portal-mojo/src/client/mock.ts`)
+serves an in-memory dataset through the **exact django-mojo wire contract** —
+envelope `{status, data, count, size, start}`, `start`/`size` paging,
+`'-field'` sort, `search`, and Django lookups (`role__in`, `is_active`,
+`created__gte`, `__icontains`, `__isnull`) — so the client code above it is
+the real thing, not a demo shim.
+
+## Where things live
+
+The toolkit — client, params store, UI components, charts — is the
+`portal-mojo` package (`packages/portal-mojo`, subpath exports
+`portal-mojo/client` · `/ui` · `/charts` · `/admin`; see its README).
+This app owns what is deployment-specific:
+
+- `src/main.tsx` — providers + hash router wiring.
+- `src/App.tsx`, `src/components/` — the shell: sidebar, topnav (theme switch).
+- `src/pages/` — the screens, written against the package.
+- `src/theme.css` — the design tokens (web-mojo's 8-value mission-control dark
+  palette verbatim, light twin) and component CSS, plus the Tailwind `@source`
+  scan of the package source. Per-deployment theming happens here.
 
 ## Stack (and why)
 
@@ -31,41 +48,15 @@ client code above it is the real thing, not a demo shim.
 | Native `<dialog>` | The awaitable ModalManager needs no z-index/backdrop stack manager |
 | Hash router | Built `dist/` works from any static mount (incl. served by django-mojo) with zero rewrite config |
 
-## What each file demonstrates
-
-- `src/lib/client.ts` — mini **@mojo/client**: one envelope-unwrap boundary; a
-  failed save REJECTS (web-mojo's `Model.save()` never-rejects trap is not
-  carried forward).
-- `src/lib/params.ts` — the architecture rule: **one flat params object** is
-  the single source of truth for search/sort/filters/paging; URL-synced, so
-  table state is shareable. Presets are mutually-exclusive bundles whose
-  active state is derived by matching, never stored.
-- `src/lib/lookups.ts` — DjangoLookups ported whole (pill text, key parsing).
-- `src/lib/format.ts` — mini DataFormatter: pipes become plain functions.
-- `src/components/ModelTable.tsx` — schema-driven server table: columns as
-  data, toolbar (search / filters / refresh / add), preset segment, filter
-  pills, 3-way header sort, skeleton/empty/error states, pagination.
-- `src/components/DetailView.tsx` — the record-viewer layout (flat header +
-  chips + active switch + grouped left rail + flat rows) as schema + small
-  components. `src/pages/UserDetail.tsx` recreates the web-mojo UserView.
-- `src/components/modal.tsx` — imperative awaitable modals:
-  `await modal.confirm(...)`, `modal.detail(...)`, `formModal(...)`.
-- `src/components/FormFields.tsx` — the field-definition language: a form is
-  an array of field objects (web-mojo's `CREATE_FORM` shape), controlled
-  inputs, one value pipeline.
-- `src/theme.css` — web-mojo's design tokens: the 8-line mission-control dark
-  palette verbatim, light twin, all components on tokens, `data-theme`
-  switching (light / dark / system in the topnav).
-
 ## Per-screen authoring cost
 
 `src/pages/UsersPage.tsx` is the proof: a complete admin screen — columns,
 badges, filters, presets, deep-linkable state, add-user form, row-click detail
-modal — in ~80 declarative lines against the toolkit components.
+modal — in ~80 declarative lines against the toolkit.
 
-## Not in the baseline (deliberate)
+## Not here yet (deliberate)
 
 Auth flows, permissions gating, group context, WebSocket, capability
 detection, sidebar collapse/mobile, column chooser, stat strip, inline cell
-edit, autosave forms — those are toolkit phases (see the port manifest), not
-baseline concerns. The seams for all of them exist here.
+edit, autosave forms — those are toolkit phases (see `PLAN.md`), not baseline
+concerns. The seams for all of them exist.

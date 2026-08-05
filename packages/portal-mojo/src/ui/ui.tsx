@@ -2,7 +2,7 @@
 // components), MetricCard (flat monochrome KPI), Spark (dependency-free SVG
 // mini chart — the chartlib porting pattern in miniature).
 import type { ReactNode } from 'react';
-import { inferTone, type Tone } from '../lib/format';
+import { inferTone, type Tone } from './format';
 
 export function Badge({ tone, children }: { tone?: Tone; children: ReactNode }) {
     const t = tone ?? (typeof children === 'string' || typeof children === 'boolean' ? inferTone(children) : 'muted');

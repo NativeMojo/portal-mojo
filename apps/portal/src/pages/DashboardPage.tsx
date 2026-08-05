@@ -1,11 +1,8 @@
 // Dashboard — KPI cards fed by count queries (the stat-strip request shape:
 // filters + size:0 → count only), a sparkline, and a recent-users feed.
-import { useModelList } from '../lib/hooks';
-import { MetricCard, Badge } from '../components/ui';
-import { MetricsChart } from '../components/MetricsChart';
-import { modal } from '../components/modal';
-import * as fmt from '../lib/format';
-import type { User } from '../lib/types';
+import { useModelList, type User } from 'portal-mojo/client';
+import { Badge, MetricCard, fmt, modal } from 'portal-mojo/ui';
+import { MetricsChart } from 'portal-mojo/charts';
 import { UserDetail } from './UserDetail';
 
 const ENDPOINT = '/api/account/user';

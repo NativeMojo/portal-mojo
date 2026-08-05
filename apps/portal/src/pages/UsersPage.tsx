@@ -1,14 +1,7 @@
 // Users — a full ModelTable page in ~80 declarative lines: columns, filters,
 // presets, add form. This is the per-screen authoring cost of the toolkit.
-import { ModelTable, type Column } from '../components/ModelTable';
-import type { FilterDef } from '../components/FilterBar';
-import { formModal } from '../components/FormFields';
-import { modal } from '../components/modal';
-import { toast } from '../components/toast';
-import { Badge } from '../components/ui';
-import { useSaveModel } from '../lib/hooks';
-import * as fmt from '../lib/format';
-import type { User } from '../lib/types';
+import { useSaveModel, type User } from 'portal-mojo/client';
+import { Badge, fmt, formModal, modal, toast, ModelTable, type Column, type FilterDef } from 'portal-mojo/ui';
 import { UserDetail } from './UserDetail';
 
 const ENDPOINT = '/api/account/user';

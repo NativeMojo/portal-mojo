@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './theme.css';
 import App from './App';
-import { ThemeProvider } from './components/ThemeProvider';
+import { ThemeProvider } from 'portal-mojo/ui';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';

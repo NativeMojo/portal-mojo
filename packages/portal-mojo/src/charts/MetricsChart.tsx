@@ -6,7 +6,7 @@
 //   · refresh + loading/error overlays with retry
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { mojoMetrics } from '../lib/client';
+import { mojoMetrics } from '../client/client';
 import { SeriesChart, type ChartType } from './SeriesChart';
 
 export interface Granularity { value: string; label: string; short: string }

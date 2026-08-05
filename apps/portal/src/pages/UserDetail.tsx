@@ -1,14 +1,8 @@
 // UserDetail — the DetailView proof: recreates the web-mojo UserView modal
 // (header with chips + active switch; Profile / Security / Sessions rail;
 // flat rows with edit pencils; danger action) as schema + small components.
-import { DetailView, Eyebrow, FlatRow, SecurityItem } from '../components/DetailView';
-import { formModal } from '../components/FormFields';
-import { modal } from '../components/modal';
-import { toast } from '../components/toast';
-import { useModel, useSaveModel } from '../lib/hooks';
-import * as fmt from '../lib/format';
-import { Badge } from '../components/ui';
-import type { User } from '../lib/types';
+import { useModel, useSaveModel, type User } from 'portal-mojo/client';
+import { Badge, DetailView, Eyebrow, FlatRow, SecurityItem, fmt, formModal, modal, toast } from 'portal-mojo/ui';
 
 const ENDPOINT = '/api/account/user';
 

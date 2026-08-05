@@ -3,9 +3,13 @@
     "private": true,
     "version": "0.0.0",
     "description": "portal-mojo monorepo — React portal toolkit for django-mojo (packages/) and the base admin portal (apps/)",
+    "workspaces": [
+        "packages/*",
+        "apps/*"
+    ],
     "scripts": {
-        "dev": "npm --prefix apps/portal run dev",
-        "build": "npm --prefix apps/portal run build",
-        "typecheck": "npm --prefix apps/portal run typecheck"
+        "dev": "npm run dev -w portal",
+        "build": "npm run build -w portal",
+        "typecheck": "npm run typecheck -w portal-mojo && npm run typecheck -w portal"
     }
 }

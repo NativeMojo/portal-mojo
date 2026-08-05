@@ -1,0 +1,16 @@
+// portal-mojo/ui — mission-control UI: server tables, filters, schema forms,
+// detail views, native-<dialog> modals, toasts, theming. Components render
+// semantic classes (panel, chip, tbl, …) styled by the consuming app's
+// theme.css tokens — light AND dark (reference set: apps/portal/src/theme.css).
+export * from './ThemeProvider';
+export * from './modal';
+export * from './toast';
+export * from './ui';
+export * from './FormFields';
+export * from './DetailView';
+export * from './FilterBar';
+export * from './ModelTable';
+// Formatters keep their web-mojo pipe ergonomics via a namespace: fmt.date(…),
+// fmt.relative(…), fmt.initials(…), fmt.inferTone(…).
+export * as fmt from './format';
+export type { Tone } from './format';

@@ -1,8 +1,7 @@
 import { Outlet } from 'react-router-dom';
+import { ModalHost, ToastHost } from 'portal-mojo/ui';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
-import { ModalHost } from './components/modal';
-import { ToastHost } from './components/toast';
 
 export default function App() {
     return (

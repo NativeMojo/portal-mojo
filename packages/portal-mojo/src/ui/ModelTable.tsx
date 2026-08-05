@@ -3,8 +3,8 @@
 // client-side row work for an engine to do. Table state IS the params store;
 // rendering is a map.
 import type { ReactNode } from 'react';
-import { PAGE_SIZES, useTableParams } from '../lib/params';
-import { useModelList } from '../lib/hooks';
+import { PAGE_SIZES, useTableParams } from '../client/params';
+import { useModelList } from '../client/hooks';
 import { FilterBar, FilterPills, type FilterDef } from './FilterBar';
 
 export interface Column<T> {

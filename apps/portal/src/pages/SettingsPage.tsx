@@ -1,6 +1,5 @@
 // Settings — SchemaForm outside a modal: same field language, plain page.
-import { SchemaForm } from '../components/FormFields';
-import { toast } from '../components/toast';
+import { SchemaForm, toast } from 'portal-mojo/ui';
 
 export function SettingsPage() {
     return (

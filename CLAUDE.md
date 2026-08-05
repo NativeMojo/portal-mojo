@@ -14,12 +14,16 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
 
 ## Layout
 
+- npm workspaces — install at root (`npm install`); root `npm run typecheck`
+  checks the package, then the app.
 - `apps/portal` — the base admin portal app (Vite/React 19/TS strict). Dev:
-  `npm run dev` (root proxies; preview config "portal", port 5199). Mock
-  django-mojo API by default; `VITE_MOJO_API=<origin>` targets a real backend.
-- `packages/portal-mojo` — the published toolkit (created in Chunk A0; subpath
-  exports: `portal-mojo/client`, `/ui`, `/charts`, `/admin`). The app imports
-  the package, never the reverse.
+  `npm run dev` (preview config "portal"; port 5199, autoPort picks another
+  via PORT when taken). Mock django-mojo API by default; `VITE_MOJO_API=<origin>`
+  targets a real backend.
+- `packages/portal-mojo` — the toolkit: TS-source subpath exports
+  `portal-mojo/client`, `/ui`, `/charts`, `/admin`; no build step. The app
+  imports the package, never the reverse. Its README lists what consuming
+  apps must provide (tokens, `@source` scan, icons, providers).
 
 ## Non-negotiable rules
 
@@ -41,8 +45,9 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
 - Everything renders correctly under `data-theme="light"` AND `"dark"` from
   day one — tokens live in `apps/portal/src/theme.css`.
 - django-mojo wire contract: `{status, data, …}` envelope, `start`/`size`
-  paging, `'-field'` sort, Django lookups. The mock (`src/lib/mock.ts`) must
-  keep speaking it exactly — it is the contract's executable spec.
+  paging, `'-field'` sort, Django lookups. The mock
+  (`packages/portal-mojo/src/client/mock.ts`) must keep speaking it exactly —
+  it is the contract's executable spec, shipped with the client.
 
 ## Product context
 

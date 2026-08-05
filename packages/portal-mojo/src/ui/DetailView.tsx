@@ -3,8 +3,8 @@
 // sections. Direct port of web-mojo's headerConfig/sections schema; the
 // section bodies are plain components built from FlatRow / SecurityItem.
 import { useState, type ReactNode } from 'react';
-import { initials } from '../lib/format';
-import type { Tone } from '../lib/format';
+import { initials } from './format';
+import type { Tone } from './format';
 
 export interface Chip {
     icon?: string;

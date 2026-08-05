@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { useTheme, type ThemePref } from './ThemeProvider';
+import { useTheme, type ThemePref } from 'portal-mojo/ui';
 
 const TITLES: Record<string, string> = { '/': 'Dashboard', '/users': 'Users', '/settings': 'Settings' };
 const NEXT: Record<ThemePref, ThemePref> = { light: 'dark', dark: 'system', system: 'light' };

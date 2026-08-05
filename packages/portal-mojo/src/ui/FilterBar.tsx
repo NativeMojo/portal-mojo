@@ -4,8 +4,8 @@
 // Adding a filter to a page is one entry in a `filters` array.
 import { useEffect, useRef, useState } from 'react';
 import { modal } from './modal';
-import { formatFilterDisplay } from '../lib/lookups';
-import type { ActiveFilter, TableParamsApi } from '../lib/params';
+import { formatFilterDisplay } from '../client/lookups';
+import type { ActiveFilter, TableParamsApi } from '../client/params';
 
 export type FilterType = 'text' | 'select' | 'multiselect' | 'number' | 'boolean' | 'date' | 'daterange';
 

@@ -7,5 +7,6 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [react(), tailwindcss()],
     base: './',
-    server: { port: 5199, strictPort: true },
+    // PORT lets the launcher assign a free port; 5199 is the manual-run default.
+    server: { port: Number(process.env.PORT ?? 5199), strictPort: true },
 });
