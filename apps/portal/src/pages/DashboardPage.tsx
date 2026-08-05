@@ -1,8 +1,12 @@
-// Dashboard — KPI cards fed by count queries (the stat-strip request shape:
-// filters + size:0 → count only), a sparkline, and a recent-users feed.
+// Dashboard — the mission-control landing: a KPI strip (metric tiles with
+// sparklines + deltas beside count tiles fed by size:0 queries), the main
+// metrics chart (stats / view-data / custom-range dialogs on the header),
+// scoped mini widgets, and a user-base doughnut + verified ring built from
+// the same count queries.
 import { useModelList, type User } from 'portal-mojo/client';
-import { Badge, MetricCard, fmt, modal } from 'portal-mojo/ui';
-import { MetricsChart } from 'portal-mojo/charts';
+import { Badge, fmt, modal } from 'portal-mojo/ui';
+import { CircularProgress, KPIStrip, MetricsChart, MetricsMiniWidget, PieChart } from 'portal-mojo/charts';
+import { GroupModel } from '../models';
 import { UserDetail } from './UserDetail';
 
 const ENDPOINT = '/api/user';
@@ -15,35 +19,99 @@ function useCount(filters: Record<string, string>) {
 export function DashboardPage() {
     const total = useCount({});
     const active = useCount({ is_active: 'true' });
-    const superusers = useCount({ is_superuser: 'true' });
     const verified = useCount({ is_email_verified: 'true' });
 
     const recent = useModelList<User>(ENDPOINT, { size: 6, sort: '-created' });
 
     const openUser = (id: number) => { void modal.detail((close) => <UserDetail id={id} onClose={() => close(null)} />); };
 
+    const disabled = total != null && active != null ? Math.max(0, total - active) : null;
+    const verifiedPct = total ? Math.round(((verified ?? 0) / total) * 100) : null;
+
     return (
         <div className="flex flex-col gap-4">
-            <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
-                <MetricCard label="Total Users" value={total ?? '—'} icon="bi-people" hint="All accounts" />
-                <MetricCard label="Active" value={active ?? '—'} icon="bi-person-check" hint={total ? `${Math.round(((active ?? 0) / total) * 100)}% of total` : undefined} />
-                <MetricCard label="Superusers" value={superusers ?? '—'} icon="bi-shield-lock" hint="System-wide access" />
-                <MetricCard label="Email Verified" value={verified ?? '—'} icon="bi-patch-check" hint={total ? `${Math.round(((verified ?? 0) / total) * 100)}% of total` : undefined} />
-            </div>
+            {/* Metric tiles (sparkline + day-over-day delta from ONE batched
+                fetch) beside count tiles fed by the size:0 count queries. */}
+            <KPIStrip
+                tiles={[
+                    { key: 'users', label: 'Total Users', value: total ?? null },
+                    { slug: 'api_calls', label: 'API Calls', tone: 'good' },
+                    { slug: 'logins', label: 'Logins', tone: 'good' },
+                    { slug: 'errors', label: 'Errors', tone: 'bad', severity: 'warn' },
+                ]}
+                granularity="days"
+                range="7d"
+            />
 
             <MetricsChart
                 title="Platform activity"
                 slugs={['api_calls', 'logins', 'errors']}
+                seriesLabels={{ api_calls: 'API Calls', logins: 'Logins', errors: 'Errors' }}
                 defaultRange="24h"
                 defaultGranularity="hours"
                 height={300}
             />
+
+            <div className="grid gap-4 lg:grid-cols-3">
+                <MetricsMiniWidget
+                    title="Logins"
+                    icon="bi bi-box-arrow-in-right"
+                    slugs={['logins']}
+                    granularity="hours"
+                    defaultRange="24h"
+                    showTrending
+                    subtitle={(ctx) => <><b>{ctx.total.toLocaleString()}</b> in 24h</>}
+                    search={{
+                        model: GroupModel,
+                        placeholder: 'All groups (global)',
+                        toAccount: (id) => `group-${id}`,
+                    }}
+                />
+                <MetricsMiniWidget
+                    title="Errors"
+                    icon="bi bi-bug"
+                    slugs={['errors']}
+                    granularity="hours"
+                    defaultRange="24h"
+                    chartType="bar"
+                    tone="bad"
+                    showTrending
+                    subtitle={(ctx) => <><b>{ctx.total.toLocaleString()}</b> in 24h · {ctx.nowLabel.toLowerCase()}: {ctx.nowValue.toLocaleString()}</>}
+                />
+                <div className="panel panel-pad">
+                    <div className="eyebrow">Accounts</div>
+                    <h3 className="panel-subtitle">User base</h3>
+                    <div className="flex items-center gap-6 flex-wrap">
+                        <PieChart
+                            data={total == null || disabled == null ? null : [
+                                { label: 'Active', value: active ?? 0, color: 'var(--ok)' },
+                                { label: 'Disabled', value: disabled, color: 'var(--bad)' },
+                            ]}
+                            width={150}
+                            height={150}
+                            cutout={0.62}
+                            centerLabel={(ctx) => ctx.total.toLocaleString()}
+                            centerSubLabel="users"
+                            emptyText="Loading…"
+                        />
+                        <CircularProgress
+                            value={verified ?? 0}
+                            max={Math.max(1, total ?? 1)}
+                            size="md"
+                            variant="success"
+                            label="verified"
+                            title={verifiedPct != null ? `${verifiedPct}% of accounts have a verified email` : undefined}
+                        />
+                    </div>
+                </div>
+            </div>
 
             <div className="grid gap-4 lg:grid-cols-5">
                 <div className="lg:col-span-3">
                     <MetricsChart
                         title="Traffic mix"
                         slugs={['api_calls', 'logins']}
+                        seriesLabels={{ api_calls: 'API Calls', logins: 'Logins' }}
                         defaultRange="7d"
                         defaultGranularity="days"
                         defaultType="bar"
