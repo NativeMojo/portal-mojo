@@ -21,6 +21,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [calendar.md](calendar.md) | The picker engine + `dateFns` namespace — three precisions, range anchor/preview, drill-down zoom |
 | [collection-multiselect.md](collection-multiselect.md) | Server-backed checkbox panel — model binding, 400ms search, select/deselect-all, shift-click ranges |
 | [detail-primitives.md](detail-primitives.md) | StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — the detail-page pack |
+| [markdown.md](markdown.md) | MarkdownView — server render via docit, allowlist sanitizer trust model, client fallback |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart`, the metrics wire shape |
 | [menus-and-access.md](menus-and-access.md) | Menu registry + SidebarNav; `useMe`/`useCan`/`Guarded`; group context |
 | [grouping-and-fmt.md](grouping-and-fmt.md) | `groupBy*` helpers, `fmt.*` formatters |

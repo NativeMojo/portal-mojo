@@ -3,10 +3,8 @@
 // something you can look at rather than something you take on faith.
 import { useMemo, useState } from 'react';
 import { getMockCallCounts, usingMockTransport } from 'portal-mojo/client';
-// MERGE-WIRE: portal-mojo/ui
-import { MarkdownView } from '../../../../../packages/portal-mojo/src/ui/MarkdownView';
-// MERGE-WIRE: portal-mojo/client
-import { clearMarkdownCache, sanitizeMarkdownHtml, type SanitizeDrop } from '../../../../../packages/portal-mojo/src/client/markdown';
+import { MarkdownView } from 'portal-mojo/ui';
+import { clearMarkdownCache, sanitizeMarkdownHtml, type SanitizeDrop } from 'portal-mojo/client';
 
 const SAMPLE = [
     '# Release notes — portal 0.4',

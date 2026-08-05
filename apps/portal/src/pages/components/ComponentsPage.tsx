@@ -19,6 +19,7 @@ import { FormatDemo } from './demos-format';
 import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
 import { DetailPrimitivesDemo } from './demos-detail-primitives';
 import { CalendarDemo } from './demos-calendar';
+import { MarkdownDemo } from './demos-markdown';
 
 interface DemoSection {
     key: string;
@@ -103,6 +104,11 @@ const SECTIONS: DemoSection[] = [
         key: 'charts', title: 'Charts', icon: 'bi-graph-up',
         blurb: 'Dependency-free SVG: SeriesChart (line/bar/area, stacked, legend) + MetricsChart against /api/metrics/fetch.',
         render: () => <ChartsDemo />,
+    },
+    {
+        key: 'markdown', title: 'MarkdownView', icon: 'bi-markdown',
+        blurb: 'Server-rendered markdown via /api/docit/render with a safe client fallback — the sanitizer IS the trust boundary, and the demo proves it.',
+        render: () => <MarkdownDemo />,
     },
     {
         key: 'format', title: 'Formatters', icon: 'bi-braces',
