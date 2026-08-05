@@ -1,0 +1,35 @@
+/* ============================================================ Popover
+   Shell for portal-mojo/ui <Popover> — the anchored surface every
+   dropdown-style control mounts in (pickers, autocomplete, multi-selects).
+   The element joins the browser top layer via the HTML Popover API so it
+   stacks above open native-<dialog> modals; these rules neutralize the UA
+   [popover] stylesheet (inset:0 + margin:auto centering, border, padding,
+   Canvas background) and restore the mission-control popover look
+   (.filter-menu / .group-menu family).
+
+   The shell is deliberately UNPADDED and UNSIZED: content brings its own
+   padding, width and scrolling (web-mojo's source shell baked in 20px
+   padding + a 260px min-width for its one tenant, the calendar — the
+   calendar port carries those on its own content instead).
+
+   NOT imported by theme.css yet — the orchestrator adds the @import at
+   merge time. */
+.mojo-popover {
+    /* One coordinate system in AND out of the top layer; JS writes top/left. */
+    position: fixed;
+    inset: auto;            /* UA [popover] sets inset:0 (centering) — kill it */
+    margin: 0;              /* UA margin:auto — kill it */
+    width: max-content;     /* natural content width — a large `left` must
+                               never shrink-wrap fixed-pos content narrower */
+    max-width: calc(100vw - 16px);
+    padding: 0;
+    overflow: visible;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow-pop);
+    /* Fallback path only (browsers without the Popover API render this as a
+       plain portaled div) — top-layer members ignore z-index entirely. */
+    z-index: 10000;
+}
