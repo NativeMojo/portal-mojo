@@ -2,7 +2,7 @@ import { useLocation } from 'react-router-dom';
 import { hostedAuthUrl, logout, redirectToHostedAuth, useAuthSnapshot, useMe } from 'portal-mojo/client';
 import { useTheme, type ThemePref, fmt } from 'portal-mojo/ui';
 
-const TITLES: Record<string, string> = { '/': 'Dashboard', '/users': 'Users', '/settings': 'Settings', '/group': 'Group' };
+const TITLES: Record<string, string> = { '/': 'Dashboard', '/users': 'Users', '/settings': 'Settings', '/group': 'Group', '/components': 'Components' };
 const NEXT: Record<ThemePref, ThemePref> = { light: 'dark', dark: 'system', system: 'light' };
 const PREF_ICON: Record<ThemePref, string> = { light: 'bi-sun', dark: 'bi-moon-stars', system: 'bi-circle-half' };
 

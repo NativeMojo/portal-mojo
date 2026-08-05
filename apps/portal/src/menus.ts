@@ -13,6 +13,8 @@ registerMenus([
             { label: 'Users', icon: 'bi-people', route: '/users' },
             { divider: 'System' },
             { label: 'Settings', icon: 'bi-gear', route: '/settings', permissions: 'view_admin' },
+            { divider: 'Develop' },
+            { label: 'Components', icon: 'bi-box-seam', route: '/components' },
         ],
     },
     {

@@ -87,13 +87,37 @@ function pageWindow(current: number, total: number): (number | '…')[] {
  * input on focus, and PINNED open while it carries text — search is the one
  * filter whose state has no pill, so the open input is its indicator. `/`
  * focuses it from anywhere (maestro keyboard.js), hinted on hover.
+ *
+ * Search is a SERVER query like every other table param — keystrokes buffer
+ * locally for 300ms (web-mojo's debounce) and then hit the wire once. Enter
+ * commits immediately.
  */
-function ExpandingSearch({ value, onChange, placeholder }: {
+export function ExpandingSearch({ value, onChange, placeholder }: {
     value: string;
     onChange: (term: string) => void;
     placeholder?: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
+    const [draft, setDraft] = useState(value);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // External resets (Clear all, preset swap, back/forward) win over a
+    // stale draft — but never while the user is mid-typing a pending edit.
+    useEffect(() => {
+        if (timerRef.current == null) setDraft(value);
+    }, [value]);
+    useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+    const commit = (term: string) => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = null;
+        onChange(term);
+    };
+    const edit = (term: string) => {
+        setDraft(term);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => commit(term), 300);
+    };
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== '/') return;
@@ -107,16 +131,19 @@ function ExpandingSearch({ value, onChange, placeholder }: {
         return () => document.removeEventListener('keydown', onKey);
     }, []);
     return (
-        <div className={`fsearch${value ? ' holding' : ''}`}>
+        <div className={`fsearch${draft ? ' holding' : ''}`}>
             <i className="bi bi-search icon" />
             <input
                 ref={inputRef}
                 className="text"
                 type="search"
-                value={value}
+                value={draft}
                 placeholder={placeholder}
-                onChange={(e) => onChange(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }}
+                onChange={(e) => edit(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Enter') commit((e.target as HTMLInputElement).value);
+                }}
                 aria-label="Search"
             />
             <kbd>/</kbd>

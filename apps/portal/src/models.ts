@@ -3,7 +3,7 @@
 // *Forms statics: endpoint, UI permission gates, form configs, and the
 // POST_SAVE_ACTIONS the backend RestMeta declares. Stabilized definitions
 // migrate into portal-mojo/admin section bundles alongside their pages.
-import { defineModel, type User } from 'portal-mojo/client';
+import { defineModel, type Group, type User } from 'portal-mojo/client';
 
 export const UserModel = defineModel<User>({
     name: 'user',
@@ -50,5 +50,23 @@ export const UserModel = defineModel<User>({
         reactivate: { permissions: ['users', 'manage_users'] },
         send_invite: {},
         revoke_sessions: { response: 'payload' },
+    },
+});
+
+/** Group kinds offered in filters — union of the mock's and mverify's data. */
+export const GROUP_KIND_OPTIONS = [
+    { value: 'org', label: 'Org' },
+    { value: 'organization', label: 'Organization' },
+    { value: 'team', label: 'Team' },
+    { value: 'project', label: 'Project' },
+    { value: 'group', label: 'Group' },
+];
+
+export const GroupModel = defineModel<Group & { id: number }>({
+    name: 'group',
+    endpoint: '/api/group',
+    permissions: {
+        view: ['groups', 'view_groups'],
+        manage: ['groups', 'manage_groups'],
     },
 });
