@@ -205,7 +205,11 @@ button.cprog { cursor: pointer; font: inherit; }
 .mmw-scope:hover { border-color: var(--mute); color: var(--ink-strong); }
 .mmw-scope:hover .mmw-scope-x { color: var(--bad); }
 .mmw-scope-pop { padding: 10px; min-width: 240px; }
-.mmw-chart { position: relative; display: flex; align-items: center; }
+/* Cards are grid-stretched to the tallest sibling, so a short card has
+   slack. It belongs ABOVE the chart: title/value pinned to the top, chart
+   sitting on the bottom edge — a metric card reads top-down and the
+   sparkline is its floor. `margin-top: auto` claims the slack. */
+.mmw-chart { position: relative; display: flex; align-items: center; margin-top: auto; }
 .mmw-skel { display: block; width: 100%; border-radius: 8px; }
 .mmw-empty { width: 100%; text-align: center; color: var(--mute); font-size: 12.5px; padding: 12px 0; }
 .mmw-error {
