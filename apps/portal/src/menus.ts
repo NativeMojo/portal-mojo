@@ -11,7 +11,13 @@ registerMenus([
             { divider: 'Main' },
             { label: 'Dashboard', icon: 'bi-grid-1x2', route: '/' },
             { label: 'Users', icon: 'bi-people', route: '/users' },
+            { label: 'Groups', icon: 'bi-diagram-3', route: '/groups' },
+            // Own keys — VIEW_PERMS include "owner", so no gate here.
+            { label: 'API Keys', icon: 'bi-key', route: '/apikeys' },
             { divider: 'System' },
+            // logit rest VIEW_PERMS: manage_logs|view_logs|security|admin —
+            // the client-side gate mirrors it (admin/superuser pass any).
+            { label: 'Logs', icon: 'bi-journal-text', route: '/logs', permissions: ['view_logs', 'manage_logs', 'security'] },
             { label: 'Settings', icon: 'bi-gear', route: '/settings', permissions: 'view_admin' },
             { divider: 'Develop' },
             { label: 'Components', icon: 'bi-box-seam', route: '/components' },
