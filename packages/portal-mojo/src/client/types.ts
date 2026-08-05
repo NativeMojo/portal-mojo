@@ -1,5 +1,9 @@
 // Shared types for the mojo portal baseline.
 
+// Type-only — erased at compile time; zod ships as a portal-mojo dependency
+// (the single sanctioned dependency, added with B3 FormView validation).
+import type { ZodType } from 'zod';
+
 /** django-mojo list response body (inside the envelope): rows + paging meta. */
 export interface MojoList<T> {
     rows: T[];
@@ -16,7 +20,31 @@ export type Params = Record<string, string | number | boolean | null | undefined
 // configs as plain data — web-mojo's User.ADD_FORM/EDIT_FORM heritage.
 // Rendering stays in portal-mojo/ui (SchemaForm/formModal re-export these).
 
+/** One value as a controlled form input holds it (server rows may carry numbers/null). */
+export type FieldValue = string | number | boolean | null;
+export type FieldValues = Record<string, FieldValue>;
+
+/**
+ * Declarative conditional visibility — FormBuilder.js:863-888 semantics:
+ * the controlling field's value is String()-coerced and matched against the
+ * allowed list; `negate` flips the result.
+ */
+export interface ShowWhenRule {
+    /** Controlling field name (dotted names allowed, e.g. 'metadata.kind'). */
+    field: string;
+    value: FieldValue | FieldValue[];
+    negate?: boolean;
+}
+/** Either the declarative rule or a predicate over the live form values. */
+export type ShowWhen = ShowWhenRule | ((values: FieldValues) => boolean);
+
 export interface Field {
+    /**
+     * Field name — the wire key. Dotted names ('permissions.manage_users')
+     * read/write nested dict values; FormView expands them to partial dicts
+     * on save (django-mojo MERGES dict bodies into JSONFields — rest.py
+     * on_rest_update_jsonfield).
+     */
     name: string;
     type: 'text' | 'email' | 'tel' | 'select' | 'switch' | 'textarea';
     label: string;
@@ -25,6 +53,15 @@ export interface Field {
     help?: string;
     columns?: 6 | 12;
     options?: { value: string; label: string }[];
+    /** Conditional visibility. Hidden fields never submit/save and their errors clear. */
+    showWhen?: ShowWhen;
+    /**
+     * Per-field zod schema, validated against the COMMITTED input value
+     * (string for text-ish types, boolean for switch). A failing parse blocks
+     * the save of that field only; the first issue's message shows in the
+     * field's error slot. Server-side validation stays authoritative.
+     */
+    schema?: ZodType;
 }
 
 export type FormData = Record<string, string | boolean>;

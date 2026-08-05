@@ -308,6 +308,41 @@ function runUserAction(user: MockUser, action: string, value: unknown): Record<s
     }
 }
 
+/**
+ * Phone normalization parity — mirrors phonehub services/phonenumbers.normalize,
+ * which User.set_phone_number runs on every REST save (set_<field> setter
+ * dispatch in rest.py on_rest_save_field). Measured live: too-few-digit
+ * "pretty" NANP values (`+1 (555) 0100`) REJECT; valid shapes normalize to
+ * E.164 (`+15555550142`) and the row comes back normalized.
+ */
+function normalizePhone(value: string): string | null {
+    const hasPlus = value.trim().startsWith('+');
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return null;
+    if (!hasPlus) {
+        if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+        if (digits.length === 10) return `+1${digits}`;
+        return null; // country not detectable without +
+    }
+    // +1… is NANP: exactly 11 digits. Other country codes: E.164 length rule.
+    if (digits.startsWith('1')) return digits.length === 11 ? `+${digits}` : null;
+    return digits.length >= 7 && digits.length <= 15 ? `+${digits}` : null;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+    return v != null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** rest.py on_rest_update_jsonfield / objict.merge_dicts — recursive merge. */
+function mergeDicts(existing: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
+    const out = { ...existing };
+    for (const [key, value] of Object.entries(incoming)) {
+        const prev = out[key];
+        out[key] = isPlainObject(prev) && isPlainObject(value) ? mergeDicts(prev, value) : value;
+    }
+    return out;
+}
+
 function saveUser(user: MockUser, body: Record<string, unknown>): unknown {
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
@@ -315,7 +350,29 @@ function saveUser(user: MockUser, body: Record<string, unknown>): unknown {
         if (USER_ACTIONS.has(key)) actionEntries.push([key, value]);
         else fields[key] = value;
     }
-    Object.assign(user, fields);
+    // set_phone_number parity (account/models/user.py:635): empty clears;
+    // anything else must normalize to E.164 or the WHOLE save rejects with
+    // the server's exact message shape.
+    if ('phone_number' in fields) {
+        const raw = fields.phone_number;
+        if (raw == null || raw === '') {
+            fields.phone_number = null;
+        } else {
+            const normalized = typeof raw === 'string' ? normalizePhone(raw) : null;
+            if (!normalized) {
+                return { status: false, error: `Invalid phone number: ${String(raw)}`, error_code: 400 };
+            }
+            fields.phone_number = normalized;
+        }
+    }
+    // JSONField parity (rest.py on_rest_update_jsonfield): a dict body MERGES
+    // into an existing dict field — {permissions: {x: true}} preserves the
+    // other grants. Non-dict values assign as before.
+    const target = user as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(fields)) {
+        const existing = target[key];
+        target[key] = isPlainObject(value) && isPlainObject(existing) ? mergeDicts(existing, value) : value;
+    }
     let actionResp: Record<string, unknown> | null = null;
     for (const [action, value] of actionEntries) {
         const resp = runUserAction(user, action, value);

@@ -7,6 +7,7 @@ import { modal } from './modal';
 // The field-language TYPES live in client/types so model definitions can
 // carry form configs as data (defineModel forms); re-exported here so the
 // ui-side API is unchanged.
+import { resolveShowWhen } from './form-autosave';
 import type { Field, FormData } from '../client/types';
 
 export type { Field, FormData } from '../client/types';
@@ -23,8 +24,11 @@ const warnedSelectValues = new Set<string>();
  * field (the buttongroup/checklistdropdown display≠state class). While the
  * value is unset (or unknown — warned, per the unknown-option rule) a
  * disabled placeholder option is rendered and selected instead.
+ *
+ * Exported since B3: FormView renders selects through this exact component —
+ * ONE select implementation, one value pipeline.
  */
-function SchemaSelect({ field, value, invalid, onChange }: {
+export function SchemaSelect({ field, value, invalid, onChange }: {
     field: Field;
     value: string;
     invalid: boolean;
@@ -74,20 +78,39 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
     const [busy, setBusy] = useState(false);
     const [formError, setFormError] = useState('');
 
+    // showWhen (B3, same pipeline as FormView): hidden fields don't render,
+    // don't validate, don't submit, and their errors clear. Fields without
+    // showWhen behave exactly as before.
+    const visibleFields = fields.filter((f) => resolveShowWhen(f.showWhen, data));
+
     const set = (name: string, value: string | boolean) => {
-        setData((d) => ({ ...d, [name]: value }));
-        setErrors((e) => { const { [name]: _drop, ...rest } = e; return rest; });
+        const next = { ...data, [name]: value };
+        setData(next);
+        setErrors((e) => {
+            const rest = { ...e };
+            delete rest[name];
+            // Fields this change just hid lose their stale errors too.
+            for (const f of fields) {
+                if (f.showWhen && !resolveShowWhen(f.showWhen, next)) delete rest[f.name];
+            }
+            return rest;
+        });
     };
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const errs = validate(fields, data);
+        const errs = validate(visibleFields, data);
         setErrors(errs);
         if (Object.keys(errs).length) return;
+        // Hidden-by-showWhen fields never ride the payload (FormView parity).
+        const payload: FormData = {};
+        for (const f of visibleFields) {
+            if (f.name in data) payload[f.name] = data[f.name]!;
+        }
         setBusy(true);
         setFormError('');
         try {
-            await onSubmit(data);
+            await onSubmit(payload);
         } catch (err) {
             setFormError(err instanceof Error ? err.message : 'Save failed');
         } finally {
@@ -99,7 +122,7 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
         <form onSubmit={submit} noValidate>
             {formError && <div className="form-alert">{formError}</div>}
             <div className="form-grid">
-                {fields.map((f) => (
+                {visibleFields.map((f) => (
                     <div key={f.name} className={f.columns === 6 ? 'col-6' : 'col-12'}>
                         {f.type === 'switch' ? (
                             <label className="switch-row">
