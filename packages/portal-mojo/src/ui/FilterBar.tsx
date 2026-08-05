@@ -4,6 +4,7 @@
 // Adding a filter to a page is one entry in a `filters` array.
 import { useEffect, useRef, useState } from 'react';
 import { modal } from './modal';
+import { DateRangePicker } from './date/DateRangePicker';
 import { formatFilterDisplay } from '../client/lookups';
 import type { ActiveFilter, TableParamsApi } from '../client/params';
 
@@ -97,16 +98,18 @@ function FilterForm({ def, current, onDone }: {
         <form className="modal-pad" onSubmit={submit}>
             <h2 className="modal-title">{def.label}</h2>
             {def.type === 'daterange' ? (
-                <div className="form-grid">
-                    <label className="field col-6">
-                        <span className="field-label">From</span>
-                        <input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-                    </label>
-                    <label className="field col-6">
-                        <span className="field-label">To</span>
-                        <input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
-                    </label>
-                </div>
+                /* Inline DateRangePicker (preset rail on) replaced the two
+                   bare native date inputs. Same staged start/end state, same
+                   Apply/Remove/Cancel semantics and dr_* wire values — one
+                   calendar pane so the body fits the md dialog. */
+                <DateRangePicker
+                    inline
+                    months={1}
+                    presets="default"
+                    start={start}
+                    end={end}
+                    onChange={(e) => { setStart(e.start); setEnd(e.end); }}
+                />
             ) : def.type === 'multiselect' ? (
                 <div className="check-list">
                     {(def.options ?? []).map((o) => (
