@@ -5,6 +5,9 @@ subpath exports — consumers compile it with their own Vite + TS
 (`moduleResolution: "bundler"`); there is no build step here. Marked
 `private` until the Phase 2 publish plan lands (see repo `PLAN.md`).
 
+**Per-component reference docs (written for AI context): [`docs/`](docs/README.md).**
+Live demos for everything: run the portal → **Develop → Components**.
+
 ## Subpath surfaces
 
 | Subpath | Surface |

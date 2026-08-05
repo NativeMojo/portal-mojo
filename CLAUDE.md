@@ -25,6 +25,9 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
   `portal-mojo/client`, `/ui`, `/charts`, `/admin`; no build step. The app
   imports the package, never the reverse. Its README lists what consuming
   apps must provide (tokens, `@source` scan, icons, providers).
+  **Component reference docs: `packages/portal-mojo/docs/` — read the page
+  before using/altering a component; new components ship with a docs page
+  AND a playground demo (app → Develop → Components).**
 
 ## Non-negotiable rules
 

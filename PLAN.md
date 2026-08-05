@@ -193,6 +193,10 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - **Port from source.** Before building any listed item, read its web-mojo file
   (paths above). The first baseline pass under-built charts/filters/pagination
   by working from summaries — that class of miss is the thing to prevent.
+- **Every component ships three-legged** (added 2026-08-05, per Ian): the
+  component, a demo section in the playground (`apps/portal` → Develop →
+  Components), and a reference page in `packages/portal-mojo/docs/` written
+  for AI context (import path, API, wire contract, invariants, pitfalls).
 - **Verify in the browser** — light AND dark, interactions clicked, console
   clean, `npm run typecheck` green — before calling an item done.
 - **Model split:** Fable drives contract-dense foundation work (Chunks A/B) and
