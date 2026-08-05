@@ -1,10 +1,11 @@
-// CollectionMultiSelect demos — the server-backed multi-pick panel against
-// the mock /api/group model. Three panels exercise every feature the port
-// carries: server search + shift-click ranges + SELECT/DESELECT (panel 1),
-// renderItem custom rows + per-row disabled + defaultParams-as-callback
-// (panel 2), and ignoreIds fed from panel 1's live selection — deliberately
-// as STRINGS against numeric row ids, proving normalized id comparison
-// end-to-end (panel 3).
+// CollectionMultiSelect demos — the server-backed multi-pick against the
+// mock /api/group model. Three panels: the DEFAULT dropdown (summary trigger,
+// menu that stays open while ticking, server search, shift-click ranges,
+// SELECT/DESELECT) — panel 1; dropdown with renderItem custom rows + per-row
+// disabled + defaultParams-as-callback (panel 2); and variant="panel" — the
+// always-visible box — with ignoreIds fed from panel 1's live selection,
+// deliberately as STRINGS against numeric row ids, proving normalized id
+// comparison end-to-end (panel 3).
 import { useState } from 'react';
 import { type Group } from 'portal-mojo/client';
 import { Badge } from 'portal-mojo/ui';
@@ -30,25 +31,29 @@ export function CollectionMultiSelectDemo() {
     return (
         <>
             <div className="panel panel-pad">
-                <div className="eyebrow">Model-bound multi-pick — search, shift-click, select/deselect all</div>
+                <div className="eyebrow">The dropdown (default) — summary trigger, menu stays open while ticking</div>
                 <p className="dim" style={{ margin: '4px 0 14px', maxWidth: 640 }}>
                     Bound to <code>GroupModel</code> — the fetch rides <code>useModelList</code>'s cache keys, so
-                    this list, the Groups table and every model hook share ONE cache. Search is a server wire
-                    param (400ms debounce). Click one row, then <b>shift-click</b> another: the clicked row's new
-                    state applies across the whole range.
+                    this picker, the Groups table and every model hook share ONE cache. The trigger summarizes
+                    picks (labels once seen, else "N selected"); ticking rows never closes the menu — <b>Done</b>,
+                    Escape or an outside click does. Search is a server wire param (400ms debounce), ON by
+                    default in the dropdown. Click one row, then <b>shift-click</b> another: the clicked row's
+                    new state applies across the whole range.
                 </p>
                 <div className="demo-row" style={{ alignItems: 'flex-start' }}>
-                    <CollectionMultiSelect<GroupRow>
-                        model={GroupModel}
-                        value={picked}
-                        onChange={setPicked}
-                        enableSearch
-                        searchPlaceholder="Search groups…"
-                        label="Groups"
-                        required
-                        help="Selections survive searches — pick under one term, search another, pick more."
-                        disabled={controlDisabled}
-                    />
+                    <div style={{ minWidth: 300 }}>
+                        <CollectionMultiSelect<GroupRow>
+                            model={GroupModel}
+                            value={picked}
+                            onChange={setPicked}
+                            searchPlaceholder="Search groups…"
+                            placeholder="Pick groups…"
+                            label="Groups"
+                            required
+                            help="Selections survive searches — pick under one term, search another, pick more."
+                            disabled={controlDisabled}
+                        />
+                    </div>
                     <div style={{ minWidth: 220 }}>
                         <div className="eyebrow">value (controlled)</div>
                         <pre className="demo-pre" style={{ marginTop: 6 }}>{JSON.stringify(picked)}</pre>
@@ -85,38 +90,43 @@ export function CollectionMultiSelectDemo() {
                         </button>
                     ))}
                 </div>
-                <CollectionMultiSelect<GroupRow>
-                    endpoint="/api/group"
-                    value={pickedCustom}
-                    onChange={setPickedCustom}
-                    size={6}
-                    defaultParams={() => (kind === 'all' ? { sort: 'name' } : { sort: 'name', kind })}
-                    isRowDisabled={(g) => g.kind === 'org'}
-                    renderItem={(g) => (
-                        <>
-                            <span className="collection-multiselect-item-label">
-                                {g.name}
-                                {g.parent && <span className="dim"> · in {g.parent.name}</span>}
-                            </span>
-                            <Badge tone={g.kind === 'org' ? 'muted' : 'primary'}>{g.kind}</Badge>
-                        </>
-                    )}
-                    label="Teams & projects"
-                    help="Org rows are disabled — select-all counts and picks only the enabled ones."
-                />
+                <div style={{ maxWidth: 340 }}>
+                    <CollectionMultiSelect<GroupRow>
+                        endpoint="/api/group"
+                        value={pickedCustom}
+                        onChange={setPickedCustom}
+                        size={6}
+                        placeholder="Pick teams & projects…"
+                        defaultParams={() => (kind === 'all' ? { sort: 'name' } : { sort: 'name', kind })}
+                        isRowDisabled={(g) => g.kind === 'org'}
+                        renderItem={(g) => (
+                            <>
+                                <span className="collection-multiselect-item-label">
+                                    {g.name}
+                                    {g.parent && <span className="dim"> · in {g.parent.name}</span>}
+                                </span>
+                                <Badge tone={g.kind === 'org' ? 'muted' : 'primary'}>{g.kind}</Badge>
+                            </>
+                        )}
+                        label="Teams & projects"
+                        help="Org rows are disabled — select-all counts and picks only the enabled ones."
+                    />
+                </div>
             </div>
 
             <div className="panel panel-pad">
-                <div className="eyebrow">ignoreIds — the "already added" pattern</div>
+                <div className="eyebrow">variant="panel" · ignoreIds — the "already added" pattern</div>
                 <p className="dim" style={{ margin: '4px 0 14px', maxWidth: 640 }}>
-                    This list hides whatever the first panel has selected — <code>ignoreIds</code> is the one
-                    sanctioned client-side row filter. The ids are passed as <b>strings</b> against numeric row
-                    ids on purpose: comparisons are normalized, so mixed id types work by construction (the
-                    legacy loose-<code>==</code> bug class ends here). The legacy server-side{' '}
-                    <code>excludeIds</code> option is not ported.
+                    <code>variant="panel"</code> keeps the always-visible box (web-mojo's shape) for
+                    settings-page contexts; search defaults OFF here. This list hides whatever the first
+                    panel has selected — <code>ignoreIds</code> is the one sanctioned client-side row filter.
+                    The ids are passed as <b>strings</b> against numeric row ids on purpose: comparisons are
+                    normalized, so mixed id types work by construction (the legacy loose-<code>==</code> bug
+                    class ends here). The legacy server-side <code>excludeIds</code> option is not ported.
                 </p>
                 <CollectionMultiSelect<GroupRow>
                     endpoint="/api/group"
+                    variant="panel"
                     value={pickedRest}
                     onChange={setPickedRest}
                     ignoreIds={picked.map(String)}

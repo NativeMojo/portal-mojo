@@ -100,7 +100,7 @@ const KITCHEN_FIELDS: Field[] = [
     },
     {
         name: 'metadata.ks_meet', type: 'datetimepicker', label: 'Meeting (datetimepicker)', columns: 6,
-        help: 'Interim input — the #1273 picker swaps in at merge. Epoch seconds on the wire.',
+        help: 'The real DateTimePicker through the registry. Epoch seconds on the wire.',
     },
     { name: 'metadata.ks_tz', type: 'timezone', label: 'Timezone (timezone)', columns: 6, help: 'IANA zone string on the wire.' },
 

@@ -1,14 +1,18 @@
-# CollectionMultiSelect — server-backed multi-pick panel
+# CollectionMultiSelect — server-backed multi-pick dropdown
 
 ```tsx
 import { CollectionMultiSelect } from 'portal-mojo/ui';
 ```
 
-An always-visible checkbox list over live model data: search on top,
-`SELECT (n)` / `DESELECT (n)` with live counts, shift-click range selection.
-The value is a **controlled id array** in both directions. Ported from
-web-mojo `CollectionMultiSelect.js`; sibling of `CollectionSelect` in the
-server-data selects family (epic #1275).
+A checkbox list over live model data — server search, `SELECT (n)` /
+`DESELECT (n)` with live counts, shift-click range selection — presented by
+default as a **dropdown**: a summary trigger + `<Popover>` menu sharing
+`MultiSelectDropdown`'s shell. The menu stays open while ticking; **Done**,
+Escape or an outside click closes it. `variant="panel"` keeps the
+always-visible box (web-mojo's shape) for settings-page contexts. The value
+is a **controlled id array** in both directions. Ported from web-mojo
+`CollectionMultiSelect.js`; sibling of `CollectionSelect` in the server-data
+selects family (epic #1275).
 
 ```tsx
 const [ids, setIds] = useState<Array<string | number>>([]);
@@ -17,7 +21,6 @@ const [ids, setIds] = useState<Array<string | number>>([]);
     model={GroupModel}            // or endpoint="/api/group"
     value={ids}
     onChange={setIds}
-    enableSearch
     label="Groups"
     required
 />
@@ -29,10 +32,14 @@ const [ids, setIds] = useState<Array<string | number>>([]);
 |---|---|
 | `model` / `endpoint` | One is required. `model` is a `defineModel` def (supplies endpoint + row type); `endpoint` is the bare path. |
 | `value` / `onChange` | Controlled id array. Every toggle commits — `onChange` fires with the full next array. Ids keep their caller-side types; all comparisons are normalized (`String()`), so string vs number ids work by construction. |
+| `variant` | `'dropdown'` (default): summary trigger + Popover menu — the form-embedded presentation. `'panel'`: the always-visible box. Internals (search, counts, ranges, states) are identical. |
+| `placeholder` | Trigger text while nothing is selected (dropdown). Default `'Select...'`. |
+| `showSelectedLabels` / `maxLabelsToShow` | Trigger summary: up to `maxLabelsToShow` (default 3) comma-joined labels **when every pick's label is known** (labels accumulate from rows the control has seen — across searches), else `"N selected"`. Hydrated initial ids the control has never seen summarize as `"N selected"` — no per-id fetches, no warn. |
+| `placement` | Menu placement against the trigger. Default `'bottom-start'`. |
 | `labelField` / `valueField` | Row fields for label and id, **dot notation** reaches nested fields (`'user.email'`). Defaults `'name'` / `'id'`. A missing field warns once and falls back (label → the id; missing id → row dropped) — never renders nothing silently. |
 | `size` | VISIBLE rows before the list scrolls (max-height = `size × 42px`). Default 8. **Not the fetch size** — the wire page size defaults to 50; override it via `defaultParams: { size: 100 }`. |
 | `maxHeight` | Explicit px override for the list height. |
-| `enableSearch` | Search input above the list. 400ms debounce (source parity — deliberately not ModelTable's 300) into the `search` wire param; trimmed; empty term drops the param. |
+| `enableSearch` | Search input above the list. **Defaults ON in the dropdown variant, OFF in the panel.** 400ms debounce (source parity — deliberately not ModelTable's 300) into the `search` wire param; trimmed; empty term drops the param. |
 | `defaultParams` | Extra wire params — a dict, or a **callback re-evaluated per render** (each fetch uses the freshest result; a changed result is a new query key → refetch). Merge order: `{size: 50} → defaultParams → group → search` (later wins). |
 | `requiresActiveGroup` | Folds the active group id in as `group`. With NO active group the fetch is **held** (empty state shows) — never an unscoped list where a scoped one was demanded. Needs a `<GroupProvider>` above; missing one warns. |
 | `ignoreIds` | Ids hidden client-side — the "already added" pattern. Compared normalized. This is the documented exception to the no-client-filtering rule; it exists so a picker can subtract rows already chosen elsewhere without a server round-trip. |
@@ -40,7 +47,8 @@ const [ids, setIds] = useState<Array<string | number>>([]);
 | `isRowDisabled` | `(row) => boolean` — per-row disabled: unclickable, skipped by SELECT and by shift-click ranges. |
 | `showSelectAll` | The SELECT/DESELECT header row. Default true. |
 | `label` / `required` / `help` / `error` | Field wrapper (house `.field-label` / `.field-help` / `.field-error`; `error` replaces `help`). |
-| `disabled` | Whole control: search, buttons, every row. |
+| `disabled` | Whole control: trigger, search, buttons, every row. |
+| `id` | id for the trigger button (a `<label for>` can point at it). |
 
 ## Selection semantics (the contract)
 
@@ -103,3 +111,7 @@ Sorting is the server's default unless `defaultParams` carries `sort`.
 - `requiresActiveGroup` holds the fetch until a group is active; pair the
   control with `RequiresGroup` or group-scoped screens so users aren't shown
   a permanently empty picker in global context.
+- The dropdown's trigger/footer classes (`.multiselect-trigger`,
+  `.multiselect-footer`, `.multiselect-done`) live in
+  `multiselect-dropdown.css` — consuming apps must import it alongside
+  `collection-multiselect.css` (the reference `theme.css` imports both).

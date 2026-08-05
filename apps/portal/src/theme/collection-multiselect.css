@@ -1,13 +1,18 @@
 /* ============================================================
-   CollectionMultiSelect — the server-backed multi-pick panel
+   CollectionMultiSelect — the server-backed multi-pick
    (packages/portal-mojo/src/ui/CollectionMultiSelect.tsx).
    Tokens only — light AND dark ride the theme.css variables.
    Reuses house primitives: .search-box, .tbl-check, .skel,
    .field-label / .field-help / .field-error.
    Row height is 42px BY CONTRACT: the component sizes the list
    as `size × 42` visible rows before it scrolls.
+   The DROPDOWN variant borrows MultiSelectDropdown's shell
+   classes (.multiselect-trigger / -footer / -done) — one trigger
+   voice for both multi-picks; import multiselect-dropdown.css
+   alongside this file.
    ============================================================ */
 .collection-multiselect { max-width: 460px; }
+.collection-multiselect-dropdown { max-width: 420px; }
 .collection-multiselect .field-label { margin-bottom: 5px; }
 
 .collection-multiselect-search { margin-bottom: 8px; }
@@ -93,3 +98,17 @@
 .collection-multiselect-error .btn { margin-top: 10px; }
 
 .collection-multiselect-disabled .field-label { opacity: 0.7; }
+
+/* ── Dropdown variant: the same head/list internals inside a Popover menu.
+   The popover IS the frame — the list drops its own border box and goes
+   full-bleed; a hairline separates it from the search/actions head. ── */
+.collection-multiselect-menu { border-radius: inherit; overflow: hidden; }
+.collection-multiselect-menu .collection-multiselect-head { padding: 10px 10px 0; }
+.collection-multiselect-menu .collection-multiselect-list,
+.collection-multiselect-menu .collection-multiselect-empty {
+    border: none; border-radius: 0; border-top: 1px solid var(--line);
+}
+.collection-multiselect-menu .collection-multiselect-body > .collection-multiselect-list:first-child,
+.collection-multiselect-menu .collection-multiselect-body > .collection-multiselect-empty:first-child {
+    border-top: none; /* no head above — the popover edge is the frame */
+}

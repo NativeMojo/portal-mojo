@@ -1,11 +1,20 @@
-// CollectionMultiSelect — the server-backed multi-pick panel: an always-
-// visible checkbox list over live model data with search on top, SELECT/
-// DESELECT-all with counts, and shift-click range selection. Ported from
-// web-mojo src/core/forms/inputs/CollectionMultiSelect.js (588 lines:
-// SearchView + ListItemsView + CollectionMultiSelectView) into the one-cache
-// world: data flows through useModelList's query keys ([endpoint, params]),
-// so pickers, tables and model hooks share one cache and one invalidation
-// root — never a parallel fetch path (the #1275 epic contract).
+// CollectionMultiSelect — the server-backed multi-pick: live model data as a
+// checkbox list with search on top, SELECT/DESELECT-all with counts, and
+// shift-click range selection. Ported from web-mojo
+// src/core/forms/inputs/CollectionMultiSelect.js (588 lines: SearchView +
+// ListItemsView + CollectionMultiSelectView) into the one-cache world: data
+// flows through useModelList's query keys ([endpoint, params]), so pickers,
+// tables and model hooks share one cache and one invalidation root — never a
+// parallel fetch path (the #1275 epic contract).
+//
+// PRESENTATION: the DEFAULT is a dropdown — a summary trigger + <Popover>
+// menu sharing MultiSelectDropdown's shell (one trigger voice for both
+// multi-picks; the menu stays open while ticking, Done closes). The source
+// (and its FormBuilder mount) rendered an always-visible panel, which eats
+// half a form column; `variant="panel"` keeps that box for settings-page /
+// always-on contexts. Search defaults ON in the dropdown (a server-backed
+// dropdown without search is a page-one-only picker) and OFF in the panel
+// (source parity).
 //
 // Deliberate departures from the source, all bug-class kills:
 //   · Ids are compared NORMALIZED (String()) everywhere — the loose `==`
@@ -24,11 +33,15 @@
 //     Trusted-HTML slots end here (architecture rule 6).
 //   · excludeIds is NOT ported: despite its "server-side" comment it was a
 //     second client-side filter identical to ignoreIds. One option remains.
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+    useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState,
+    type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
+} from 'react';
 import { useModelList } from '../client/hooks';
 import type { ModelDef } from '../client/model';
 import type { Params } from '../client/types';
 import { GroupContext } from '../client/group-context';
+import { Popover, type PopoverPlacement } from './Popover';
 
 /** Every id comparison in this component goes through here — string and
  *  number ids (and mixes of the two) work by construction. */
@@ -73,6 +86,21 @@ export interface CollectionMultiSelectProps<T extends { id: number | string }> {
     value: Array<string | number>;
     /** Fires with the full next id array on every commit (each toggle IS a commit). */
     onChange: (ids: Array<string | number>) => void;
+    /**
+     * 'dropdown' (default): summary trigger + Popover menu — the form-embedded
+     * presentation. 'panel': the always-visible box (the source's shape) for
+     * settings-page / always-on contexts.
+     */
+    variant?: 'dropdown' | 'panel';
+    /** Trigger text while nothing is selected (dropdown). Default 'Select...'. */
+    placeholder?: string;
+    /** Summarize the trigger with row labels when all picks have been seen
+     *  (else always "N selected"). Default true. */
+    showSelectedLabels?: boolean;
+    /** Above this many picks the trigger shows "N selected". Default 3. */
+    maxLabelsToShow?: number;
+    /** Menu placement against the trigger (dropdown). Default 'bottom-start'. */
+    placement?: PopoverPlacement;
     /** Row field shown as the label; dot notation reaches nested fields. Default 'name'. */
     labelField?: string;
     /** Row field used as the id; dot notation reaches nested fields. Default 'id'. */
@@ -81,7 +109,8 @@ export interface CollectionMultiSelectProps<T extends { id: number | string }> {
     size?: number;
     /** Explicit list max-height in px; defaults to size × 42 (the row height). */
     maxHeight?: number;
-    /** Search input above the list — 400ms debounce into the `search` wire param. */
+    /** Search input above the list — 400ms debounce into the `search` wire
+     *  param. Defaults ON in the dropdown variant, OFF in the panel. */
     enableSearch?: boolean;
     searchPlaceholder?: string;
     /**
@@ -111,21 +140,30 @@ export interface CollectionMultiSelectProps<T extends { id: number | string }> {
     required?: boolean;
     help?: string;
     error?: string;
-    /** Disable the whole control: search, buttons and every row. */
+    /** Disable the whole control: trigger, search, buttons and every row. */
     disabled?: boolean;
+    /** id for the trigger button (the label points at it). */
+    id?: string;
 }
 
 export function CollectionMultiSelect<T extends { id: number | string }>({
     model, endpoint, value, onChange,
+    variant = 'dropdown',
+    placeholder = 'Select...',
+    showSelectedLabels = true, maxLabelsToShow = 3,
+    placement = 'bottom-start',
     labelField = 'name', valueField = 'id',
     size = 8, maxHeight,
-    enableSearch = false, searchPlaceholder = 'Search…',
+    enableSearch, searchPlaceholder = 'Search…',
     defaultParams, requiresActiveGroup = false, ignoreIds,
     renderItem, isRowDisabled, showSelectAll = true,
     label, required = false, help, error, disabled = false,
+    id,
 }: CollectionMultiSelectProps<T>) {
     const resolvedEndpoint = model?.endpoint ?? endpoint;
     if (!resolvedEndpoint) throw new Error('CollectionMultiSelect: pass `model` or `endpoint`');
+
+    const searchOn = enableSearch ?? (variant === 'dropdown');
 
     // ── Search: live input → 400ms debounce → the `search` wire param ──
     // (the source's SearchView debounce, verbatim 400ms — deliberately NOT
@@ -157,7 +195,7 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
         size: 50, // page size on the WIRE (overridable via defaultParams) — not the visible-rows prop
         ...extra,
         ...(requiresActiveGroup && activeGroupId != null ? { group: activeGroupId } : {}),
-        ...(enableSearch && term ? { search: term } : {}),
+        ...(searchOn && term ? { search: term } : {}),
     };
     const query = useModelList<T>(resolvedEndpoint, wire, { enabled: !waitingForGroup });
     const rows = query.data?.rows;
@@ -199,6 +237,26 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
     // Selection is an ID SET over the controlled value — never row references,
     // so it survives searches and refetches by construction.
     const selectedKeys = useMemo(() => new Set(value.map(keyOf)), [value]);
+
+    // ── Trigger summary labels ──────────────────────────────────────────
+    // Labels accumulate from every row this control has SEEN (across searches
+    // and refetches) — a pick made under an old term keeps its label. An id
+    // never seen (hydrated initial value) is NOT an error — the summary just
+    // says "N selected"; no per-id fetches, no wrong labels, no warn.
+    const [labelCache, setLabelCache] = useState<ReadonlyMap<string, string>>(new Map());
+    useEffect(() => {
+        setLabelCache((prev) => {
+            let changed = false;
+            const next = new Map(prev);
+            for (const it of items) {
+                if (next.get(it.key) !== it.label) {
+                    next.set(it.key, it.label);
+                    changed = true;
+                }
+            }
+            return changed ? next : prev;
+        });
+    }, [items]);
 
     // ── Shift-click anchor: the last clicked row index ──────────────────
     // Reset when the row set itself changes (new data, ignoreIds change) —
@@ -261,6 +319,86 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
         if (value.length > 0) onChange([]);
     };
 
+    // ── Dropdown shell state (open / width / focus) ─────────────────────
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
+    const [open, setOpen] = useState(false);
+    // Menu width is glued to the trigger (never narrower than 260px — the
+    // search + action row needs the room) — set at open time so the popover's
+    // FIRST render is already right, then kept in sync while open.
+    const [menuWidth, setMenuWidth] = useState<number>();
+
+    const autoId = useId();
+    const menuId = `${autoId}-menu`;
+    const labelId = `${autoId}-label`;
+    const triggerId = id ?? `${autoId}-trigger`;
+
+    const close = useCallback((restoreFocus: boolean) => {
+        setOpen(false);
+        if (restoreFocus) triggerRef.current?.focus();
+    }, []);
+
+    const openMenu = () => {
+        const rect = triggerRef.current?.getBoundingClientRect();
+        if (rect) setMenuWidth(Math.max(rect.width, 260));
+        setOpen(true);
+    };
+
+    useLayoutEffect(() => {
+        if (variant !== 'dropdown' || !open) return;
+        const el = triggerRef.current;
+        if (!el) return;
+        const sync = () => setMenuWidth(Math.max(el.getBoundingClientRect().width, 260));
+        sync();
+        const ro = new ResizeObserver(sync);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [variant, open]);
+
+    const rowEls = () => Array.from(
+        bodyRef.current?.querySelectorAll<HTMLElement>('[data-cms-row]:not([aria-disabled="true"])') ?? [],
+    );
+
+    // Opening moves focus INTO the menu (it is portaled to the end of <body>,
+    // so Tab from the trigger would not reach it): the search input when
+    // search is on, else the first enabled row. Focus returns to the trigger
+    // on Escape/Done (see close()).
+    useEffect(() => {
+        if (variant !== 'dropdown' || !open) return;
+        if (searchOn) searchRef.current?.focus();
+        else rowEls()[0]?.focus();
+    }, [variant, open, searchOn]);
+
+    const onRowKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>, index: number) => {
+        switch (event.key) {
+            case ' ':
+            case 'Enter':
+                // The SAME toggleRow() a click runs — shiftKey included, so
+                // Shift+Space range-selects from the keyboard too.
+                event.preventDefault();
+                toggleRow(index, event.shiftKey);
+                return;
+            case 'ArrowDown':
+            case 'ArrowUp': {
+                event.preventDefault();
+                const list = rowEls();
+                if (list.length === 0) return;
+                const at = list.indexOf(event.currentTarget);
+                list[(at + (event.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length]?.focus();
+                return;
+            }
+            case 'Home':
+            case 'End': {
+                event.preventDefault();
+                const list = rowEls();
+                (event.key === 'Home' ? list[0] : list[list.length - 1])?.focus();
+                return;
+            }
+            default:
+        }
+    };
+
     // Skeleton whenever THIS key's rows aren't on screen yet (cold load or a
     // search/params change still serving the previous key via placeholder) —
     // the ModelTable pattern. Background refetches of the same key keep the
@@ -268,49 +406,56 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
     const pendingView = !waitingForGroup && (query.isPending || query.isPlaceholderData);
     const listMaxHeight = maxHeight ?? size * 42;
 
-    return (
-        <div className={`collection-multiselect${disabled ? ' collection-multiselect-disabled' : ''}`}>
-            {label && (
-                <div className="field-label">
-                    {label}
-                    {required && <em> *</em>}
-                </div>
-            )}
+    const showActions = showSelectAll && !pendingView && items.length > 0;
 
-            {enableSearch && (
-                <div className="search-box collection-multiselect-search">
-                    <i className="bi bi-search" />
-                    <input
-                        type="search"
-                        value={input}
-                        placeholder={searchPlaceholder}
-                        disabled={disabled}
-                        onChange={(e) => setInput(e.target.value)}
-                        aria-label={label ? `Search ${label}` : 'Search'}
-                    />
-                </div>
-            )}
-
-            {showSelectAll && !pendingView && items.length > 0 && (
-                <div className="collection-multiselect-actions">
-                    <button
-                        type="button"
-                        className="collection-multiselect-action"
-                        disabled={disabled || selectableCount === 0}
-                        onClick={selectAllVisible}
-                    >
-                        <i className="bi bi-check-square" />
-                        SELECT{selectableCount > 0 && ` (${selectableCount})`}
-                    </button>
-                    <button
-                        type="button"
-                        className="collection-multiselect-action"
-                        disabled={disabled || selectedCount === 0}
-                        onClick={deselectAll}
-                    >
-                        DESELECT{selectedCount > 0 && ` (${selectedCount})`}
-                        <i className="bi bi-square" />
-                    </button>
+    // ── The shared body: search + actions + list/skeleton/empty/error ───
+    // Rendered identically inside the panel box and the dropdown menu.
+    const body = (
+        <div className="collection-multiselect-body" ref={bodyRef}>
+            {(searchOn || showActions) && (
+                <div className="collection-multiselect-head">
+                    {searchOn && (
+                        <div className="search-box collection-multiselect-search">
+                            <i className="bi bi-search" />
+                            <input
+                                ref={searchRef}
+                                type="search"
+                                value={input}
+                                placeholder={searchPlaceholder}
+                                disabled={disabled}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'ArrowDown') {
+                                        e.preventDefault();
+                                        rowEls()[0]?.focus();
+                                    }
+                                }}
+                                aria-label={label ? `Search ${label}` : 'Search'}
+                            />
+                        </div>
+                    )}
+                    {showActions && (
+                        <div className="collection-multiselect-actions">
+                            <button
+                                type="button"
+                                className="collection-multiselect-action"
+                                disabled={disabled || selectableCount === 0}
+                                onClick={selectAllVisible}
+                            >
+                                <i className="bi bi-check-square" />
+                                SELECT{selectableCount > 0 && ` (${selectableCount})`}
+                            </button>
+                            <button
+                                type="button"
+                                className="collection-multiselect-action"
+                                disabled={disabled || selectedCount === 0}
+                                onClick={deselectAll}
+                            >
+                                DESELECT{selectedCount > 0 && ` (${selectedCount})`}
+                                <i className="bi bi-square" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -348,6 +493,7 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
                         return (
                             <div
                                 key={item.key}
+                                data-cms-row=""
                                 role="checkbox"
                                 aria-checked={checked}
                                 aria-disabled={item.disabled || undefined}
@@ -358,12 +504,7 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
                                     item.disabled ? 'is-disabled' : '',
                                 ].filter(Boolean).join(' ')}
                                 onClick={(e) => toggleRow(index, e.shiftKey)}
-                                onKeyDown={(e) => {
-                                    if (e.key === ' ' || e.key === 'Enter') {
-                                        e.preventDefault();
-                                        toggleRow(index, e.shiftKey);
-                                    }
-                                }}
+                                onKeyDown={(e) => onRowKeyDown(e, index)}
                             >
                                 {/* Purely visual — pointer-events:none in CSS, so every
                                     interaction (incl. shiftKey) lands on the row; the
@@ -377,12 +518,103 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
                     })}
                 </div>
             )}
+        </div>
+    );
 
-            {error ? (
-                <div className="field-error">{error}</div>
-            ) : help ? (
-                <div className="field-help">{help}</div>
-            ) : null}
+    const foot = error ? (
+        <div className="field-error">{error}</div>
+    ) : help ? (
+        <div className="field-help">{help}</div>
+    ) : null;
+
+    if (variant === 'panel') {
+        return (
+            <div className={`collection-multiselect${disabled ? ' collection-multiselect-disabled' : ''}`}>
+                {label && (
+                    <div className="field-label">
+                        {label}
+                        {required && <em> *</em>}
+                    </div>
+                )}
+                {body}
+                {foot}
+            </div>
+        );
+    }
+
+    // Trigger summary: placeholder → up to N comma-joined labels (only when
+    // EVERY pick's label is known) → "N selected".
+    const allLabeled = value.every((v) => labelCache.has(keyOf(v)));
+    const triggerText = selectedCount === 0
+        ? placeholder
+        : showSelectedLabels && selectedCount <= maxLabelsToShow && allLabeled
+            ? value.map((v) => labelCache.get(keyOf(v))!).join(', ')
+            : `${selectedCount} selected`;
+
+    return (
+        <div className={`collection-multiselect collection-multiselect-dropdown${disabled ? ' collection-multiselect-disabled' : ''}`}>
+            {label && (
+                <div className="field-label" id={labelId}>
+                    {label}
+                    {required && <em> *</em>}
+                </div>
+            )}
+
+            <button
+                ref={triggerRef}
+                type="button"
+                id={triggerId}
+                className={`multiselect-trigger${open ? ' is-open' : ''}`}
+                disabled={disabled}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                aria-controls={open ? menuId : undefined}
+                // BOTH ids: the field label AND the trigger's own summary, so
+                // the accessible name reads "Groups, Ops, Design".
+                aria-labelledby={label ? `${labelId} ${triggerId}` : undefined}
+                onClick={() => (open ? close(true) : openMenu())}
+                onKeyDown={(event) => {
+                    if (!open && event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        openMenu();
+                    }
+                }}
+            >
+                <span className={`multiselect-trigger-text${selectedCount === 0 ? ' is-placeholder' : ''}`}>
+                    {triggerText}
+                </span>
+                <i className="bi bi-chevron-down" aria-hidden="true" />
+            </button>
+
+            <Popover
+                anchorRef={triggerRef}
+                open={open}
+                placement={placement}
+                // Escape always hands focus back; an outside click only does
+                // when focus is still parked inside the menu (never fight the
+                // element the user just clicked).
+                onClose={(reason) => close(
+                    reason === 'escape' || bodyRef.current?.contains(document.activeElement) === true,
+                )}
+                id={menuId}
+                aria-label={label ?? 'Options'}
+                style={menuWidth === undefined ? undefined : { width: menuWidth }}
+            >
+                <div className="collection-multiselect-menu">
+                    {body}
+                    <div className="multiselect-footer">
+                        <button
+                            type="button"
+                            className="btn btn-primary btn-compact multiselect-done"
+                            onClick={() => close(true)}
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </Popover>
+
+            {foot}
         </div>
     );
 }
