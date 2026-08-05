@@ -1,0 +1,43 @@
+/* ComboBox — styles for portal-mojo <ComboBox> (packages/portal-mojo/src/ui/ComboBox.tsx).
+   Tokens only; reads correctly under data-theme="light" AND "dark".
+   NOT imported yet — the orchestrator adds `@import "./theme/combobox.css";`
+   to theme.css at merge. */
+
+.combo { position: relative; width: 100%; }
+.combo-input-wrap { position: relative; }
+.combo-input { padding-right: 32px; /* room for the chevron */ }
+.combo-toggle {
+    position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+    width: 24px; height: 24px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: none; border-radius: 6px;
+    color: var(--mute); cursor: pointer; font-size: 12px;
+}
+.combo-toggle:hover { background: var(--line-soft); color: var(--ink-strong); }
+
+/* Local absolute dropdown inside the relative container (as source: full
+   width, 300px scroll). MERGE-WIRE: consider Popover primitive (#1271). */
+.combo-pop {
+    position: absolute; z-index: 45; top: calc(100% + 5px); left: 0; right: 0;
+    max-height: 300px; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: var(--shadow-pop); padding: 5px;
+}
+.combo-option {
+    display: flex; align-items: flex-start; gap: 9px;
+    padding: 7px 10px; border-radius: 7px; cursor: pointer;
+    font-size: 13.5px; color: var(--ink);
+}
+/* Keyboard highlight (.combo-hot) and hover share one look — there is only
+   one "pointed at" state. */
+.combo-option:hover, .combo-option.combo-hot { background: var(--surface2); color: var(--ink-strong); }
+.combo-option-main { flex: 1; min-width: 0; }
+.combo-option-label { font-weight: 550; }
+.combo-option-desc { font-size: 12px; color: var(--mute); margin-top: 1px; }
+.combo-option.combo-selected .combo-option-label { color: var(--accent); font-weight: 650; }
+.combo-check { flex: none; color: var(--accent); font-size: 13px; margin-top: 1px; }
+.combo-empty { display: flex; align-items: center; gap: 7px; padding: 9px 10px; color: var(--mute); font-size: 12.5px; }
+.combo-empty i { flex: none; }
+/* The <mark> around the matched substring — override the UA's yellow/black
+   so it stays legible on both themes. */
+.combo-mark { background: var(--warn-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
