@@ -23,6 +23,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [daterange.md](daterange.md) | Range picker + PresetRail — quick ranges, precision modes, the FilterBar daterange dialog |
 | [timezone-select.md](timezone-select.md) | IANA zone picker over ComboBox — offset labels, local default, alias tolerance, commit-only |
 | [timepicker.md](timepicker.md) | Stepper time entry — 12h/24h, minute step math, min/max, ISO/IANA/object serialization, embed mode |
+| [datetimepicker.md](datetimepicker.md) | Calendar + time + timezone in one popover — DST-correct offsets, boundary-day clamping |
 | [collection-select.md](collection-select.md) | Single record picker — server search, id→label hydration, null sentinel, shared cache keys |
 | [multiselect-dropdown.md](multiselect-dropdown.md) | Static checkbox dropdown — summarized trigger, Done footer, disabled options |
 | [collection-multiselect.md](collection-multiselect.md) | Server-backed checkbox panel — model binding, 400ms search, select/deselect-all, shift-click ranges |

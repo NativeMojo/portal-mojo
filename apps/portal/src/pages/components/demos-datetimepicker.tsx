@@ -6,11 +6,7 @@
 // change log, so the commit-only pipeline is visible: no-op edits never fire.
 import { useState, type ReactNode } from 'react';
 import { TimezoneSelect } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui
-import {
-    DateTimePicker,
-    type DateTimeValue,
-} from '../../../../../packages/portal-mojo/src/ui/date/DateTimePicker';
+import { DateTimePicker, type DateTimeValue } from 'portal-mojo/ui';
 
 function useEventLog(): [string[], (line: string) => void] {
     const [lines, setLines] = useState<string[]>([]);

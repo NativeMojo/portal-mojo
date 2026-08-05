@@ -28,6 +28,7 @@ import { AutosaveDemo } from './demos-autosave';
 import { TimezoneSelectDemo } from './demos-timezone-select';
 import { TimePickerDemo } from './demos-timepicker';
 import { DateRangeDemo } from './demos-daterange';
+import { DateTimePickerDemo } from './demos-datetimepicker';
 import { CollectionSelectDemo } from './demos-collection-select';
 
 interface DemoSection {
@@ -78,6 +79,11 @@ const SECTIONS: DemoSection[] = [
         key: 'daterange', title: 'DateRangePicker', icon: 'bi-calendar3-range',
         blurb: 'Two-pane range picker with the quick-range presets rail — day/month/year modes, cross-page anchor, and the FilterBar daterange dialog now uses it.',
         render: () => <DateRangeDemo />,
+    },
+    {
+        key: 'datetimepicker', title: 'DateTimePicker', icon: 'bi-calendar-event',
+        blurb: 'Calendar + time steppers + timezone in one popover — DST-correct ISO offsets computed at the selected date, one value out.',
+        render: () => <DateTimePickerDemo />,
     },
     {
         key: 'timepicker', title: 'TimePicker', icon: 'bi-clock',
