@@ -30,22 +30,48 @@ const FIRST = ['Ian', 'Maya', 'Jordan', 'Priya', 'Marcus', 'Elena', 'Tom', 'Aish
 const LAST = ['Starnes', 'Chen', 'Alvarez', 'Patel', 'Reed', 'Kovacs', 'Nguyen', 'Okafor', 'Ramos', 'Lindqvist', 'Barnes', 'Moreau', 'Ito', 'Novak', 'Haddad', 'Kim', 'Weber', 'Silva', 'Fontaine'];
 
 /**
- * Internal user record: the serialized row (real /api/user default-graph
- * shape, epoch-second datetimes) PLUS server-private fields the wire never
- * carries — `created` exists on the model (so `sort=-created` works, exactly
- * like the real backend) but is NOT in the default graph; serializeUser
- * strips it.
+ * Internal user record: the serialized row (epoch-second datetimes) PLUS
+ * server-private fields the wire never carries — `created` exists on the
+ * model (so `sort=-created` works, exactly like the real backend) but is in
+ * NO user graph; serializeUser strips it.
+ *
+ * Graph parity (django-mojo account/models/user.py GRAPHS, read 2026-08-05):
+ *   list    — the row incl. `is_online`, excl. requires_mfa/has_passkey
+ *   default — one-record GETs: + requires_mfa + has_passkey, NO is_online
+ *   basic   — the sub-graph embedded on device/login rows
+ * `is_staff` is in no graph at all — never serialized here either.
  */
-export type MockUser = User & { created: number };
+export type MockUser = User & { created: number; requires_mfa: boolean };
 
-const PRIVATE_USER_FIELDS = new Set(['created']);
+const PRIVATE_USER_FIELDS = new Set(['created', 'requires_mfa']);
 
-function serializeUser(u: MockUser): User {
+function serializeUser(u: MockUser, graph: 'list' | 'default' = 'list'): User {
     const row: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(u)) {
         if (!PRIVATE_USER_FIELDS.has(k)) row[k] = v;
     }
+    if (graph === 'default') {
+        delete row.is_online; // list-graph-only field
+        row.requires_mfa = u.requires_mfa;
+        row.has_passkey = db.passkeys.some((p) => p.user === u.id && p.is_enabled);
+    }
     return row as unknown as User;
+}
+
+/** The "basic" user sub-graph other models embed (devices, logins, passkeys). */
+function userBasic(u: MockUser): Record<string, unknown> {
+    return {
+        id: u.id,
+        display_name: u.display_name,
+        username: u.username,
+        last_login: u.last_login,
+        last_activity: u.last_activity,
+        is_active: u.is_active,
+        is_email_verified: u.is_email_verified,
+        is_phone_verified: u.is_phone_verified,
+        is_dob_verified: u.is_dob_verified,
+        avatar: u.avatar ?? null,
+    };
 }
 
 function buildUsers(): MockUser[] {
@@ -89,6 +115,7 @@ function buildUsers(): MockUser[] {
             dob: null,
             avatar: null,
             org: null,
+            requires_mfa: false,
             created: nowSec - createdDays * DAY,
         });
     }
@@ -407,14 +434,455 @@ function buildLogs(users: MockUser[], groups: MockGroup[]): MockLog[] {
     return logs;
 }
 
+// ── UserView-parity stores (wave: port/user-view-parity) ──────────────
+// Shapes mirror the LIVE graphs measured 2026-08-05 (mverify @9009 +
+// django-mojo model RestMeta) — notably: push devices are the real
+// RegisteredDevice shape (platform/device_name/os_version), NOT web-mojo's
+// assumed device_info block; login events carry NO event_type; incident
+// events' prose field is `details`.
+
+/** ua-parser block exactly as /api/user/device serializes it. */
+interface MockUAInfo {
+    os: { major: string | null; minor: string | null; patch: string | null; family: string; patch_minor: string | null };
+    device: { brand: string | null; model: string | null; family: string };
+    user_agent: { major: string | null; minor: string | null; patch: string | null; family: string };
+    string: string;
+}
+
+interface MockDevice {
+    id: number;
+    user: number; // uid — serialized to the basic user sub-graph
+    muid: string | null;
+    duid: string;
+    device_info: MockUAInfo | null;
+    user_agent_hash: string | null;
+    last_ip: string | null;
+    first_seen: number;
+    last_seen: number;
+    [field: string]: unknown;
+}
+
+interface MockPushDevice {
+    id: number;
+    user: number;
+    device_id: string;
+    platform: string;
+    device_name: string;
+    app_version: string;
+    os_version: string;
+    push_enabled: boolean;
+    push_preferences: Record<string, unknown>;
+    last_seen: number;
+    [field: string]: unknown;
+}
+
+interface MockLoginEvent {
+    id: number;
+    user: number;
+    ip_address: string | null;
+    country_code: string | null;
+    region: string | null;
+    region_code: string | null;
+    city: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    source: string | null;
+    is_new_country: boolean;
+    is_new_region: boolean;
+    created: number;
+    [field: string]: unknown;
+}
+
+interface MockIncidentEvent {
+    id: number;
+    created: number;
+    level: number;
+    scope: string;
+    category: string;
+    source_ip: string | null;
+    hostname: string | null;
+    uid: number | null;
+    country_code: string | null;
+    title: string | null;
+    details: string | null;
+    model_name: string | null;
+    model_id: number | null;
+    metadata: Record<string, unknown>;
+    group_id: number | null;
+    [field: string]: unknown;
+}
+
+interface MockPasskey {
+    id: number;
+    user: number;
+    friendly_name: string | null;
+    credential_id: string;
+    rp_id: string;
+    is_enabled: boolean;
+    sign_count: number;
+    transports: string | null;
+    aaguid: string | null;
+    last_used: number | null;
+    created: number;
+    [field: string]: unknown;
+}
+
+interface MockOAuthConnection {
+    id: number;
+    user: number;
+    provider: string;
+    email: string | null;
+    is_active: boolean;
+    created: number;
+    [field: string]: unknown;
+}
+
+const UA_CHROME_MAC: MockUAInfo = {
+    os: { major: '10', minor: '15', patch: '7', family: 'Mac OS X', patch_minor: null },
+    device: { brand: 'Apple', model: 'Mac', family: 'Mac' },
+    user_agent: { major: '148', minor: '0', patch: '7778', family: 'Chrome' },
+    string: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.280 Safari/537.36',
+};
+const UA_FIREFOX_WIN: MockUAInfo = {
+    os: { major: '10', minor: null, patch: null, family: 'Windows', patch_minor: null },
+    device: { brand: null, model: null, family: 'Other' },
+    user_agent: { major: '141', minor: '0', patch: null, family: 'Firefox' },
+    string: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0',
+};
+const UA_SAFARI_IPHONE: MockUAInfo = {
+    os: { major: '19', minor: '2', patch: null, family: 'iOS', patch_minor: null },
+    device: { brand: 'Apple', model: 'iPhone', family: 'iPhone' },
+    user_agent: { major: '19', minor: '2', patch: null, family: 'Mobile Safari' },
+    string: 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.2 Mobile/15E148 Safari/604.1',
+};
+const UA_CURL: MockUAInfo = {
+    os: { major: null, minor: null, patch: null, family: 'Other', patch_minor: null },
+    device: { brand: null, model: null, family: 'Other' },
+    user_agent: { major: '8', minor: '7', patch: '1', family: 'curl' },
+    string: 'curl/8.7.1',
+};
+
+/** Fake uuid4 with dashes (live DUIDs come in this shape). */
+function mockUuid(rand: () => number): string {
+    const h = mockHex32(rand);
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function buildDevices(): MockDevice[] {
+    const rand = mulberry32(20260808);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const seeds: { user: number; ua: MockUAInfo; lastSeenDays: number; ageDays: number; ip: string; hashDuid?: boolean }[] = [
+        { user: 1, ua: UA_CHROME_MAC, lastSeenDays: 0, ageDays: 120, ip: '73.92.14.5' },
+        { user: 1, ua: UA_SAFARI_IPHONE, lastSeenDays: 2, ageDays: 90, ip: '172.58.27.101' },
+        { user: 1, ua: UA_FIREFOX_WIN, lastSeenDays: 34, ageDays: 200, ip: '73.92.14.5' },
+        // Live parity: API-born devices get the `ua-hash-…` DUID variant.
+        { user: 1, ua: UA_CURL, lastSeenDays: 5, ageDays: 5, ip: '127.0.0.1', hashDuid: true },
+        { user: 2, ua: UA_CHROME_MAC, lastSeenDays: 1, ageDays: 60, ip: '98.51.100.23' },
+        { user: 2, ua: UA_SAFARI_IPHONE, lastSeenDays: 0, ageDays: 30, ip: '98.51.100.23' },
+        { user: 3, ua: UA_FIREFOX_WIN, lastSeenDays: 7, ageDays: 45, ip: '203.0.113.9' },
+        { user: 9, ua: UA_CHROME_MAC, lastSeenDays: 80, ageDays: 300, ip: '198.51.100.77' },
+    ];
+    return seeds.map((s, i) => ({
+        id: 1200 - i,
+        user: s.user,
+        muid: mockHex32(rand),
+        duid: s.hashDuid ? `ua-hash-${mockHex32(rand)}${mockHex32(rand)}` : mockUuid(rand),
+        device_info: s.ua,
+        user_agent_hash: mockHex32(rand) + mockHex32(rand),
+        last_ip: s.ip,
+        first_seen: nowSec - s.ageDays * DAY,
+        last_seen: nowSec - s.lastSeenDays * DAY - Math.floor(rand() * 4000),
+    }));
+}
+
+function buildPushDevices(): MockPushDevice[] {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const seeds: { user: number; platform: string; name: string; os: string; app: string; enabled?: boolean; lastSeenDays: number }[] = [
+        { user: 1, platform: 'ios', name: "Ian's iPhone", os: '19.2', app: '2.4.1', lastSeenDays: 0 },
+        { user: 1, platform: 'web', name: 'Chrome on Mac', os: 'macOS 15', app: '2.4.1', enabled: false, lastSeenDays: 12 },
+        { user: 2, platform: 'android', name: 'Pixel 11', os: '17', app: '2.3.9', lastSeenDays: 1 },
+    ];
+    return seeds.map((s, i) => ({
+        id: 300 + i,
+        user: s.user,
+        device_id: `dev-${s.user}-${i}`,
+        platform: s.platform,
+        device_name: s.name,
+        app_version: s.app,
+        os_version: s.os,
+        push_enabled: s.enabled ?? true,
+        push_preferences: {},
+        last_seen: nowSec - s.lastSeenDays * DAY - 1800,
+    }));
+}
+
+const LOGIN_GEOS: { ip: string; cc: string | null; region: string | null; rc: string | null; city: string | null; lat: number | null; lng: number | null }[] = [
+    { ip: '73.92.14.5', cc: 'US', region: 'California', rc: 'CA', city: 'San Diego', lat: 32.7157, lng: -117.1611 },
+    { ip: '172.58.27.101', cc: 'US', region: 'Texas', rc: 'TX', city: 'Austin', lat: 30.2672, lng: -97.7431 },
+    { ip: '98.51.100.23', cc: 'DE', region: 'Berlin', rc: 'BE', city: 'Berlin', lat: 52.52, lng: 13.405 },
+    // Live parity: private-range logins geolocate as region "Private".
+    { ip: '127.0.0.1', cc: null, region: 'Private', rc: null, city: null, lat: null, lng: null },
+    { ip: '203.0.113.9', cc: 'GB', region: 'England', rc: 'ENG', city: 'London', lat: 51.5072, lng: -0.1276 },
+];
+const LOGIN_SOURCES = ['password', 'password', 'magic', 'passkey'];
+
+function buildLoginEvents(users: MockUser[]): MockLoginEvent[] {
+    const rand = mulberry32(20260809);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const events: MockLoginEvent[] = [];
+    let id = 14400;
+    // Dense history for the detail-view seeds, sparse for the rest.
+    for (const uid of [1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 9, 10]) {
+        const geo = LOGIN_GEOS[Math.floor(rand() * LOGIN_GEOS.length)]!;
+        const daysAgo = events.filter((e) => e.user === uid).length * (uid === 1 ? 2 : 9) + rand() * 2;
+        events.push({
+            id: id--,
+            user: uid,
+            ip_address: geo.ip,
+            country_code: geo.cc,
+            region: geo.region,
+            region_code: geo.rc,
+            city: geo.city,
+            latitude: geo.lat,
+            longitude: geo.lng,
+            source: LOGIN_SOURCES[Math.floor(rand() * LOGIN_SOURCES.length)]!,
+            is_new_country: rand() > 0.9,
+            is_new_region: rand() > 0.8,
+            created: nowSec - Math.floor(daysAgo * 86400) - Math.floor(rand() * 7200),
+        });
+    }
+    // Guard: seeds only reference seeded users.
+    return events.filter((e) => users.some((u) => u.id === e.user));
+}
+
+function buildIncidentEvents(): MockIncidentEvent[] {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const seeds: { uid: number; cat: string; title: string; details: string | null; level: number; days: number; ip?: string }[] = [
+        { uid: 1, cat: 'magic_login', title: 'ian requested a magic login link via email', details: null, level: 3, days: 1 },
+        { uid: 1, cat: 'invalid_password', title: 'ian entered an invalid password', details: 'Attempt from 73.92.14.5 (San Diego, US)', level: 5, days: 6, ip: '73.92.14.5' },
+        { uid: 3, cat: 'login_throttled', title: 'Login attempts throttled', details: '11 failed attempts within the 15-minute window', level: 6, days: 0 },
+        { uid: 4, cat: 'account.user_disabled', title: 'User disabled (reason=admin)', details: 'Disabled by ian: repeated ToS violations', level: 6, days: 12 },
+        { uid: 5, cat: 'account.user_disabled', title: 'User disabled (reason=abuse)', details: 'Banned by automated abuse sweep', level: 8, days: 30 },
+    ];
+    return seeds.map((s, i) => ({
+        id: 9000 - i,
+        created: nowSec - s.days * DAY - 3600,
+        level: s.level,
+        scope: 'global',
+        category: s.cat,
+        source_ip: s.ip ?? null,
+        hostname: 'mojo-1',
+        uid: s.uid,
+        country_code: null,
+        title: s.title,
+        details: s.details,
+        model_name: 'account.User',
+        model_id: s.uid,
+        metadata: {},
+        group_id: null,
+    }));
+}
+
+function buildPasskeys(): MockPasskey[] {
+    const rand = mulberry32(20260810);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const seeds: { user: number; name: string | null; ageDays: number; usedDays: number | null; count: number; enabled?: boolean; transports?: string }[] = [
+        { user: 1, name: 'Mac — Chrome', ageDays: 140, usedDays: 1, count: 212, transports: 'internal,hybrid' },
+        { user: 2, name: 'iPhone — Safari', ageDays: 60, usedDays: 0, count: 88, transports: 'internal' },
+        { user: 2, name: null, ageDays: 300, usedDays: null, count: 0, enabled: false, transports: 'usb' },
+    ];
+    return seeds.map((s, i) => ({
+        id: 70 + i,
+        user: s.user,
+        friendly_name: s.name,
+        credential_id: mockHex32(rand) + mockHex32(rand),
+        rp_id: 'localhost',
+        is_enabled: s.enabled ?? true,
+        sign_count: s.count,
+        transports: s.transports ?? null,
+        aaguid: mockUuid(rand),
+        last_used: s.usedDays == null ? null : nowSec - s.usedDays * DAY - 900,
+        created: nowSec - s.ageDays * DAY,
+    }));
+}
+
+function buildOAuthConnections(): MockOAuthConnection[] {
+    const nowSec = Math.floor(Date.now() / 1000);
+    return [
+        { id: 11, user: 1, provider: 'google', email: 'ian@nativemojo.com', is_active: true, created: nowSec - 200 * 86400 },
+        { id: 12, user: 2, provider: 'google', email: 'maya@nativemojo.com', is_active: true, created: nowSec - 90 * 86400 },
+        { id: 13, user: 2, provider: 'github', email: 'maya-dev@users.noreply.github.com', is_active: true, created: nowSec - 40 * 86400 },
+    ];
+}
+
+/**
+ * Per-user notification preferences — the notification_prefs service shape:
+ * kind → {in_app|email|push: bool}. Absent kinds/channels default ON in the
+ * admin grid (source semantics: `!== false`).
+ */
+function buildNotificationPrefs(): Map<number, Record<string, Record<string, boolean>>> {
+    return new Map<number, Record<string, Record<string, boolean>>>([
+        [1, {
+            security_alert: { in_app: true, email: true, push: false },
+            system: { in_app: true, email: false, push: false },
+            mentions: { in_app: true, email: true, push: true },
+            marketing: { in_app: false, email: false, push: false },
+        }],
+        [2, {
+            security_alert: { in_app: true, email: true, push: true },
+            digest: { email: true },
+        }],
+    ]);
+}
+
+/**
+ * Post-build user decoration: the disable-lifecycle seeds (reason spread +
+ * history + inactivity warning, ISO `at` values per services/disable.py),
+ * org links (groups exist by now), MFA/DOB/metadata variety. Deterministic
+ * overrides on fixed ids so every UserView surface has a demo row.
+ */
+function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
+    const nowMs = Date.now();
+    const iso = (daysAgo: number) => new Date(nowMs - daysAgo * 864e5).toISOString();
+    const at = (u: number): MockUser => users[u - 1]!;
+
+    // u1 — the reference row: org, timezone + address metadata, DOB.
+    const ian = at(1);
+    ian.org = { id: groups[0]!.id, name: groups[0]!.name };
+    ian.metadata = {
+        timezone: 'America/Los_Angeles',
+        street: '400 Harbor Dr', city: 'San Diego', state: 'CA', zip: '92101', country: 'US',
+    };
+    ian.dob = '1988-04-12';
+
+    // u2 — MFA + passkeys + avatar + org; verified phone (SMS-MFA eligible).
+    const maya = at(2);
+    maya.requires_mfa = true;
+    maya.is_active = true;
+    maya.phone_number = '+15555550142';
+    maya.is_phone_verified = true;
+    maya.is_email_verified = true;
+    maya.org = { id: groups[1]?.id ?? groups[0]!.id, name: groups[1]?.name ?? groups[0]!.name };
+    maya.avatar = {
+        url: 'data:image/svg+xml,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#2f6bdf"/><text x="32" y="41" font-family="sans-serif" font-size="26" fill="#fff" text-anchor="middle">MC</text></svg>'),
+    };
+
+    // u3 — login-throttled (see db.throttle) but ACTIVE; unverified email.
+    const throttled = at(3);
+    throttled.is_active = true;
+    throttled.is_email_verified = false;
+
+    // u4 — admin-disabled with a prior reactivated cycle in history.
+    const blocked = at(4);
+    blocked.is_active = false;
+    blocked.metadata = {
+        ...blocked.metadata,
+        protected: {
+            disable: {
+                reason: 'admin',
+                at: iso(12),
+                by_user_id: 1,
+                by_username: 'ian',
+                note: 'Repeated ToS violations after the second warning.',
+                history: [{
+                    at: iso(90), reason: 'admin', by_user_id: 1, by_username: 'ian',
+                    note: 'First offense — 30 day suspension.',
+                    reactivated_at: iso(60), reactivated_by_user_id: 1,
+                    reactivated_by_username: 'ian', reactivated_note: 'Suspension served.',
+                }],
+            },
+        },
+    };
+
+    // u5 — banned (abuse).
+    const banned = at(5);
+    banned.is_active = false;
+    banned.metadata = {
+        ...banned.metadata,
+        protected: { disable: { reason: 'abuse', at: iso(30), by_user_id: null, by_username: 'system', note: 'Automated abuse sweep.', history: [] } },
+    };
+
+    // u6 — auto-disabled for inactivity.
+    const idle = at(6);
+    idle.is_active = false;
+    idle.metadata = {
+        ...idle.metadata,
+        protected: { disable: { reason: 'inactive', at: iso(45), by_user_id: null, by_username: 'system', note: null, history: [] } },
+    };
+
+    // u7 — anonymized (irreversible; toggle hidden).
+    const anon = at(7);
+    anon.is_active = false;
+    anon.display_name = null;
+    anon.first_name = '';
+    anon.last_name = '';
+    anon.username = 'deleted-9c41f2ab77aa';
+    anon.email = 'deleted-9c41f2ab77aa@deleted.local';
+    anon.phone_number = null;
+    anon.dob = null;
+    anon.is_email_verified = false;
+    anon.is_phone_verified = false;
+    anon.permissions = {};
+    anon.metadata = { protected: { disable: { reason: 'anonymized', at: iso(120), by_user_id: null, by_username: 'system', note: null, history: [] } } };
+
+    // u8 — self-deactivated.
+    const self = at(8);
+    self.is_active = false;
+    self.metadata = {
+        ...self.metadata,
+        protected: { disable: { reason: 'self', at: iso(9), by_user_id: 8, by_username: self.username, note: null, history: [] } },
+    };
+
+    // u9 — ACTIVE with an inactivity warning in flight (header warning row).
+    const drowsy = at(9);
+    drowsy.is_active = true;
+    drowsy.last_login = Math.floor(nowMs / 1000) - 80 * 86400;
+    drowsy.last_activity = drowsy.last_login;
+    drowsy.metadata = {
+        ...drowsy.metadata,
+        protected: { disable: { warning: { sent_at: iso(3), days_until_disable_at_send: 14 }, history: [] } },
+    };
+
+    // u10 — invited, never signed in (Resend Invite gate).
+    const invited = at(10);
+    invited.is_active = true;
+    invited.last_login = null;
+    invited.last_activity = null;
+    invited.is_email_verified = false;
+
+    // Seed-consistency sweep: a disabled (or long-idle) account is never
+    // "online" regardless of what the random spread rolled.
+    for (const u of users) {
+        if (!u.is_active || u === drowsy || u === invited) u.is_online = false;
+    }
+}
+
 const users = buildUsers();
 const groups = buildGroups();
+decorateUsers(users, groups);
 const db = {
     users,
     groups,
     members: buildMembers(users, groups),
     apiKeys: buildApiKeys(),
     logs: buildLogs(users, groups),
+    devices: buildDevices(),
+    pushDevices: buildPushDevices(),
+    loginEvents: buildLoginEvents(users),
+    incidentEvents: buildIncidentEvents(),
+    passkeys: buildPasskeys(),
+    oauthConnections: buildOAuthConnections(),
+    notificationPrefs: buildNotificationPrefs(),
+    // Per-user login throttle counters (auth/manage/throttle shape). u3 is
+    // mid-lockout so the header badge + Clear Rate Limit are demoable.
+    throttle: new Map<number, { count: number; limit: number; window: number; retry_after_seconds: number }>([
+        [3, { count: 11, limit: 10, window: 900, retry_after_seconds: 412 }],
+    ]),
 };
 
 function getField(row: Record<string, unknown>, field: string): unknown {
@@ -528,7 +996,7 @@ function listUsers(params: Params) {
         params,
         (u) => `${u.username} ${u.email} ${u.display_name} ${u.phone_number ?? ''}`,
     );
-    return { ...result, data: (result.data as unknown as MockUser[]).map(serializeUser) };
+    return { ...result, data: (result.data as unknown as MockUser[]).map((u) => serializeUser(u, 'list')) };
 }
 
 /**
@@ -564,31 +1032,80 @@ function exportUsers(params: Params) {
 // (action_resp wins verbatim). The mocked subset matches django-mojo
 // account/models/user.py RestMeta.POST_SAVE_ACTIONS (which also declares
 // change_username + the TOTP trio — unmocked until a screen needs them).
-const USER_ACTIONS = new Set(['send_invite', 'disable', 'reactivate', 'revoke_sessions']);
+const USER_ACTIONS = new Set(['send_invite', 'disable', 'reactivate', 'revoke_sessions', 'disable_totp']);
 const USER_DISABLE_REASONS = new Set(['abuse', 'admin']); // services/disable.py USER_REST_REASONS
 
-function runUserAction(user: MockUser, action: string, value: unknown): Record<string, unknown> | null {
+/** The live disable block, as a mutable dict (creates the path when absent). */
+function disableBlockOf(user: MockUser): Record<string, unknown> {
+    const meta = (isPlainObject(user.metadata) ? user.metadata : {}) as Record<string, unknown>;
+    const protectedNs = isPlainObject(meta.protected) ? (meta.protected as Record<string, unknown>) : {};
+    const block = isPlainObject(protectedNs.disable) ? (protectedNs.disable as Record<string, unknown>) : {};
+    protectedNs.disable = block;
+    meta.protected = protectedNs;
+    user.metadata = meta;
+    return block;
+}
+
+function runUserAction(user: MockUser, action: string, value: unknown, caller?: MockUser): Record<string, unknown> | null {
     const dict = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
     switch (action) {
         case 'disable': {
             // Backend parity: reason is REQUIRED and validated against the
-            // service's frozenset; a bad one rejects the whole save.
+            // service's frozenset; a bad one rejects the whole save. The
+            // service then records the metadata.protected.disable block
+            // (ISO `at` stamps — services/disable.py schema) and clears any
+            // pending inactivity warning.
             const reason = String(dict.reason ?? '');
             if (!USER_DISABLE_REASONS.has(reason)) {
                 return { status: false, error: `reason must be one of: ${[...USER_DISABLE_REASONS].sort().join(', ')}`, error_code: 400 };
             }
             user.is_active = false;
+            const block = disableBlockOf(user);
+            const history = Array.isArray(block.history) ? block.history : [];
+            delete block.warning;
+            Object.assign(block, {
+                reason,
+                at: new Date().toISOString(),
+                by_user_id: caller?.id ?? null,
+                by_username: caller?.username ?? 'system',
+                note: typeof dict.note === 'string' && dict.note ? dict.note : null,
+                history,
+            });
             return null;
         }
-        case 'reactivate':
+        case 'reactivate': {
+            // Pushes the live disable block into history with reactivated_*
+            // fields; the new block keeps ONLY the history list.
             user.is_active = true;
+            const block = disableBlockOf(user);
+            const history = Array.isArray(block.history) ? [...block.history] : [];
+            if (block.reason != null || block.at != null) {
+                history.push({
+                    at: block.at ?? null,
+                    reason: block.reason ?? null,
+                    by_user_id: block.by_user_id ?? null,
+                    by_username: block.by_username ?? null,
+                    note: block.note ?? null,
+                    reactivated_at: new Date().toISOString(),
+                    reactivated_by_user_id: caller?.id ?? null,
+                    reactivated_by_username: caller?.username ?? 'system',
+                    reactivated_note: typeof dict.note === 'string' && dict.note ? dict.note : null,
+                });
+            }
+            for (const key of Object.keys(block)) delete block[key];
+            block.history = history.slice(-20); // HISTORY_CAP parity
             return null;
+        }
         case 'send_invite':
             // Sends mail server-side; the REST-visible effect is just the row.
             return null;
         case 'revoke_sessions':
             // Handler returns its own payload — the response is NOT the row.
             return { status: true, message: 'Sessions revoked. Re-authenticate to continue.' };
+        case 'disable_totp':
+            // on_action_disable_totp: clears enrollment (no-ops when nothing
+            // is enrolled) and answers its own {status:true} payload.
+            return { status: true };
         default:
             return null;
     }
@@ -629,12 +1146,38 @@ function mergeDicts(existing: Record<string, unknown>, incoming: Record<string, 
     return out;
 }
 
-function saveUser(user: MockUser, body: Record<string, unknown>): unknown {
+// NO_SAVE_FIELDS parity (account/models/user.py RestMeta): silently dropped,
+// never an error — matching rest.py's strip. NOTE is_dob_verified IS in this
+// set live, which is why the portal ships no DOB force-verify affordance.
+const USER_NO_SAVE = new Set(['id', 'pk', 'auth_key', 'last_activity', 'is_dob_verified', 'created', 'has_passkey', 'is_online']);
+
+function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUser): unknown {
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
     for (const [key, value] of Object.entries(body)) {
         if (USER_ACTIONS.has(key)) actionEntries.push([key, value]);
-        else fields[key] = value;
+        else if (!USER_NO_SAVE.has(key)) fields[key] = value;
+    }
+    // set_new_password parity: admin tier may set without current_password;
+    // the value never lands on the row (write-only virtual field).
+    if ('new_password' in fields) {
+        const pw = String(fields.new_password ?? '');
+        delete fields.new_password;
+        if (pw.length < 8) {
+            return { status: false, error: 'Password is too weak. Use a longer password or include a mix of uppercase, lowercase, numbers, and special characters', error_code: 400 };
+        }
+    }
+    // set_org parity: the FK arrives as an id (or null to clear), serializes
+    // back as the basic sub-graph.
+    if ('org' in fields) {
+        const raw = fields.org;
+        if (raw == null || raw === '') {
+            fields.org = null;
+        } else {
+            const orgGroup = db.groups.find((g) => g.id === Number(raw));
+            if (!orgGroup) return { status: false, error: 'Group not found', error_code: 404 };
+            fields.org = { id: orgGroup.id, name: orgGroup.name };
+        }
     }
     // set_phone_number parity (account/models/user.py:635): empty clears;
     // anything else must normalize to E.164 or the WHOLE save rejects with
@@ -661,13 +1204,13 @@ function saveUser(user: MockUser, body: Record<string, unknown>): unknown {
     }
     let actionResp: Record<string, unknown> | null = null;
     for (const [action, value] of actionEntries) {
-        const resp = runUserAction(user, action, value);
+        const resp = runUserAction(user, action, value, caller);
         if (resp) {
             if (resp.status === false) return resp; // action error rejects the request
             actionResp = resp;
         }
     }
-    return actionResp ?? { status: true, data: serializeUser(user) };
+    return actionResp ?? { status: true, data: serializeUser(user, 'default') };
 }
 
 // ── Group save + POST_SAVE_ACTIONS ────────────────────────────────────
@@ -862,6 +1405,21 @@ function findByEmail(email: unknown): MockUser | undefined {
     return db.users.find((u) => u.email.toLowerCase() === needle);
 }
 
+/**
+ * User.lookup_from_request parity for the send flows: `email` or
+ * `phone_number` body field (phone digits compared loosely, like the
+ * server's normalize-then-match).
+ */
+function findByIdentifier(body: Record<string, unknown>): MockUser | undefined {
+    if (body.email) return findByEmail(body.email);
+    if (body.phone_number) {
+        const digits = String(body.phone_number).replace(/\D/g, '');
+        if (!digits) return undefined;
+        return db.users.find((u) => (u.phone_number ?? '').replace(/\D/g, '').endsWith(digits.slice(-10)));
+    }
+    return undefined;
+}
+
 function invalidCreds() {
     return { status: false, error: 'Invalid username or password', error_code: 401 };
 }
@@ -902,8 +1460,10 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
             return { status: true, data: tokenPair(user, accessTtl, authTime) };
         }
         case '/api/auth/forgot': {
-            const user = findByEmail(body.email);
-            // Server-parity: no account-enumeration oracle — always succeeds.
+            // Body: {email|phone_number, method: link|code, channel?: 'sms'}
+            // (rest/user.py on_user_forgot). Always succeeds — no
+            // account-enumeration oracle.
+            const user = findByIdentifier(body);
             if (user && body.method !== 'link') {
                 pendingResetCodes.set(user.email.toLowerCase(), '123456');
                 return { status: true, data: { sent: true, method: 'code' } };
@@ -912,6 +1472,11 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
                 status: true,
                 data: { sent: true, method: body.method ?? 'code', ...(user ? { __mock_token: `pr:mock-${user.id}` } : {}) },
             };
+        }
+        case '/api/auth/email/verify/send': {
+            // rest/user.py on_email_verify_send — public, admin-targetable
+            // (accepts an email/username body); always answers success.
+            return { status: true, message: 'If account is in our system a verification email was sent.' };
         }
         case '/api/auth/password/reset/code': {
             const user = findByEmail(body.email);
@@ -929,7 +1494,9 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
             return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
         }
         case '/api/auth/magic/send': {
-            const user = findByEmail(body.email);
+            // Body: {email|phone_number, method?: 'sms'} (rest/user.py
+            // on_magic_login_send) — email is the default channel.
+            const user = findByIdentifier(body);
             return {
                 status: true,
                 data: { sent: true, ...(user ? { __mock_token: `ml:mock-${user.id}` } : {}) },
@@ -997,13 +1564,13 @@ export interface MockFetchOpts {
 }
 
 /**
- * The `me` graph = the default row plus me-only fields (verified live:
- * has_passkey + requires_mfa ride only /api/user/me). Permissions come from
- * the row itself now — buildUsers seeds the spread (superusers, users-category
+ * The `me` graph = the DEFAULT one-record graph (which is where has_passkey
+ * and requires_mfa live — django-mojo user.py GRAPHS). Permissions come from
+ * the row itself — buildUsers seeds the spread (superusers, users-category
  * admins with the loose `1`-style truthy values, unprivileged rest).
  */
 function meDict(user: MockUser) {
-    return { ...serializeUser(user), has_passkey: false, requires_mfa: false };
+    return serializeUser(user, 'default') as unknown as Record<string, unknown>;
 }
 
 /** The bearer's user, when a valid unexpired mock JWT is presented. */
@@ -1054,8 +1621,205 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             data: { id: record.id, jti, expires: record.expires, token: `mock_ak_${jti}` },
         };
     }
+    if (path === '/api/auth/manage/generate_api_key') {
+        // Admin-tier variant: mints a key FOR ANOTHER USER (`uid` body field)
+        // — the UserView "Generate Key" surface. Gated users|manage_users.
+        // NOTE: not yet mounted in django-mojo (only the caller-scoped
+        // /api/auth/generate_api_key is) — the mock carries the target
+        // contract; see the UserDetail report's MERGE-WIRE note.
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
+        if (!caller.is_superuser && !caller.permissions['users'] && !caller.permissions['manage_users'] && !caller.permissions['admin']) {
+            return { status: false, error: 'permission denied', error_code: 403 };
+        }
+        const body = opts.body ?? {};
+        const target = db.users.find((u) => u.id === Number(body.uid));
+        if (!target) return { status: false, error: 'User not found', error_code: 404 };
+        const expireDays = Number(body.expire_days ?? 360);
+        if (!Number.isFinite(expireDays) || expireDays > 360 || expireDays <= 0) {
+            return { status: false, error: 'Invalid expire_days', error_code: 400 };
+        }
+        const nowSec = Math.floor(Date.now() / 1000);
+        const rand = mulberry32(nowSec ^ target.id);
+        const jti = mockHex32(rand);
+        db.apiKeys.unshift({
+            id: Math.max(0, ...db.apiKeys.map((k) => k.id)) + 1,
+            label: String(body.label ?? ''),
+            allowed_ips: Array.isArray(body.allowed_ips) ? (body.allowed_ips as string[]) : [],
+            expires: nowSec + expireDays * 86400,
+            is_active: true,
+            last_used: null,
+            created: nowSec,
+            jti,
+            user: target.id,
+        });
+        return { status: true, data: { id: db.apiKeys[0]!.id, jti, expires: db.apiKeys[0]!.expires, token: `mock_ak_${jti}` } };
+    }
+    if (path === '/api/auth/manage/throttle') {
+        // GET {user_id|username, key='login'} → the per-account attempt
+        // counter (rest/user.py on_read_throttle). Admin-tier; reading never
+        // mutates the counter.
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
+        const params = opts.params ?? {};
+        const key = String(params.key ?? 'login');
+        if (key !== 'login') return { status: false, error: "only key='login' is supported", error_code: 400 };
+        const uid = Number(params.user_id ?? 0);
+        if (!db.users.some((u) => u.id === uid)) return { status: false, error: 'Unknown user_id', error_code: 400 };
+        const state = db.throttle.get(uid) ?? { count: 0, limit: 10, window: 900, retry_after_seconds: 0 };
+        return { status: true, data: state };
+    }
+    if (path === '/api/auth/manage/clear_rate_limit') {
+        // POST {user_id, key} → {deleted:n} (rest/user.py on_clear_rate_limit).
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
+        const uid = Number(opts.body?.user_id ?? 0);
+        const had = db.throttle.delete(uid);
+        return { status: true, data: { deleted: had ? 1 : 0 } };
+    }
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
         return authFetch(path, opts.body ?? {});
+    }
+    // ── Browser devices — /api/user/device (account/models/device.py) ──
+    if (path === '/api/user/device') {
+        const result = listRows(
+            db.devices as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (d) => `${d.duid} ${(d as unknown as MockDevice).device_info?.string ?? ''}`,
+            '-last_seen',
+        );
+        const rows = (result.data as unknown as MockDevice[]).map((d) => {
+            const owner = db.users.find((u) => u.id === d.user);
+            const { user: _uid, ...rest } = d;
+            return { ...rest, user: owner ? userBasic(owner) : null };
+        });
+        return { ...result, data: rows };
+    }
+    // ── Push devices — /api/account/devices/push (RegisteredDevice) ──
+    if (path === '/api/account/devices/push') {
+        const result = listRows(
+            db.pushDevices as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (d) => `${d.device_name} ${d.platform} ${d.device_id}`,
+            '-last_seen',
+        );
+        const rows = (result.data as unknown as MockPushDevice[]).map((d) => {
+            const owner = db.users.find((u) => u.id === d.user);
+            const { user: _uid, ...rest } = d;
+            return { ...rest, user: owner ? userBasic(owner) : null };
+        });
+        return { ...result, data: rows };
+    }
+    // ── Login events — /api/account/logins (list graph; no event_type) ──
+    if (path === '/api/account/logins') {
+        const result = listRows(
+            db.loginEvents as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (l) => `${l.ip_address ?? ''} ${l.country_code ?? ''} ${l.region ?? ''} ${l.city ?? ''}`,
+            '-created',
+        );
+        const rows = (result.data as unknown as MockLoginEvent[]).map((l) => {
+            const owner = db.users.find((u) => u.id === l.user);
+            const { user: _uid, ...rest } = l;
+            return { ...rest, user: owner ? userBasic(owner) : null };
+        });
+        return { ...result, data: rows };
+    }
+    // ── Incident events — /api/incident/event (view_security-gated live) ──
+    if (path === '/api/incident/event') {
+        const result = listRows(
+            db.incidentEvents as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (e) => `${e.details ?? ''}`, // SEARCH_FIELDS = ["details"]
+            '-created',
+        );
+        return result;
+    }
+    // ── Passkeys — /api/account/passkeys (save: friendly_name/is_enabled) ──
+    const onePasskey = path.match(/^\/api\/account\/passkeys\/(\d+)$/);
+    if (onePasskey) {
+        const pk = db.passkeys.find((p) => p.id === Number(onePasskey[1]));
+        if (!pk) return { status: false, error: 'Passkey not found', error_code: 404 };
+        if (opts.method === 'DELETE') {
+            db.passkeys = db.passkeys.filter((p) => p.id !== pk.id);
+            return { status: 'deleted' };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            // NO_SAVE_FIELDS parity: everything except the two editables drops.
+            if ('friendly_name' in opts.body) pk.friendly_name = opts.body.friendly_name == null ? null : String(opts.body.friendly_name);
+            if ('is_enabled' in opts.body) pk.is_enabled = Boolean(opts.body.is_enabled);
+        }
+        const owner = db.users.find((u) => u.id === pk.user);
+        const { user: _uid, ...rest } = pk;
+        return { status: true, data: { ...rest, user: owner ? userBasic(owner) : null }, graph: 'default' };
+    }
+    if (path === '/api/account/passkeys') {
+        const result = listRows(
+            db.passkeys as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (p) => `${p.friendly_name ?? ''} ${p.credential_id}`,
+            '-created',
+        );
+        const rows = (result.data as unknown as MockPasskey[]).map((p) => {
+            const owner = db.users.find((u) => u.id === p.user);
+            const { user: _uid, ...rest } = p;
+            return { ...rest, user: owner ? userBasic(owner) : null };
+        });
+        return { ...result, data: rows };
+    }
+    // ── OAuth connections — /api/account/oauth_connection ──
+    const oneOAuth = path.match(/^\/api\/account\/oauth_connection\/(\d+)$/);
+    if (oneOAuth) {
+        const conn = db.oauthConnections.find((c) => c.id === Number(oneOAuth[1]));
+        if (!conn) return { status: false, error: 'OAuthConnection not found', error_code: 404 };
+        if (opts.method === 'DELETE') {
+            db.oauthConnections = db.oauthConnections.filter((c) => c.id !== conn.id);
+            return { status: 'deleted' };
+        }
+        const { user: _uid, ...rest } = conn;
+        return { status: true, data: rest, graph: 'default' };
+    }
+    if (path === '/api/account/oauth_connection') {
+        const result = listRows(
+            db.oauthConnections as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (c) => `${c.provider} ${c.email ?? ''}`,
+            '-created',
+        );
+        // default graph carries no user embed — strip the FK.
+        const rows = (result.data as unknown as MockOAuthConnection[]).map(({ user: _uid, ...rest }) => rest);
+        return { ...result, data: rows };
+    }
+    // ── Notification preferences (notification_prefs.py service shape) ──
+    // Live scope note: the real handler reads request.user and IGNORES
+    // ?user= / body.user (admin-view-of-another-user is not yet a backend
+    // surface). The mock honors the target param so the admin grid is
+    // buildable now; the report carries the backend gap.
+    if (path === '/api/account/notification/preferences') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
+        const targetId = Number(opts.body?.user ?? opts.params?.user ?? caller.id);
+        if (!db.users.some((u) => u.id === targetId)) {
+            return { status: false, error: 'User not found', error_code: 404 };
+        }
+        if (opts.method === 'POST') {
+            const incoming = opts.body?.preferences;
+            if (!isPlainObject(incoming)) return { status: false, error: 'preferences is required', error_code: 400 };
+            const current = db.notificationPrefs.get(targetId) ?? {};
+            for (const [kind, channels] of Object.entries(incoming)) {
+                if (!isPlainObject(channels)) return { status: false, error: `Value for '${kind}' must be a dict of channel booleans`, error_code: 400 };
+                const kindPrefs = { ...(current[kind] ?? {}) };
+                for (const [channel, value] of Object.entries(channels)) {
+                    if (!['in_app', 'email', 'push'].includes(channel)) continue; // unknown channels ignored
+                    if (typeof value !== 'boolean') return { status: false, error: `Channel '${channel}' value must be a boolean`, error_code: 400 };
+                    kindPrefs[channel] = value;
+                }
+                current[kind] = kindPrefs;
+            }
+            db.notificationPrefs.set(targetId, current);
+            return { status: true, data: { preferences: current } };
+        }
+        return { status: true, data: { preferences: db.notificationPrefs.get(targetId) ?? {} } };
     }
     if (path === '/api/user/me') {
         // The first authed mock endpoint — meaningless without a session,
@@ -1251,9 +2015,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { status: 'deleted' };
         }
         if (opts.method === 'POST' && opts.body) {
-            return saveUser(user, opts.body);
+            return saveUser(user, opts.body, userFromBearer(opts.headers));
         }
-        return { status: true, data: serializeUser(user), graph: 'default' };
+        return { status: true, data: serializeUser(user, 'default'), graph: 'default' };
     }
     if (path === '/api/user') {
         if (opts.params?.download_format) return exportUsers(opts.params);
@@ -1284,10 +2048,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                 dob: null,
                 avatar: null,
                 org: null,
+                requires_mfa: false,
                 created: Math.floor(Date.now() / 1000),
             };
             db.users.unshift(user);
-            return { status: true, data: serializeUser(user) };
+            return { status: true, data: serializeUser(user, 'default') };
         }
         return listUsers(opts.params ?? {});
     }

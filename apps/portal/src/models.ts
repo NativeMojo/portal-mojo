@@ -9,7 +9,20 @@
 // endpoint + graph facts.
 import { defineModel, type Group, type Params, type User } from 'portal-mojo/client';
 
-export const UserModel = defineModel<User>({
+/**
+ * The user row as the DEFAULT (one-record) graph serializes it — measured in
+ * django-mojo account/models/user.py GRAPHS 2026-08-05: `requires_mfa` and
+ * `has_passkey` ride ONLY the default graph; `is_online` rides ONLY the list
+ * graph (typed non-optional in the shared User type for list rows — do not
+ * read it off a one-record fetch). `is_staff` is serialized by NO graph at
+ * all, which is why no portal surface renders or edits it.
+ */
+export type UserRow = User & {
+    requires_mfa?: boolean;
+    has_passkey?: boolean;
+};
+
+export const UserModel = defineModel<UserRow>({
     name: 'user',
     endpoint: '/api/user',
     // Category-or-granular pairs, exactly the any-of lists the backend gates
@@ -48,12 +61,16 @@ export const UserModel = defineModel<User>({
         },
     },
     // django-mojo account/models/user.py RestMeta.POST_SAVE_ACTIONS (the
-    // change_username / TOTP actions join when their screens land).
+    // change_username / confirm_totp / regenerate_totp_codes actions join
+    // when their screens land).
     actions: {
         disable: { permissions: ['users', 'manage_users'] },
         reactivate: { permissions: ['users', 'manage_users'] },
         send_invite: {},
         revoke_sessions: { response: 'payload' },
+        // Clears any enrolled authenticator (on_action_disable_totp — no-ops
+        // gracefully when nothing is enrolled; answers {status:true}).
+        disable_totp: { permissions: ['users', 'manage_users'], response: 'payload' },
     },
 });
 
@@ -269,3 +286,172 @@ export function memberParamsFor(groupId: number, search: string): Params {
     if (search) params.search = search;
     return params;
 }
+
+// ── UserView-parity models (wave: port/user-view-parity) ──────────────
+// Shapes below are the LIVE graphs, measured against mverify @9009 and
+// django-mojo model RestMeta on 2026-08-05 — not web-mojo's assumptions.
+
+/** ua-parser block as django-mojo stores it on device/login rows. */
+export interface UAInfo {
+    os: { major: string | null; minor: string | null; patch: string | null; family: string; patch_minor: string | null };
+    device: { brand: string | null; model: string | null; family: string };
+    user_agent: { major: string | null; minor: string | null; patch: string | null; family: string };
+    string: string;
+}
+
+/** The basic user sub-graph embedded on device/login rows. */
+export interface UserBasicRef {
+    id: number;
+    display_name: string | null;
+    username: string;
+    last_login: number | null;
+    last_activity: number | null;
+    is_active: boolean;
+    is_email_verified: boolean;
+    is_phone_verified: boolean;
+    is_dob_verified: boolean;
+    avatar: unknown;
+}
+
+/**
+ * /api/user/device row (account/models/device.py, list graph measured live):
+ * browser sessions keyed by DUID. VIEW_PERMS manage_users|users|owner.
+ */
+export interface DeviceRow {
+    id: number;
+    user: UserBasicRef | null;
+    muid: string | null;
+    duid: string;
+    device_info: UAInfo | null;
+    user_agent_hash: string | null;
+    last_ip: string | null;
+    first_seen: number;
+    last_seen: number;
+}
+
+export const DeviceModel = defineModel<DeviceRow>({
+    name: 'device',
+    endpoint: '/api/user/device',
+    permissions: { view: ['users', 'manage_users'] },
+});
+
+/**
+ * /api/account/devices/push row (account/models/push/device.py default
+ * graph): NOT web-mojo's device_info/duid shape — the real RegisteredDevice
+ * serializes platform/device_name/app_version/os_version/push_enabled.
+ */
+export interface PushDeviceRow {
+    id: number;
+    device_id: string;
+    platform: string; // ios | android | web
+    device_name: string;
+    app_version: string;
+    os_version: string;
+    push_enabled: boolean;
+    push_preferences: Record<string, unknown>;
+    last_seen: number;
+    user: UserBasicRef | null;
+}
+
+export const PushDeviceModel = defineModel<PushDeviceRow>({
+    name: 'push_device',
+    endpoint: '/api/account/devices/push',
+    permissions: { view: ['view_devices', 'manage_devices', 'comms', 'manage_users'] },
+});
+
+/**
+ * /api/account/logins row (account/models/login_event.py list graph).
+ * NOTE: there is NO event_type on the wire — web-mojo's LOGIN_TONE keyed on
+ * it and deliberately fell through to a neutral tone when absent; the field
+ * stays optional here so the tone map keeps that exact degrade.
+ */
+export interface LoginEventRow {
+    id: number;
+    ip_address: string | null;
+    country_code: string | null;
+    region: string | null;
+    region_code: string | null;
+    city: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    source: string | null; // password | magic | passkey | …
+    is_new_country: boolean;
+    is_new_region: boolean;
+    created: number;
+    user: UserBasicRef | null;
+    event_type?: string;
+}
+
+export const LoginEventModel = defineModel<LoginEventRow>({
+    name: 'login_event',
+    endpoint: '/api/account/logins',
+    permissions: { view: ['manage_users', 'security', 'users'] },
+});
+
+/**
+ * /api/incident/event row (incident/models/event.py default graph — all
+ * concrete fields + group_id extra). The prose field is `details`, not
+ * web-mojo's assumed `description`. VIEW_PERMS view_security|security.
+ */
+export interface IncidentEventRow {
+    id: number;
+    created: number;
+    level: number;
+    scope: string;
+    category: string;
+    source_ip: string | null;
+    hostname: string | null;
+    uid: number | null;
+    country_code: string | null;
+    title: string | null;
+    details: string | null;
+    model_name: string | null;
+    model_id: number | null;
+    metadata: Record<string, unknown>;
+    group_id: number | null;
+}
+
+export const IncidentEventModel = defineModel<IncidentEventRow>({
+    name: 'incident_event',
+    endpoint: '/api/incident/event',
+    permissions: { view: ['view_security', 'security'] },
+});
+
+/**
+ * /api/account/passkeys row (account/models/pkey.py default graph).
+ * Editable via REST save: friendly_name + is_enabled ONLY (NO_SAVE_FIELDS
+ * covers the rest); CAN_DELETE true.
+ */
+export interface PasskeyRow {
+    id: number;
+    friendly_name: string | null;
+    credential_id: string;
+    rp_id: string;
+    is_enabled: boolean;
+    sign_count: number;
+    transports: string | null;
+    aaguid: string | null;
+    last_used: number | null;
+    created: number;
+}
+
+export const PasskeyModel = defineModel<PasskeyRow>({
+    name: 'passkey',
+    endpoint: '/api/account/passkeys',
+    permissions: { view: ['users', 'manage_users'], manage: ['users', 'manage_users'] },
+});
+
+/** /api/account/oauth_connection row (account/models/oauth.py default graph). */
+export interface OAuthConnectionRow {
+    id: number;
+    provider: string;
+    email: string | null;
+    is_active: boolean;
+    created: number;
+}
+
+export const OAuthConnectionModel = defineModel<OAuthConnectionRow>({
+    name: 'oauth_connection',
+    endpoint: '/api/account/oauth_connection',
+    permissions: { view: ['users', 'manage_users'], manage: ['users', 'manage_users'] },
+});
