@@ -54,9 +54,29 @@ MarkdownView #1307 · drawer #1308. Notable cross-stack finds recorded on
 the items: ComboInput orphaned in web-mojo (rich spec restored); V8
 ICU-canonical vs Python zoneinfo timezone ids (alias tolerance built);
 DST-correct offsets at the selected date; django-mojo JSONField dict-merge
-semantics in autosave. **Remaining Phase 1:** C2 charts #1258, C3 in-app
-auth pages #1259, C4 first live screens #1281 — then the admin program
-epic #1260 (19 accepted children).
+semantics in autosave. Post-run design revision: CollectionMultiSelect now
+DEFAULTS to a dropdown (trigger + Popover; `variant="panel"` keeps the box)
+and the playground rail folded into 8 collapsible groups (c869ea7).
+
+**2026-08-05, wave 3 (C2/C3/C4):** three parallel worktree agents, merged
+individually (23 conflict-free merges total across the migration), wired,
+typechecked, browser-verified dark+light on the mock AND `dev:live` @9009.
+**DONE:** C2 charts #1258 (stats/data dialogs, custom-range dialog on
+DateRangePicker feeding REAL `dt_start`/`dt_end` epochs — web-mojo sent
+`dr_*`, which `/api/metrics/fetch` silently ignores, so legacy custom
+ranges never worked; MetricsMiniWidget, KPITile/Strip, CircularProgress,
+PieChart, exportChartPng; Dashboard showcase) · C4 first live screens
+#1281 (Users/Groups/ApiKeys/Logs + ArmedButton/undoToast/progressToast;
+mock parity rebuilt — dr_* epoch compare, FK id lookups, `graph` echo;
+live-verified: 970 users/574 groups/97,514 logs as portal_test via the new
+in-app login; ApiKeys ride `/api/account/api_keys` because
+`/api/group/apikey` 500s live → django-mojo item #1313). **REVIEW:** C3
+in-app auth pages #1259 (login/forgot/reset/magic/passkey on A1 flows,
+fresh-auth 440 step-up modal, MFA panel, password strength+generator,
+`VITE_MOJO_AUTH` switch — awaiting Ian's real-authenticator passkey touch;
+OAuth redirect re-deferred with the wire documented in-seam). Mock parity
+follow-ups filed as #1314. **Remaining Phase 1:** land #1259 after the
+passkey touch — then the admin program epic #1260 (19 accepted children).
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
