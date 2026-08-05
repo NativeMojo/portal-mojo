@@ -1,0 +1,11 @@
+{
+    "name": "portal-mojo-repo",
+    "private": true,
+    "version": "0.0.0",
+    "description": "portal-mojo monorepo — React portal toolkit for django-mojo (packages/) and the base admin portal (apps/)",
+    "scripts": {
+        "dev": "npm --prefix apps/portal run dev",
+        "build": "npm --prefix apps/portal run build",
+        "typecheck": "npm --prefix apps/portal run typecheck"
+    }
+}
