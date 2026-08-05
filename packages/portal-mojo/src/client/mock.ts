@@ -108,56 +108,330 @@ function buildUsers(): MockUser[] {
 // ── Groups ────────────────────────────────────────────────────────────
 // Deterministic hierarchy: orgs → teams (2–3 each) → two projects. Team
 // names repeat across orgs on purpose — the switcher's tree is what makes
-// them unambiguous.
+// them unambiguous. Row shape mirrors the live /api/group default graph
+// exactly (measured 2026-08-05): {id, uuid, name, created, modified,
+// last_activity, is_active, kind, parent(basic|null), auth_domain,
+// metadata, member_count, avatar}.
 export interface MockGroup {
     id: number;
+    uuid: string | null;
     name: string;
     kind: string;
-    parent: { id: number; name: string; kind: string } | null;
+    parent: Record<string, unknown> | null;
     created: number; // epoch seconds, like every mojo datetime
+    modified: number;
+    last_activity: number | null;
+    is_active: boolean;
+    auth_domain: string | null;
+    metadata: Record<string, unknown>;
+    member_count: number;
+    avatar: null;
     [field: string]: unknown;
 }
 
 const ORG_NAMES = ['Acme Corp', 'Globex', 'Initech', 'Umbrella Labs', 'Stark Industries', 'Wayne Enterprises'];
 const TEAM_NAMES = ['Engineering', 'Operations', 'Support'];
 
+/** Fake uuid4().hex — 32 lowercase hex chars, deterministic per seed. */
+function mockHex32(rand: () => number): string {
+    let out = '';
+    for (let i = 0; i < 32; i++) out += Math.floor(rand() * 16).toString(16);
+    return out;
+}
+
+/** The "basic" sub-graph shape the live backend embeds for `parent`. */
+function groupBasic(g: MockGroup): Record<string, unknown> {
+    return {
+        id: g.id, uuid: g.uuid, name: g.name, created: g.created, modified: g.modified,
+        last_activity: g.last_activity, is_active: g.is_active, kind: g.kind, avatar: null,
+    };
+}
+
 function buildGroups(): MockGroup[] {
+    const rand = mulberry32(20260805);
     const now = Date.now();
+    const nowSec = Math.floor(now / 1000);
     const groups: MockGroup[] = [];
     let id = 1;
+    const mk = (partial: Pick<MockGroup, 'name' | 'kind' | 'created'> & Partial<MockGroup>): MockGroup => {
+        const g: MockGroup = {
+            id: id++,
+            uuid: rand() > 0.3 ? mockHex32(rand) : null, // live rows: uuid is nullable
+            parent: null,
+            modified: 0,
+            last_activity: rand() > 0.2 ? nowSec - Math.floor(rand() * 20) * 86400 : null,
+            is_active: true,
+            auth_domain: null,
+            metadata: {},
+            member_count: 0,
+            avatar: null,
+            ...partial,
+        };
+        g.modified = g.modified || g.created + Math.floor(rand() * 30) * 86400;
+        groups.push(g);
+        return g;
+    };
     const engineeringTeams: MockGroup[] = [];
     ORG_NAMES.forEach((orgName, oi) => {
-        const org: MockGroup = {
-            id: id++, name: orgName, kind: 'org', parent: null,
+        const org = mk({
+            name: orgName, kind: 'org',
             created: Math.floor((now - (420 - oi * 40) * 864e5) / 1000),
-        };
-        groups.push(org);
+            metadata: oi % 2 === 0
+                ? { timezone: 'America/Los_Angeles', short_name: orgName.split(' ')[0]!.toLowerCase() }
+                : {},
+        });
         const teamCount = 2 + (oi % 2);
         for (let t = 0; t < teamCount; t++) {
-            const team: MockGroup = {
-                id: id++, name: TEAM_NAMES[t]!, kind: 'team',
-                parent: { id: org.id, name: org.name, kind: 'org' },
+            const team = mk({
+                name: TEAM_NAMES[t]!, kind: 'team',
+                parent: null, // set below once org is complete
                 created: Math.floor((now - (400 - oi * 40 - t * 5) * 864e5) / 1000),
-            };
-            groups.push(team);
+                // One deterministic inactive team so Status filters/badges demo.
+                is_active: !(oi === 2 && t === 1),
+            });
+            team.parent = groupBasic(org);
             if (t === 0) engineeringTeams.push(team);
         }
     });
     for (const [pi, name] of (['Project Apollo', 'Project Zephyr'] as const).entries()) {
         const team = engineeringTeams[pi]!;
-        groups.push({
-            id: id++, name, kind: 'project',
-            parent: { id: team.id, name: team.name, kind: 'team' },
+        const project = mk({
+            name, kind: 'project',
             created: Math.floor((now - (120 - pi * 30) * 864e5) / 1000),
         });
+        project.parent = groupBasic(team);
     }
     return groups;
 }
 
-const db = { users: buildUsers(), groups: buildGroups() };
+// ── Members ───────────────────────────────────────────────────────────
+// /api/group/member rows — live shape (measured): {id, created, modified,
+// is_active, permissions, metadata, user: <me-graph user dict>, group:
+// <basic group>}. The `user` sub-graph on live members carries
+// requires_mfa/has_passkey (same dict as /api/user/me), unlike bare list
+// rows — meDict() is reused for exactly that reason.
+export interface MockMember {
+    id: number;
+    created: number;
+    modified: number;
+    is_active: boolean;
+    permissions: Record<string, unknown>;
+    metadata: Record<string, unknown>;
+    user: number;  // uid — serialized to the user dict on the way out
+    group: number; // gid — serialized to the basic group dict
+    [field: string]: unknown;
+}
+
+function buildMembers(users: MockUser[], groups: MockGroup[]): MockMember[] {
+    const members: MockMember[] = [];
+    for (const g of groups) {
+        const count = 3 + (g.id % 5);
+        const seen = new Set<number>();
+        for (let k = 0; k < count; k++) {
+            const u = users[(g.id * 7 + k * 3) % users.length]!;
+            if (seen.has(u.id)) continue;
+            seen.add(u.id);
+            members.push({
+                id: g.id * 100 + k,
+                created: g.created + k * 86400,
+                modified: g.created + k * 86400,
+                is_active: (g.id + k) % 8 !== 5,
+                permissions: k === 0 ? { admin: true } : k === 1 ? { manage_group: true, view_members: 1 } : {},
+                metadata: {},
+                user: u.id,
+                group: g.id,
+            });
+        }
+        g.member_count = members.filter((m) => m.group === g.id).length;
+    }
+    return members;
+}
+
+// ── User API keys ─────────────────────────────────────────────────────
+// /api/account/api_keys rows — live default graph (measured): {id, label,
+// allowed_ips, expires, is_active, last_used, created}. `user` (the owner
+// FK) exists on the model — filterable via ?user=<id> — but is NOT in the
+// graph; serializeApiKey strips it, exactly like MockUser.created.
+export interface MockApiKey {
+    id: number;
+    label: string;
+    allowed_ips: string[];
+    expires: number;
+    is_active: boolean;
+    last_used: number | null;
+    created: number;
+    jti: string;      // server-private (SENSITIVE_FIELDS) — never serialized
+    user: number;     // owner FK — filterable, not in the graph
+    [field: string]: unknown;
+}
+
+const PRIVATE_APIKEY_FIELDS = new Set(['user', 'jti']);
+
+function serializeApiKey(k: MockApiKey): Record<string, unknown> {
+    const row: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(k)) {
+        if (!PRIVATE_APIKEY_FIELDS.has(key)) row[key] = v;
+    }
+    return row;
+}
+
+function buildApiKeys(): MockApiKey[] {
+    const rand = mulberry32(20260806);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const seeds: { user: number; label: string; ips?: string[]; ageDays: number; expireDays: number; active?: boolean; used?: number | null }[] = [
+        { user: 1, label: 'CI/CD Pipeline', ips: ['203.0.113.0/24'], ageDays: 120, expireDays: 360, used: 1 },
+        { user: 1, label: 'Metrics exporter', ageDays: 45, expireDays: 90, used: 3 },
+        { user: 1, label: 'Legacy importer', ageDays: 400, expireDays: 360, used: 90 }, // expired
+        { user: 1, label: 'Staging smoke tests', ageDays: 30, expireDays: 60, active: false, used: 12 }, // revoked
+        { user: 2, label: 'Mobile app backend', ips: ['10.0.0.1'], ageDays: 80, expireDays: 180, used: 0 },
+        { user: 3, label: 'Data warehouse sync', ageDays: 15, expireDays: 30, used: null },
+        { user: 5, label: 'Webhook relay', ageDays: 200, expireDays: 360, used: 5 },
+        { user: 8, label: '', ageDays: 10, expireDays: 90, used: null }, // label is blank-able (default "")
+    ];
+    return seeds.map((s, i) => {
+        const created = nowSec - s.ageDays * DAY;
+        return {
+            id: i + 1,
+            label: s.label,
+            allowed_ips: s.ips ?? [],
+            expires: created + s.expireDays * DAY,
+            is_active: s.active ?? true,
+            last_used: s.used == null ? null : nowSec - s.used * DAY - Math.floor(rand() * DAY),
+            created,
+            jti: mockHex32(rand),
+            user: s.user,
+        };
+    });
+}
+
+// ── Logs ──────────────────────────────────────────────────────────────
+// /api/logs rows — live default graph (measured): {id, created, level, kind,
+// method, path, payload, ip, duid, uid, gid, username, user_agent, log,
+// model_name, model_id}. graph=basic narrows to the id/created/level/kind/
+// method/path/ip/uid/gid/username/model_name/model_id subset.
+export interface MockLog {
+    id: number;
+    created: number;
+    level: string;
+    kind: string | null;
+    method: string | null;
+    path: string | null;
+    payload: string | null;
+    ip: string | null;
+    duid: string | null;
+    uid: number;
+    gid: number;
+    username: string | null;
+    user_agent: string | null;
+    log: string | null;
+    model_name: string | null;
+    model_id: number;
+    [field: string]: unknown;
+}
+
+const LOG_BASIC_FIELDS = [
+    'id', 'created', 'level', 'kind', 'method', 'path',
+    'ip', 'uid', 'gid', 'username', 'model_name', 'model_id',
+] as const;
+
+function serializeLog(l: MockLog, graph: string): Record<string, unknown> {
+    if (graph === 'basic') {
+        const row: Record<string, unknown> = {};
+        for (const f of LOG_BASIC_FIELDS) row[f] = l[f];
+        return row;
+    }
+    return { ...l };
+}
+
+const LOG_PATHS = ['/api/user', '/api/group', '/api/user/me', '/api/metrics/fetch', '/api/logs', '/api/account/api_keys', '/api/login', '/favicon.ico'];
+const LOG_AGENTS = [
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/141.0',
+    'python-requests/2.32.0',
+];
+
+function buildLogs(users: MockUser[], groups: MockGroup[]): MockLog[] {
+    const rand = mulberry32(20260807);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const logs: MockLog[] = [];
+    let created = nowSec - 120; // newest ~2 minutes ago
+    for (let i = 0; i < 140; i++) {
+        const r = rand();
+        // Weighted kind mix roughly matching a real request log.
+        const kind = r < 0.3 ? 'request'
+            : r < 0.55 ? 'response'
+            : r < 0.63 ? 'login'
+            : r < 0.7 ? 'error'
+            : r < 0.8 ? 'model_change'
+            : r < 0.86 ? 'api_key:generated'
+            : r < 0.9 ? 'user:disabled'
+            : 'cron';
+        const level = kind === 'error'
+            ? (rand() > 0.85 ? 'critical' : 'error')
+            : rand() > 0.88 ? 'warning' : 'info';
+        const user = rand() > 0.4 ? users[Math.floor(rand() * users.length)]! : null;
+        const group = rand() > 0.6 ? groups[Math.floor(rand() * groups.length)]! : null;
+        const method = kind === 'cron' ? null : rand() > 0.55 ? 'POST' : 'GET';
+        const path = kind === 'cron' ? null : LOG_PATHS[Math.floor(rand() * LOG_PATHS.length)]!;
+        const isModelKind = kind === 'model_change' || kind === 'user:disabled';
+        logs.push({
+            id: 100000 - i, // live ids descend with age (default sort is -id)
+            created,
+            level,
+            kind,
+            method,
+            path,
+            payload: method === 'POST' && rand() > 0.5
+                ? JSON.stringify({ size: 25, start: 0, sort: '-created' })
+                : null,
+            ip: rand() > 0.3 ? `10.1.2.${Math.floor(rand() * 250)}` : '127.0.0.1',
+            duid: rand() > 0.7 ? mockHex32(rand).slice(0, 16) : null,
+            uid: user?.id ?? 0,
+            gid: group?.id ?? 0,
+            username: user?.username ?? null,
+            user_agent: kind === 'cron' ? 'system' : LOG_AGENTS[Math.floor(rand() * LOG_AGENTS.length)]!,
+            log: kind === 'error'
+                ? `Traceback (most recent call last): ValueError: invalid literal at ${path ?? 'task'}`
+                : kind === 'login' ? `login ok for ${user?.username ?? 'unknown'}`
+                : kind === 'user:disabled' ? `disabled reason=admin by=${user?.username ?? 'system'}`
+                : kind === 'api_key:generated' ? `API Key Generated ${mockHex32(rand).slice(0, 8)} expire 90 days`
+                : kind === 'cron' ? 'nightly metrics rollup completed'
+                : `${method} ${path} 200`,
+            model_name: isModelKind ? 'account.User' : null,
+            model_id: isModelKind && user ? user.id : 0,
+        });
+        // Walk backwards 10min–4h per row → ~14 days of history.
+        created -= 600 + Math.floor(rand() * 13800);
+    }
+    return logs;
+}
+
+const users = buildUsers();
+const groups = buildGroups();
+const db = {
+    users,
+    groups,
+    members: buildMembers(users, groups),
+    apiKeys: buildApiKeys(),
+    logs: buildLogs(users, groups),
+};
 
 function getField(row: Record<string, unknown>, field: string): unknown {
     return row[field];
+}
+
+/**
+ * Django FK semantics: filtering on a relation field (`parent=3`, `group=1`,
+ * `user=2`) compares the related row's PK. Mock rows embed relations as
+ * objects (`{id, name, …}`), so lookups unwrap to `.id` before comparing —
+ * exactly what the ORM does with `filter(parent=3)`.
+ */
+function fkValue(v: unknown): unknown {
+    if (v != null && typeof v === 'object' && !Array.isArray(v) && 'id' in (v as Record<string, unknown>)) {
+        return (v as Record<string, unknown>).id;
+    }
+    return v;
 }
 
 /** Apply one Django-style lookup param to the row set. */
@@ -169,7 +443,7 @@ function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, 
     const op = known.includes(lookup) && parts.length > 1 ? lookup : 'exact';
 
     return rows.filter((row) => {
-        const v = getField(row, field);
+        const v = fkValue(getField(row, field));
         switch (op) {
             case 'in': return raw.split(',').map((s) => s.trim()).includes(String(v));
             case 'icontains': return String(v ?? '').toLowerCase().includes(raw.toLowerCase());
@@ -208,7 +482,12 @@ function listRows<T extends Record<string, unknown>>(
         rows = rows.filter((row) => {
             const raw = row[drField];
             if (raw == null) return false;
-            const day = String(raw).slice(0, 10);
+            // dr_* bounds are canonical YYYY-MM-DD strings; mojo datetime
+            // fields are epoch SECONDS — normalize to the row's calendar day
+            // before comparing (the server compares real datetimes).
+            const day = typeof raw === 'number'
+                ? new Date(raw * 1000).toISOString().slice(0, 10)
+                : String(raw).slice(0, 10);
             if (s && day < s) return false;
             if (e && day > e) return false;
             return true;
@@ -234,6 +513,9 @@ function listRows<T extends Record<string, unknown>>(
         count: rows.length,
         start,
         size,
+        // Live parity: every list envelope names the graph it serialized
+        // ("list" — models without a list graph fall back to default).
+        graph: 'list',
         data: size === 0 ? [] : rows.slice(start, start + size),
     };
 }
@@ -250,16 +532,14 @@ function listUsers(params: Params) {
 }
 
 /**
- * `download_format=csv|json` on the list endpoint (mojo/models/rest.py
- * on_rest_list_response): the WHOLE filtered set — same pipeline, no paging —
- * as a file. The mock returns the file body in the envelope
+ * `download_format=csv|json` on ANY list endpoint (mojo/models/rest.py
+ * on_rest_list_response is generic): the WHOLE filtered set — same pipeline,
+ * no paging — as a file. The mock returns the file body in the envelope
  * ({filename, content, mime}); the client turns it into a Blob download.
  */
-function exportUsers(params: Params) {
+function exportRows(rows: Record<string, unknown>[], params: Params, modelName: string) {
     const format = String(params.download_format);
-    const full = listUsers({ ...params, start: 0, size: db.users.length });
-    const rows = full.data as unknown as Record<string, unknown>[];
-    const filename = String(params.filename ?? `User.${format}`);
+    const filename = String(params.filename ?? `${modelName}.${format}`);
     if (format === 'csv') {
         const cols = rows.length > 0 ? Object.keys(rows[0]!) : [];
         const cell = (v: unknown) => {
@@ -270,6 +550,11 @@ function exportUsers(params: Params) {
         return { status: true, data: { filename, content, mime: 'text/csv' } };
     }
     return { status: true, data: { filename, content: JSON.stringify(rows, null, 2), mime: 'application/json' } };
+}
+
+function exportUsers(params: Params) {
+    const full = listUsers({ ...params, start: 0, size: db.users.length });
+    return exportRows(full.data as unknown as Record<string, unknown>[], params, 'User');
 }
 
 // ── POST_SAVE_ACTIONS (User) ──────────────────────────────────────────
@@ -383,6 +668,68 @@ function saveUser(user: MockUser, body: Record<string, unknown>): unknown {
         }
     }
     return actionResp ?? { status: true, data: serializeUser(user) };
+}
+
+// ── Group save + POST_SAVE_ACTIONS ────────────────────────────────────
+// django-mojo account/models/group.py RestMeta: POST_SAVE_ACTIONS include
+// disable/reactivate (reason REQUIRED ∈ GROUP_REST_REASONS = admin | abuse |
+// archived — one more than users get); NO_SAVE_FIELDS id/pk/created.
+const GROUP_ACTIONS = new Set(['disable', 'reactivate']);
+const GROUP_DISABLE_REASONS = new Set(['abuse', 'admin', 'archived']);
+// NO_SAVE_FIELDS parity (id/pk/created); member_count additionally blocked
+// here because it is a graph EXTRA, not a column (uuid IS savable live).
+const GROUP_NO_SAVE = new Set(['id', 'pk', 'created', 'member_count']);
+
+function serializeGroup(g: MockGroup): Record<string, unknown> {
+    return { ...g };
+}
+
+function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
+    const fields: Record<string, unknown> = {};
+    const actionEntries: [string, unknown][] = [];
+    for (const [key, value] of Object.entries(body)) {
+        if (GROUP_ACTIONS.has(key)) actionEntries.push([key, value]);
+        else if (!GROUP_NO_SAVE.has(key)) fields[key] = value;
+    }
+    const target = group as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(fields)) {
+        const existing = target[key];
+        // JSONField dict-merge parity (metadata), plain assign otherwise.
+        target[key] = isPlainObject(value) && isPlainObject(existing) ? mergeDicts(existing, value) : value;
+    }
+    for (const [action, value] of actionEntries) {
+        const dict = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+        if (action === 'disable') {
+            const reason = String(dict.reason ?? '');
+            if (!GROUP_DISABLE_REASONS.has(reason)) {
+                return { status: false, error: `reason must be one of: ${[...GROUP_DISABLE_REASONS].sort().join(', ')}`, error_code: 400 };
+            }
+            group.is_active = false;
+        } else if (action === 'reactivate') {
+            group.is_active = true;
+        }
+    }
+    group.modified = Math.floor(Date.now() / 1000);
+    return { status: true, data: serializeGroup(group), graph: 'default' };
+}
+
+// ── Member serialization ──────────────────────────────────────────────
+
+function serializeMember(m: MockMember): Record<string, unknown> {
+    const user = db.users.find((u) => u.id === m.user);
+    const group = db.groups.find((g) => g.id === m.group);
+    return {
+        id: m.id,
+        created: m.created,
+        modified: m.modified,
+        is_active: m.is_active,
+        permissions: m.permissions,
+        metadata: m.metadata,
+        // Live member.user is the me-graph dict (requires_mfa/has_passkey ride
+        // along) — measured 2026-08-05 against /api/group/member.
+        user: user ? meDict(user) : null,
+        group: group ? groupBasic(group) : null,
+    };
 }
 
 // ── /api/metrics/fetch ────────────────────────────────────────────────
@@ -674,6 +1021,39 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     const key = `${opts.method ?? 'GET'} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     await new Promise((r) => setTimeout(r, LATENCY_MS));
+    if (path === '/api/auth/generate_api_key') {
+        // account/rest/user_api_key.py generate_api_key: mints a long-lived
+        // key for the CALLER (@requires_auth — needs the bearer, unlike the
+        // other /api/auth/ flows), expire_days capped at 360. The response is
+        // create_for_user's objict — {id, jti, expires, token} — the ONE time
+        // the token is ever visible.
+        const user = userFromBearer(opts.headers);
+        if (!user) return { status: false, error: 'permission denied', error_code: 401 };
+        const body = opts.body ?? {};
+        const expireDays = Number(body.expire_days ?? 360);
+        if (!Number.isFinite(expireDays) || expireDays > 360 || expireDays <= 0) {
+            return { status: false, error: 'Invalid expire_days', error_code: 400 };
+        }
+        const nowSec = Math.floor(Date.now() / 1000);
+        const rand = mulberry32(nowSec ^ user.id);
+        const jti = mockHex32(rand);
+        const record: MockApiKey = {
+            id: Math.max(0, ...db.apiKeys.map((k) => k.id)) + 1,
+            label: String(body.label ?? ''),
+            allowed_ips: Array.isArray(body.allowed_ips) ? (body.allowed_ips as string[]) : [],
+            expires: nowSec + expireDays * 86400,
+            is_active: true,
+            last_used: null,
+            created: nowSec,
+            jti,
+            user: user.id,
+        };
+        db.apiKeys.unshift(record);
+        return {
+            status: true,
+            data: { id: record.id, jti, expires: record.expires, token: `mock_ak_${jti}` },
+        };
+    }
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
         return authFetch(path, opts.body ?? {});
     }
@@ -718,14 +1098,132 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             },
         };
     }
+    // Members list/detail — /api/group/member (admin listing; the group-
+    // scoped /api/group/<id>/member self-membership route stays separate
+    // above). SEARCH_FIELDS parity: user__username / user__email /
+    // user__display_name.
+    const oneMember = path.match(/^\/api\/group\/member\/(\d+)$/);
+    if (oneMember) {
+        const m = db.members.find((x) => x.id === Number(oneMember[1]));
+        if (!m) return { status: false, error: 'Member not found', error_code: 404 };
+        return { status: true, data: serializeMember(m), graph: 'default' };
+    }
+    if (path === '/api/group/member') {
+        const memberSearch = (m: Record<string, unknown>) => {
+            const u = db.users.find((x) => x.id === Number(m.user));
+            return u ? `${u.username} ${u.email} ${u.display_name}` : '';
+        };
+        const result = listRows(db.members as unknown as Record<string, unknown>[], opts.params ?? {}, memberSearch, '-id');
+        return { ...result, data: (result.data as unknown as MockMember[]).map(serializeMember) };
+    }
     const oneGroup = path.match(/^\/api\/group\/(\d+)$/);
     if (oneGroup) {
         const group = db.groups.find((g) => g.id === Number(oneGroup[1]));
         if (!group) return { status: false, error: 'Group not found', error_code: 404 };
-        return { status: true, data: { ...group } };
+        if (opts.method === 'POST' && opts.body) {
+            return saveGroup(group, opts.body);
+        }
+        return { status: true, data: serializeGroup(group), graph: 'default' };
     }
     if (path === '/api/group') {
+        if (opts.params?.download_format) {
+            const full = listRows(db.groups as unknown as Record<string, unknown>[], { ...opts.params, start: 0, size: db.groups.length }, (g) => String(g.name), 'name');
+            return exportRows(full.data as Record<string, unknown>[], opts.params, 'Group');
+        }
+        if (opts.method === 'POST' && opts.body) {
+            // Create parity: parent arrives as an id, embeds as the basic
+            // graph; uuid stays null until generated (live rows show both).
+            const body = opts.body;
+            const parent = body.parent != null ? db.groups.find((g) => g.id === Number(body.parent)) : undefined;
+            if (body.parent != null && !parent) return { status: false, error: 'Group not found', error_code: 404 };
+            const nowSec = Math.floor(Date.now() / 1000);
+            const group: MockGroup = {
+                id: Math.max(0, ...db.groups.map((g) => g.id)) + 1,
+                uuid: null,
+                name: String(body.name ?? 'New Group'),
+                kind: String(body.kind ?? 'group'),
+                parent: parent ? groupBasic(parent) : null,
+                created: nowSec,
+                modified: nowSec,
+                last_activity: null,
+                is_active: true,
+                auth_domain: null,
+                metadata: isPlainObject(body.metadata) ? body.metadata : {},
+                member_count: 0,
+                avatar: null,
+            };
+            db.groups.push(group);
+            return { status: true, data: serializeGroup(group), graph: 'default' };
+        }
         return listRows(db.groups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
+    }
+    // User API keys — /api/account/api_keys (account/rest/user_api_key.py).
+    // No DELETE (CAN_DELETE defaults false); the kill switch is the `revoke`
+    // POST_SAVE_ACTION, which answers with its own payload {status:true},
+    // NOT the row. NO_SAVE_FIELDS: jti / expires / user / last_used.
+    const oneApiKey = path.match(/^\/api\/account\/api_keys\/(\d+)$/);
+    if (oneApiKey) {
+        const k = db.apiKeys.find((x) => x.id === Number(oneApiKey[1]));
+        if (!k) return { status: false, error: 'UserAPIKey not found', error_code: 404 };
+        if (opts.method === 'DELETE') {
+            return { status: false, error: 'DELETE not allowed: UserAPIKey', error_code: 403 };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            let revoked = false;
+            for (const [bkey, value] of Object.entries(opts.body)) {
+                if (bkey === 'revoke') {
+                    // on_action_revoke: rotates the signing secret + deactivates.
+                    k.is_active = false;
+                    revoked = true;
+                } else if (bkey === 'label') {
+                    k.label = String(value ?? '');
+                } else if (bkey === 'allowed_ips' && Array.isArray(value)) {
+                    k.allowed_ips = value as string[];
+                } else if (bkey === 'is_active') {
+                    k.is_active = Boolean(value);
+                }
+                // jti/expires/user/last_used silently ignored (NO_SAVE_FIELDS).
+            }
+            if (revoked) return { status: true }; // action payload, verbatim
+            return { status: true, data: serializeApiKey(k), graph: 'default' };
+        }
+        return { status: true, data: serializeApiKey(k), graph: 'default' };
+    }
+    if (path === '/api/account/api_keys') {
+        const params = opts.params ?? {};
+        const search = (k: Record<string, unknown>) => String(k.label ?? '');
+        if (params.download_format) {
+            const full = listRows(db.apiKeys as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.apiKeys.length }, search, '-id');
+            return exportRows((full.data as unknown as MockApiKey[]).map(serializeApiKey), params, 'UserAPIKey');
+        }
+        const result = listRows(db.apiKeys as unknown as Record<string, unknown>[], params, search, '-id');
+        return { ...result, data: (result.data as unknown as MockApiKey[]).map(serializeApiKey) };
+    }
+    // Logs — /api/logs (mojo/apps/logit). Read surface only from the portal;
+    // default sort is -id (rest.py pops sort with that default), graph=basic
+    // narrows the row, and search sweeps the text columns.
+    const oneLog = path.match(/^\/api\/logs\/(\d+)$/);
+    if (oneLog) {
+        const l = db.logs.find((x) => x.id === Number(oneLog[1]));
+        if (!l) return { status: false, error: 'Log not found', error_code: 404 };
+        return { status: true, data: serializeLog(l, String(opts.params?.graph ?? 'default')), graph: String(opts.params?.graph ?? 'default') };
+    }
+    if (path === '/api/logs') {
+        const params = opts.params ?? {};
+        // Envelope-graph parity: an explicit ?graph= echoes back; otherwise
+        // the envelope says "list" while rows serialize via the default
+        // graph (Log declares no list graph — the fallback the live wire
+        // shows: graph:"list" with full default-graph rows).
+        const graphParam = params.graph ? String(params.graph) : null;
+        const rowGraph = graphParam ?? 'default';
+        const search = (l: Record<string, unknown>) =>
+            `${l.level} ${l.kind ?? ''} ${l.method ?? ''} ${l.path ?? ''} ${l.username ?? ''} ${l.ip ?? ''} ${l.log ?? ''} ${l.model_name ?? ''}`;
+        if (params.download_format) {
+            const full = listRows(db.logs as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.logs.length }, search, '-id');
+            return exportRows((full.data as unknown as MockLog[]).map((l) => serializeLog(l, rowGraph)), params, 'Log');
+        }
+        const result = listRows(db.logs as unknown as Record<string, unknown>[], params, search, '-id');
+        return { ...result, graph: graphParam ?? 'list', data: (result.data as unknown as MockLog[]).map((l) => serializeLog(l, rowGraph)) };
     }
     if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
     if (path === '/api/docit/render') {
@@ -755,7 +1253,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (opts.method === 'POST' && opts.body) {
             return saveUser(user, opts.body);
         }
-        return { status: true, data: serializeUser(user) };
+        return { status: true, data: serializeUser(user), graph: 'default' };
     }
     if (path === '/api/user') {
         if (opts.params?.download_format) return exportUsers(opts.params);
