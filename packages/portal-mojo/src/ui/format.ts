@@ -11,6 +11,7 @@
 //      overrides it; `slug` documents `''` instead). A formatter is the last
 //      thing allowed to take a row down.
 //   2. Fixed 'en-US' locale — the portal's house style, not the browser's.
+import { toDateSmart } from './date/fns';
 
 const DASH = '—';
 
@@ -91,14 +92,11 @@ function currencyFormat(code: string, decimals: number | undefined): Intl.Number
 const DATE_FMT = new Intl.DateTimeFormat('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 const DATETIME_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-function toDate(value: string | number | Date | null | undefined): Date | null {
-    if (value == null || value === '') return null;
-    // django-mojo serializes datetimes as epoch SECONDS; JS Date takes ms.
-    // <1e11 distinguishes them until the year 5138 (web-mojo's Job heuristic).
-    const normalized = typeof value === 'number' && value < 1e11 ? value * 1000 : value;
-    const d = normalized instanceof Date ? normalized : new Date(normalized);
-    return Number.isNaN(d.getTime()) ? null : d;
-}
+// Every formatter parses through the shared sniffer, so ALL of django-mojo's
+// datetime shapes render: epoch seconds (DateTimeField), 'YYYY-MM-DD'
+// (DateField), full ISO strings, epoch milliseconds, and any of those in
+// string clothing (JSONField metadata). See date/fns.ts detectTemporal.
+const toDate = toDateSmart;
 
 export function date(value: string | number | null | undefined, fallback = '—'): string {
     const d = toDate(value);

@@ -8,7 +8,7 @@
 // DISABLE_REASON_BADGES, _statusBadge, _inactivityWarning, LOG_LEVEL_*,
 // LOGIN_TONE, PROVIDER_ICONS) — read in full 2026-08-05.
 import { useState, type ReactNode } from 'react';
-import { fmt, modal, type Tone } from 'portal-mojo/ui';
+import { dateFns, fmt, modal, type Tone } from 'portal-mojo/ui';
 import { useCan, type Params } from 'portal-mojo/client';
 import type { UserRow } from '../../models';
 import { GroupDetail } from '../GroupDetail';
@@ -84,10 +84,8 @@ export function inactivityWarning(user: UserRow): { sent_at: string; days: numbe
 
 /** Online if `last_activity` is within 5 minutes (UserView.isOnline). */
 export function isOnline(user: UserRow): boolean {
-    const last = user.last_activity;
-    if (last == null) return false;
-    const ms = typeof last === 'number' && last < 1e11 ? last * 1000 : new Date(last).getTime();
-    if (!Number.isFinite(ms)) return false;
+    const ms = toMs(user.last_activity);
+    if (ms == null) return false;
     return Date.now() - ms < 5 * 60 * 1000;
 }
 
@@ -173,12 +171,11 @@ export function openGroupDetail(id: number) {
 
 // ── Time helpers ──────────────────────────────────────────────────────
 
-/** Epoch-seconds | ISO → ms for merge-feed sorting (UserView._toMs). */
+/** Any stored temporal shape → ms for merge-feed sorting (UserView._toMs).
+ *  Delegates to the toolkit's sniffer so epoch seconds, epoch millis,
+ *  numeric strings and ISO all sort against each other correctly. */
 export function toMs(value: number | string | null | undefined): number | null {
-    if (value == null) return null;
-    if (typeof value === 'number') return value < 1e11 ? value * 1000 : value;
-    const ms = new Date(value).getTime();
-    return Number.isFinite(ms) ? ms : null;
+    return dateFns.detectTemporal(value)?.ms ?? null;
 }
 
 /** Day-relative header label: Today / Yesterday / Mon, Jun 3. */

@@ -28,13 +28,15 @@
 // `fieldToWire` — so SchemaForm's submit payload and FormView's autosave
 // batches carry wire-ready values without either surface knowing dates exist.
 import {
+    detectTemporal,
     formatByPrecision,
     formatDateTime,
-    ianaOffset,
     parseByPrecision,
     parseDateTime,
+    partsToMs,
     type ParsedDate,
     type Precision,
+    type TemporalKind,
 } from './date/fns';
 import type { Field, FieldValue } from '../client/types';
 
@@ -88,12 +90,17 @@ function warnOnce(field: Field, value: unknown, note: string): void {
     console.warn(`field-wire: ${note} (field "${field.name}", value ${JSON.stringify(value)})`);
 }
 
-/** Epoch detection for incoming raws: numbers, or all-digit strings of 5+
- *  chars (4 digits is a canonical YYYY year, never an epoch). */
+/**
+ * Epoch seconds for an incoming raw, or null when the value is not an epoch
+ * (a canonical/ISO string takes the string path instead). Numbers AND
+ * numeric strings count; MILLISECOND epochs are normalized down to seconds
+ * — before this went through detectTemporal a 13-digit ms value was read as
+ * seconds and rendered as the year 57564.
+ */
 function asEpoch(raw: unknown): number | null {
-    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
-    if (typeof raw === 'string' && /^-?\d{5,}(\.\d+)?$/.test(raw.trim())) return Number(raw.trim());
-    return null;
+    const t = detectTemporal(raw);
+    if (!t || (t.kind !== 'epoch-s' && t.kind !== 'epoch-ms')) return null;
+    return Math.floor(t.ms / 1000);
 }
 
 /** Canonical date string at precision → epoch seconds at UTC midnight
@@ -114,14 +121,6 @@ function epochToCanonical(epoch: number, precision: Precision): string {
 
 const pad2 = (n: number): string => (n < 10 ? `0${n}` : String(n));
 
-/** '±HH:MM' → signed minutes, or null when malformed. */
-function offsetMinutes(offset: string): number | null {
-    const m = offset.match(/^([+-])(\d{2}):(\d{2})$/);
-    if (!m) return null;
-    const sign = m[1] === '-' ? -1 : 1;
-    return sign * (Number(m[2]) * 60 + Number(m[3]));
-}
-
 /**
  * Datetime string → epoch seconds. Accepts every shape fns.parseDateTime
  * does ('YYYY-MM-DD HH:MM', ISO 'T' forms, '±HH:MM' offsets, IANA tails,
@@ -135,21 +134,10 @@ function offsetMinutes(offset: string): number | null {
 export function datetimeStringToEpoch(s: string): number | null {
     const parsed = parseDateTime(s);
     if (!parsed) return null;
-    const { date, time, timezone } = parsed;
-    const utcGuess = Math.floor(Date.UTC(date.y, date.m - 1, date.d, time.hours, time.minutes) / 1000);
-    if (!timezone) {
-        return Math.floor(new Date(date.y, date.m - 1, date.d, time.hours, time.minutes).getTime() / 1000);
-    }
-    const direct = offsetMinutes(timezone);
-    if (direct != null) return utcGuess - direct * 60;
-    // IANA zone: offset depends on the instant; resolve, adjust, re-check.
-    const off1 = ianaOffset(timezone, new Date(utcGuess * 1000));
-    const min1 = off1 != null ? offsetMinutes(off1) : null;
-    if (min1 == null) return utcGuess; // unknown zone — treat wall time as UTC
-    const attempt = utcGuess - min1 * 60;
-    const off2 = ianaOffset(timezone, new Date(attempt * 1000));
-    const min2 = off2 != null ? offsetMinutes(off2) : min1;
-    return min2 === min1 ? attempt : utcGuess - (min2 ?? min1) * 60;
+    // The zone resolution itself lives in fns.partsToMs — ONE implementation,
+    // shared with the detector, so a picker commit and a rendered cell can
+    // never disagree about what instant a wall time means.
+    return Math.floor(partsToMs(parsed) / 1000);
 }
 
 /** Epoch seconds → 'YYYY-MM-DD HH:MM' in the BROWSER'S local time (the
@@ -157,6 +145,51 @@ export function datetimeStringToEpoch(s: string): number | null {
 export function epochToDatetimeString(epoch: number): string {
     const d = new Date(epoch * 1000);
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+// ── Shape memory (answer in the shape the server spoke) ───────────────
+//
+// django-mojo's datetime wire shape is per-COLUMN, not global: a
+// DateTimeField serializes epoch seconds, a DateField 'YYYY-MM-DD', and a
+// JSONField carries whatever the producer wrote (ISO strings are common).
+// Emitting epochs for all of them — the old behavior — silently rewrote a
+// DateField's shape on every save and turned an ISO metadata value into a
+// number. So the boundary REMEMBERS what each field last read and answers
+// in that shape; `Field.outputFormat` remains the explicit override.
+//
+// Keyed by the Field OBJECT (schemas are module-level consts, so the same
+// object flows through wireToField and fieldToWire) — never by name, which
+// would collide across forms. A field never read yet defaults to epoch
+// seconds, the documented DateTimeField contract.
+const inboundKind = new WeakMap<Field, TemporalKind>();
+
+type WireShape = 'epoch' | 'epoch-ms' | 'date' | 'iso';
+
+function rememberKind(field: Field, raw: unknown): void {
+    const t = detectTemporal(raw);
+    if (t) inboundKind.set(field, t.kind);
+}
+
+/** Explicit `Field.outputFormat` wins; else the remembered inbound shape;
+ *  else epoch seconds. ('iana' is a TimePicker serialization, not a date
+ *  wire shape — it falls through to epoch here.) */
+function outputShape(field: Field): WireShape {
+    if (field.outputFormat === 'date') return 'date';
+    if (field.outputFormat === 'iso') return 'iso';
+    if (field.outputFormat === 'epoch') return 'epoch';
+    switch (inboundKind.get(field)) {
+        case 'date-string': return 'date';
+        case 'datetime-string': return 'iso';
+        case 'epoch-ms': return 'epoch-ms';
+        default: return 'epoch';
+    }
+}
+
+/** Epoch seconds → the wire value for a resolved shape. */
+function epochAs(shape: WireShape, epoch: number): FieldValue {
+    if (shape === 'epoch-ms') return epoch * 1000;
+    if (shape === 'iso') return new Date(epoch * 1000).toISOString();
+    return epoch;
 }
 
 // ── The boundary ──────────────────────────────────────────────────────
@@ -182,18 +215,18 @@ function rawToCanonical(field: Field, raw: unknown, precision: Precision): strin
  * table in docs/forms.md).
  */
 export function fieldToWire(field: Field, value: FieldValue): FieldValue {
-    const keepString = field.outputFormat === 'date';
+    const shape = outputShape(field);
 
     if (DATE_TYPES.has(field.type)) {
         if (value == null || value === '') return null;
         const canonical = String(value);
-        if (keepString) return canonical;
+        if (shape === 'date') return canonical;
         const epoch = canonicalToEpoch(canonical, fieldPrecision(field));
         if (epoch == null) {
             warnOnce(field, value, 'commit is not a canonical date string — posting null');
             return null;
         }
-        return epoch;
+        return epochAs(shape, epoch);
     }
 
     if (RANGE_TYPES.has(field.type)) {
@@ -201,7 +234,7 @@ export function fieldToWire(field: Field, value: FieldValue): FieldValue {
         const pair = Array.isArray(value) ? value : [value];
         const [s, e] = [String(pair[0] ?? ''), String(pair[1] ?? '')];
         if (!s || !e) return null; // the picker only ever commits complete-or-cleared
-        if (keepString) return [s, e];
+        if (shape === 'date') return [s, e];
         const precision = fieldPrecision(field);
         const es = canonicalToEpoch(s, precision);
         const ee = canonicalToEpoch(e, precision);
@@ -209,19 +242,21 @@ export function fieldToWire(field: Field, value: FieldValue): FieldValue {
             warnOnce(field, value, 'range commit is not a canonical pair — posting null');
             return null;
         }
-        return [es, ee];
+        return [epochAs(shape, es), epochAs(shape, ee)] as FieldValue;
     }
 
     if (field.type === 'datetimepicker') {
         if (value == null || value === '') return null;
         const str = String(value);
-        if (keepString) return str;
+        // 'date' on a datetime field means "keep the picker's own string"
+        // (the pre-detection behavior of outputFormat: 'date').
+        if (shape === 'date') return str;
         const epoch = datetimeStringToEpoch(str);
         if (epoch == null) {
             warnOnce(field, value, 'commit is not a parseable datetime — posting null');
             return null;
         }
-        return epoch;
+        return epochAs(shape, epoch);
     }
 
     return value;
@@ -235,6 +270,7 @@ export function fieldToWire(field: Field, value: FieldValue): FieldValue {
  */
 export function wireToField(field: Field, raw: FieldValue): FieldValue {
     if (DATE_TYPES.has(field.type)) {
+        rememberKind(field, raw);
         return rawToCanonical(field, raw, fieldPrecision(field));
     }
 
@@ -248,6 +284,7 @@ export function wireToField(field: Field, raw: FieldValue): FieldValue {
             warnOnce(field, raw, 'range value is not a two-element pair — treating as empty');
             return null;
         }
+        rememberKind(field, parts[0]); // both ends always share a shape
         const s = rawToCanonical(field, parts[0], precision);
         const e = rawToCanonical(field, parts[1], precision);
         return s && e ? [s, e] : null;
@@ -255,6 +292,7 @@ export function wireToField(field: Field, raw: FieldValue): FieldValue {
 
     if (field.type === 'datetimepicker') {
         if (raw == null || raw === '') return null;
+        rememberKind(field, raw);
         const epoch = asEpoch(raw);
         if (epoch != null) return epochToDatetimeString(epoch);
         const parsed = parseDateTime(String(raw));

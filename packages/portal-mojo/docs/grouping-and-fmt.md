@@ -10,7 +10,13 @@ Each returns `{groupBy, groupHeaderLabel}` — spread straight into
 ModelTable props: `{...groupByRecency<User>('last_activity')}`. Keys are
 STABLE bucket ids (sort-ordered where it matters); labels format
 separately. A null key = ungrouped tail (no header; the prior section
-continues). All date helpers accept epoch seconds / ms / ISO / Date.
+continues). All date helpers parse through `date/fns detectTemporal`, so
+they accept **every** shape django-mojo emits: epoch seconds, epoch
+milliseconds, either as a numeric string (JSONField metadata routinely
+carries these), `'YYYY-MM-DD'`, `'YYYY-MM'`, `'YYYY'`, full ISO with `Z` or
+an offset, IANA-tailed wall times, and `Date`. A 4-digit numeric string is
+read as a **year**, never an epoch. Anything unrecognizable degrades to the
+fallback — a formatter never throws.
 
 | Helper | Buckets |
 |---|---|

@@ -532,7 +532,144 @@ export function weekdayNames(locale = 'en-US', firstDay = 1, length: 'short' | '
     return out.slice();
 }
 
+// ── Temporal detection (epoch vs ISO — the shape sniffer) ──────────
+//
+// django-mojo does NOT speak one datetime shape. Depending on the column
+// and the server's serializer settings a timestamp arrives as epoch
+// SECONDS (DateTimeField), a 'YYYY-MM-DD' string (DateField), a full ISO
+// string (some JSONField payloads, the webhook-secret timestamps), and
+// occasionally epoch MILLISECONDS (anything that round-tripped through a
+// JS producer). web-mojo tolerated all of them at read time
+// (DataFormatter.normalizeEpoch); this is that idea done once, for the
+// whole toolkit — and with the shape REPORTED, so a writer can answer in
+// the same shape instead of flipping the column's wire type on save.
+
+export type TemporalKind =
+    /** number/numeric-string of epoch seconds — django-mojo's DateTimeField */
+    | 'epoch-s'
+    /** number/numeric-string of epoch milliseconds — a JS producer's output */
+    | 'epoch-ms'
+    /** 'YYYY' | 'YYYY-MM' | 'YYYY-MM-DD' — django-mojo's DateField */
+    | 'date-string'
+    /** anything with a time part: ISO, 'YYYY-MM-DD HH:MM', IANA-tailed */
+    | 'datetime-string'
+    /** a live Date instance (never a wire shape — callers hand these in) */
+    | 'date-object';
+
+export interface Temporal {
+    /** Milliseconds since the Unix epoch — the one normalized instant. */
+    ms: number;
+    /** The shape the value ARRIVED in, so writers can answer in kind. */
+    kind: TemporalKind;
+}
+
+/** 'YYYY' | 'YYYY-MM' | 'YYYY-MM-DD' — no time part. */
+const DATE_ONLY_RE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
+/** A string that is ENTIRELY a number. Deliberately not parseFloat: that
+ *  reads '2026-06-15' as 2026 and would multiply a date into garbage. */
+const ALL_NUMERIC_RE = /^\s*[+-]?\d+(\.\d+)?\s*$/;
+
+/**
+ * Seconds-vs-milliseconds boundary. 1e11 SECONDS is the year 5138; 1e11
+ * MILLISECONDS is 1973 — so under the boundary the value can only sanely be
+ * seconds, and over it, milliseconds. (web-mojo threw on the 1e11–1e12 band;
+ * we read it as milliseconds instead: 1973–2001 timestamps are real, year
+ * 5138+ ones are not, and a formatter must never throw at render time.)
+ */
+const SECONDS_CEILING = 1e11;
+
+/** ParsedDateTime → epoch ms, resolving the zone the parse found:
+ *  explicit offset → exact instant; IANA name → the offset AT that instant
+ *  (two-pass, so a DST boundary lands on the correct side); no zone → the
+ *  browser's local wall time (what the user meant in a zoneless picker). */
+export function partsToMs(parsed: ParsedDateTime): number {
+    const { date, time, timezone } = parsed;
+    const utcGuess = Date.UTC(date.y, date.m - 1, date.d, time.hours, time.minutes);
+    if (!timezone) {
+        return new Date(date.y, date.m - 1, date.d, time.hours, time.minutes).getTime();
+    }
+    const direct = offsetToMinutes(timezone);
+    if (direct != null) return utcGuess - direct * 60_000;
+    const off1 = ianaOffset(timezone, new Date(utcGuess));
+    const min1 = off1 != null ? offsetToMinutes(off1) : null;
+    if (min1 == null) return utcGuess; // unknown zone — treat wall time as UTC
+    const attempt = utcGuess - min1 * 60_000;
+    const off2 = ianaOffset(timezone, new Date(attempt));
+    const min2 = off2 != null ? offsetToMinutes(off2) : min1;
+    return min2 === min1 ? attempt : utcGuess - (min2 ?? min1) * 60_000;
+}
+
+/**
+ * Sniff any stored temporal value into `{ ms, kind }`, or null when it is
+ * not a timestamp at all. Every date-consuming surface in the toolkit reads
+ * through this — formatters, pickers, and the form wire boundary — so one
+ * row can carry `last_login` epochs beside a `dob` 'YYYY-MM-DD' beside an
+ * ISO `created_at` and all three render (and save) correctly.
+ *
+ * Numeric strings of 4 digits or fewer are NOT read as epochs: '2026' is a
+ * canonical year (what a yearpicker holds), not 1970-01-01T00:33:46Z.
+ */
+export function detectTemporal(raw: unknown): Temporal | null {
+    if (raw == null || raw === '') return null;
+
+    if (raw instanceof Date) {
+        const ms = raw.getTime();
+        return Number.isNaN(ms) ? null : { ms, kind: 'date-object' };
+    }
+
+    if (typeof raw === 'number') {
+        if (!Number.isFinite(raw)) return null;
+        return Math.abs(raw) < SECONDS_CEILING
+            ? { ms: raw * 1000, kind: 'epoch-s' }
+            : { ms: raw, kind: 'epoch-ms' };
+    }
+
+    if (typeof raw !== 'string') return null;
+    const str = raw.trim();
+    if (str === '') return null;
+
+    // Numeric strings: epoch in string clothing (JSONField metadata, query
+    // params, anything that crossed a text boundary).
+    if (ALL_NUMERIC_RE.test(str) && str.replace(/^[+-]/, '').split('.')[0]!.length >= 5) {
+        const n = Number(str);
+        if (!Number.isFinite(n)) return null;
+        return Math.abs(n) < SECONDS_CEILING
+            ? { ms: n * 1000, kind: 'epoch-s' }
+            : { ms: n, kind: 'epoch-ms' };
+    }
+
+    // Date-only strings resolve at UTC midnight — the same convention the
+    // form wire boundary uses, so 'YYYY-MM-DD' round-trips to its own day.
+    if (DATE_ONLY_RE.test(str)) {
+        const p = parseYmd(str.length === 4 ? `${str}-01-01` : str.length === 7 ? `${str}-01` : str);
+        if (!p) return null;
+        return { ms: Date.UTC(p.y, p.m - 1, p.d), kind: 'date-string' };
+    }
+
+    const parsed = parseDateTime(str);
+    if (parsed) return { ms: partsToMs(parsed), kind: 'datetime-string' };
+
+    // Last resort: whatever else Date can read (RFC 2822, 'Aug 5, 2026'…).
+    const loose = Date.parse(str);
+    return Number.isFinite(loose) ? { ms: loose, kind: 'datetime-string' } : null;
+}
+
+/** `detectTemporal` → a Date, or null. The one parse every formatter uses. */
+export function toDateSmart(raw: unknown): Date | null {
+    const t = detectTemporal(raw);
+    if (!t) return null;
+    const d = new Date(t.ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // ── Internal ───────────────────────────────────────────────────────
+
+/** '±HH:MM' → signed minutes, or null when malformed. */
+function offsetToMinutes(offset: string): number | null {
+    const m = offset.match(/^([+-])(\d{2}):(\d{2})$/);
+    if (!m) return null;
+    return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
+}
 
 function pad2(n: number): string { return n < 10 ? '0' + n : String(n); }
 

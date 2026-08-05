@@ -6,6 +6,7 @@
 //
 // A falsy key means "ungrouped tail": the row renders without a new header,
 // visually continuing the prior section.
+import { toDateSmart } from './date/fns';
 
 // Interfaces without index signatures (User, …) aren't assignable to
 // Record<string, unknown> under strict TS, so the row constraint is plain
@@ -18,13 +19,10 @@ function resolveAccessor<T extends Row>(fieldOrAccessor: string | Accessor<T>): 
     return (row: T) => (row as Record<string, unknown>)[fieldOrAccessor];
 }
 
-/** Epoch seconds / ms / ISO / Date → local Date, or null when unusable. */
-function toDate(raw: unknown): Date | null {
-    if (raw == null || raw === '') return null;
-    const normalized = typeof raw === 'number' && raw < 1e11 ? raw * 1000 : raw;
-    const d = normalized instanceof Date ? normalized : new Date(normalized as string | number);
-    return Number.isNaN(d.getTime()) ? null : d;
-}
+/** Epoch seconds / ms / numeric string / ISO / Date → local Date, or null.
+ *  One shared sniffer (date/fns detectTemporal) so a grouped bucket and the
+ *  cell rendered inside it can never disagree about what day a row is on. */
+const toDate = toDateSmart;
 
 /** Stable local-time YYYY-MM-DD bucket key. */
 function isoDayKey(date: Date): string {

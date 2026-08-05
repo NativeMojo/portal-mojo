@@ -221,10 +221,10 @@ dates exist. This is the ONE conversion point.
 | `collection` | CollectionSelect | one picked row | the row's **id** (`string \| number`); `null` clears | `null` |
 | `collectionmultiselect`, `collection-multiselect` | CollectionMultiSelect | checked rows | **array of ids** | `[]` |
 | `combo`, `combobox`, `autocomplete` | ComboBox | committed option/text | the committed value (`string \| number`; free text iff `allowCustom`) | `''` |
-| `datepicker`, `monthpicker`, `yearpicker` | DatePicker | canonical `YYYY-MM-DD` / `YYYY-MM` / `YYYY` | **epoch seconds** at UTC midnight (number); `outputFormat:'date'` → the canonical string | `null` |
-| `daterange`, `monthrange`, `yearrange` | DateRangePicker | canonical `[start, end]` pair | **`[startEpoch, endEpoch]`** (numbers); `outputFormat:'date'` → canonical pair | `null` |
+| `datepicker`, `monthpicker`, `yearpicker` | DatePicker | canonical `YYYY-MM-DD` / `YYYY-MM` / `YYYY` | the shape it read (see below); **epoch seconds** at UTC midnight by default; `outputFormat` overrides | `null` |
+| `daterange`, `monthrange`, `yearrange` | DateRangePicker | canonical `[start, end]` pair | as above, per element — **`[startEpoch, endEpoch]`** by default | `null` |
 | `timepicker` | TimePicker (+ the REAL TimezoneSelect in its slot) | HH:MM (+ zone) | serialized **string** — `'iso'` (default) `'14:30-07:00'`, `'iana'` `'14:30 America/…'`; times are never epochs | `''` |
-| `datetimepicker` | DateTimePicker (#1273 — seam until merged) | `'YYYY-MM-DD HH:MM'` local | **epoch seconds** (exact instant); `outputFormat:'date'` → the string | `null` |
+| `datetimepicker` | DateTimePicker | `'YYYY-MM-DD HH:MM'` local | the shape it read; **epoch seconds** (exact instant) by default, ISO when the column spoke ISO | `null` |
 | `timezone` | TimezoneSelect | IANA zone | the IANA **string** | `''` (picker displays the local zone; `resolveTimezone` computes that effective default when a form must post it) |
 
 Alias precision mapping (web-mojo `PRECISION_ALIASES`): `monthpicker`/
@@ -249,15 +249,29 @@ as epoch seconds** and the save path parses epochs back in; DateField
 serializes OUT as `'YYYY-MM-DD'` but its save path ALSO accepts epochs
 (naive/UTC-parsed — a UTC-midnight epoch lands on the same day). Hence:
 
-- `fieldToWire(field, control)` — canonical picker strings → **epoch
-  seconds** (UTC midnight for date-only precisions; datetimes honor an
-  explicit offset/IANA zone, else the browser's local wall time).
-  `outputFormat:'date'` opts a field into canonical-string output for
-  DateField columns that should round-trip exactly as the server emits.
-- `wireToField(field, raw)` — accepts **both** shapes regardless (epoch
-  numbers, epoch strings, canonical strings), so rows mixing `last_login`
-  epochs and `dob` strings flow through one path. Unparseable stored values
-  warn once and read as empty.
+- `wireToField(field, raw)` — accepts **every** shape django-mojo emits
+  (epoch seconds, epoch **milliseconds**, either of those as numeric
+  strings, `'YYYY-MM-DD'`, full ISO, `Date`), so rows mixing `last_login`
+  epochs and `dob` strings flow through one path. Detection is
+  `date/fns detectTemporal`; unparseable stored values warn once and read
+  as empty.
+- `fieldToWire(field, control)` — **answers in the shape the field last
+  read**. A column that arrived as `'YYYY-MM-DD'` saves back as
+  `'YYYY-MM-DD'`; one that arrived as ISO saves ISO; one that arrived as
+  epoch milliseconds saves milliseconds; everything else (and any field
+  never read — a fresh record) saves **epoch seconds**, the DateTimeField
+  contract. Canonical strings become UTC midnight for date-only
+  precisions; datetimes honor an explicit offset/IANA zone, else the
+  browser's local wall time.
+
+  This auto-detection exists because the wire shape is per-COLUMN, not
+  global: emitting epochs for everything silently rewrote a DateField's
+  type on every save and turned ISO metadata values into numbers.
+  `Field.outputFormat` (`'epoch' | 'date' | 'iso'`) remains the explicit
+  override and always wins — set it when a column's shape must not be
+  inferred. The remembered shape is keyed by the Field **object**, so
+  module-level schema constants (the normal case) carry it correctly and
+  two forms sharing a field name never collide.
 - **`dr_field/dr_start/dr_end` filter params are NOT this boundary** — they
   stay `YYYY-MM-DD` strings and belong to FilterBar/params (rest.py parses
   dr_* itself). Untouched.
