@@ -16,8 +16,8 @@
 .multiselect-trigger {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
     width: 100%; box-sizing: border-box;
-    background: var(--surface); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--field-bg); color: var(--ink);
+    border: 1px solid var(--field-line); border-radius: 8px;
     padding: 7px 10px; font-size: 13.5px; font-weight: 550;
     text-align: left; cursor: pointer;
 }

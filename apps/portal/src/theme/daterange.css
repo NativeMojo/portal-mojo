@@ -29,8 +29,8 @@
 .mojo-daterange-trigger {
     display: flex; align-items: center; gap: 9px;
     width: 100%; box-sizing: border-box;
-    background: var(--surface2); color: var(--ink-strong);
-    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--field-bg); color: var(--ink-strong);
+    border: 1px solid var(--field-line); border-radius: 8px;
     padding: 7px 10px; font-size: 13.5px;
     text-align: left; cursor: pointer;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;

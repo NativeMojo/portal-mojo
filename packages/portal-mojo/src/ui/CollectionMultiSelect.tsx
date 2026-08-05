@@ -414,8 +414,10 @@ export function CollectionMultiSelect<T extends { id: number | string }>({
         <div className="collection-multiselect-body" ref={bodyRef}>
             {(searchOn || showActions) && (
                 <div className="collection-multiselect-head">
+                    {/* search-box-fill: the house .search-box input is a 210px
+                        TOOLBAR control; here it must fill the menu. */}
                     {searchOn && (
-                        <div className="search-box collection-multiselect-search">
+                        <div className="search-box search-box-fill collection-multiselect-search">
                             <i className="bi bi-search" />
                             <input
                                 ref={searchRef}

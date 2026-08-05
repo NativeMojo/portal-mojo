@@ -31,9 +31,9 @@
     width: 100%;
     min-height: 36px;
     padding: 7px 10px;
-    background: var(--surface2);
+    background: var(--field-bg);
     color: var(--ink-strong);
-    border: 1px solid var(--line);
+    border: 1px solid var(--field-line);
     border-radius: 8px;
     font-size: 13.5px;
     text-align: left;

@@ -144,8 +144,13 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
                     return (
                         <div key={f.name} className={f.columns === 6 ? 'col-6' : 'col-12'}>
                             {f.type === 'switch' ? (
+                                // Control FIRST, label after — web-mojo's
+                                // switch is Bootstrap's `.form-check
+                                // .form-switch`, which renders <input> then
+                                // <label>. Label-then-switch with the two
+                                // pushed to opposite ends of a wide form read
+                                // as unrelated controls.
                                 <label className="switch-row">
-                                    <span className="field-label">{f.label}</span>
                                     <input
                                         type="checkbox"
                                         role="switch"
@@ -153,6 +158,7 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
                                         checked={data[f.name] === true}
                                         onChange={(e) => set(f.name, e.target.checked)}
                                     />
+                                    <span className="field-label">{f.label}</span>
                                 </label>
                             ) : Registered ? (
                                 // A <div>, not a <label>: registry controls are

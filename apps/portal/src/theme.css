@@ -50,6 +50,12 @@
     --info: #16657f;    --info-soft: rgba(31, 143, 175, 0.12);
     --shadow: 0 1px 2px rgba(13, 20, 32, 0.05);
     --shadow-pop: 0 12px 40px rgba(13, 20, 32, 0.18);
+    /* Form controls get their OWN fill + boundary (see the dark block for
+       why). Light: a white field on the page's grey, bordered — filling a
+       field with --surface2 grey on a white card is the disabled look. */
+    --field-bg: #ffffff;
+    --field-line: #c8d0dc;
+    --field-line-hover: #a7b2c2;
 }
 :root[data-theme="dark"] {
     --bg: #0a0d11;          /* --bs-body-bg */
@@ -68,6 +74,15 @@
     --bad: #e07a7a;     --bad-soft: rgba(224, 122, 122, 0.12);
     --info: #4db8d4;    --info-soft: rgba(77, 184, 212, 0.12);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    /* Form controls are RECESSED WELLS, not raised panels — the convention
+       web-mojo inherited from Bootstrap dark (.form-control fills with
+       --bs-body-bg, the darkest value, not the card surface). Filling a
+       field with --surface2 put it 1.05:1 against the panel with a 1.19:1
+       border: an editable field that reads as inert. The well is darker
+       than the card and the boundary is a real line. */
+    --field-bg: #080b0f;
+    --field-line: #313c4b;
+    --field-line-hover: #465468;
     --shadow-pop: 0 16px 50px rgba(0, 0, 0, 0.55);
 }
 
@@ -168,8 +183,8 @@ button { font: inherit; color: inherit; }
 .group-menu-search input {
     width: 100%; box-sizing: border-box;
     padding: 6.5px 10px 6.5px 30px;
-    background: var(--surface2); color: var(--ink-strong);
-    border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
+    background: var(--field-bg); color: var(--ink-strong);
+    border: 1px solid var(--field-line); border-radius: 8px; font-size: 13px;
 }
 .group-menu-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; }
 .group-row {
@@ -243,19 +258,31 @@ button { font: inherit; color: inherit; }
 .search-box i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--mute); font-size: 13px; }
 .search-box input {
     width: 210px; padding: 6.5px 10px 6.5px 30px;
-    background: var(--surface2); color: var(--ink-strong);
-    border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px;
+    background: var(--field-bg); color: var(--ink-strong);
+    border: 1px solid var(--field-line); border-radius: 8px; font-size: 13.5px;
 }
+/* The 210px above is the TOOLBAR width. Any search box that fills its
+   container (dropdown menus, panels) opts in — without this, @import order
+   makes the 210px win over the component file's own width:100% at equal
+   specificity, which is what shrank the picker search to half its menu. */
+.search-box-fill input { width: 100%; box-sizing: border-box; }
 .search-box input::placeholder { color: var(--mute); }
 
 /* ============================================================ Inputs & buttons */
 .input {
     width: 100%; box-sizing: border-box;
-    background: var(--surface2); color: var(--ink-strong);
-    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--field-bg); color: var(--ink-strong);
+    border: 1px solid var(--field-line); border-radius: 8px;
     padding: 7px 10px; font-size: 13.5px;
 }
+.input:hover:not(:disabled):not([readonly]) { border-color: var(--field-line-hover); }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Disabled must look different from enabled — it couldn't before, when every
+   field already wore the muted fill. */
+.input:disabled, .input[readonly] {
+    background: var(--surface2); border-color: var(--line);
+    color: var(--mute); cursor: not-allowed;
+}
 .input-compact { width: auto; padding: 6px 8px; }
 .input-invalid { border-color: var(--bad); }
 .btn {
@@ -567,7 +594,11 @@ button { font: inherit; color: inherit; }
 }
 .switch:checked { background: var(--accent); }
 .switch:checked::before { transform: translateX(15px); }
-.switch-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; cursor: pointer; }
+/* Switch then label, sitting together (Bootstrap .form-switch order). The
+   old space-between pushed the two to opposite ends of a full-width form
+   row, so the control read as belonging to nothing. */
+.switch-row { display: flex; align-items: center; gap: 9px; padding: 9px 0; cursor: pointer; }
+.switch-row .field-label { margin-bottom: 0; }
 .switch-inline { display: inline-flex; align-items: center; }
 
 /* ============================================================ Forms */

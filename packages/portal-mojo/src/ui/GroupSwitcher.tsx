@@ -157,7 +157,7 @@ export function GroupSwitcher({ onSelected, onCleared }: {
             </button>
             {open && (
                 <div className="group-menu" role="listbox">
-                    <div className="search-box group-menu-search">
+                    <div className="search-box search-box-fill group-menu-search">
                         <i className="bi bi-search" />
                         <input
                             ref={searchRef}
