@@ -19,6 +19,7 @@
 @import "./theme/datetimepicker.css";
 @import "./theme/auth.css";
 @import "./theme/idioms.css";
+@import "./theme/charts-c2.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";

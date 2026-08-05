@@ -35,6 +35,7 @@ import { KitchenSinkDemo } from './demos-kitchen-sink';
 import { CollectionSelectDemo } from './demos-collection-select';
 import { PasswordDemo } from './demos-password';
 import { IdiomsDemo } from './demos-idioms';
+import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
     key: string;
@@ -217,6 +218,26 @@ const GROUPS: DemoGroup[] = [
                 key: 'charts', title: 'Charts', icon: 'bi-graph-up',
                 blurb: 'Dependency-free SVG: SeriesChart (line/bar/area, stacked, legend) + MetricsChart against /api/metrics/fetch.',
                 render: () => <ChartsDemo />,
+            },
+            {
+                key: 'charts-metrics', title: 'MetricsChart+', icon: 'bi-graph-up-arrow',
+                blurb: 'C2 completion: stats summary + view-data dialogs (CSV), the custom date-range dialog feeding dt_start/dt_end epochs, and exportChartPng.',
+                render: () => <ChartsMetricsC2Demo />,
+            },
+            {
+                key: 'charts-mini', title: 'Metrics mini widget', icon: 'bi-activity',
+                blurb: 'Compact metrics card: windowed trending, stats/data/refresh/settings actions, persisted settings — and the entity search scoping the metric via account=.',
+                render: () => <ChartsMiniWidgetDemo />,
+            },
+            {
+                key: 'charts-kpi', title: 'KPI & progress', icon: 'bi-speedometer2',
+                blurb: 'KPITile/KPIStrip (one batched fetch, delta badges that never render Infinity%) and CircularProgress (sizes, gauges, segments, gradients).',
+                render: () => <ChartsKpiDemo />,
+            },
+            {
+                key: 'charts-pie', title: 'PieChart', icon: 'bi-pie-chart',
+                blurb: 'Native SVG pie/doughnut: all three input shapes, golden-angle colors, center labels, label-keyed arc tween, slice click, PNG export.',
+                render: () => <ChartsPieDemo />,
             },
             {
                 key: 'markdown', title: 'MarkdownView', icon: 'bi-markdown',
