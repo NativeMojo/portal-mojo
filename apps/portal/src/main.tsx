@@ -7,6 +7,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import './theme.css';
 import './menus';
 import App from './App';
+import { authRoutes, RequireAuth, handleAuthTokenLanding } from './pages/auth/routes';
 
 // Wire the auth gate + Authorization/DUID headers into the client and start
 // session upkeep (single-flight refresh watcher) if a session exists.
@@ -14,8 +15,12 @@ mojo.initAuth();
 // Returning from the hosted /auth pages: exchange ?auth_code= for a session
 // (no-op when the param is absent — i.e. every normal load).
 void mojo.handleAuthCodeFromURL();
-// Dev console handle: drive auth flows before the C3 login pages exist —
-// e.g. __mojo.login('ian@mojoverify.com', 'mojo'), __mojo.logout().
+// Reset/magic-link emails landing in the REAL search string
+// (?flow=…&token=…): scrub + hash-route to the matching landing page.
+// Synchronous, and MUST run before createHashRouter is constructed
+// (replaceState fires no hashchange).
+handleAuthTokenLanding();
+// Dev console handle — e.g. __mojo.logout(), __mojo.requestFreshAuth().
 if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__mojo = mojo;
 }
@@ -27,11 +32,14 @@ import { GroupOverviewPage } from './pages/GroupOverviewPage';
 import { ComponentsPage } from './pages/components/ComponentsPage';
 
 // Hash routing so the built dist works from any static mount (including
-// served by django-mojo) with zero server rewrite config.
+// served by django-mojo) with zero server rewrite config. The auth pages are
+// SIBLINGS of the App route (full-screen, no Sidebar/TopNav chrome); the
+// RequireAuth guard sends unauthenticated visits to in-app login or the
+// hosted /auth pages per VITE_MOJO_AUTH.
 const router = createHashRouter([
     {
         path: '/',
-        element: <App />,
+        element: <RequireAuth><App /></RequireAuth>,
         children: [
             { index: true, element: <DashboardPage /> },
             { path: 'users', element: <UsersPage /> },
@@ -40,6 +48,7 @@ const router = createHashRouter([
             { path: 'components', element: <ComponentsPage /> },
         ],
     },
+    ...authRoutes,
 ]);
 
 const mojoDefaults = mojo.mojoQueryDefaults();

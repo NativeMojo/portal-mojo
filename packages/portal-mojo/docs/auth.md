@@ -51,7 +51,7 @@ to host; the UI should fall back to a dev affordance (`__mojo.login(...)`).
 
 ## Direct flows (for in-app auth pages)
 
-`login(username, password)` → `{kind: 'user', user}` or an MFA challenge;
+`login(username, password)` → `{kind: 'authenticated', user}` or an MFA challenge;
 magic-link (`sendMagicLink` → `loginWithMagicToken`), password reset (code
 and token variants), passkeys (`loginWithPasskey`; ceremony fully ported,
 mock validates shape only). All reject with the server's message on

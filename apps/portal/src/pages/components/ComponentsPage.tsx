@@ -33,6 +33,7 @@ import { DateRangeDemo } from './demos-daterange';
 import { DateTimePickerDemo } from './demos-datetimepicker';
 import { KitchenSinkDemo } from './demos-kitchen-sink';
 import { CollectionSelectDemo } from './demos-collection-select';
+import { PasswordDemo } from './demos-password';
 
 interface DemoSection {
     key: string;
@@ -85,6 +86,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'forms', title: 'SchemaForm', icon: 'bi-ui-checks',
                 blurb: 'The field-definition language: fields are data, inputs are controlled, selects can never show what state doesn\'t hold.',
                 render: () => <FormsDemo />,
+            },
+            {
+                key: 'password', title: 'Password tools', icon: 'bi-shield-lock',
+                blurb: 'checkPasswordStrength (web-mojo-exact scoring) + PasswordStrengthMeter + crypto generatePassword — the reset-form pieces.',
+                render: () => <PasswordDemo />,
             },
         ],
     },

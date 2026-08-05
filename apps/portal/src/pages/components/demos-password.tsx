@@ -8,12 +8,10 @@
 //     blurb: 'checkPasswordStrength (web-mojo-exact scoring) + PasswordStrengthMeter + crypto generatePassword — the reset-form pieces.',
 //     render: () => <PasswordDemo /> }
 import { useState } from 'react';
-import { toast } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui
 import {
-    checkPasswordStrength, generatePassword, PasswordStrengthMeter,
+    checkPasswordStrength, generatePassword, PasswordStrengthMeter, toast,
     type GeneratePasswordOptions,
-} from '../../../../../packages/portal-mojo/src/ui/password';
+} from 'portal-mojo/ui';
 
 const SAMPLES: { label: string; value: string }[] = [
     { label: 'common', value: '123456' },

@@ -24,6 +24,7 @@ export * from './MultiSelectDropdown';
 export * as dateFns from './date/fns';
 export * from './detail';
 export * from './modal';
+export * from './password';
 export * from './Popover';
 export * from './TagInput';
 export * from './toast';

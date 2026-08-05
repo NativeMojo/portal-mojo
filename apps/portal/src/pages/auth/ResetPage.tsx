@@ -21,9 +21,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPasswordWithCode, resetPasswordWithToken, usingMockTransport } from 'portal-mojo/client';
-import { toast } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui
-import { generatePassword, PasswordStrengthMeter } from '../../../../../packages/portal-mojo/src/ui/password';
+import { generatePassword, PasswordStrengthMeter, toast } from 'portal-mojo/ui';
 import { clearResetEmail, consumeReturnRoute, peekResetEmail } from './config';
 
 export function ResetPage() {

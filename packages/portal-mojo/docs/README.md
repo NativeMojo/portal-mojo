@@ -11,6 +11,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [defineModel.md](defineModel.md) | Model definitions + hooks, POST_SAVE_ACTIONS, `fetchOne`, cache keys |
 | [params.md](params.md) | `useTableParams` — the single source of truth for table state; persistence blob |
 | [auth.md](auth.md) | Login flows, token upkeep, hosted-auth (bouncer page) bridge, auth events |
+| [auth-pages.md](auth-pages.md) | The in-app auth pages: routes + guard, `VITE_MOJO_AUTH` switch, fresh-auth (440 step-up) modal, MFA panel, password tools |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
