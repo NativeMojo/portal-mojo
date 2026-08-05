@@ -18,6 +18,7 @@ import { GroupContext } from '../client/group-context';
 import type { PermSpec, ModelDef, SaveVars } from '../client/model';
 import type { Field } from '../client/types';
 import { SchemaSelect } from './FormFields';
+import { emptyFieldValue, resolveFieldRenderer } from './field-registry';
 import { toast } from './toast';
 import {
     useFormAutosave,
@@ -247,6 +248,31 @@ function FieldRow({ field, form }: { field: Field; form: FormAutosaveApi }) {
                 {footSlot}
             </div>
         );
+    }
+
+    // Non-builtin types resolve through the field-type registry (B4 #1278).
+    // Every registry control fires on COMMIT, so its one change gesture maps
+    // straight onto form.commit — same batch/indicator lifecycle as builtins.
+    // A <div>, not a <label>: these are composite widgets (triggers,
+    // popovers, chip lists) and label-click forwarding would fight them.
+    if (!['text', 'email', 'tel', 'select', 'textarea'].includes(field.type)) {
+        const Registered = resolveFieldRenderer(field.type);
+        if (Registered) {
+            return (
+                <div className={field.columns === 6 ? 'col-6' : 'col-12'}>
+                    <div className="field">
+                        {labelSlot}
+                        <Registered
+                            field={field}
+                            value={value ?? emptyFieldValue(field)}
+                            invalid={!!error}
+                            commit={(v) => form.commit(field.name, v)}
+                        />
+                        {footSlot}
+                    </div>
+                </div>
+            );
+        }
     }
 
     let control: ReactNode;

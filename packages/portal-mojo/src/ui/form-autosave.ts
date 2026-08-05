@@ -67,9 +67,12 @@ export function resolveShowWhen(show: ShowWhen | undefined, values: FieldValues)
     return show.negate ? !matches : matches;
 }
 
-/** Server raw → controlled input value (switch → loose-truthy boolean, null → ''). */
+/** Server raw → controlled input value (switch → loose-truthy boolean, null → '').
+ *  Arrays survive as string lists (B4 #1278: multiselect ids, daterange pairs) —
+ *  String() would flatten them to 'a,b' and lose comma-carrying items. */
 export function toDisplay(field: Field, raw: unknown): FieldValue {
     if (field.type === 'switch') return raw === true || raw === 1;
+    if (Array.isArray(raw)) return raw.map((x) => String(x));
     if (raw == null) return '';
     return String(raw);
 }

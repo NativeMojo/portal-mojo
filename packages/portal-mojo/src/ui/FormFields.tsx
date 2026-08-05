@@ -8,11 +8,21 @@ import { modal } from './modal';
 // carry form configs as data (defineModel forms); re-exported here so the
 // ui-side API is unchanged.
 import { resolveShowWhen } from './form-autosave';
-import type { Field, FormData } from '../client/types';
+import { emptyFieldValue, resolveFieldRenderer, warnUnknownFieldType } from './field-registry';
+import type { Field, FieldValue, FormData } from '../client/types';
 
 export type { Field, FormData } from '../client/types';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The types SchemaForm renders inline; everything else asks the field-type
+ *  registry (B4 #1278), and a miss falls back to text WITH one warn. */
+const BUILTIN_TYPES = new Set(['text', 'email', 'tel', 'select', 'switch', 'textarea']);
+
+/** '' / null / empty list all mean "missing" for required-checks. */
+function isEmptyValue(v: FieldValue | undefined): boolean {
+    return v == null || v === '' || (Array.isArray(v) && v.length === 0);
+}
 
 // One warn per (field, value) — a mismatch is a config bug, not a render event.
 const warnedSelectValues = new Set<string>();
@@ -35,7 +45,9 @@ export function SchemaSelect({ field, value, invalid, onChange }: {
     onChange: (v: string) => void;
 }) {
     const options = field.options ?? [];
-    const known = value === '' || options.some((o) => o.value === value);
+    // Option values may be numbers (FieldOption) — the controlled value is a
+    // string, so identity is compared normalized.
+    const known = value === '' || options.some((o) => String(o.value) === value);
     if (!known) {
         const key = `${field.name}:${value}`;
         if (!warnedSelectValues.has(key)) {
@@ -56,7 +68,7 @@ function validate(fields: Field[], data: FormData): Record<string, string> {
     const errors: Record<string, string> = {};
     for (const f of fields) {
         const v = data[f.name];
-        if (f.required && (v == null || v === '')) errors[f.name] = `${f.label} is required`;
+        if (f.required && isEmptyValue(v)) errors[f.name] = `${f.label} is required`;
         else if (f.type === 'email' && typeof v === 'string' && v && !EMAIL_RE.test(v)) errors[f.name] = 'Enter a valid email address';
     }
     return errors;
@@ -71,7 +83,9 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
 }) {
     const [data, setData] = useState<FormData>(() => {
         const d: FormData = {};
-        for (const f of fields) d[f.name] = initial[f.name] ?? (f.type === 'switch' ? false : '');
+        // emptyFieldValue keeps the builtin seeds byte-identical ('' / false)
+        // and gives registry types their own empties ([] lists, null pickers).
+        for (const f of fields) d[f.name] = initial[f.name] ?? emptyFieldValue(f);
         return d;
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -83,7 +97,7 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
     // showWhen behave exactly as before.
     const visibleFields = fields.filter((f) => resolveShowWhen(f.showWhen, data));
 
-    const set = (name: string, value: string | boolean) => {
+    const set = (name: string, value: FieldValue) => {
         const next = { ...data, [name]: value };
         setData(next);
         setErrors((e) => {
@@ -122,41 +136,63 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
         <form onSubmit={submit} noValidate>
             {formError && <div className="form-alert">{formError}</div>}
             <div className="form-grid">
-                {visibleFields.map((f) => (
-                    <div key={f.name} className={f.columns === 6 ? 'col-6' : 'col-12'}>
-                        {f.type === 'switch' ? (
-                            <label className="switch-row">
-                                <span className="field-label">{f.label}</span>
-                                <input
-                                    type="checkbox"
-                                    role="switch"
-                                    className="switch"
-                                    checked={data[f.name] === true}
-                                    onChange={(e) => set(f.name, e.target.checked)}
-                                />
-                            </label>
-                        ) : (
-                            <label className="field">
-                                <span className="field-label">{f.label}{f.required && <em> *</em>}</span>
-                                {f.type === 'select' ? (
-                                    <SchemaSelect field={f} value={String(data[f.name] ?? '')} invalid={!!errors[f.name]} onChange={(v) => set(f.name, v)} />
-                                ) : f.type === 'textarea' ? (
-                                    <textarea className="input" rows={3} placeholder={f.placeholder} value={String(data[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} />
-                                ) : (
+                {visibleFields.map((f) => {
+                    // Non-builtin types resolve through the field-type
+                    // registry (B4 #1278); a miss warns once + text-input
+                    // falls back below — never "render nothing".
+                    const Registered = BUILTIN_TYPES.has(f.type) ? null : resolveFieldRenderer(f.type);
+                    return (
+                        <div key={f.name} className={f.columns === 6 ? 'col-6' : 'col-12'}>
+                            {f.type === 'switch' ? (
+                                <label className="switch-row">
+                                    <span className="field-label">{f.label}</span>
                                     <input
-                                        className={`input${errors[f.name] ? ' input-invalid' : ''}`}
-                                        type={f.type}
-                                        placeholder={f.placeholder}
-                                        value={String(data[f.name] ?? '')}
-                                        onChange={(e) => set(f.name, e.target.value)}
+                                        type="checkbox"
+                                        role="switch"
+                                        className="switch"
+                                        checked={data[f.name] === true}
+                                        onChange={(e) => set(f.name, e.target.checked)}
                                     />
-                                )}
-                                {errors[f.name] && <span className="field-error">{errors[f.name]}</span>}
-                                {f.help && !errors[f.name] && <span className="field-help">{f.help}</span>}
-                            </label>
-                        )}
-                    </div>
-                ))}
+                                </label>
+                            ) : Registered ? (
+                                // A <div>, not a <label>: registry controls are
+                                // composite widgets (triggers, popovers, chip
+                                // lists) — label-click forwarding would fight
+                                // their own focus handling.
+                                <div className="field">
+                                    <span className="field-label">{f.label}{f.required && <em> *</em>}</span>
+                                    <Registered
+                                        field={f}
+                                        value={data[f.name] ?? emptyFieldValue(f)}
+                                        invalid={!!errors[f.name]}
+                                        commit={(v) => set(f.name, v)}
+                                    />
+                                    {errors[f.name] && <span className="field-error">{errors[f.name]}</span>}
+                                    {f.help && !errors[f.name] && <span className="field-help">{f.help}</span>}
+                                </div>
+                            ) : (
+                                <label className="field">
+                                    <span className="field-label">{f.label}{f.required && <em> *</em>}</span>
+                                    {f.type === 'select' ? (
+                                        <SchemaSelect field={f} value={String(data[f.name] ?? '')} invalid={!!errors[f.name]} onChange={(v) => set(f.name, v)} />
+                                    ) : f.type === 'textarea' ? (
+                                        <textarea className="input" rows={3} placeholder={f.placeholder} value={String(data[f.name] ?? '')} onChange={(e) => set(f.name, e.target.value)} />
+                                    ) : (
+                                        <input
+                                            className={`input${errors[f.name] ? ' input-invalid' : ''}`}
+                                            type={BUILTIN_TYPES.has(f.type) ? f.type : (warnUnknownFieldType('SchemaForm', f), 'text')}
+                                            placeholder={f.placeholder}
+                                            value={String(data[f.name] ?? '')}
+                                            onChange={(e) => set(f.name, e.target.value)}
+                                        />
+                                    )}
+                                    {errors[f.name] && <span className="field-error">{errors[f.name]}</span>}
+                                    {f.help && !errors[f.name] && <span className="field-help">{f.help}</span>}
+                                </label>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
             <div className="modal-actions">
                 {onCancel && <button type="button" className="btn" onClick={onCancel}>Cancel</button>}
