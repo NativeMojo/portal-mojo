@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { mojoGet, mojoList, mojoSave } from './client';
 import type { Params } from './types';
 
-export function useModelList<T>(endpoint: string, params: Params = {}) {
+export function useModelList<T>(endpoint: string, params: Params = {}, opts: { enabled?: boolean } = {}) {
     return useQuery({
         queryKey: [endpoint, params],
         queryFn: () => mojoList<T>(endpoint, params),
@@ -13,6 +13,9 @@ export function useModelList<T>(endpoint: string, params: Params = {}) {
         // page/sort changes (web-mojo needed careful fetch-event juggling for
         // this; here it's one option).
         placeholderData: keepPreviousData,
+        // Lets ModelTable hold the first request until persisted view state
+        // has been rehydrated into the URL (persistState).
+        enabled: opts.enabled !== false,
     });
 }
 

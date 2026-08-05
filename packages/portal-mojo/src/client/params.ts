@@ -42,12 +42,75 @@ export interface TableParamsApi extends TableParams {
     clearFilters(): void;
     setPage(page: number): void;
     setSize(size: number): void;
+    /**
+     * One-shot rehydrate from a persisted view blob. Precedence is URL >
+     * saved (a shared link always wins) — except `size`, a per-user viewing
+     * preference the URL merely echoes, where saved wins. `sort: ''` (sort
+     * deliberately off) is not persisted, so it can't be restored — the
+     * default reappears; documented trade for clean URLs.
+     */
+    applySaved(saved: { sort?: string; size?: number; search?: string; filters?: Record<string, string> }): void;
 }
 
 const RESERVED = new Set(['search', 'sort', 'page', 'size']);
 const RANGE_KEYS = new Set(['dr_field', 'dr_start', 'dr_end']);
 export const PAGE_SIZES = [5, 10, 25, 50, 100];
 const DEFAULT_SIZE = 10;
+
+// ── View persistence (WM-035 port) ────────────────────────────────────
+// One localStorage blob per table remembers how each user likes it — sort,
+// page size, search + filters (field__in / dr_* triples verbatim), hidden
+// columns. Versioned; anything unparseable or from another schema version is
+// discarded AND cleared. Storage access always degrades to a no-op (privacy
+// mode / SSR). Precedence on restore is URL > saved > defaults — except
+// `size`, a per-user viewing preference the URL merely echoes, where saved
+// wins (web-mojo's documented rule).
+
+export interface PersistedTableState {
+    v: 2;
+    sort?: string;
+    size?: number;
+    search?: string;
+    filters?: Record<string, string>;
+    hidden?: string[];
+}
+
+const PERSIST_PREFIX = 'mojo:tableview:';
+
+function persistStorage(): Storage | null {
+    try {
+        const ls = globalThis.localStorage;
+        if (ls && typeof ls.getItem === 'function') return ls;
+    } catch { /* access denied */ }
+    return null;
+}
+
+export function readTableState(key: string): PersistedTableState | null {
+    const store = persistStorage();
+    if (!store) return null;
+    let raw: string | null;
+    try { raw = store.getItem(PERSIST_PREFIX + key); } catch { return null; }
+    if (!raw) return null;
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw); } catch { clearTableState(key); return null; }
+    if (!parsed || typeof parsed !== 'object' || (parsed as PersistedTableState).v !== 2) {
+        clearTableState(key);
+        return null;
+    }
+    return parsed as PersistedTableState;
+}
+
+export function writeTableState(key: string, state: PersistedTableState): void {
+    const store = persistStorage();
+    if (!store) return;
+    try { store.setItem(PERSIST_PREFIX + key, JSON.stringify(state)); } catch { /* quota / denied */ }
+}
+
+export function clearTableState(key: string): void {
+    const store = persistStorage();
+    if (!store) return;
+    try { store.removeItem(PERSIST_PREFIX + key); } catch { /* denied */ }
+}
 
 export function useTableParams(defaults: Partial<TableParams> = {}): TableParamsApi {
     const [sp, setSp] = useSearchParams();
@@ -173,5 +236,17 @@ export function useTableParams(defaults: Partial<TableParams> = {}): TableParams
         clearFilters: () => write({ ...state, search: '', page: 1 }, {}),
         setPage: (page) => write({ ...state, page }, filters),
         setSize: (size) => write({ ...state, size, page: 1 }, filters),
+        applySaved: (saved) => {
+            const urlKeys = new Set(Array.from(sp.keys()));
+            const next = { ...state };
+            const nextFilters = { ...filters };
+            if (saved.sort !== undefined && saved.sort !== '' && !urlKeys.has('sort')) next.sort = saved.sort;
+            if (saved.search !== undefined && !urlKeys.has('search')) next.search = saved.search;
+            if (saved.size !== undefined && PAGE_SIZES.includes(saved.size)) next.size = saved.size;
+            for (const [key, value] of Object.entries(saved.filters ?? {})) {
+                if (!urlKeys.has(key)) nextFilters[key] = value;
+            }
+            write(next, nextFilters);
+        },
     };
 }

@@ -196,3 +196,46 @@ export async function mojoSave<T>(endpoint: string, id: number | string | null, 
 export async function mojoDelete(endpoint: string, id: number | string): Promise<void> {
     await unwrap(`${endpoint}/${id}`, { method: 'DELETE' });
 }
+
+/** Trigger a browser download of an in-memory file. */
+function saveBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Server-side export (mojo/models/rest.py on_rest_list_response): the list
+ * endpoint with `download_format=csv|json` + `filename` streams a file built
+ * from the model's graph fields under the CURRENT filters (paging params are
+ * stripped here — an export is the whole result set). Under the mock the
+ * same filter pipeline synthesizes the file content in-memory.
+ */
+export async function mojoDownload(endpoint: string, params: Params, format: 'csv' | 'json'): Promise<void> {
+    const cleaned: Params = { ...params };
+    delete cleaned.start;
+    delete cleaned.size;
+    const filename = `export-${endpoint.split('/').filter(Boolean).pop() ?? 'data'}.${format}`;
+    const withFormat: Params = { ...cleaned, download_format: format, filename };
+
+    if (authHooks) await authHooks.preRequest(endpoint);
+    const headers: Record<string, string> = { [DUID_HEADER]: getDuid() };
+    const bearer = authHooks?.authHeader();
+    if (bearer) headers['Authorization'] = bearer;
+
+    if (!API_BASE) {
+        const body = (await mockFetch(endpoint, { params: withFormat, headers })) as Envelope;
+        if (body.status === false) throw new MojoError(body.error ?? 'Export failed', body.error_code ?? 0);
+        const file = body.data as { filename: string; content: string; mime: string };
+        saveBlob(new Blob([file.content], { type: file.mime }), file.filename);
+        return;
+    }
+    const res = await fetch(`${API_BASE}${endpoint}${buildQuery(withFormat)}`, { headers });
+    if (!res.ok) throw new MojoError(`Export failed (HTTP ${res.status})`, res.status);
+    saveBlob(await res.blob(), filename);
+}

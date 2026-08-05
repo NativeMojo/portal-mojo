@@ -15,6 +15,7 @@ export * from './FormFields';
 export * from './DetailView';
 export * from './FilterBar';
 export * from './ModelTable';
+export * from './grouping';
 // Formatters keep their web-mojo pipe ergonomics via a namespace: fmt.date(…),
 // fmt.relative(…), fmt.initials(…), fmt.inferTone(…).
 export * as fmt from './format';

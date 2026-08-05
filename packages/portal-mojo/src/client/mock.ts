@@ -184,7 +184,9 @@ function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, 
 
 // dr_* is the daterange TRIPLE: dr_field names which column the range applies
 // to, dr_start/dr_end carry the bounds. One active daterange by construction.
-const RESERVED = new Set(['start', 'size', 'sort', 'search', 'graph', 'dr_field', 'dr_start', 'dr_end']);
+// download_format/filename are export controls (rest.py reserved_keys), not
+// field lookups.
+const RESERVED = new Set(['start', 'size', 'sort', 'search', 'graph', 'dr_field', 'dr_start', 'dr_end', 'download_format', 'filename']);
 
 /** The shared list pipeline: search → daterange triple → lookups → sort → page. */
 function listRows<T extends Record<string, unknown>>(
@@ -244,6 +246,29 @@ function listUsers(params: Params) {
         (u) => `${u.username} ${u.email} ${u.display_name} ${u.phone_number ?? ''}`,
     );
     return { ...result, data: (result.data as unknown as MockUser[]).map(serializeUser) };
+}
+
+/**
+ * `download_format=csv|json` on the list endpoint (mojo/models/rest.py
+ * on_rest_list_response): the WHOLE filtered set — same pipeline, no paging —
+ * as a file. The mock returns the file body in the envelope
+ * ({filename, content, mime}); the client turns it into a Blob download.
+ */
+function exportUsers(params: Params) {
+    const format = String(params.download_format);
+    const full = listUsers({ ...params, start: 0, size: db.users.length });
+    const rows = full.data as unknown as Record<string, unknown>[];
+    const filename = String(params.filename ?? `User.${format}`);
+    if (format === 'csv') {
+        const cols = rows.length > 0 ? Object.keys(rows[0]!) : [];
+        const cell = (v: unknown) => {
+            const s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const content = [cols.join(','), ...rows.map((r) => cols.map((c) => cell(r[c])).join(','))].join('\n');
+        return { status: true, data: { filename, content, mime: 'text/csv' } };
+    }
+    return { status: true, data: { filename, content: JSON.stringify(rows, null, 2), mime: 'application/json' } };
 }
 
 // ── POST_SAVE_ACTIONS (User) ──────────────────────────────────────────
@@ -662,6 +687,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: serializeUser(user) };
     }
     if (path === '/api/user') {
+        if (opts.params?.download_format) return exportUsers(opts.params);
         if (opts.method === 'POST' && opts.body) {
             const id = Math.max(...db.users.map((u) => u.id)) + 1;
             const email = String(opts.body.email ?? `user${id}@nativemojo.com`);

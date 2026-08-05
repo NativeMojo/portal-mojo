@@ -604,3 +604,95 @@ button { font: inherit; color: inherit; }
 .toast-error i { color: var(--bad); }
 .toast-info { border-left-color: var(--info); }
 .toast-info i { color: var(--info); }
+.toast-warning { border-left-color: var(--warn); }
+.toast-warning i { color: var(--warn); }
+
+/* ── ModelTable B2: selection / batch / chooser / expand / groups ── */
+.tbl-check {
+    appearance: none; width: 15px; height: 15px; margin: 0;
+    border: 1.5px solid var(--line-strong, var(--line)); border-radius: 4px;
+    background: var(--surface); cursor: pointer; vertical-align: middle;
+    display: inline-grid; place-content: center; flex: 0 0 auto;
+}
+.tbl-check:checked, .tbl-check:indeterminate { background: var(--accent); border-color: var(--accent); }
+.tbl-check:checked::before {
+    content: ''; width: 8px; height: 8px;
+    clip-path: polygon(13% 52%, 5% 65%, 40% 92%, 95% 20%, 82% 10%, 38% 70%);
+    background: #fff;
+}
+.tbl-check:indeterminate::before { content: ''; width: 8px; height: 2px; background: #fff; }
+.tbl-check:disabled { opacity: 0.5; cursor: default; }
+.col-select { width: 34px; }
+.col-expand { width: 34px; }
+.row-selected td { background: var(--accent-soft, var(--surface2)); }
+
+.batch-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin: 0 16px 10px; padding: 8px 12px;
+    background: var(--info-soft, var(--surface2));
+    border: 1px solid var(--line); border-radius: 10px;
+}
+.batch-count { font-size: 13px; color: var(--ink-strong); }
+.batch-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn-danger-ghost { color: var(--bad); }
+.btn-danger-ghost i { color: var(--bad); }
+
+.filter-menu-header {
+    padding: 6px 12px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--mute);
+}
+.chooser-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+    font-size: 13.5px; color: var(--ink); cursor: pointer; user-select: none;
+}
+.chooser-item:hover { background: var(--surface2); }
+.chooser-locked { cursor: default; opacity: 0.65; }
+.chooser-locked:hover { background: transparent; }
+.chooser-lock { margin-left: auto; color: var(--mute); font-size: 11px; }
+.chooser-persist {
+    display: flex; align-items: center; gap: 6px; padding: 6px 12px 4px;
+    font-size: 11.5px; color: var(--mute);
+}
+.chooser-persist i { color: var(--ok); }
+
+.expand-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; padding: 4px 0; background: none; border: 0;
+    color: var(--mute); cursor: pointer;
+}
+.expand-toggle:hover { color: var(--ink-strong); }
+.expand-toggle i { transition: transform 0.16s ease; font-size: 12.5px; }
+.row-expanded .expand-toggle { color: var(--accent); }
+.row-expanded .expand-toggle i { transform: rotate(90deg); }
+.detail-row > td { padding: 0 !important; background: var(--surface2); }
+.detail-panel {
+    margin: 8px 14px 12px 44px; padding: 12px 14px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent); border-radius: 8px;
+}
+
+.group-header-row th {
+    padding: 7px 16px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--mute); text-align: left;
+}
+/* The label pins inside the visible scroll viewport (tables are often wider
+   than the pane); alignment differences between styles ride on the span. */
+.group-header-label { position: sticky; left: 16px; display: inline-block; }
+.group-header--banner th, .group-header--band th { background: var(--surface2); }
+.group-header--mark th { color: var(--ink-strong); }
+.group-header--mark .group-header-label { padding-left: 12px; position: sticky; }
+.group-header--mark .group-header-label::before {
+    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 6px; height: 6px; background: var(--accent); border-radius: 1.5px;
+}
+.group-header--rule th { border-top: 1px solid var(--line); }
+
+.expand-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; font-size: 13px; }
+.expand-grid .eyebrow { margin-bottom: 4px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.auto-refresh-dot { display: inline-flex; align-items: center; color: var(--mute); font-size: 13px; }
+.auto-refresh-dot.is-refreshing i { animation: rot 0.6s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .auto-refresh-dot.is-refreshing i, .expand-toggle i { animation: none; transition: none; }
+}

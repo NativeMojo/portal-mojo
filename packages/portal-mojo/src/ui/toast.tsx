@@ -3,7 +3,7 @@
 // compact two-line card, bottom-right.
 import { useSyncExternalStore } from 'react';
 
-type Level = 'success' | 'error' | 'info';
+type Level = 'success' | 'error' | 'info' | 'warning';
 interface Toast { id: number; level: Level; message: string }
 
 let nextId = 1;
@@ -25,9 +25,16 @@ export const toast = {
     success: (m: string) => push('success', m),
     error: (m: string) => push('error', m),
     info: (m: string) => push('info', m),
+    /** Partial outcomes (batch "N succeeded, M failed"). */
+    warning: (m: string) => push('warning', m),
 };
 
-const ICONS: Record<Level, string> = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', info: 'bi-info-circle-fill' };
+const ICONS: Record<Level, string> = {
+    success: 'bi-check-circle-fill',
+    error: 'bi-x-circle-fill',
+    info: 'bi-info-circle-fill',
+    warning: 'bi-exclamation-triangle-fill',
+};
 
 export function ToastHost() {
     const items = useSyncExternalStore(
