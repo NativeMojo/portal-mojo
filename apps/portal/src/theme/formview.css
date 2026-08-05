@@ -38,6 +38,13 @@
 
 /* Switch rows keep the theme's switch-row layout; the status slot rides
    the label. The error line lands under the row. */
+/* The autosave switch row keeps the SETTINGS-LIST order (label left, control
+   right) because the label slot carries the saved/error indicator and a
+   column of these should scan down a common right edge. That order is only
+   legible while the pair stays visually bound — at col-12 on a wide dialog
+   the toggle ends up hundreds of px from its text. The cap is the rule:
+   label and switch are never further apart than a readable row. */
+.fv-switch-row { max-width: 460px; }
 .fv-switch-row .fv-label { flex: 1; margin-bottom: 0; }
 
 /* ── Permission tabset nav (one row of tabs over a form grid) ── */

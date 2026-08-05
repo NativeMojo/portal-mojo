@@ -594,11 +594,26 @@ button { font: inherit; color: inherit; }
 }
 .switch:checked { background: var(--accent); }
 .switch:checked::before { transform: translateX(15px); }
-/* Switch then label, sitting together (Bootstrap .form-switch order). The
-   old space-between pushed the two to opposite ends of a full-width form
-   row, so the control read as belonging to nothing. */
+/* TWO switch layouts, both standard — the context picks, and the ONE rule
+   that binds both is that the control never drifts far from its text:
+   · .switch-row (default, a form field among fields): control THEN label,
+     adjacent. Bootstrap's .form-check.form-switch order, which is what
+     web-mojo's FormBuilder emitted.
+   · .switch-setting (a settings LIST — a column of one-per-row toggles):
+     label left, control right, so the column scans down a common edge
+     (iOS/GitHub settings). Legible only while the row is BOUNDED, hence the
+     max-width + divider; unbounded space-between at full width is what put
+     a toggle 1000px from its label. .fv-switch-row is the autosave variant
+     of this and carries the same cap. */
 .switch-row { display: flex; align-items: center; gap: 9px; padding: 9px 0; cursor: pointer; }
 .switch-row .field-label { margin-bottom: 0; }
+.switch-setting {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    max-width: 460px; padding: 9px 0; cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+}
+.switch-setting:last-child { border-bottom: none; }
+.switch-setting .field-label { margin-bottom: 0; }
 .switch-inline { display: inline-flex; align-items: center; }
 
 /* ============================================================ Forms */

@@ -87,7 +87,9 @@ function FriendlyEditor({ form, onChange }: { form: RuleForm; onChange: (next: R
             <div className="ga-geo-flags">
                 <div className="field-label">Anonymized connections</div>
                 {ABUSE_FLAGS.map((f) => (
-                    <label key={f.key} className="switch-row">
+                    // A settings LIST (label + help per row, one toggle each):
+                    // label left, control right, bounded — see .switch-setting.
+                    <label key={f.key} className="switch-setting">
                         <span className="field-label">
                             Block {f.label.toLowerCase()}
                             <span className="field-help" style={{ display: 'block' }}>{f.help}</span>
