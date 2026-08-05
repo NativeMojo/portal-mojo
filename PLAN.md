@@ -30,6 +30,33 @@ in `apps/portal` before it counts as done. When pages stabilize they migrate INT
 the package (`portal-mojo/admin`) so deployed portals get admin updates via
 `npm update` — clone the shell, never the admin (see manifest §01).
 
+### Admin distribution: dual-mount (decided 2026-08-04)
+
+Admin ships as **self-registering section bundles** in `portal-mojo/admin`
+(each: pages + routes + sidebar contribution + `permissions` + capability key),
+mountable two ways from the same code:
+
+1. **Standalone admin portal** — `apps/portal` mounts ALL admin sections and
+   nothing else. Deployed as-is against any django-mojo instance, it IS the
+   dedicated back office (the `contrib.admin` equivalent) — for products whose
+   user-facing surface isn't a portal (consumer React/mobile apps), or where
+   admin belongs on a separate origin (IP-restricted host, separate cookie
+   surface). The capabilities endpoint makes one build fit every deployment.
+2. **Embedded admin** — a product's custom portal (its own app on portal-mojo)
+   imports the same sections and registers them under a "System" area gated by
+   `view_admin`, beside its product pages. **Default** for products that have a
+   portal anyway — one deployment, shared group context; the frontend mirror of
+   the one-CRUD-API/permissions-gate backend philosophy. (web-mojo's proven
+   model across all three existing portals.)
+
+Design constraints this puts on Chunk A (build them in from the start):
+- Admin section routes are **mount-point relative** (root in standalone,
+  `#/system/…` when embedded).
+- Sections **contribute** sidebar groups; they never own the sidebar. The A4
+  sidebar engine's registry serves global / group / `group.kind` menus AND
+  contributed admin sections through the same mechanism.
+- Section visibility = permissions (now) ∧ backend capabilities (later).
+
 ## Stack (decided, with reasons)
 
 | Choice | Why |
