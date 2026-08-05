@@ -8,22 +8,21 @@
 //   - Lists: {status, data: T[], count, size, start} → MojoList<T>.
 //   - Singles: {status, data: T} → T.
 //   - Paging: start/size. Sort: 'field' | '-field'. Filters: Django lookups.
+//   - Every request carries the X-Mojo-UID device header; when auth is
+//     initialized (initAuth), a pre-request gate + Authorization header are
+//     installed via installAuthHooks — the client core itself has zero auth
+//     knowledge (web-mojo's Rest-interceptor shape).
 //
 // With VITE_MOJO_API unset the transport is the in-memory mock; set it to a
 // django-mojo origin and the same code talks to the real backend.
 import { mockFetch } from './mock';
+import { MojoError } from './errors';
+import { DUID_HEADER, getDuid } from './duid';
 import type { MojoList, Params } from './types';
 
-const API_BASE: string = import.meta.env.VITE_MOJO_API ?? '';
+export { MojoError, AuthRequiredError } from './errors';
 
-export class MojoError extends Error {
-    status: number;
-    constructor(message: string, status = 0) {
-        super(message);
-        this.name = 'MojoError';
-        this.status = status;
-    }
-}
+const API_BASE: string = import.meta.env.VITE_MOJO_API ?? '';
 
 export function buildQuery(params: Params): string {
     const qs = new URLSearchParams();
@@ -35,35 +34,70 @@ export function buildQuery(params: Params): string {
     return s ? `?${s}` : '';
 }
 
-interface FetchOpts {
+export interface FetchOpts {
     params?: Params;
     method?: 'GET' | 'POST' | 'DELETE';
     body?: Record<string, unknown>;
 }
 
-interface Envelope {
+export interface Envelope {
     status: boolean;
     data?: unknown;
     error?: string;
+    error_code?: number;
     message?: string;
     count?: number;
     size?: number;
     start?: number;
 }
 
+/** Installed by auth (initAuth). The transport stays auth-agnostic. */
+export interface AuthHooks {
+    /** Pre-request gate; may throw AuthRequiredError → synthetic-401 reject, no fetch. */
+    preRequest(path: string): Promise<void>;
+    /** Authorization header value, or null when no session exists. */
+    authHeader(): string | null;
+}
+
+let authHooks: AuthHooks | null = null;
+
+export function installAuthHooks(hooks: AuthHooks | null): void {
+    authHooks = hooks;
+}
+
 async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
+    // Gate BEFORE headers are built: after a mid-gate token refresh the fresh
+    // Authorization value is picked up below by construction (web-mojo had to
+    // re-stamp a snapshotted header here).
+    if (authHooks) await authHooks.preRequest(path);
+
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        [DUID_HEADER]: getDuid(),
+    };
+    const bearer = authHooks?.authHeader();
+    if (bearer) headers['Authorization'] = bearer;
+
     if (!API_BASE) {
-        return (await mockFetch(path, opts)) as Envelope;
+        return (await mockFetch(path, { ...opts, headers })) as Envelope;
     }
     const res = await fetch(`${API_BASE}${path}${buildQuery(opts.params ?? {})}`, {
         method: opts.method ?? 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            // Real deployments add: Authorization: Bearer <token>, X-Mojo-UID
-        },
+        headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
-    if (!res.ok) throw new MojoError(`HTTP ${res.status}`, res.status);
+    if (!res.ok) {
+        // django-mojo sends its envelope on error responses too — surface the
+        // real message ("Invalid username or password"), not "HTTP 401".
+        let detail = `HTTP ${res.status}`;
+        try {
+            const body = (await res.json()) as Envelope;
+            detail = body.error ?? body.message ?? detail;
+        } catch {
+            // Non-JSON error body — keep the status text.
+        }
+        throw new MojoError(detail, res.status);
+    }
     return (await res.json()) as Envelope;
 }
 
@@ -71,9 +105,18 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
 async function unwrap(path: string, opts: FetchOpts): Promise<Envelope> {
     const body = await transport(path, opts);
     if (body.status === false) {
-        throw new MojoError(body.error ?? body.message ?? 'Request failed');
+        throw new MojoError(body.error ?? body.message ?? 'Request failed', body.error_code ?? 0);
     }
     return body;
+}
+
+/**
+ * Typed escape hatch over the unwrap boundary for protocol modules (auth) and
+ * one-off endpoints. Still the same single boundary — never parse envelopes
+ * anywhere else.
+ */
+export function mojoCall(path: string, opts: FetchOpts = {}): Promise<Envelope> {
+    return unwrap(path, opts);
 }
 
 export async function mojoList<T>(endpoint: string, params: Params = {}): Promise<MojoList<T>> {

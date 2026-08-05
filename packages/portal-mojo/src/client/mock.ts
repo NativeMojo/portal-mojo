@@ -3,6 +3,16 @@
 // with '-' prefix, search, and Django-style lookups (field, field__in,
 // field__icontains, field__gte) — so the client code below it is real, and
 // pointing at a live backend is only a VITE_MOJO_API env change.
+//
+// Auth (Chunk A1): password / magic / passkey / reset / refresh / exchange
+// endpoints mirroring django-mojo apps/account/rest/user.py + passkeys.py.
+//   · any seeded ACTIVE user logs in with their email + password "mojo"
+//   · tokens are real-SHAPED JWTs (decodable payload, exp/iat/uid) with a
+//     fake signature — expiry logic runs authentically client-side
+//   · flows that would send email return the minted token in a __mock_token
+//     field so they are drivable end-to-end in dev (a real server never does)
+// Data endpoints stay open (no auth required) until the portal grows login
+// pages (Chunk C3) — then they 401 without a bearer, like the real backend.
 import type { Params, User } from './types';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
@@ -201,11 +211,194 @@ function fetchMetrics(params: Params) {
     return { status: true, data: { labels, datasets, granularity, range } };
 }
 
+// ── Auth endpoints ────────────────────────────────────────────────────
+// django-mojo contract: login → {access_token, refresh_token, user} (or an
+// MFA challenge); refresh → token pair ONLY (no user; auth_time carried
+// forward); errors are {status:false, error, error_code} envelopes.
+
+const MOCK_PASSWORD = 'mojo';
+const ACCESS_TTL = 21600; // JWT_TOKEN_EXPIRY default (6h)
+const REFRESH_TTL = 604800; // JWT_REFRESH_TOKEN_EXPIRY default (7d)
+
+function b64url(s: string): string {
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/** Real-shaped JWT (decodable header.payload) with a fake signature. */
+function mintJwt(user: User, ttlSec: number, extra: Record<string, unknown> = {}): string {
+    const now = Math.floor(Date.now() / 1000);
+    const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+    const payload = b64url(JSON.stringify({
+        uid: user.id,
+        email: user.email,
+        name: user.display_name,
+        iat: now,
+        exp: now + ttlSec,
+        ...extra,
+    }));
+    return `${header}.${payload}.mock-signature`;
+}
+
+function decodeMockJwt(token: string): Record<string, unknown> | null {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    try {
+        let base64 = parts[1]!.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = 4 - (base64.length % 4);
+        if (pad !== 4) base64 += '='.repeat(pad);
+        return JSON.parse(atob(base64)) as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+}
+
+function findByEmail(email: unknown): User | undefined {
+    const needle = String(email ?? '').toLowerCase();
+    return db.users.find((u) => u.email.toLowerCase() === needle);
+}
+
+function invalidCreds() {
+    return { status: false, error: 'Invalid username or password', error_code: 401 };
+}
+
+/** {access_token, refresh_token} pair; auth_time carried forward on refresh. */
+function tokenPair(user: User, accessTtl = ACCESS_TTL, authTime?: number) {
+    const at = authTime ?? Math.floor(Date.now() / 1000);
+    return {
+        access_token: mintJwt(user, accessTtl, { auth_time: at }),
+        refresh_token: mintJwt(user, REFRESH_TTL, { auth_time: at, token_kind: 'refresh' }),
+    };
+}
+
+// Pending one-time credentials, keyed the way the server keys them.
+const pendingResetCodes = new Map<string, string>(); // email → 6-digit code
+
+function authFetch(path: string, body: Record<string, unknown>): unknown {
+    // Dev knob: __mock_access_ttl mints a short-lived access token so refresh
+    // paths are testable without waiting 6 hours. Mock-only; ignored by the
+    // real backend (unknown params are dropped server-side).
+    const accessTtl = typeof body.__mock_access_ttl === 'number' ? body.__mock_access_ttl : ACCESS_TTL;
+
+    switch (path) {
+        case '/api/login': {
+            const user = findByEmail(body.username);
+            if (!user || !user.is_active || body.password !== MOCK_PASSWORD) return invalidCreds();
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+        }
+        case '/api/token/refresh': {
+            const payload = decodeMockJwt(String(body.refresh_token ?? ''));
+            const user = payload && db.users.find((u) => u.id === Number(payload.uid));
+            const now = Math.floor(Date.now() / 1000);
+            if (!payload || !user || typeof payload.exp !== 'number' || now >= payload.exp) {
+                return { status: false, error: 'token is invalid or expired', error_code: 401 };
+            }
+            // A refresh is NOT a fresh authentication: auth_time carries forward.
+            const authTime = typeof payload.auth_time === 'number' ? payload.auth_time : undefined;
+            return { status: true, data: tokenPair(user, accessTtl, authTime) };
+        }
+        case '/api/auth/forgot': {
+            const user = findByEmail(body.email);
+            // Server-parity: no account-enumeration oracle — always succeeds.
+            if (user && body.method !== 'link') {
+                pendingResetCodes.set(user.email.toLowerCase(), '123456');
+                return { status: true, data: { sent: true, method: 'code' } };
+            }
+            return {
+                status: true,
+                data: { sent: true, method: body.method ?? 'code', ...(user ? { __mock_token: `pr:mock-${user.id}` } : {}) },
+            };
+        }
+        case '/api/auth/password/reset/code': {
+            const user = findByEmail(body.email);
+            const stored = user && pendingResetCodes.get(user.email.toLowerCase());
+            if (!user || !stored || stored !== String(body.code)) {
+                return { status: false, error: 'invalid or expired reset code', error_code: 401 };
+            }
+            pendingResetCodes.delete(user.email.toLowerCase());
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+        }
+        case '/api/auth/password/reset/token': {
+            const m = String(body.token ?? '').match(/^pr:mock-(\d+)$/);
+            const user = m && db.users.find((u) => u.id === Number(m[1]));
+            if (!user) return { status: false, error: 'invalid or expired reset token', error_code: 401 };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+        }
+        case '/api/auth/magic/send': {
+            const user = findByEmail(body.email);
+            return {
+                status: true,
+                data: { sent: true, ...(user ? { __mock_token: `ml:mock-${user.id}` } : {}) },
+            };
+        }
+        case '/api/auth/magic/login': {
+            const m = String(body.token ?? '').match(/^ml:mock-(\d+)$/);
+            const user = m && db.users.find((u) => u.id === Number(m[1]));
+            if (!user) return { status: false, error: 'invalid or expired magic link', error_code: 401 };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+        }
+        case '/api/auth/exchange': {
+            const m = String(body.code ?? '').match(/^mock-handoff-(\d+)$/);
+            const user = m && db.users.find((u) => u.id === Number(m[1]));
+            if (!user) return { status: false, error: 'invalid or expired auth code', error_code: 401 };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+        }
+        case '/api/auth/passkeys/login/begin': {
+            // Shape-level mock: a real assertion needs a registered credential
+            // + authenticator; the mock validates the ceremony's plumbing.
+            const user = body.username ? findByEmail(body.username) : undefined;
+            if (body.username && !user) return invalidCreds();
+            return {
+                status: true,
+                data: {
+                    challenge_id: `chal-${user?.id ?? 'any'}`,
+                    publicKey: {
+                        challenge: b64url('mock-webauthn-challenge'),
+                        rpId: 'localhost',
+                        timeout: 60000,
+                        userVerification: 'preferred',
+                        allowCredentials: user ? [{ type: 'public-key', id: b64url(`cred-${user.id}`) }] : [],
+                    },
+                },
+            };
+        }
+        case '/api/auth/passkeys/login/complete': {
+            const m = String(body.challenge_id ?? '').match(/^chal-(\d+|any)$/);
+            if (!m || !body.credential) return { status: false, error: 'invalid passkey assertion', error_code: 401 };
+            const user = m[1] === 'any' ? db.users[0]! : db.users.find((u) => u.id === Number(m[1]));
+            if (!user) return { status: false, error: 'invalid passkey assertion', error_code: 401 };
+            return { status: true, data: { ...tokenPair(user, accessTtl), user: { ...user } } };
+        }
+        default:
+            return { status: false, error: `No mock for ${path}`, error_code: 404 };
+    }
+}
+
+// Per-endpoint call counts — lets dev tooling assert single-flight behavior
+// (e.g. three concurrent refreshes must produce ONE '/api/token/refresh').
+const callCounts = new Map<string, number>();
+
+export function getMockCallCounts(): Record<string, number> {
+    return Object.fromEntries(callCounts);
+}
+
 const LATENCY_MS = 220;
 
+export interface MockFetchOpts {
+    params?: Params;
+    method?: string;
+    body?: Record<string, unknown>;
+    /** Forwarded by the transport; auth endpoints ignore it, data endpoints will enforce it come C3. */
+    headers?: Record<string, string>;
+}
+
 /** Mock transport. Same signature the real fetch path resolves through. */
-export async function mockFetch(path: string, opts: { params?: Params; method?: string; body?: Record<string, unknown> }): Promise<unknown> {
+export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
+    const key = `${opts.method ?? 'GET'} ${path}`;
+    callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     await new Promise((r) => setTimeout(r, LATENCY_MS));
+    if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
+        return authFetch(path, opts.body ?? {});
+    }
     if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
     const one = path.match(/^\/api\/account\/user\/(\d+)$/);
     if (one) {
