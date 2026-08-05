@@ -17,6 +17,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
 | [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
 | [idioms.md](idioms.md) | ArmedButton (two-step confirm), `undoToast` (grace-period undo), `progressToast` — the dangerous-action trio |
+| [loading.md](loading.md) | `Spinner`, `busy()`/`busyWhile()` blocking overlay, `ViewLoader`, `InlineLoader`, `Busy` — the anti-flash delay rule and skeleton-vs-loader guidance |
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |

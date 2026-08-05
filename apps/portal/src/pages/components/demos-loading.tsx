@@ -5,20 +5,11 @@
 //     blurb: 'Spinner atom, the blocking full-screen overlay (top layer, above modals), the view loader, inline loaders — all with the anti-flash delay that keeps fast work silent.',
 //     render: () => <LoadingDemo /> }
 import { useState } from 'react';
-import { Badge, modal, toast } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui — after `export * from './loading'` lands in
-// packages/portal-mojo/src/ui/index.ts, fold these into the import above.
 import {
-    Busy,
-    InlineLoader,
-    LoadingOverlay,
-    Spinner,
-    ViewLoader,
-    busy,
-    busyWhile,
-    useDelayedFlag,
-    LOADING_DELAY_MS,
-} from '../../../../../packages/portal-mojo/src/ui/loading';
+    Badge, modal, toast,
+    Busy, InlineLoader, LoadingOverlay, Spinner, ViewLoader,
+    busy, busyWhile, useDelayedFlag, LOADING_DELAY_MS,
+} from 'portal-mojo/ui';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
 

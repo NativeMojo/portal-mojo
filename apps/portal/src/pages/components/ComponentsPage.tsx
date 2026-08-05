@@ -37,6 +37,7 @@ import { KitchenSinkDemo } from './demos-kitchen-sink';
 import { CollectionSelectDemo } from './demos-collection-select';
 import { PasswordDemo } from './demos-password';
 import { IdiomsDemo } from './demos-idioms';
+import { LoadingDemo } from './demos-loading';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
@@ -185,6 +186,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'toasts', title: 'Toasts', icon: 'bi-chat-square-dots',
                 blurb: 'success / error / info / warning — the batch bar uses warning for partial results.',
                 render: () => <ToastsDemo />,
+            },
+            {
+                key: 'loading', title: 'Loaders', icon: 'bi-hourglass-split',
+                blurb: 'Spinner atom, the blocking full-screen overlay (top layer, above modals), the view loader, inline loaders — all with the anti-flash delay that keeps fast work silent.',
+                render: () => <LoadingDemo />,
             },
             {
                 key: 'idioms', title: 'UX idioms', icon: 'bi-hand-index-thumb',
