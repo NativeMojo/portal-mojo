@@ -24,6 +24,32 @@ export { MojoError, AuthRequiredError } from './errors';
 
 const API_BASE: string = import.meta.env.VITE_MOJO_API ?? '';
 
+/** True when the in-memory mock transport is active (VITE_MOJO_API unset). */
+export function usingMockTransport(): boolean {
+    return !API_BASE;
+}
+
+/**
+ * TanStack Query defaults tuned for the mojo protocol — spread these into the
+ * app's QueryClient:
+ *   · 4xx MojoErrors never retry (a 404/401/403 is deterministic — retrying
+ *     it only delays the error surfacing, e.g. the group-context fallback)
+ *   · networkMode 'always' under the mock (an in-memory backend can't be
+ *     offline; online-pausing would wedge failures forever), 'online' for
+ *     real backends.
+ */
+export function mojoQueryDefaults() {
+    return {
+        queries: {
+            networkMode: (usingMockTransport() ? 'always' : 'online') as 'always' | 'online',
+            retry: (failureCount: number, error: unknown): boolean => {
+                if (error instanceof MojoError && error.status >= 400 && error.status < 500) return false;
+                return failureCount < 1;
+            },
+        },
+    };
+}
+
 export function buildQuery(params: Params): string {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {

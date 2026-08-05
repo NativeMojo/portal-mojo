@@ -57,7 +57,56 @@ function buildUsers(): User[] {
     return users;
 }
 
-const db = { users: buildUsers() };
+// ── Groups ────────────────────────────────────────────────────────────
+// Deterministic hierarchy: orgs → teams (2–3 each) → two projects. Team
+// names repeat across orgs on purpose — the switcher's tree is what makes
+// them unambiguous.
+export interface MockGroup {
+    id: number;
+    name: string;
+    kind: string;
+    parent: { id: number; name: string; kind: string } | null;
+    created: string;
+    [field: string]: unknown;
+}
+
+const ORG_NAMES = ['Acme Corp', 'Globex', 'Initech', 'Umbrella Labs', 'Stark Industries', 'Wayne Enterprises'];
+const TEAM_NAMES = ['Engineering', 'Operations', 'Support'];
+
+function buildGroups(): MockGroup[] {
+    const now = Date.now();
+    const groups: MockGroup[] = [];
+    let id = 1;
+    const engineeringTeams: MockGroup[] = [];
+    ORG_NAMES.forEach((orgName, oi) => {
+        const org: MockGroup = {
+            id: id++, name: orgName, kind: 'org', parent: null,
+            created: new Date(now - (420 - oi * 40) * 864e5).toISOString(),
+        };
+        groups.push(org);
+        const teamCount = 2 + (oi % 2);
+        for (let t = 0; t < teamCount; t++) {
+            const team: MockGroup = {
+                id: id++, name: TEAM_NAMES[t]!, kind: 'team',
+                parent: { id: org.id, name: org.name, kind: 'org' },
+                created: new Date(now - (400 - oi * 40 - t * 5) * 864e5).toISOString(),
+            };
+            groups.push(team);
+            if (t === 0) engineeringTeams.push(team);
+        }
+    });
+    for (const [pi, name] of (['Project Apollo', 'Project Zephyr'] as const).entries()) {
+        const team = engineeringTeams[pi]!;
+        groups.push({
+            id: id++, name, kind: 'project',
+            parent: { id: team.id, name: team.name, kind: 'team' },
+            created: new Date(now - (120 - pi * 30) * 864e5).toISOString(),
+        });
+    }
+    return groups;
+}
+
+const db = { users: buildUsers(), groups: buildGroups() };
 
 function getField(row: Record<string, unknown>, field: string): unknown {
     return row[field];
@@ -90,18 +139,24 @@ function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, 
 // to, dr_start/dr_end carry the bounds. One active daterange by construction.
 const RESERVED = new Set(['start', 'size', 'sort', 'search', 'graph', 'dr_field', 'dr_start', 'dr_end']);
 
-function listUsers(params: Params) {
-    let rows = [...db.users];
+/** The shared list pipeline: search → daterange triple → lookups → sort → page. */
+function listRows<T extends Record<string, unknown>>(
+    all: T[],
+    params: Params,
+    searchText: (row: T) => string,
+    defaultSort = '-created',
+) {
+    let rows = [...all];
     const search = params.search ? String(params.search).toLowerCase() : '';
     if (search) {
-        rows = rows.filter((u) => u.display_name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
+        rows = rows.filter((row) => searchText(row).toLowerCase().includes(search));
     }
     const drField = params.dr_field ? String(params.dr_field) : '';
     if (drField) {
         const s = params.dr_start ? String(params.dr_start) : '';
         const e = params.dr_end ? String(params.dr_end) : '';
-        rows = rows.filter((u) => {
-            const raw = (u as unknown as Record<string, unknown>)[drField];
+        rows = rows.filter((row) => {
+            const raw = row[drField];
             if (raw == null) return false;
             const day = String(raw).slice(0, 10);
             if (s && day < s) return false;
@@ -111,14 +166,14 @@ function listUsers(params: Params) {
     }
     for (const [key, value] of Object.entries(params)) {
         if (RESERVED.has(key) || value == null || value === '') continue;
-        rows = applyLookup(rows as unknown as Record<string, unknown>[], key, String(value)) as unknown as User[];
+        rows = applyLookup(rows, key, String(value));
     }
-    const sort = String(params.sort ?? '-created');
+    const sort = String(params.sort ?? defaultSort);
     const desc = sort.startsWith('-');
     const field = desc ? sort.slice(1) : sort;
     rows.sort((a, b) => {
-        const av = getField(a as unknown as Record<string, unknown>, field);
-        const bv = getField(b as unknown as Record<string, unknown>, field);
+        const av = getField(a, field);
+        const bv = getField(b, field);
         const cmp = av == null ? -1 : bv == null ? 1 : String(av).localeCompare(String(bv), undefined, { numeric: true });
         return desc ? -cmp : cmp;
     });
@@ -131,6 +186,10 @@ function listUsers(params: Params) {
         size,
         data: size === 0 ? [] : rows.slice(start, start + size),
     };
+}
+
+function listUsers(params: Params) {
+    return listRows(db.users as unknown as Record<string, unknown>[], params, (u) => `${u.display_name} ${u.email}`);
 }
 
 // ── /api/metrics/fetch ────────────────────────────────────────────────
@@ -431,6 +490,46 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const user = userFromBearer(opts.headers);
         if (!user) return { status: false, error: 'permission denied', error_code: 401 };
         return { status: true, data: meDict(user) };
+    }
+    const memberMatch = path.match(/^\/api\/group\/(\d+)\/member$/);
+    if (memberMatch) {
+        // The signed-in user's membership in one group — the group-context
+        // permission source (@requires_auth on the real backend).
+        const user = userFromBearer(opts.headers);
+        if (!user) return { status: false, error: 'permission denied', error_code: 401 };
+        const groupId = Number(memberMatch[1]);
+        if (!db.groups.some((g) => g.id === groupId)) {
+            return { status: false, error: 'Group not found', error_code: 404 };
+        }
+        // Deterministic per (user, group) so group-context behavior is
+        // demoable: user 1 (Ian, plain role) is GROUP ADMIN of odd-id groups
+        // and a bare member of even ones — picking an odd group lights up
+        // member-admin-gated UI; staff manage their groups; admin-role users
+        // are group admins everywhere.
+        const permissions =
+            user.role === 'admin' ? { admin: 1 }
+            : user.role === 'staff' ? { manage_group: true, view_members: true }
+            : user.id === 1 && groupId % 2 === 1 ? { admin: true }
+            : {};
+        return {
+            status: true,
+            data: {
+                id: groupId * 1000 + user.id,
+                user_id: user.id,
+                group_id: groupId,
+                role: 'admin' in permissions ? 'admin' : 'member',
+                permissions,
+            },
+        };
+    }
+    const oneGroup = path.match(/^\/api\/group\/(\d+)$/);
+    if (oneGroup) {
+        const group = db.groups.find((g) => g.id === Number(oneGroup[1]));
+        if (!group) return { status: false, error: 'Group not found', error_code: 404 };
+        return { status: true, data: { ...group } };
+    }
+    if (path === '/api/group') {
+        return listRows(db.groups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
     }
     if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
     const one = path.match(/^\/api\/account\/user\/(\d+)$/);

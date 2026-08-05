@@ -16,9 +16,10 @@
 //   6. Otherwise the active-group member: direct grant, or the member
 //      `admin` wildcard (full access within the group — never sys.*).
 import { useQuery } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useContext, useSyncExternalStore } from 'react';
 import { mojoGet } from './client';
 import { getAuthSnapshot, subscribeAuth, type AuthSnapshot } from './auth';
+import { GroupContext } from './group-context';
 
 /** Server permission dicts use true AND 1 as granted (web-mojo checked `== true`). */
 export type PermissionsDict = Record<string, unknown>;
@@ -162,12 +163,14 @@ export interface CanResult {
 }
 
 /**
- * Permission check against the signed-in user. Resolves false while loading
- * or anonymous (fail-closed rendering). Member context joins in Chunk A3 via
- * the GroupProvider; until then checks are user-level.
+ * Permission check against the signed-in user PLUS the active-group member
+ * when a <GroupProvider> is mounted (member `admin` grants everything in the
+ * group; sys.* checks never consult it). Resolves false while loading or
+ * anonymous (fail-closed rendering).
  */
 export function useCan(permission: string | string[]): CanResult {
     const { data, isLoading } = useMe();
+    const groupCtx = useContext(GroupContext);
     const me = data ?? null;
-    return { can: hasPermission(me, permission), isLoading, me };
+    return { can: hasPermission(me, permission, groupCtx?.member ?? null), isLoading, me };
 }

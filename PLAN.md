@@ -4,10 +4,9 @@
 shipped with every django-mojo deployment. Succeeds `web-mojo`, which goes to
 maintenance mode and keeps serving its three existing portals untouched.
 
-**Status:** A0–A2 shipped 2026-08-04. A0: npm workspaces; `packages/portal-mojo`
-extracted with TS-source subpath exports (`/client`, `/ui`, `/charts`, `/admin`
-incl. the dual-mount `AdminSection` contract). A1: auth client. A2: Me +
-permissions (see rows). Next up: **A3**.
+**Status:** Chunk A COMPLETE except A4 — A0–A3 shipped 2026-08-04 (workspace
+extraction; auth client; Me + permissions; group context — see rows).
+Next up: **A4** (sidebar engine).
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
@@ -122,7 +121,7 @@ Port from source, not memory: each item lists its web-mojo source. Read it first
 | A0 ✓ | Extract `packages/portal-mojo` from `apps/portal/src/lib` + `components`; npm workspaces | — | Done 2026-08-04: TS-source subpath exports; mock ships with the client; `AdminSection` contract stub; Tailwind `@source` scan |
 | A1 ✓ | Auth client: password / magic / passkey flows, forgot/reset, single-flight refresh, DUID header, logout | `src/core/services/TokenManager.js` (629), `src/core/Rest.js:16-48,379-446`, `src/extensions/mojo-auth/mojo-auth.js:53-64` | Done 2026-08-04 (`client/auth.ts` + mock auth endpoints; endpoints verified against django-mojo `account/rest/user.py`). Synthetic-401 short-circuit + refresh-path recursion guard browser-verified (3 concurrent → 1 POST). Fixed vs web-mojo: cross-storage token shadowing; refresh promoting session→local. Passkeys: full ceremony ported, mock is shape-level — needs a real-authenticator pass when C3 login pages land. MFA completion + OAuth redirect flows deferred (C3). Logout is client-side only (no server endpoint exists). |
 | A2 ✓ | `Me` + permissions: `useMe()`, `can()`, `<Guarded>` | `src/core/models/User.js:13-61` (hasPermission: `admin` wildcard, `is_superuser` literal, `sys.*`, `CATEGORY_GRANULAR_MAP` rollup), `Member.js:15-28` | Done 2026-08-04: `client/me.ts` (`hasPermission`/`memberHasPermission` pure fns + `useMe`/`useAuthSnapshot`/`useCan`; `registerPermissionCategories` registry replaces web-mojo's mutate+rebuild) + `ui/Guarded.tsx` (fail-closed) + mock role→permissions `/api/user/me`. Semantics matrix browser-verified incl. loose `1` grants, one-way rollup, `sys.` pinning, member `admin` never granting sys.*. Shell demo: live TopNav identity chip; sidebar System section gated by `view_admin`. Member context joins via A3 GroupProvider. Client errs permissive; server authoritative. |
-| A3 | Group context: `GroupProvider`, active group storage + `?group=` param, searchable switcher, `requiresGroup` guard | `src/core/PortalApp.js:230-348`, `GroupSearchView.js` | Heavily group-driven is the product's spine |
+| A3 ✓ | Group context: `GroupProvider`, active group storage + `?group=` param, searchable switcher, `requiresGroup` guard | `src/core/PortalApp.js:230-348`, `GroupSearchView.js` | Done 2026-08-04: `client/group.tsx` (URL param beats stored id; param rides the REAL search string so it survives hash navigation; `active_group_id` key; member fetch per group; bad-group fallback chain WITH console.warn) + `ui/GroupSwitcher.tsx` (300ms server search, GroupSearchView tree port incl. embedded-parent rows + │├└ segments + kind chips) + `ui/RequiresGroup.tsx` (first consumer: C4 screens). `useCan` now folds in the active member (verified: member `admin` in odd mock groups lights the System section for a plain user; even groups don't). Also shipped `mojoQueryDefaults()` — 4xx MojoErrors never retry; `networkMode` 'always' under the mock ('online' real) — a paused-retry wedge found the hard way. Browser-verified both themes. |
 | A4 | Sidebar engine: menu registry keyed by context — global vs group vs `group.kind`; route auto-switch; active-state walk | `src/core/views/navigation/Sidebar.js` (registry + `autoSwitchToMenuForRoute` + `menuContainsRoute`) | Declarative menus-as-data |
 
 ### Chunk B — data + the crown jewels

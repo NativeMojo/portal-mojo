@@ -34,15 +34,21 @@ const router = createHashRouter([
     },
 ]);
 
+const mojoDefaults = mojo.mojoQueryDefaults();
 const queryClient = new QueryClient({
-    defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+    defaultOptions: { queries: { ...mojoDefaults.queries, staleTime: 30_000 } },
 });
+if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__qc = queryClient;
+}
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
             <ThemeProvider>
-                <RouterProvider router={router} />
+                <mojo.GroupProvider>
+                    <RouterProvider router={router} />
+                </mojo.GroupProvider>
             </ThemeProvider>
         </QueryClientProvider>
     </StrictMode>,

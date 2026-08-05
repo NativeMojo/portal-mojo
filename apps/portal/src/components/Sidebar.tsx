@@ -4,7 +4,8 @@
 // superuser pass implicitly) — the A4 sidebar engine turns this into a
 // registry keyed by context.
 import { NavLink } from 'react-router-dom';
-import { Guarded } from 'portal-mojo/ui';
+import { useAuthSnapshot } from 'portal-mojo/client';
+import { Guarded, GroupSwitcher } from 'portal-mojo/ui';
 
 interface Item { label: string; icon: string; to: string }
 
@@ -36,12 +37,14 @@ function NavItems({ items }: { items: Item[] }) {
 }
 
 export function Sidebar() {
+    const auth = useAuthSnapshot();
     return (
         <aside className="sidebar">
             <div className="side-brand">
                 <span className="brand-dot" />
                 <span className="brand-name">MOJO&nbsp;Portal</span>
             </div>
+            {auth.authenticated && <GroupSwitcher />}
             <nav className="side-nav">
                 <div className="side-label">Main</div>
                 <NavItems items={MAIN} />
