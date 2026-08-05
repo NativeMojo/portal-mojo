@@ -1,0 +1,139 @@
+/* ============================================================
+   DataView — the inferred record grid + the JSON block.
+
+   Ported from web-mojo src/core/views/data/DataView.js, whose
+   markup was Bootstrap utilities plus INLINE hex colors in the
+   JSON "highlighter" (#0969da / #0a3069 / #8250df / #656d76 /
+   #0550ae over bg-light) — light-theme-only by construction.
+   Everything below rides mojo tokens instead, so both
+   data-theme values read correctly:
+     .row.g-3 / .col-md-6        → CSS grid on --dataview-cols
+     .fw-semibold.text-muted
+       .small.text-uppercase     → the house .eyebrow treatment
+     .badge.bg-success/secondary → <Badge> (.chip in theme.css)
+     .border.rounded.p-3.bg-light→ --line / --surface2
+   Container queries (not media queries) do the reflow: a
+   DataView is routinely nested inside a modal or a detail rail,
+   where the viewport width says nothing useful.
+   ============================================================ */
+
+.dataview {
+    container-type: inline-size;
+    display: grid;
+    grid-template-columns: repeat(var(--dataview-cols, 2), minmax(0, 1fr));
+    gap: 2px 22px;
+}
+/* Source's `col-12` rule: JSON, arrays and nested grids always span. */
+.dataview-item-full { grid-column: 1 / -1; }
+@container (max-width: 560px) {
+    .dataview { grid-template-columns: 1fr; }
+}
+
+.dataview-item {
+    min-width: 0;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line-soft);
+}
+.dataview-label {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--mute);
+    margin-bottom: 3px;
+}
+.dataview-value {
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: var(--ink-strong);
+    min-width: 0;
+    word-break: break-word;
+}
+.dataview-value-empty { color: var(--mute); font-style: italic; }
+.dataview-empty { font-size: 13px; padding: 6px 0; }
+
+.dataview-link { color: var(--accent); text-decoration: none; }
+.dataview-link:hover { text-decoration: underline; }
+.dataview-link i { font-size: 10.5px; opacity: 0.75; }
+.dataview-mono {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: var(--surface2);
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: var(--ink);
+}
+
+/* Nested DataView: a tinted, bordered inset (source: .border.rounded.p-3
+   .bg-light). Its own container query means it reflows on ITS width, so a
+   nested grid inside a narrow column stacks while the outer one does not. */
+.dataview-nested {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface2);
+    padding: 4px 14px 6px;
+    margin-top: 2px;
+}
+.dataview-nested > .dataview > .dataview-item:last-child { border-bottom: none; }
+/* Two nestings deep the inset would stack tint on tint — flip back to the
+   base surface so the depth stays legible instead of turning into mud. */
+.dataview-nested .dataview-nested { background: var(--surface); }
+
+/* ============================================================ JsonBlock */
+.json-block {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface2);
+    overflow: hidden;
+    margin-top: 2px;
+}
+.json-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 5px 7px 5px 13px;
+}
+.json-block-caption {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--mute);
+    text-transform: uppercase;
+}
+.json-block-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.json-block-toggle { background: var(--surface); }
+.json-block-copied { color: var(--ok); }
+.json-block-preview {
+    border-top: 1px solid var(--line-soft);
+    padding: 8px 13px;
+    background: var(--surface);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--mute);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.json-block-body {
+    margin: 0;
+    padding: 11px 13px 13px;
+    border-top: 1px solid var(--line-soft);
+    background: var(--surface);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 25rem;
+    overflow: auto;
+}
+
+/* Token colors — the source's five inline hexes, re-expressed as tokens so
+   they hold in dark mode (where #0a3069 on #f8f9fa was invisible). */
+.json-tok-key { color: var(--accent); font-weight: 600; }
+.json-tok-string { color: var(--ok); }
+.json-tok-number { color: var(--info); }
+.json-tok-boolean { color: var(--warn); font-weight: 600; }
+.json-tok-null { color: var(--mute); font-style: italic; }
