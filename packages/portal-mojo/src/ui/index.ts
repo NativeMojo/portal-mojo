@@ -31,6 +31,8 @@ export * from './ui';
 export * from './FormFields';
 export * from './FormView';
 export * from './form-autosave';
+export * from './field-registry';
+export * from './field-wire';
 export * from './DetailView';
 export * from './FilterBar';
 export * from './ModelTable';

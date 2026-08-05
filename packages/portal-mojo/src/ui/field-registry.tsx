@@ -29,6 +29,7 @@ import { MultiSelectDropdown, type MultiSelectValue } from './MultiSelectDropdow
 import { TagInput } from './TagInput';
 import { DatePicker } from './date/DatePicker';
 import { DateRangePicker } from './date/DateRangePicker';
+import { DateTimePicker } from './date/DateTimePicker';
 import { TimePicker, type TimeValue } from './date/TimePicker';
 import { TimezoneSelect } from './date/TimezoneSelect';
 import {
@@ -346,61 +347,28 @@ registerFieldType('timezone', function TimezoneField({ field, value, disabled, c
     );
 });
 
-// datetimepicker — #1273 builds DateTimePicker IN PARALLEL; at this branch's
-// fork point packages/portal-mojo/src/ui/date/DateTimePicker.tsx does not
-// exist, so importing it would break the build. The alias is registered NOW
-// against an interim input that speaks the SAME state/wire contract
-// (epoch seconds ↔ 'YYYY-MM-DD HH:MM' local via field-wire), so schemas and
-// saves work today and only the control swaps at merge.
-//
-// MERGE-WIRE(#1273): when DateTimePicker.tsx lands, replace the renderer
-// body below with the real binding:
-//
-//   import { DateTimePicker } from './date/DateTimePicker';
-//   registerFieldType('datetimepicker', function DateTimeField({ field, value, invalid, disabled, commit }) {
-//       return (
-//           <DateTimePicker
-//               value={wireToField(field, value) as string | null}
-//               timeFormat={field.timeFormat}
-//               displayFormat={field.displayFormat}
-//               timezone={field.timezone}
-//               timezones={field.timezones}
-//               placeholder={field.placeholder}
-//               required={field.required}
-//               invalid={invalid}
-//               disabled={disabled || field.disabled}
-//               onChange={(e) => commit(fieldToWire(field, e.value))}
-//           />
-//       );
-//   });
-//   (adjust prop names to the shipped DateTimePickerProps; the value/commit
-//   pipeline through field-wire stays exactly as here.)
-registerFieldType('datetimepicker', function DateTimeSeamField({ field, value, invalid, disabled, commit }) {
-    const control = wireToField(field, value); // epoch|string → 'YYYY-MM-DD HH:MM' local
-    const committed = control == null ? '' : String(control);
-    const [draft, setDraft] = useState<string | null>(null);
-    const settle = () => {
-        if (draft == null) return;
-        const next = draft.trim();
-        setDraft(null);
-        if (next === committed) return;
-        commit(next === '' ? null : fieldToWire(field, next));
-    };
+// datetimepicker — the real #1273 DateTimePicker (seam activated at merge:
+// the control renders the picker; state stays in the wire shape via
+// field-wire on both edges, exactly as every date-ish renderer here).
+registerFieldType('datetimepicker', function DateTimeField({ field, value, invalid, disabled, commit }) {
     return (
-        <input
-            className={`input${invalid ? ' input-invalid' : ''}`}
-            type="text"
-            placeholder={field.placeholder ?? 'YYYY-MM-DD HH:MM'}
-            title="Interim input — DateTimePicker (#1273) replaces this at merge"
-            value={draft ?? committed}
+        <DateTimePicker
+            value={wireToField(field, value) as string | null}
+            timeFormat={field.timeFormat}
+            displayFormat={field.displayFormat}
+            timezone={field.timezones ?? field.timezone}
+            placeholder={field.placeholder}
+            required={field.required}
+            invalid={invalid}
             disabled={disabled || field.disabled}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={settle}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    settle();
-                }
+            onChange={(e) => {
+                if (e.value == null) return commit(null);
+                // This binding never sets outputFormat:'object', so e.value is a
+                // string; the object branch keeps the type honest regardless.
+                const s = typeof e.value === 'string'
+                    ? e.value
+                    : `${e.value.date} ${e.value.time}${e.value.timezone ? ` ${e.value.timezone}` : ''}`;
+                commit(fieldToWire(field, s));
             }}
         />
     );

@@ -17,10 +17,7 @@ import { useState } from 'react';
 import { FormView, SchemaForm, getPath } from 'portal-mojo/ui';
 import type { Field, FormData } from 'portal-mojo/ui';
 import type { FieldValue, User } from 'portal-mojo/client';
-// MERGE-WIRE: portal-mojo/ui — swap for the package export once the
-// orchestrator adds field-wire/field-registry to ui/index.ts.
-import { wireToField } from '../../../../../packages/portal-mojo/src/ui/field-wire';
-import { registeredFieldTypes } from '../../../../../packages/portal-mojo/src/ui/field-registry';
+import { wireToField, registeredFieldTypes } from 'portal-mojo/ui';
 import { GroupModel, UserModel } from '../../models';
 
 // ── The one schema — every registered type (all aliases), plus a builtin,

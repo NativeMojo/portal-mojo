@@ -29,6 +29,7 @@ import { TimezoneSelectDemo } from './demos-timezone-select';
 import { TimePickerDemo } from './demos-timepicker';
 import { DateRangeDemo } from './demos-daterange';
 import { DateTimePickerDemo } from './demos-datetimepicker';
+import { KitchenSinkDemo } from './demos-kitchen-sink';
 import { CollectionSelectDemo } from './demos-collection-select';
 
 interface DemoSection {
@@ -54,6 +55,11 @@ const SECTIONS: DemoSection[] = [
         key: 'search', title: 'Expanding search', icon: 'bi-search',
         blurb: 'maestro fsearch: icon at rest, input on focus, pinned while holding text, "/" to focus, 300ms debounce to the wire.',
         render: () => <SearchDemo />,
+    },
+    {
+        key: 'kitchen-sink', title: 'Kitchen sink form', icon: 'bi-grid-3x3-gap',
+        blurb: 'ONE schema rendering every registered field type through the registry — state vs wire shapes live, on both SchemaForm and FormView autosave.',
+        render: () => <KitchenSinkDemo />,
     },
     {
         key: 'autosave', title: 'FormView autosave', icon: 'bi-magic',
