@@ -30,6 +30,7 @@ import { mojoMetrics } from '../client/client';
 import type { ModelDef } from '../client/model';
 import type { Params } from '../client/types';
 import { CollectionSelect, type CollectionSelectValue } from '../ui/CollectionSelect';
+import { Popover } from '../ui/Popover';
 import { DateRangePicker } from '../ui/date/DateRangePicker';
 import { modal } from '../ui/modal';
 import { showSeriesData, showSeriesStats } from './chart-dialogs';
@@ -280,6 +281,10 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
 
     // ── Scope (the entity search) ─────────────────────────────────────
     const [pickedId, setPickedId] = useState<CollectionSelectValue>(null);
+    // Scope shows as a tiny label; the picker opens from the header button.
+    const [scopeLabel, setScopeLabel] = useState<string | null>(null);
+    const [scopeOpen, setScopeOpen] = useState(false);
+    const scopeBtnRef = useRef<HTMLButtonElement>(null);
     const [scopedAccount, setScopedAccount] = useState<string | null>(null);
     const effectiveAccount = scopedAccount ?? account;
 
@@ -449,6 +454,18 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
                             <i className={`bi bi-arrow-clockwise${query.isFetching ? ' spin' : ''}`} />
                         </button>
                     )}
+                    {search && (
+                        <button
+                            ref={scopeBtnRef}
+                            className={`btn-icon btn-icon-sm${scopeOpen ? ' is-on' : ''}`}
+                            title={scopeLabel ? `Scope: ${scopeLabel}` : 'Scope this metric'}
+                            aria-label="Scope this metric"
+                            aria-expanded={scopeOpen}
+                            onClick={() => setScopeOpen((o) => !o)}
+                        >
+                            <i className="bi bi-funnel" />
+                        </button>
+                    )}
                     {showSettings && (
                         <button className="btn-icon btn-icon-sm" title="Settings" aria-label="Settings" onClick={() => void openSettings()}>
                             <i className="bi bi-gear" />
@@ -461,35 +478,68 @@ export function MetricsMiniWidget<T extends { id: number | string } = { id: numb
                 <div className="mmw-id">
                     <div className="mmw-title">{title}</div>
                     {subtitleNode != null && <div className="mmw-subtitle">{subtitleNode}</div>}
-                    {showTrending && trendLabel != null && (
-                        <div className={`mmw-trend ${trendUp ? 'mmw-trend-up' : 'mmw-trend-down'}`}>
-                            <i className={`bi ${trendUp ? 'bi-arrow-up' : 'bi-arrow-down'}`} />
-                            {trendLabel}
-                        </div>
-                    )}
+                    <div className="mmw-meta">
+                        {showTrending && trendLabel != null && (
+                            <div className={`mmw-trend ${trendUp ? 'mmw-trend-up' : 'mmw-trend-down'}`}>
+                                <i className={`bi ${trendUp ? 'bi-arrow-up' : 'bi-arrow-down'}`} />
+                                {trendLabel}
+                            </div>
+                        )}
+                        {/* Scope reads as a tiny LABEL, not a form control — the
+                            picker lives behind the funnel button in the header.
+                            Global scope shows nothing: a chart with no chip is
+                            simply the whole account. */}
+                        {scopeLabel && (
+                            <button
+                                type="button"
+                                className="mmw-scope"
+                                title={`Scoped to ${scopeLabel} — click to clear`}
+                                onClick={() => { setPickedId(null); setScopeLabel(null); setScopedAccount(null); onScopeChange?.(null); }}
+                            >
+                                <i className="bi bi-funnel-fill" />
+                                {scopeLabel}
+                                <i className="bi bi-x mmw-scope-x" />
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {icon && <i className={`${icon} mmw-icon`} aria-hidden="true" />}
             </div>
 
+            {/* The picker is a POPOVER off the funnel button — a metrics card
+                is not a form, so it carries no resting form control. */}
             {search && (
-                <div className="mmw-search">
-                    <CollectionSelect<T>
-                        model={search.model}
-                        endpoint={search.endpoint}
-                        value={pickedId}
-                        labelField={search.labelField ?? 'name'}
-                        valueField={search.valueField ?? 'id'}
-                        placeholder={search.placeholder ?? 'All (global)'}
-                        defaultParams={search.defaultParams}
-                        requiresActiveGroup={search.requiresActiveGroup ?? false}
-                        onChange={(id, row) => {
-                            setPickedId(id);
-                            const nextAccount = id == null ? null : search.toAccount(id, row);
-                            setScopedAccount(nextAccount);
-                            onScopeChange?.(nextAccount, row);
-                        }}
-                    />
-                </div>
+                <Popover
+                    anchorRef={scopeBtnRef}
+                    open={scopeOpen}
+                    placement="bottom-end"
+                    onClose={() => setScopeOpen(false)}
+                    aria-label="Scope this metric"
+                >
+                    <div className="mmw-scope-pop">
+                        <CollectionSelect<T>
+                            model={search.model}
+                            endpoint={search.endpoint}
+                            value={pickedId}
+                            labelField={search.labelField ?? 'name'}
+                            valueField={search.valueField ?? 'id'}
+                            placeholder={search.placeholder ?? 'All (global)'}
+                            defaultParams={search.defaultParams}
+                            requiresActiveGroup={search.requiresActiveGroup ?? false}
+                            onChange={(id, row) => {
+                                setPickedId(id);
+                                const label = id == null
+                                    ? null
+                                    : String((row as Record<string, unknown> | null)?.[search.labelField ?? 'name'] ?? id);
+                                setScopeLabel(label);
+                                const nextAccount = id == null ? null : search.toAccount(id, row);
+                                setScopedAccount(nextAccount);
+                                onScopeChange?.(nextAccount, row);
+                                setScopeOpen(false);
+                            }}
+                        />
+                    </div>
+                </Popover>
             )}
 
             <div className="mmw-chart" style={{ minHeight: height }}>

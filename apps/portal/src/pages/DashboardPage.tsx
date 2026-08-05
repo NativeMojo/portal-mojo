@@ -60,6 +60,10 @@ export function DashboardPage() {
                     granularity="hours"
                     defaultRange="24h"
                     showTrending
+                    // Anchor the comparison off the IN-PROGRESS bucket and
+                    // compare 6 complete hours vs the 6 before (trendRange/2).
+                    trendOffset={1}
+                    trendRange={12}
                     subtitle={(ctx) => <><b>{ctx.total.toLocaleString()}</b> in 24h</>}
                     search={{
                         model: GroupModel,
@@ -76,6 +80,10 @@ export function DashboardPage() {
                     chartType="bar"
                     tone="bad"
                     showTrending
+                    // Anchor the comparison off the IN-PROGRESS bucket and
+                    // compare 6 complete hours vs the 6 before (trendRange/2).
+                    trendOffset={1}
+                    trendRange={12}
                     subtitle={(ctx) => <><b>{ctx.total.toLocaleString()}</b> in 24h · {ctx.nowLabel.toLowerCase()}: {ctx.nowValue.toLocaleString()}</>}
                 />
                 <div className="panel panel-pad">
