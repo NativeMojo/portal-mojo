@@ -8,6 +8,7 @@ import './theme.css';
 import './menus';
 import App from './App';
 import { authRoutes, RequireAuth, handleAuthTokenLanding } from './pages/auth/routes';
+import { adminRoutes } from './pages/admin-routes';
 
 // Wire the auth gate + Authorization/DUID headers into the client and start
 // session upkeep (single-flight refresh watcher) if a session exists.
@@ -46,6 +47,7 @@ const router = createHashRouter([
             { path: 'settings', element: <SettingsPage /> },
             { path: 'group', element: <GroupOverviewPage /> },
             { path: 'components', element: <ComponentsPage /> },
+            ...adminRoutes,
         ],
     },
     ...authRoutes,

@@ -34,6 +34,7 @@ import { DateTimePickerDemo } from './demos-datetimepicker';
 import { KitchenSinkDemo } from './demos-kitchen-sink';
 import { CollectionSelectDemo } from './demos-collection-select';
 import { PasswordDemo } from './demos-password';
+import { IdiomsDemo } from './demos-idioms';
 
 interface DemoSection {
     key: string;
@@ -181,6 +182,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'toasts', title: 'Toasts', icon: 'bi-chat-square-dots',
                 blurb: 'success / error / info / warning — the batch bar uses warning for partial results.',
                 render: () => <ToastsDemo />,
+            },
+            {
+                key: 'idioms', title: 'UX idioms', icon: 'bi-hand-index-thumb',
+                blurb: 'Armed two-step confirm for the irreversible; act-now + Undo for the reversible; a persistent progress card for the long-running.',
+                render: () => <IdiomsDemo />,
             },
         ],
     },

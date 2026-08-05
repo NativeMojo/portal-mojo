@@ -16,10 +16,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { mojoCall } from 'portal-mojo/client';
 import {
     Badge, fmt, formModal, modal, toast, ModelTable,
+    ArmedButton,
     type Column, type FilterDef,
 } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui — flip to the package import once index.ts exports ArmedButton
-import { ArmedButton } from '../../../../packages/portal-mojo/src/ui/armed-button';
 import { ApiKeyModel, type ApiKeyRow } from '../models';
 
 const nowSec = () => Math.floor(Date.now() / 1000);

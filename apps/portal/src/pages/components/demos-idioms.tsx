@@ -5,9 +5,7 @@
 //     blurb: 'Armed two-step confirm for the irreversible; act-now + Undo for the reversible; a persistent progress card for the long-running.',
 //     render: () => <IdiomsDemo /> }
 import { useRef, useState } from 'react';
-import { Badge, toast } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui — flip to the package import once index.ts exports ArmedButton
-import { ArmedButton } from '../../../../../packages/portal-mojo/src/ui/armed-button';
+import { ArmedButton, Badge, toast } from 'portal-mojo/ui';
 
 const INITIAL = ['portal_test', 'jane.cooper', 'devon.lane'];
 

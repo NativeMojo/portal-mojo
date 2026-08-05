@@ -22,10 +22,9 @@ import { mojoCall } from 'portal-mojo/client';
 import {
     Badge, DetailView, Eyebrow, FlatRow, FormView, MetricCard, SecurityItem, Timeline,
     fmt, formModal, modal, toast,
+    ArmedButton,
     type DetailMenuEntry, type Field, type TimelineItem, type Tone,
 } from 'portal-mojo/ui';
-// MERGE-WIRE: portal-mojo/ui — flip to the package import once index.ts exports ArmedButton
-import { ArmedButton } from '../../../../packages/portal-mojo/src/ui/armed-button';
 import { ApiKeyModel, LogModel, UserModel } from '../models';
 import type { User } from 'portal-mojo/client';
 
