@@ -3,6 +3,8 @@
 @import "./theme/popover.css";
 @import "./theme/taginput.css";
 @import "./theme/drawer.css";
+@import "./theme/combobox.css";
+@import "./theme/collection-multiselect.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";

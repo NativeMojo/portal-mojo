@@ -14,6 +14,9 @@ import { DisplayDemo, SearchDemo, SkeletonDemo, AccessDemo } from './demos-displ
 import { PopoverDemo } from './demos-popover';
 import { TagInputDemo } from './demos-taginput';
 import { DrawerDemo } from './demos-drawer';
+import { ComboBoxDemo } from './demos-combobox';
+import { FormatDemo } from './demos-format';
+import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
 
 interface DemoSection {
     key: string;
@@ -43,6 +46,16 @@ const SECTIONS: DemoSection[] = [
         key: 'forms', title: 'SchemaForm', icon: 'bi-ui-checks',
         blurb: 'The field-definition language: fields are data, inputs are controlled, selects can never show what state doesn\'t hold.',
         render: () => <FormsDemo />,
+    },
+    {
+        key: 'combobox', title: 'ComboBox', icon: 'bi-input-cursor-text',
+        blurb: 'The house autocomplete — descriptions + meta on options, match highlighting, allowCustom, full ARIA. Change fires on COMMIT, never per keystroke.',
+        render: () => <ComboBoxDemo />,
+    },
+    {
+        key: 'collection-multiselect', title: 'CollectionMultiSelect', icon: 'bi-list-check',
+        blurb: 'Server-backed multi-pick: live checkbox list, 400ms server search, SELECT/DESELECT counts, shift-click ranges, normalized ids.',
+        render: () => <CollectionMultiSelectDemo />,
     },
     {
         key: 'taginput', title: 'TagInput', icon: 'bi-tags',
@@ -78,6 +91,11 @@ const SECTIONS: DemoSection[] = [
         key: 'charts', title: 'Charts', icon: 'bi-graph-up',
         blurb: 'Dependency-free SVG: SeriesChart (line/bar/area, stacked, legend) + MetricsChart against /api/metrics/fetch.',
         render: () => <ChartsDemo />,
+    },
+    {
+        key: 'format', title: 'Formatters', icon: 'bi-braces',
+        blurb: 'The full fmt namespace — filesize, currency, phone, duration… every value a live call, edge cases included.',
+        render: () => <FormatDemo />,
     },
     {
         key: 'display', title: 'Badges & formatters', icon: 'bi-tags',

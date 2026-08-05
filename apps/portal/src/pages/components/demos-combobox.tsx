@@ -2,8 +2,7 @@
 // COMMIT pipeline: the value lines only ever change on selection, Enter on
 // custom text, or blur-settle — never per keystroke.
 import { useState } from 'react';
-// MERGE-WIRE: portal-mojo/ui
-import { ComboBox, type ComboOption, type ComboValue } from '../../../../../packages/portal-mojo/src/ui/ComboBox';
+import { ComboBox, type ComboOption, type ComboValue } from 'portal-mojo/ui';
 
 // The rule-builder shape ComboInput was written for: field pickers whose
 // options carry a description line and a meta payload (field type).

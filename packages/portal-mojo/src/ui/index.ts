@@ -8,6 +8,8 @@ export * from './GroupSwitcher';
 export * from './RequiresGroup';
 export * from './menu-registry';
 export * from './SidebarNav';
+export * from './CollectionMultiSelect';
+export * from './ComboBox';
 export * from './modal';
 export * from './Popover';
 export * from './TagInput';

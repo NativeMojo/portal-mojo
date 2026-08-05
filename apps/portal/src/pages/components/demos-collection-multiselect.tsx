@@ -9,8 +9,7 @@ import { useState } from 'react';
 import { type Group } from 'portal-mojo/client';
 import { Badge } from 'portal-mojo/ui';
 import { GroupModel } from '../../models';
-// MERGE-WIRE: portal-mojo/ui
-import { CollectionMultiSelect } from '../../../../../packages/portal-mojo/src/ui/CollectionMultiSelect';
+import { CollectionMultiSelect } from 'portal-mojo/ui';
 
 type GroupRow = Group & { id: number };
 

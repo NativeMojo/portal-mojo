@@ -70,8 +70,15 @@ Your worktree has no `node_modules`. First:
 ```bash
 git checkout -b port/<slug>
 ln -s /Users/ians/Projects/mojo/nativemojo/portal-mojo/node_modules node_modules
-ln -s /Users/ians/Projects/mojo/nativemojo/portal-mojo/apps/portal/node_modules apps/portal/node_modules
+mkdir -p apps/portal/node_modules
+ln -s ../../../packages/portal-mojo apps/portal/node_modules/portal-mojo
 ```
+
+The second symlink pair matters: without it, `portal-mojo/*` imports resolve
+to MAIN's package copy instead of your worktree's — app typechecks then
+false-fail on your new exports (or false-green on your edits). The local
+`apps/portal/node_modules/portal-mojo` link shadows the root resolution for
+that one specifier so the app sees YOUR package source.
 
 Before committing: `npm run typecheck` must be GREEN (package + app). Do not
 run dev servers or browsers — browser verification (both themes, clicked
