@@ -6,7 +6,6 @@
 //      to JSON below it
 //   4. a raw-JSON panel on its own: tokenized spans, copy (toast), collapse
 import { useState } from 'react';
-// MERGE-WIRE: portal-mojo/ui — DataView ships in the detail pack barrel.
 import { DataView, JsonBlock, inferFieldType, type DataViewField } from 'portal-mojo/ui';
 
 const NOW = Math.floor(Date.now() / 1000);

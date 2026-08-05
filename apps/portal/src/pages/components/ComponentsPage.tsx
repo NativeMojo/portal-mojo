@@ -9,7 +9,9 @@ import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { TableDemo, FiltersNote } from './demos-data';
 import { ChartsDemo } from './demos-charts';
-import { FormsDemo, ModalsDemo, ToastsDemo, DetailViewDemo } from './demos-feedback';
+import { FormsDemo, ModalsDemo, ToastsDemo } from './demos-feedback';
+import { DetailViewFullDemo } from './demos-detailview';
+import { DataViewDemo } from './demos-dataview';
 import { DisplayDemo, SearchDemo, SkeletonDemo, AccessDemo } from './demos-display';
 import { PopoverDemo } from './demos-popover';
 import { TagInputDemo } from './demos-taginput';
@@ -110,8 +112,13 @@ const SECTIONS: DemoSection[] = [
     },
     {
         key: 'detail', title: 'DetailView', icon: 'bi-person-badge',
-        blurb: 'The UserView house style: header chips + active switch over a section rail.',
-        render: () => <DetailViewDemo />,
+        blurb: 'The UserView house style, completed: gated sections (fail-closed), sticky self-heal, live badges, kebab context menu, keep-alive sections.',
+        render: () => <DetailViewFullDemo />,
+    },
+    {
+        key: 'dataview', title: 'DataView', icon: 'bi-card-list',
+        blurb: 'Point it at any record and get a detail grid: names + values pick the formatter, nested objects nest, raw JSON gets tokenized spans with copy + collapse.',
+        render: () => <DataViewDemo />,
     },
     {
         key: 'detail-primitives', title: 'Detail primitives', icon: 'bi-layout-text-window-reverse',

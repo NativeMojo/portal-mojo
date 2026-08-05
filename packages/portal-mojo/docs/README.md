@@ -23,6 +23,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [multiselect-dropdown.md](multiselect-dropdown.md) | Static checkbox dropdown — summarized trigger, Done footer, disabled options |
 | [collection-multiselect.md](collection-multiselect.md) | Server-backed checkbox panel — model binding, 400ms search, select/deselect-all, shift-click ranges |
 | [detail-primitives.md](detail-primitives.md) | StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — the detail-page pack |
+| [dataview.md](dataview.md) | Auto-inferring key/value grid + safe JSON viewer — schema or inference, nested records |
 | [markdown.md](markdown.md) | MarkdownView — server render via docit, allowlist sanitizer trust model, client fallback |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart`, the metrics wire shape |
 | [menus-and-access.md](menus-and-access.md) | Menu registry + SidebarNav; `useMe`/`useCan`/`Guarded`; group context |
