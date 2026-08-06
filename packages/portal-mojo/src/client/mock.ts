@@ -376,6 +376,87 @@ interface MockSetting {
     [field: string]: unknown;
 }
 
+interface MockTicketNote {
+    id: number;
+    parent: number;
+    created: number;
+    group: number | null;
+    user: number | null;
+    note: string | null;
+    media: null;
+    metadata: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockIncidentHistory {
+    id: number;
+    parent: number;
+    created: number;
+    group: number | null;
+    kind: string | null;
+    to: number | null;
+    user: number | null;
+    state: number;
+    priority: number;
+    note: string | null;
+    media: null;
+    metadata: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockBouncerDevice {
+    id: number;
+    muid: string;
+    duid: string;
+    msid: string;
+    fingerprint_id: string | null;
+    risk_tier: string;
+    event_count: number;
+    block_count: number;
+    last_seen_ip: string | null;
+    linked_muids: string[];
+    first_seen: number;
+    last_seen: number;
+    [field: string]: unknown;
+}
+
+interface MockBouncerSignal {
+    id: number;
+    device: number | null;
+    muid: string;
+    duid: string;
+    msid: string;
+    mtab: string;
+    session_id: string;
+    stage: string;
+    ip_address: string | null;
+    page_type: string;
+    raw_signals: Record<string, unknown>;
+    server_signals: Record<string, unknown>;
+    risk_score: number;
+    decision: string;
+    triggered_signals: string[];
+    geo_ip: Record<string, unknown> | null;
+    created: number;
+    [field: string]: unknown;
+}
+
+interface MockBotSignature {
+    id: number;
+    sig_type: string;
+    value: string;
+    source: string;
+    confidence: number;
+    hit_count: number;
+    block_count: number;
+    expires_at: number | null;
+    is_active: boolean;
+    notes: string;
+    created: number;
+    modified: number;
+    [field: string]: unknown;
+}
+
 function buildGroupApiKeys(): MockGroupApiKey[] {
     const now = Math.floor(Date.now() / 1000);
     return [
@@ -403,6 +484,51 @@ function buildSettings(): MockSetting[] {
         // PostgreSQL unique_together permits repeated NULL group values. Keep
         // that live quirk executable instead of enforcing a stricter mock.
         { id: 404, created: now - 5 * 86400, modified: now - 5 * 86400, key: 'SITE_NAME', value: 'NativeMojo fallback', is_secret: false, group: null, secretValue: null },
+    ];
+}
+
+function buildTicketNotes(): MockTicketNote[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 701, parent: 501, created: now - 900, group: 1, user: 1, note: 'Confirmed the webhook failures began after the receiver deploy.', media: null, metadata: {} },
+        { id: 700, parent: 501, created: now - 7200, group: 1, user: null, note: '[LLM Agent] Five consecutive 503 responses observed.', media: null, metadata: { origin: 'agent' } },
+        { id: 699, parent: 502, created: now - 86400, group: 2, user: 2, note: 'Customer supplied a fresh trace id.', media: null, metadata: {} },
+    ];
+}
+
+function buildIncidentHistory(): MockIncidentHistory[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 801, parent: 601, created: now - 600, group: 1, kind: 'note', to: null, user: 1, state: 2, priority: 7, note: 'Escalated after the fifth failed delivery.', media: null, metadata: {} },
+        { id: 800, parent: 601, created: now - 5400, group: 1, kind: 'state', to: null, user: 12, state: 1, priority: 5, note: 'Investigation opened.', media: null, metadata: { old_state: 0 } },
+        { id: 799, parent: 602, created: now - 2 * 86400, group: 2, kind: 'note', to: 2, user: null, state: 1, priority: 3, note: 'Automated monitor linked related events.', media: null, metadata: {} },
+    ];
+}
+
+function buildBouncerDevices(): MockBouncerDevice[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 901, muid: 'muid-human-001', duid: 'duid-browser-001', msid: 'msid-a1', fingerprint_id: 'fp-chrome-mac', risk_tier: 'low', event_count: 28, block_count: 0, last_seen_ip: '203.0.113.42', linked_muids: [], first_seen: now - 90 * 86400, last_seen: now - 300 },
+        { id: 902, muid: 'muid-monitor-002', duid: 'duid-browser-002', msid: 'msid-b2', fingerprint_id: 'fp-firefox-linux', risk_tier: 'medium', event_count: 113, block_count: 1, last_seen_ip: '198.51.100.77', linked_muids: ['muid-monitor-002b'], first_seen: now - 30 * 86400, last_seen: now - 1800 },
+        { id: 903, muid: 'muid-bot-003', duid: '', msid: 'msid-c3', fingerprint_id: 'fp-headless', risk_tier: 'blocked', event_count: 412, block_count: 18, last_seen_ip: '198.51.100.66', linked_muids: ['muid-bot-003b', 'muid-bot-003c'], first_seen: now - 14 * 86400, last_seen: now - 7200 },
+    ];
+}
+
+function buildBouncerSignals(): MockBouncerSignal[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 1003, device: 903, muid: 'muid-bot-003', duid: '', msid: 'msid-c3', mtab: 'tab-9', session_id: 'session-bot-9', stage: 'assess', ip_address: '198.51.100.66', page_type: 'login', raw_signals: { webdriver: true, languages: [], timing_ms: 12 }, server_signals: { user_agent: 'HeadlessChrome', header_order: 'automation' }, risk_score: 94, decision: 'block', triggered_signals: ['webdriver', 'headless', 'rapid_navigation'], geo_ip: { id: 3103, ip_address: '198.51.100.66', country_code: 'CN', region_code: 'CN-BJ', city: 'Beijing', is_vpn: true, is_proxy: true, is_datacenter: true }, created: now - 7200 },
+        { id: 1002, device: 902, muid: 'muid-monitor-002', duid: 'duid-browser-002', msid: 'msid-b2', mtab: 'tab-4', session_id: 'session-monitor-4', stage: 'submit', ip_address: '198.51.100.77', page_type: 'registration', raw_signals: { canvas: 'stable', focus_changes: 14 }, server_signals: { user_agent: 'Firefox/141' }, risk_score: 51, decision: 'monitor', triggered_signals: ['focus_churn'], geo_ip: { id: 3102, ip_address: '198.51.100.77', country_code: 'US', region_code: 'US-VA', city: 'Ashburn', is_vpn: false, is_proxy: false, is_datacenter: true }, created: now - 1800 },
+        { id: 1001, device: 901, muid: 'muid-human-001', duid: 'duid-browser-001', msid: 'msid-a1', mtab: 'tab-1', session_id: 'session-human-1', stage: 'assess', ip_address: '203.0.113.42', page_type: 'login', raw_signals: { webdriver: false, languages: ['en-US'], timing_ms: 1840 }, server_signals: { user_agent: 'Chrome/148' }, risk_score: 4, decision: 'allow', triggered_signals: [], geo_ip: { id: 3101, ip_address: '203.0.113.42', country_code: 'US', region_code: 'US-CA', city: 'San Diego', is_vpn: false, is_proxy: false, is_datacenter: false }, created: now - 300 },
+    ];
+}
+
+function buildBotSignatures(): MockBotSignature[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 1101, sig_type: 'fingerprint', value: 'fp-headless', source: 'auto', confidence: 96, hit_count: 412, block_count: 18, expires_at: now + 20 * 86400, is_active: true, notes: 'Learned from repeated high-confidence blocks.', created: now - 10 * 86400, modified: now - 7200 },
+        { id: 1102, sig_type: 'subnet_24', value: '198.51.100.0/24', source: 'manual', confidence: 85, hit_count: 39, block_count: 9, expires_at: null, is_active: true, notes: 'Operations-reviewed campaign subnet.', created: now - 40 * 86400, modified: now - 2 * 86400 },
+        { id: 1103, sig_type: 'user_agent', value: 'BadCrawler/1.0', source: 'auto', confidence: 72, hit_count: 17, block_count: 3, expires_at: now - 86400, is_active: false, notes: '', created: now - 60 * 86400, modified: now - 8 * 86400 },
     ];
 }
 
@@ -440,6 +566,69 @@ function serializeSetting(row: MockSetting): Record<string, unknown> {
         group: group ? groupBasic(group) : null,
         display_value: row.is_secret ? '******' : row.value,
     };
+}
+
+function serializeFeedUser(userId: number | null): Record<string, unknown> | null {
+    if (userId == null) return null;
+    const user = db.users.find((candidate) => candidate.id === userId);
+    return user ? userBasic(user) : null;
+}
+
+function serializeTicketNote(row: MockTicketNote): Record<string, unknown> {
+    return { ...row, user: serializeFeedUser(row.user), media: null };
+}
+
+function serializeIncidentHistory(row: MockIncidentHistory): Record<string, unknown> {
+    const stateLabels: Record<number, string> = { 0: 'New', 1: 'Open', 2: 'Escalated', 3: 'Resolved' };
+    const priorityLabels: Record<number, string> = { 0: 'None', 1: 'Low', 3: 'Normal', 5: 'High', 7: 'Critical' };
+    return {
+        ...row,
+        user: serializeFeedUser(row.user),
+        media: null,
+        state_display: stateLabels[row.state] ?? String(row.state),
+        priority_display: priorityLabels[row.priority] ?? String(row.priority),
+    };
+}
+
+function serializeBouncerDevice(row: MockBouncerDevice, graph: string): Record<string, unknown> {
+    if (graph === 'list') {
+        return { id: row.id, muid: row.muid, duid: row.duid, risk_tier: row.risk_tier, event_count: row.event_count, block_count: row.block_count, last_seen_ip: row.last_seen_ip, last_seen: row.last_seen };
+    }
+    return { ...row };
+}
+
+function serializeBouncerSignal(row: MockBouncerSignal, graph: string): Record<string, unknown> {
+    const device = row.device == null ? null : db.bouncerDevices.find((candidate) => candidate.id === row.device);
+    if (graph === 'list') {
+        return { id: row.id, muid: row.muid, msid: row.msid, stage: row.stage, ip_address: row.ip_address, page_type: row.page_type, risk_score: row.risk_score, decision: row.decision, created: row.created };
+    }
+    if (graph === 'detail') {
+        return {
+            id: row.id, muid: row.muid, duid: row.duid, msid: row.msid, mtab: row.mtab,
+            session_id: row.session_id, stage: row.stage, ip_address: row.ip_address,
+            page_type: row.page_type, risk_score: row.risk_score, decision: row.decision,
+            triggered_signals: row.triggered_signals, raw_signals: row.raw_signals,
+            server_signals: row.server_signals, created: row.created,
+            device: device ? serializeBouncerDevice(device, 'default') : null,
+            geo_ip: row.geo_ip,
+            // Deliberately no token_nonce. The backend cleanup is tracked
+            // separately; the portal mock never types, stores, or caches it.
+        };
+    }
+    return {
+        id: row.id, muid: row.muid, duid: row.duid, msid: row.msid, mtab: row.mtab,
+        stage: row.stage, ip_address: row.ip_address, page_type: row.page_type,
+        risk_score: row.risk_score, decision: row.decision,
+        triggered_signals: row.triggered_signals, created: row.created,
+        device: device ? serializeBouncerDevice(device, 'list') : null,
+    };
+}
+
+function serializeBotSignature(row: MockBotSignature, graph: string): Record<string, unknown> {
+    if (graph === 'list') {
+        return { id: row.id, sig_type: row.sig_type, value: row.value, source: row.source, confidence: row.confidence, hit_count: row.hit_count, is_active: row.is_active, expires_at: row.expires_at, modified: row.modified };
+    }
+    return { ...row };
 }
 
 // ── Logs ──────────────────────────────────────────────────────────────
@@ -809,6 +998,24 @@ function buildIncidentEvents(): MockIncidentEvent[] {
             title: 'Member invite retried', details: 'Invite resent after the original link expired',
             model_name: 'account.Group', model_id: 1, metadata: {}, group_id: 1,
         },
+        {
+            id: 8988, created: nowSec - 2 * 3600, level: 8, scope: 'global',
+            category: 'security:bouncer:block', source_ip: '198.51.100.66',
+            hostname: 'auth-1', uid: null, country_code: 'CN',
+            title: 'Bouncer blocked a high-risk login assessment',
+            details: 'muid=muid-bot-003 score=94 decision=block',
+            model_name: 'account.BouncerDevice', model_id: 903,
+            metadata: { muid: 'muid-bot-003', risk_score: 94, triggered_signals: ['webdriver', 'headless'] }, group_id: null,
+        },
+        {
+            id: 8987, created: nowSec - 1800, level: 5, scope: 'global',
+            category: 'security:bouncer:monitor', source_ip: '198.51.100.77',
+            hostname: 'auth-1', uid: null, country_code: 'US',
+            title: 'Bouncer monitoring a medium-risk registration',
+            details: 'muid=muid-monitor-002 score=51 decision=monitor',
+            model_name: 'account.BouncerDevice', model_id: 902,
+            metadata: { muid: 'muid-monitor-002', risk_score: 51 }, group_id: null,
+        },
     );
     return rows;
 }
@@ -1054,6 +1261,13 @@ const db = {
     ]),
     geoRules: { countries: { deny: ['CN'] } } as Record<string, unknown>,
     geoAllowlist: [{ cidr: '203.0.113.0/24', reason: 'Office egress', until: null }] as unknown[],
+    tickets: new Map<number, { group: number | null }>([[501, { group: 1 }], [502, { group: 2 }]]),
+    incidents: new Map<number, { group: number | null }>([[601, { group: 1 }], [602, { group: 2 }]]),
+    ticketNotes: buildTicketNotes(),
+    incidentHistory: buildIncidentHistory(),
+    bouncerDevices: buildBouncerDevices(),
+    bouncerSignals: buildBouncerSignals(),
+    botSignatures: buildBotSignatures(),
     // Per-user login throttle counters (auth/manage/throttle shape). u3 is
     // mid-lockout so the header badge + Clear Rate Limit are demoable.
     throttle: new Map<number, { count: number; limit: number; window: number; retry_after_seconds: number }>([
@@ -2323,6 +2537,153 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         }
         const data = [...db.metricPermissions.entries()].map(([id, row]) => ({ id, account: id, ...row }));
         return { status: true, data, size: 10, start: 0, count: data.length };
+    }
+    // ── Shared record feeds: newest 100, parent/group scoped, graph=default ──
+    const ticketNoteMatch = path.match(/^\/api\/ticket\/note(?:\/(\d+))?$/);
+    if (ticketNoteMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (ticketNoteMatch[1]) {
+            const row = db.ticketNotes.find((candidate) => candidate.id === Number(ticketNoteMatch[1]));
+            if (!row) return { status: false, error: 'TicketNote not found', error_code: 404 };
+            return { status: true, data: serializeTicketNote(row), graph: 'default' };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            const parentId = Number(opts.body.parent ?? 0);
+            const parent = db.tickets.get(parentId);
+            if (!parent) return { status: false, error: 'Ticket not found', error_code: 404 };
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockTicketNote = {
+                id: Math.max(0, ...db.ticketNotes.map((candidate) => candidate.id)) + 1,
+                parent: parentId, created: now, group: parent.group, user: caller.id,
+                note: opts.body.note == null ? null : String(opts.body.note), media: null,
+                metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
+            };
+            db.ticketNotes.unshift(row);
+            return { status: true, data: serializeTicketNote(row), graph: 'default' };
+        }
+        const requestedSize = Number(opts.params?.size ?? 100);
+        const params: Params = { ...(opts.params ?? {}), start: Number(opts.params?.start ?? 0), size: Math.min(100, Math.max(0, requestedSize)), sort: '-created', graph: 'default' };
+        const result = listRows(db.ticketNotes as unknown as Record<string, unknown>[], params, (row) => String(row.note ?? ''), '-created');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockTicketNote[]).map(serializeTicketNote) };
+    }
+    const incidentHistoryMatch = path.match(/^\/api\/incident(?:\/(\d+))?\/history(?:\/(\d+))?$/);
+    if (incidentHistoryMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const parentFromPath = incidentHistoryMatch[1] ? Number(incidentHistoryMatch[1]) : null;
+        const detailId = incidentHistoryMatch[2] ? Number(incidentHistoryMatch[2]) : null;
+        if (detailId != null) {
+            const row = db.incidentHistory.find((candidate) => candidate.id === detailId);
+            if (!row) return { status: false, error: 'IncidentHistory not found', error_code: 404 };
+            return { status: true, data: serializeIncidentHistory(row), graph: 'default' };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            const parentId = parentFromPath ?? Number(opts.body.parent ?? 0);
+            const parent = db.incidents.get(parentId);
+            if (!parent) return { status: false, error: 'Incident not found', error_code: 404 };
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockIncidentHistory = {
+                id: Math.max(0, ...db.incidentHistory.map((candidate) => candidate.id)) + 1,
+                parent: parentId, created: now, group: parent.group,
+                kind: opts.body.kind == null ? null : String(opts.body.kind),
+                to: opts.body.to == null ? null : Number(opts.body.to), user: caller.id,
+                state: Number(opts.body.state ?? 0), priority: Number(opts.body.priority ?? 0),
+                note: opts.body.note == null ? null : String(opts.body.note), media: null,
+                metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
+            };
+            db.incidentHistory.unshift(row);
+            return { status: true, data: serializeIncidentHistory(row), graph: 'default' };
+        }
+        const requestedSize = Number(opts.params?.size ?? 100);
+        const params: Params = { ...(opts.params ?? {}), ...(parentFromPath != null ? { parent: parentFromPath } : {}), start: Number(opts.params?.start ?? 0), size: Math.min(100, Math.max(0, requestedSize)), sort: '-created', graph: 'default' };
+        const result = listRows(db.incidentHistory as unknown as Record<string, unknown>[], params, (row) => String(row.note ?? ''), '-created');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockIncidentHistory[]).map(serializeIncidentHistory) };
+    }
+    // ── Bouncer operator data ─────────────────────────────────────────
+    const bouncerViewPerms = ['manage_users', 'view_security', 'manage_security', 'security', 'users'];
+    const bouncerSavePerms = ['manage_users', 'manage_security', 'security', 'users'];
+    const bouncerSignalMatch = path.match(/^\/api\/account\/bouncer\/signal(?:\/(\d+))?$/);
+    if (bouncerSignalMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, bouncerViewPerms)) return permissionDenied();
+        if (opts.method === 'POST' || opts.method === 'DELETE') return { status: false, error: 'BouncerSignal is read-only', error_code: 403 };
+        if (bouncerSignalMatch[1]) {
+            const row = db.bouncerSignals.find((candidate) => candidate.id === Number(bouncerSignalMatch[1]));
+            if (!row) return { status: false, error: 'BouncerSignal not found', error_code: 404 };
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: serializeBouncerSignal(row, graph), graph };
+        }
+        const graph = String(opts.params?.graph ?? 'list');
+        const result = listRows(db.bouncerSignals as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.muid} ${row.duid} ${row.ip_address ?? ''} ${row.decision}`, '-created');
+        return { ...result, graph: opts.params?.graph ? graph : 'list', data: (result.data as unknown as MockBouncerSignal[]).map((row) => serializeBouncerSignal(row, graph)) };
+    }
+    const bouncerDeviceMatch = path.match(/^\/api\/account\/bouncer\/device(?:\/(\d+))?$/);
+    if (bouncerDeviceMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, bouncerViewPerms)) return permissionDenied();
+        if (bouncerDeviceMatch[1]) {
+            const row = db.bouncerDevices.find((candidate) => candidate.id === Number(bouncerDeviceMatch[1]));
+            if (!row) return { status: false, error: 'BouncerDevice not found', error_code: 404 };
+            if (opts.method === 'DELETE') return { status: false, error: 'DELETE not allowed: BouncerDevice', error_code: 403 };
+            if (opts.method === 'POST' && opts.body) {
+                if (!hasGlobalPermission(caller, bouncerSavePerms)) return permissionDenied();
+                if ('risk_tier' in opts.body) row.risk_tier = String(opts.body.risk_tier);
+                if ('fingerprint_id' in opts.body) row.fingerprint_id = opts.body.fingerprint_id == null ? null : String(opts.body.fingerprint_id);
+                if (Array.isArray(opts.body.linked_muids)) row.linked_muids = opts.body.linked_muids.map(String);
+            }
+            return { status: true, data: serializeBouncerDevice(row, 'default'), graph: 'default' };
+        }
+        const graph = String(opts.params?.graph ?? 'list');
+        const result = listRows(db.bouncerDevices as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.muid} ${row.duid} ${row.fingerprint_id ?? ''} ${row.last_seen_ip ?? ''}`, '-last_seen');
+        return { ...result, graph: opts.params?.graph ? graph : 'list', data: (result.data as unknown as MockBouncerDevice[]).map((row) => serializeBouncerDevice(row, graph)) };
+    }
+    const signatureMatch = path.match(/^\/api\/account\/bouncer\/signature(?:\/(\d+))?$/);
+    if (signatureMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, bouncerViewPerms)) return permissionDenied();
+        if (signatureMatch[1]) {
+            const row = db.botSignatures.find((candidate) => candidate.id === Number(signatureMatch[1]));
+            if (!row) return { status: false, error: 'BotSignature not found', error_code: 404 };
+            if (opts.method === 'DELETE') {
+                if (!hasGlobalPermission(caller, bouncerSavePerms)) return permissionDenied();
+                db.botSignatures = db.botSignatures.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (opts.method === 'POST' && opts.body) {
+                if (!hasGlobalPermission(caller, bouncerSavePerms)) return permissionDenied();
+                const sigType = 'sig_type' in opts.body ? String(opts.body.sig_type) : row.sig_type;
+                const value = 'value' in opts.body ? String(opts.body.value) : row.value;
+                if (!['ip', 'subnet_24', 'subnet_16', 'user_agent', 'fingerprint', 'signal_set'].includes(sigType)) return { status: false, error: 'invalid sig_type', error_code: 400 };
+                if (db.botSignatures.some((candidate) => candidate.id !== row.id && candidate.sig_type === sigType && candidate.value === value)) return { status: false, error: 'Bot signature already exists', error_code: 400 };
+                row.sig_type = sigType; row.value = value;
+                if ('source' in opts.body) row.source = String(opts.body.source);
+                if ('confidence' in opts.body) row.confidence = Number(opts.body.confidence);
+                if ('expires_at' in opts.body) row.expires_at = opts.body.expires_at == null ? null : Number(opts.body.expires_at);
+                if ('is_active' in opts.body) row.is_active = Boolean(opts.body.is_active);
+                if ('notes' in opts.body) row.notes = String(opts.body.notes ?? '');
+                row.modified = Math.floor(Date.now() / 1000);
+            }
+            return { status: true, data: serializeBotSignature(row, 'default'), graph: 'default' };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            if (!hasGlobalPermission(caller, bouncerSavePerms)) return permissionDenied();
+            const sigType = String(opts.body.sig_type ?? '');
+            const value = String(opts.body.value ?? '');
+            if (!['ip', 'subnet_24', 'subnet_16', 'user_agent', 'fingerprint', 'signal_set'].includes(sigType)) return { status: false, error: 'invalid sig_type', error_code: 400 };
+            if (!value) return { status: false, error: 'value is required', error_code: 400 };
+            if (db.botSignatures.some((candidate) => candidate.sig_type === sigType && candidate.value === value)) return { status: false, error: 'Bot signature already exists', error_code: 400 };
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockBotSignature = { id: Math.max(0, ...db.botSignatures.map((candidate) => candidate.id)) + 1, sig_type: sigType, value, source: String(opts.body.source ?? 'manual'), confidence: Number(opts.body.confidence ?? 0), hit_count: 0, block_count: 0, expires_at: opts.body.expires_at == null ? null : Number(opts.body.expires_at), is_active: opts.body.is_active == null ? true : Boolean(opts.body.is_active), notes: String(opts.body.notes ?? ''), created: now, modified: now };
+            db.botSignatures.unshift(row);
+            return { status: true, data: serializeBotSignature(row, 'default'), graph: 'default' };
+        }
+        const graph = String(opts.params?.graph ?? 'list');
+        const result = listRows(db.botSignatures as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.sig_type} ${row.value} ${row.source}`, '-modified');
+        return { ...result, graph: opts.params?.graph ? graph : 'list', data: (result.data as unknown as MockBotSignature[]).map((row) => serializeBotSignature(row, graph)) };
     }
     // ── Browser devices — /api/user/device (account/models/device.py) ──
     if (path === '/api/user/device') {

@@ -89,6 +89,21 @@ management; `groups.manager@nativemojo.com` has global groups/users
 management. `/api/geo/check?__mock_country=CN` is the deterministic public
 deny case; the default US case allows.
 
+The record-feed mock follows the shared Django feed shape rather than a
+component-specific adapter. `/api/ticket/note` and
+`/api/incident[/<parent>]/history` return the newest 100 rows, support parent
+and group filtering, and explicitly use `graph=default`. Posts reject unknown
+parents, inherit the parent's group, stamp the authenticated user, embed that
+user in the response, and keep `media` null.
+
+Bouncer operator data is available to the stable global security identities:
+signals and devices provide seeded list/detail graphs, while bot signatures
+exercise create, update, uniqueness validation, and delete. The security
+viewer is read-only; the security manager can mutate supported resources.
+Signal detail deliberately omits `token_nonce`: it is neither needed by the
+admin portal nor safe to type, store, or cache as operator-facing data. Block
+and monitor decisions are also seeded into the incident-event feed.
+
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx
