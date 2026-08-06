@@ -120,6 +120,13 @@ The mock-only component showcase signs in as
 narrow `security.viewer`, `security.manager`, `groups.manager`, and Ian
 fixtures remain unchanged for permission-boundary verification.
 
+Communications mock parity includes `/api/aws/email/{domain,mailbox,sent,template,send}`
+and `/api/account/public_message`. Credential plaintext is reduced to masks
+and discarded, managed onboarding writes through the registered DNS adapter,
+audit persists domain status, send may return a 2xx `failed` row, and mailbox
+and domain deletes reproduce local audit cascades. Stable email/support
+operator identities are listed in [admin-messaging.md](admin-messaging.md).
+
 DNSMan's mock contract is central-state-backed and capability-first. Stable
 identities `dns.viewer@nativemojo.com`, `dns.manager@nativemojo.com`, the
 group-1-only member `dns.tenant@nativemojo.com`, and the house-only superuser

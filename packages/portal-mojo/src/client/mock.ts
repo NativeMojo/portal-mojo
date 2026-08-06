@@ -15,7 +15,7 @@
 // pages (Chunk C3) — then they 401 without a bearer, like the real backend.
 import { markdownToHtml } from './markdown-parse';
 import type { Params, User } from './types';
-import { registerDnsAdminIntegration } from '../admin/dns/dns-integration';
+import { getDnsAdminIntegration, registerDnsAdminIntegration } from '../admin/dns/dns-integration';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
 function mulberry32(seed: number) {
@@ -2423,7 +2423,26 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         // bucket operations retain their independent manage_aws gate.
         files: true,
         manage_aws: true,
+        comms: true,
+        view_support: true,
+        manage_support: true,
     };
+    const emailOperator = at(27);
+    emailOperator.is_active = true; emailOperator.is_superuser = false;
+    emailOperator.username = 'email.operator'; emailOperator.email = 'email.operator@nativemojo.com';
+    emailOperator.display_name = 'Email Operator'; emailOperator.permissions = { comms: true };
+    const supportViewer = at(28);
+    supportViewer.is_active = true; supportViewer.is_superuser = false;
+    supportViewer.username = 'support.viewer'; supportViewer.email = 'support.viewer@nativemojo.com';
+    supportViewer.display_name = 'Support Viewer'; supportViewer.permissions = { view_support: true };
+    const supportManager = at(29);
+    supportManager.is_active = true; supportManager.is_superuser = false;
+    supportManager.username = 'support.manager'; supportManager.email = 'support.manager@nativemojo.com';
+    supportManager.display_name = 'Support Manager'; supportManager.permissions = { view_support: true, manage_support: true };
+    const supportManageOnly = at(30);
+    supportManageOnly.is_active = true; supportManageOnly.is_superuser = false;
+    supportManageOnly.username = 'support.manage-only'; supportManageOnly.email = 'support.manage-only@nativemojo.com';
+    supportManageOnly.display_name = 'Support Manage Only'; supportManageOnly.permissions = { manage_support: true };
     const storageViewer = at(31);
     storageViewer.is_active = true;
     storageViewer.is_superuser = false;
@@ -3787,6 +3806,28 @@ interface MockStorageShare {
     user: number; group: number | null; file: number;
 }
 
+interface MockEmailDomain { id:number;created:number;modified:number;name:string;region:string;status:string;receiving_enabled:boolean;s3_inbound_bucket:string|null;s3_inbound_prefix:string;dns_mode:string;aws_key_masked:string|null;aws_secret_masked:string|null;sns_topic_bounce_arn:string|null;sns_topic_complaint_arn:string|null;sns_topic_delivery_arn:string|null;sns_topic_inbound_arn:string|null }
+interface MockEmailMailbox { id:number;created:number;modified:number;email:string;domain:number;allow_inbound:boolean;allow_outbound:boolean;async_handler:string|null;is_system_default:boolean;is_domain_default:boolean }
+interface MockSentMessage { id:number;created:number;modified:number;mailbox:number;to_addresses:string[];cc_addresses:string[];bcc_addresses:string[];subject:string;status:string;ses_message_id:string|null;status_reason:string|null;body_text:string|null;body_html:string|null }
+interface MockEmailTemplate { id:number;created:number;modified:number;name:string;subject_template:string;html_template:string|null;text_template:string|null }
+interface MockPublicMessage { id:number;created:number;modified:number;kind:string;status:string;name:string;email:string;subject:string;group:number|null;message:string;metadata:Record<string,unknown>;ip_address:string|null;user_agent:string|null }
+function buildMessaging(){const now=Math.floor(Date.now()/1000);return {
+    emailDomains:[
+        {id:7101,created:now-120*86400,modified:now-3600,name:'acme.example',region:'us-west-2',status:'verified',receiving_enabled:true,s3_inbound_bucket:'mojo-private-assets',s3_inbound_prefix:'inbound/',dns_mode:'route53',aws_key_masked:'****************9K2M',aws_secret_masked:'****************x7p',sns_topic_bounce_arn:'arn:aws:sns:us-west-2:123:bounce',sns_topic_complaint_arn:'arn:aws:sns:us-west-2:123:complaint',sns_topic_delivery_arn:'arn:aws:sns:us-west-2:123:delivery',sns_topic_inbound_arn:'arn:aws:sns:us-west-2:123:inbound'},
+        {id:7102,created:now-10*86400,modified:now-7200,name:'manual.example',region:'us-east-1',status:'pending',receiving_enabled:false,s3_inbound_bucket:null,s3_inbound_prefix:'',dns_mode:'manual',aws_key_masked:null,aws_secret_masked:null,sns_topic_bounce_arn:null,sns_topic_complaint_arn:null,sns_topic_delivery_arn:null,sns_topic_inbound_arn:null},
+    ] as MockEmailDomain[],
+    emailMailboxes:[
+        {id:7201,created:now-100*86400,modified:now-1800,email:'hello@acme.example',domain:7101,allow_inbound:true,allow_outbound:true,async_handler:null,is_system_default:true,is_domain_default:true},
+        {id:7202,created:now-50*86400,modified:now-7200,email:'support@acme.example',domain:7101,allow_inbound:true,allow_outbound:true,async_handler:'support.inbound',is_system_default:false,is_domain_default:false},
+    ] as MockEmailMailbox[],
+    sentMessages:[
+        {id:7301,created:now-1200,modified:now-900,mailbox:7201,to_addresses:['operator@example.test'],cc_addresses:[],bcc_addresses:['audit@example.test'],subject:'Welcome',status:'delivered',ses_message_id:'010201demo',status_reason:null,body_text:'Welcome to the demo.',body_html:'<p>Welcome <a href="https://network.invalid">outside</a></p>'},
+        {id:7302,created:now-600,modified:now-500,mailbox:7202,to_addresses:['fail@example.test'],cc_addresses:[],bcc_addresses:[],subject:'Failure fixture',status:'failed',ses_message_id:null,status_reason:'Provider rejected the recipient',body_text:'Delivery test',body_html:'<meta http-equiv="refresh" content="0;url=https://network.invalid"><img src="https://network.invalid/pixel">'},
+    ] as MockSentMessage[],
+    emailTemplates:[{id:7401,created:now-80*86400,modified:now-4000,name:'welcome',subject_template:'Welcome, {{ name }}',html_template:'<h1>Welcome</h1><a href="https://network.invalid">Continue</a>',text_template:'Welcome'}] as MockEmailTemplate[],
+    publicMessages:[{id:7501,created:now-300,modified:now-300,kind:'support',status:'open',name:'Ada Example',email:'ada@example.test',subject:'Cannot sign in',group:null,message:'My passkey is not being accepted.',metadata:{company:'Example Co',severity:'high',utm_source:'docs',private_payload:'withheld-canary'},ip_address:'203.0.113.42',user_agent:'DemoBrowser/1.0'},{id:7502,created:now-86400,modified:now-7200,kind:'contact_us',status:'closed',name:'Grace Example',email:'grace@example.test',subject:'Partnership',group:1,message:'Would like to talk.',metadata:{category:'sales'},ip_address:'198.51.100.9',user_agent:'DemoBrowser/2.0'}] as MockPublicMessage[],
+};}
+
 function buildStorageBuckets(): MockStorageBucket[] {
     const now = Math.floor(Date.now() / 1000);
     return [
@@ -3828,6 +3869,7 @@ function buildStorageRenditions(): MockStorageRendition[] {
     ];
 }
 
+const messagingSeed = buildMessaging();
 const db = {
     users,
     groups,
@@ -3892,6 +3934,11 @@ const db = {
     fileRenditions: buildStorageRenditions(),
     storageRenditionJobs: new Map<number, { roles: string[]; detailGets: number; finalStatus: 'completed' | 'failed' | 'expired' }>(),
     storageShares: [] as MockStorageShare[],
+    emailDomains: messagingSeed.emailDomains,
+    emailMailboxes: messagingSeed.emailMailboxes,
+    sentMessages: messagingSeed.sentMessages,
+    emailTemplates: messagingSeed.emailTemplates,
+    publicMessages: messagingSeed.publicMessages,
     // The scheduler lock, as `control/force-scheduler-lead` sees it: a Redis
     // string key whose VALUE is the holder. Deleting it is the whole control.
     jobsSchedulerLock: 'runner-mojo-web-01-engine' as string | null,
@@ -3902,10 +3949,15 @@ const db = {
     ]),
 };
 
+let messagingManagedFault=false;
 registerDnsAdminIntegration({
     applyManagedDnsRecords: (domainId, records) => {
         if (!db.dnsDomains.some((domain) => domain.id === domainId)) throw new Error('Domain not found');
-        db.dnsRecords.set(domainId, records.map((record) => ({ ...record, record_values: [...record.record_values] })));
+        if(messagingManagedFault){messagingManagedFault=false;throw new Error('Provider rejected DNS write: X-Amz-Security-Token: mock-raw-token');}
+        const existing=db.dnsRecords.get(domainId)??[];
+        const incoming=records.map(record=>({...record,record_values:[...record.record_values]}));
+        const owners=new Set(incoming.map(record=>`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`));
+        db.dnsRecords.set(domainId,[...existing.filter(record=>!owners.has(`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`)),...incoming]);
     },
 });
 
@@ -5168,6 +5220,9 @@ export function setMockDnsConfigMalformed(value: boolean): void {
 export function armMockDnsWriteFault(mode: 'reject' | 'ambiguous' | 'reconcile'): void {
     dnsWriteFault = mode;
 }
+
+/** Verifier-only managed SES/DNS provider failure after SES planning. */
+export function armMockMessagingManagedFailure():void{messagingManagedFault=true;}
 
 const LATENCY_MS = 220;
 
@@ -6745,6 +6800,63 @@ function jobsFetch(path: string, opts: MockFetchOpts): unknown {
 
 // ══ end jobs engine wire ═════════════════════════════════════════════
 
+const EMAIL_GRANTS=['manage_aws','comms'];
+const SUPPORT_VIEW_GRANTS=['view_support','security','support'];
+const SUPPORT_MANAGE_GRANTS=['manage_support','security','support'];
+function emailDomainWire(row:MockEmailDomain){return {...row};}
+function emailMailboxWire(row:MockEmailMailbox){const domain=db.emailDomains.find(v=>v.id===row.domain);return {...row,domain:domain?{id:domain.id,name:domain.name}:row.domain};}
+function sentWire(row:MockSentMessage,graph:string){const mailbox=db.emailMailboxes.find(v=>v.id===row.mailbox);const basic={id:row.id,created:row.created,mailbox:mailbox?{id:mailbox.id,email:mailbox.email,domain:mailbox.domain,allow_inbound:mailbox.allow_inbound,allow_outbound:mailbox.allow_outbound,is_system_default:mailbox.is_system_default,is_domain_default:mailbox.is_domain_default}:row.mailbox,ses_message_id:row.ses_message_id,subject:row.subject,to_addresses:[...row.to_addresses],status:row.status};return graph==='basic'?basic:{...basic,modified:row.modified,cc_addresses:[...row.cc_addresses],bcc_addresses:[...row.bcc_addresses],body_text:row.body_text,body_html:row.body_html,template_name:null,template_context:{secret_canary:'never projected'},status_reason:row.status_reason,metadata:{provider_payload:'never projected'}};}
+function templateWire(row:MockEmailTemplate,graph:string){const basic={id:row.id,created:row.created,modified:row.modified,name:row.name};return graph==='basic'?basic:{...basic,subject_template:row.subject_template,html_template:row.html_template,text_template:row.text_template,metadata:{unknown:'withheld'}};}
+function publicMessageWire(row:MockPublicMessage,graph:string){const group=row.group==null?null:(()=>{const g=db.groups.find(v=>v.id===row.group);return g?{id:g.id,name:g.name}:row.group;})();const list={id:row.id,created:row.created,modified:row.modified,kind:row.kind,status:row.status,name:row.name,email:row.email,subject:row.subject,group};return graph==='list'?list:{...list,message:row.message,metadata:{...row.metadata},ip_address:row.ip_address,user_agent:row.user_agent};}
+const MESSAGING_LIST_RESERVED=new Set(['start','size','search']);
+function messagingParams(params:Params,filters:readonly string[],sorts:readonly string[],graph:string,defaultSort:string,dateRange=false):Params{const out:Params={graph,start:params.start??0,size:params.size??25,sort:defaultSort};for(const key of MESSAGING_LIST_RESERVED)if(params[key]!=null&&params[key]!=='')out[key]=params[key];for(const key of filters)if(params[key]!=null&&params[key]!=='')out[key]=params[key];const requested=typeof params.sort==='string'?params.sort:'';if(sorts.includes(requested.replace(/^-/,'')))out.sort=requested;if(dateRange&&(params.dr_start||params.dr_end)){out.dr_field='created';if(params.dr_start)out.dr_start=params.dr_start;if(params.dr_end)out.dr_end=params.dr_end;}return out;}
+function messagingList(rows:Record<string,unknown>[],params:Params,search:(row:Record<string,unknown>)=>string,graph:string,serialize:(row:Record<string,unknown>,graph:string)=>Record<string,unknown>,defaultSort:string){const result=listRows(rows,params,search,defaultSort);return {...result,graph,data:(result.data as Record<string,unknown>[]).map(row=>serialize(row,graph))};}
+function mockEmailList(value:unknown):string[]{const values=Array.isArray(value)?value:[value];return values.flatMap(item=>item==null?[]:[String(item).trim()]).filter(Boolean);}
+function renderMockEmailTemplate(value:string|null,context:Record<string,unknown>):string|null{if(!value)return null;return value.replace(/{{\s*([a-zA-Z0-9_.]+)\s*}}/g,(_match,key:string)=>{let current:unknown=context;for(const part of key.split('.'))current=current&&typeof current==='object'?(current as Record<string,unknown>)[part]:undefined;return current==null?'':String(current);});}
+async function messagingFetch(path:string,opts:MockFetchOpts):Promise<unknown|undefined>{
+    if(!path.startsWith('/api/aws/email/')&&!path.startsWith('/api/account/public_message'))return undefined;
+    const method=(opts.method??'GET').toUpperCase();const caller=userFromBearer(opts.headers);if(!caller)return permissionDenied(401);
+    const actionMatch=path.match(/^\/api\/aws\/email\/domain\/(\d+)\/(onboard|audit|reconcile)$/);
+    if(actionMatch){
+        if(!hasGlobalPermission(caller,EMAIL_GRANTS))return permissionDenied();
+        if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};
+        const row=db.emailDomains.find(v=>v.id===Number(actionMatch[1]));if(!row)return {status:false,error:'Email domain not found',error_code:404};
+        const action=actionMatch[2];
+        if(action==='audit'){row.status=row.name.includes('manual')?'missing':'ready';row.modified=Math.floor(Date.now()/1000);return {status:true,data:{domain:row.name,region:row.region,status:row.status,audit_pass:row.status==='ready',checks:{ses_production_access:true,ses_verified:row.status==='ready',dkim_verified:row.status==='ready',notification_topics_ok:true,unknown_provider_check:'drop-me'},items:[{resource:'SES identity',status:row.status,desired:{secret:'drop'}},{resource:'DKIM',status:row.status}],recommendations:row.status==='ready'?[]:[{resource:'DNS verification',severity:'warning',action:'Publish the returned verification records.',explanation:'SES cannot verify the identity until DNS converges.'}],provider:{raw:'drop'}}};}
+        const records=[{type:'TXT',name:`_amazonses.${row.name}`,record_values:['mock-verification-token'],ttl:300},{type:'CNAME',name:`mock._domainkey.${row.name}`,record_values:['mock.dkim.amazonses.com'],ttl:300},{type:'MX',name:`mail.${row.name}`,record_values:['10 feedback-smtp.us-west-2.amazonses.com'],ttl:300}];
+        if(action==='onboard'){
+            const useDns=Boolean(opts.body?.use_dnsman);const region=String(opts.body?.region??row.region);const receiving=Boolean(opts.body?.receiving_enabled);const bucket=opts.body?.s3_inbound_bucket?String(opts.body.s3_inbound_bucket):null;const prefix=String(opts.body?.s3_inbound_prefix??'');let provider:string|undefined;let applied:unknown;
+            if(useDns){const integration=getDnsAdminIntegration();if(!integration?.resolveDomainByName||!integration.applyManagedDnsRecords)return {status:false,error:'Managed DNS integration is unavailable',error_code:409};const id=await integration.resolveDomainByName(row.name);if(id==null)return {status:false,error:'Managed DNS domain is unavailable',error_code:409};const dnsDomain=db.dnsDomains.find(domain=>domain.id===id);if(!dnsDomain||dnsDomain.status!=='active'||!['route53','godaddy'].includes(dnsDomain.provider))return {status:false,error:'Managed DNS domain is inactive or uses an unsupported provider',error_code:409};if(dnsDomain.provider==='godaddy'){const credential=db.dnsCredentials.find(item=>item.id===dnsDomain.credential);if(!credential?.is_active||!credential.verified)return {status:false,error:'Managed DNS credential is unavailable',error_code:409};}try{await integration.applyManagedDnsRecords(id,records);}catch(error){return {status:false,error:error instanceof Error?error.message:'Managed DNS provider failed',error_code:502};}provider=dnsDomain.provider;row.region=region;row.dns_mode=provider;row.modified=Math.floor(Date.now()/1000);applied={provider,applied:records.length,records};}else{row.region=region;row.receiving_enabled=receiving;row.s3_inbound_bucket=bucket;row.s3_inbound_prefix=prefix;row.dns_mode='manual';row.modified=Math.floor(Date.now()/1000);}
+            return {status:true,data:{domain:row.name,region:row.region,dns_records:records,dkim_tokens:['mock'],topic_arns:{bounce:'arn:aws:sns:mock:bounce'},receipt_rule:'mojo-inbound',rule_set:'mojo',notes:[useDns?'Managed DNS records applied.':'Publish every returned record.'],...(provider?{provider,applied}:{})}};
+        }
+        row.modified=Math.floor(Date.now()/1000);return {status:true,data:{domain:row.name,region:row.region,status:row.status,topic_arns:{bounce:'arn:aws:sns:mock:bounce'},receipt_rule:'mojo-inbound',rule_set:'mojo',notes:['SES/SNS resources reconciled. No DNS writes were made.']}};
+    }
+    const domainMatch=path.match(/^\/api\/aws\/email\/domain(?:\/(\d+))?$/);
+    if(domainMatch){
+        if(!hasGlobalPermission(caller,EMAIL_GRANTS))return permissionDenied();const id=domainMatch[1]?Number(domainMatch[1]):null;
+        if(id!=null){const row=db.emailDomains.find(v=>v.id===id);if(!row)return {status:false,error:'Email domain not found',error_code:404};if(method==='DELETE'){db.emailDomains=db.emailDomains.filter(v=>v.id!==id);const mailboxIds=new Set(db.emailMailboxes.filter(v=>v.domain===id).map(v=>v.id));db.emailMailboxes=db.emailMailboxes.filter(v=>v.domain!==id);db.sentMessages=db.sentMessages.filter(v=>!mailboxIds.has(v.mailbox));return {status:'deleted'};}if(method==='POST'){const body=opts.body??{};for(const key of ['region','status','receiving_enabled','s3_inbound_bucket','s3_inbound_prefix','dns_mode','sns_topic_bounce_arn','sns_topic_complaint_arn','sns_topic_delivery_arn','sns_topic_inbound_arn'] as const)if(key in body)(row as unknown as Record<string,unknown>)[key]=body[key];if(typeof body.aws_key==='string'&&body.aws_key)row.aws_key_masked=`****************${body.aws_key.slice(-4)}`;if(typeof body.aws_secret==='string'&&body.aws_secret)row.aws_secret_masked=`****************${body.aws_secret.slice(-4)}`;row.modified=Math.floor(Date.now()/1000);}return {status:true,data:emailDomainWire(row),graph:'default'};}
+        if(method==='POST'){const body=opts.body??{};if(!body.name)return {status:false,error:'name is required',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockEmailDomain={id:Math.max(0,...db.emailDomains.map(v=>v.id))+1,created:now,modified:now,name:String(body.name).toLowerCase().replace(/\.$/,''),region:String(body.region??'us-east-1'),status:'pending',receiving_enabled:Boolean(body.receiving_enabled),s3_inbound_bucket:body.s3_inbound_bucket?String(body.s3_inbound_bucket):null,s3_inbound_prefix:String(body.s3_inbound_prefix??''),dns_mode:String(body.dns_mode??'manual'),aws_key_masked:typeof body.aws_key==='string'&&body.aws_key?`****************${body.aws_key.slice(-4)}`:null,aws_secret_masked:typeof body.aws_secret==='string'&&body.aws_secret?`****************${body.aws_secret.slice(-4)}`:null,sns_topic_bounce_arn:null,sns_topic_complaint_arn:null,sns_topic_delivery_arn:null,sns_topic_inbound_arn:null};db.emailDomains.unshift(row);return {status:true,data:emailDomainWire(row),graph:'default'};}
+        if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['region','status','receiving_enabled','dns_mode'],['name','region','status','receiving_enabled','dns_mode','created','modified'],'default','name');return messagingList(db.emailDomains as unknown as Record<string,unknown>[],params,r=>`${r.name} ${r.region} ${r.status}`,'default',r=>emailDomainWire(r as unknown as MockEmailDomain),'name');
+    }
+    const mailboxMatch=path.match(/^\/api\/aws\/email\/mailbox(?:\/(\d+))?$/);
+    if(mailboxMatch){
+        if(!hasGlobalPermission(caller,EMAIL_GRANTS))return permissionDenied();const id=mailboxMatch[1]?Number(mailboxMatch[1]):null;
+        if(id!=null){const row=db.emailMailboxes.find(v=>v.id===id);if(!row)return {status:false,error:'Mailbox not found',error_code:404};if(method==='DELETE'){db.emailMailboxes=db.emailMailboxes.filter(v=>v.id!==id);db.sentMessages=db.sentMessages.filter(v=>v.mailbox!==id);return {status:'deleted'};}if(method==='POST'){const body=opts.body??{};if('email'in body)row.email=String(body.email);if('domain'in body)row.domain=Number(body.domain);if('allow_inbound'in body)row.allow_inbound=Boolean(body.allow_inbound);if('allow_outbound'in body)row.allow_outbound=Boolean(body.allow_outbound);if('async_handler'in body)row.async_handler=body.async_handler?String(body.async_handler):null;if('is_system_default'in body)row.is_system_default=Boolean(body.is_system_default);if('is_domain_default'in body)row.is_domain_default=Boolean(body.is_domain_default);row.modified=Math.floor(Date.now()/1000);if(row.is_system_default)for(const other of db.emailMailboxes)if(other.id!==id)other.is_system_default=false;if(row.is_domain_default)for(const other of db.emailMailboxes)if(other.id!==id&&other.domain===row.domain)other.is_domain_default=false;}return {status:true,data:emailMailboxWire(row),graph:'default'};}
+        if(method==='POST'){const body=opts.body??{};const now=Math.floor(Date.now()/1000);const row:MockEmailMailbox={id:Math.max(0,...db.emailMailboxes.map(v=>v.id))+1,created:now,modified:now,email:String(body.email??''),domain:Number(body.domain),allow_inbound:body.allow_inbound!==false,allow_outbound:body.allow_outbound!==false,async_handler:body.async_handler?String(body.async_handler):null,is_system_default:Boolean(body.is_system_default),is_domain_default:Boolean(body.is_domain_default)};if(row.is_system_default)for(const other of db.emailMailboxes)other.is_system_default=false;if(row.is_domain_default)for(const other of db.emailMailboxes)if(other.domain===row.domain)other.is_domain_default=false;db.emailMailboxes.push(row);return {status:true,data:emailMailboxWire(row),graph:'default'};}
+        if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['domain','allow_inbound','allow_outbound','is_system_default','is_domain_default'],['email','allow_inbound','allow_outbound','is_system_default','is_domain_default','created','modified'],'default','email');return messagingList(db.emailMailboxes as unknown as Record<string,unknown>[],params,r=>String(r.email),'default',r=>emailMailboxWire(r as unknown as MockEmailMailbox),'email');
+    }
+    if(path==='/api/aws/email/send'){
+        if(!hasGlobalPermission(caller,EMAIL_GRANTS))return permissionDenied();if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};const body=opts.body??{};const fromEmail=String(body.from_email??'').trim();const mailbox=db.emailMailboxes.find(v=>v.email.toLowerCase()===fromEmail.toLowerCase());if(!mailbox)return {status:false,error:'Mailbox not found',error_code:404};if(!mailbox.allow_outbound)return permissionDenied();const recipients=mockEmailList(body.to);if(!recipients.length)return {status:false,error:"At least one recipient in 'to' is required",error_code:400};const cc=mockEmailList(body.cc),bcc=mockEmailList(body.bcc);const templateName=String(body.template_name??'').trim();const context=body.template_context&&typeof body.template_context==='object'&&!Array.isArray(body.template_context)?body.template_context as Record<string,unknown>:{};let subject=String(body.subject??'').trim(),bodyText=body.body_text?String(body.body_text):null,bodyHtml=body.body_html?String(body.body_html):null;if(templateName){const domain=db.emailDomains.find(v=>v.id===mailbox.domain);const template=db.emailTemplates.find(v=>v.name===`${domain?.name}.${templateName}`)??db.emailTemplates.find(v=>v.name===templateName);if(!template)return {status:false,error:`EmailTemplate not found: ${templateName}`,error_code:400};subject=(renderMockEmailTemplate(template.subject_template,context)??'').trim();bodyText=renderMockEmailTemplate(template.text_template,context);bodyHtml=renderMockEmailTemplate(template.html_template,context);if(!subject&&!bodyText&&!bodyHtml)return {status:false,error:'Rendered template produced no subject/text/html',error_code:400};}const now=Math.floor(Date.now()/1000);const failed=recipients.some(v=>v.toLowerCase().includes('fail'));const row:MockSentMessage={id:Math.max(0,...db.sentMessages.map(v=>v.id))+1,created:now,modified:now,mailbox:mailbox.id,to_addresses:recipients,cc_addresses:cc,bcc_addresses:bcc,subject,status:failed?'failed':'sending',ses_message_id:failed?null:`mock-${now}`,status_reason:failed?'Provider rejected the recipient':null,body_text:bodyText,body_html:bodyHtml};db.sentMessages.unshift(row);return {status:true,data:sentWire(row,'default')};
+    }
+    const sentMatch=path.match(/^\/api\/aws\/email\/sent(?:\/(\d+))?$/);
+    if(sentMatch){if(!hasGlobalPermission(caller,EMAIL_GRANTS))return permissionDenied();if(method!=='GET')return {status:false,error:'Sent messages are immutable',error_code:405};if(sentMatch[1]){const row=db.sentMessages.find(v=>v.id===Number(sentMatch[1]));return row?{status:true,data:sentWire(row,'default'),graph:'default'}:{status:false,error:'Sent message not found',error_code:404};}const params=messagingParams(opts.params??{},['mailbox','status','status__in'],['created','status','subject','ses_message_id'],'basic','-created',true);return messagingList(db.sentMessages as unknown as Record<string,unknown>[],params,r=>`${r.subject} ${r.ses_message_id??''}`,'basic',r=>sentWire(r as unknown as MockSentMessage,'basic'),'-created');}
+    const templateMatch=path.match(/^\/api\/aws\/email\/template(?:\/(\d+))?$/);
+    if(templateMatch){if(!hasGlobalPermission(caller,EMAIL_GRANTS))return permissionDenied();const id=templateMatch[1]?Number(templateMatch[1]):null;if(id!=null){const row=db.emailTemplates.find(v=>v.id===id);if(!row)return {status:false,error:'Template not found',error_code:404};if(method==='DELETE'){db.emailTemplates=db.emailTemplates.filter(v=>v.id!==id);return {status:'deleted'};}if(method==='POST'){const body=opts.body??{};if('name'in body)row.name=String(body.name);if('subject_template'in body)row.subject_template=String(body.subject_template??'');if('html_template'in body)row.html_template=body.html_template?String(body.html_template):null;if('text_template'in body)row.text_template=body.text_template?String(body.text_template):null;row.modified=Math.floor(Date.now()/1000);}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};return {status:true,data:templateWire(row,'default'),graph:'default'};}if(method==='POST'){const now=Math.floor(Date.now()/1000);const body=opts.body??{};const row:MockEmailTemplate={id:Math.max(0,...db.emailTemplates.map(v=>v.id))+1,created:now,modified:now,name:String(body.name??''),subject_template:String(body.subject_template??''),html_template:body.html_template?String(body.html_template):null,text_template:body.text_template?String(body.text_template):null};db.emailTemplates.push(row);return {status:true,data:templateWire(row,'default'),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},[],['name','created','modified'],'basic','name',true);return messagingList(db.emailTemplates as unknown as Record<string,unknown>[],params,r=>String(r.name),'basic',r=>templateWire(r as unknown as MockEmailTemplate,'basic'),'name');}
+    const publicMatch=path.match(/^\/api\/account\/public_message(?:\/(\d+))?$/);
+    if(publicMatch){if(method==='DELETE'){if(!hasGlobalPermission(caller,['manage_support']))return permissionDenied();}else if(method==='POST'){if(!hasGlobalPermission(caller,SUPPORT_MANAGE_GRANTS))return permissionDenied();}else if(!hasGlobalPermission(caller,SUPPORT_VIEW_GRANTS))return permissionDenied();const id=publicMatch[1]?Number(publicMatch[1]):null;if(id!=null){const row=db.publicMessages.find(v=>v.id===id);if(!row)return {status:false,error:'Public message not found',error_code:404};if(method==='DELETE'){db.publicMessages=db.publicMessages.filter(v=>v.id!==id);return {status:'deleted'};}if(method==='POST'){if(opts.body?.status==='open'||opts.body?.status==='closed')row.status=opts.body.status;row.modified=Math.floor(Date.now()/1000);}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};return {status:true,data:publicMessageWire(row,'default'),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['kind','kind__in','status','status__in'],['created','modified','kind','status','name','email','subject'],'list','-created',true);return messagingList(db.publicMessages as unknown as Record<string,unknown>[],params,r=>`${r.name} ${r.email} ${r.subject} ${r.message}`,'list',r=>publicMessageWire(r as unknown as MockPublicMessage,'list'),'-created');}
+    return undefined;
+}
+
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
     const method = (opts.method ?? 'GET').toUpperCase();
@@ -6765,6 +6877,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         armedReauth = null;
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
+    const messagingResult = await messagingFetch(path, opts);
+    if (messagingResult !== undefined) return messagingResult;
     const storageResult = storageFetch(path, opts);
     if (storageResult !== undefined) return storageResult;
     if (path === '/api/auth/generate_api_key') {
