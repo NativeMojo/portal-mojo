@@ -44,6 +44,7 @@ import { AdminCredentialsDemo } from './demos-admin-credentials';
 import { AdminMonitoringDemo } from './demos-admin-monitoring';
 import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
+import { AdminDevicesDemo } from './demos-admin-devices';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminMembersDemo } from './demos-admin-members';
@@ -332,6 +333,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-bouncer', title: 'Bouncer', icon: 'bi-shield-check',
                 blurb: 'Risk decisions, device investigation, and supported bot-signature administration without caching token nonces.',
                 render: () => <AdminBouncerDemo />,
+            },
+            {
+                key: 'admin-devices', title: 'Devices, logins & GeoIP', icon: 'bi-laptop',
+                blurb: 'Fleet-wide device triage, the login-location world map with country drill-down, and the GeoIP dossier with expiry-aware enforcement and a never-cached raw provider record.',
+                render: () => <AdminDevicesDemo />,
             },
             {
                 key: 'admin-incidents', title: 'Incidents & events', icon: 'bi-shield-exclamation',

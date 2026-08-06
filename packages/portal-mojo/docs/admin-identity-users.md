@@ -33,7 +33,22 @@ the section and prevents background requests.
 
 Pass `onOpenGroup(groupId)` to `UsersPage` or `UserDetail` to connect an
 app-owned Group detail. Without it, organization and membership identities are
-plain text—never false links. The Logins surface is list-only.
+plain text—never false links.
+
+**Logins ships a Map tab (#1291, shipped).** The section is `Map | Logins`;
+the Map renders `<LoginLocationMap userId={user.id} height={280} />` over
+`/api/account/logins/user?user_id=`, and it is present only when
+`useCan(LOGIN_SUMMARY_PERMS)` passes — absent, it issues no request at all.
+Login rows are clickable and open `showLoginEventDetail`. The dead
+`loginTone(event_type)` map is gone: `UserLoginEvent` has never had an
+`event_type` field, so every dot rendered muted. Tone now comes from
+`loginRiskTone(row)` (`is_new_country` / `is_new_region`). Device rows are
+clickable too and open the full device dossier. See
+[admin-devices-geoip.md](admin-devices-geoip.md).
+
+The device / device-location / login-event models are DEFINED in
+`admin/security/devices/models.ts` and re-exported here — one `defineModel`
+per endpoint, so `UserDetail` and the fleet-wide tables share one cache.
 
 ## Action contracts
 
@@ -58,7 +73,8 @@ plain text—never false links. The Logins surface is list-only.
 ## Known seams
 
 Avatar clear is supported; upload awaits multipart/fileman support. The login
-map and richer device/GeoIP dossier belong to #1291. Arbitrary-user key
+map and the richer device/GeoIP dossiers SHIPPED with #1291 and are documented
+in [admin-devices-geoip.md](admin-devices-geoip.md). Arbitrary-user key
 creation, arbitrary-user notification administration, and active-user
 inactivity-warning clear require new backend contracts and are intentionally
 absent.

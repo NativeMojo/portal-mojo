@@ -11,6 +11,7 @@
 //     this backend never serializes; the row binds the live fields instead.
 import { useEffect, useState } from 'react';
 import { Badge, Eyebrow, fmt } from '../../../../ui';
+import { showUserDeviceDetail } from '../../../security/devices/UserDeviceDetail';
 import { DeviceModel, PushDeviceModel, type UserRow } from '../models';
 import { lastSeenLabel, Pager, SectionSearch, SectionTabs, useSectionList } from './shared';
 
@@ -40,20 +41,30 @@ function BrowserTab({ user, enabled }: { user: UserRow; enabled: boolean }) {
                 const os = ua?.os.family || 'Unknown OS';
                 const osMajor = ua?.os.major ?? '';
                 return (
-                    <div key={d.id} className="us-device-row">
-                        <div className="us-row-icon"><i className="bi bi-laptop" /></div>
-                        <div className="us-row-info">
-                            <div className="us-row-title">
+                    // Clickable since #1291: the full device dossier
+                    // (locations, logins, sessions, cross-account sharing)
+                    // lives in admin/security/devices and opens as a KISS
+                    // modal over this one.
+                    <button
+                        key={d.id}
+                        type="button"
+                        className="us-device-row"
+                        onClick={() => showUserDeviceDetail(d.id)}
+                        title="Open device details"
+                    >
+                        <span className="us-row-icon"><i className="bi bi-laptop" /></span>
+                        <span className="us-row-info">
+                            <span className="us-row-title">
                                 {browser} {browserMajor} · {os} {osMajor}
-                            </div>
-                            <div className="us-row-meta">
+                            </span>
+                            <span className="us-row-meta">
                                 {lastSeenLabel(d.last_seen)}
                                 {d.duid && <> · <code title={d.duid}>{fmt.truncateMiddle(d.duid, 8, '…')}</code></>}
                                 {d.last_ip && <> · {d.last_ip}</>}
-                            </div>
-                        </div>
+                            </span>
+                        </span>
                         <Badge tone="info">Browser</Badge>
-                    </div>
+                    </button>
                 );
             })}
             <Pager state={list} count={data?.count ?? 0} />
