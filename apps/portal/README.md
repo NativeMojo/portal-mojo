@@ -50,7 +50,7 @@ This app owns what is deployment-specific:
 
 ## Per-screen authoring cost
 
-`src/pages/UsersPage.tsx` is the proof: a complete admin screen — columns,
+`portal-mojo/admin`'s `UsersPage` is the proof: a complete admin screen — columns,
 badges, filters, presets, deep-linkable state, add-user form, row-click detail
 modal — in ~80 declarative lines against the toolkit.
 

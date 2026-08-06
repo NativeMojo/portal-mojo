@@ -174,6 +174,19 @@ Group reads preserve product membership behavior on shared `/api/group` while
 matching lifecycle, parent-graph, auth-reset, and DELETE contracts. Focused
 verification command: `npm run verify:admin-groups`.
 
+**2026-08-05, wave 7a residual (Users Admin #1412):** the shipped Wave 4
+Users table and 14-section detail now live in the reusable
+`portal-mojo/admin` identity bundle with dual-mount, system-pinned route and
+mutation gates. Permission-enabled shared queries issue no denied background
+reads; Member and canonical Incident/Event models come from their sibling
+packages. Username changes use `change_username`, direct combined MFA writes
+retry fresh auth, and lifecycle batches exclude rows already in the target
+state. The mock no longer invents arbitrary-user key generation or targeted
+notification preferences. Caller-only key creation uses the transient,
+pre-cache secret split. Avatar upload and the login map/device dossier remain
+deferred to multipart/fileman and #1291 respectively. Focused verification:
+`npm run verify:admin-users`.
+
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
 The web-mojo source of record is `/Users/ians/Projects/mojo/nativemojo/web-mojo`

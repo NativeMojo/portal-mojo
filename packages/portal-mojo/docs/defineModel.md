@@ -27,7 +27,7 @@ export const UserModel = defineModel<User>({
 
 | Member | Behavior |
 |---|---|
-| `useList(params?)` | `useQuery` list under key `[endpoint, params]` with `keepPreviousData` |
+| `useList(params?, {enabled?})` | `useQuery` list under key `[endpoint, params]` with `keepPreviousData`; `enabled:false` suppresses permission-hidden background reads |
 | `useOne(id \| null)` | one record, key `[endpoint, 'one', id]`; disabled while `id` is null |
 | `useSave()` | mutation `{id, changes}`; `id: null` creates. Handles one fresh-auth 440/retry, then writes the returned row into the one-record cache and invalidates `[endpoint]`. REJECTS on failure |
 | `useDelete()` | mutation `{id}`; removes the one-record cache entry + invalidates |

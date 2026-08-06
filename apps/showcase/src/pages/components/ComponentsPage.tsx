@@ -47,6 +47,7 @@ import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminMembersDemo } from './demos-admin-members';
+import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
@@ -291,6 +292,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Admin',
         sections: [
+            {
+                key: 'admin-users', title: 'Users', icon: 'bi-people',
+                blurb: 'Reusable full-fidelity Users table and 14-section detail with system-pinned permissions and caller-only secrets.',
+                render: () => <AdminIdentityUsersDemo />,
+            },
             {
                 key: 'admin-members', title: 'Members', icon: 'bi-person-badge',
                 blurb: 'Global membership table/detail, explicit no-oracle invitation versus authorized directory add, safe grants, and fixed-group composition.',
