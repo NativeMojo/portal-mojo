@@ -194,7 +194,21 @@ try {
     const mapBinding = surfaces[0];
     assert.match(mapBinding, /from '\.\.\/\.\.\/\.\.\/charts'/, 'the map imports from the charts subpath');
     assert.doesNotMatch(stripComments(mapBinding), /maplibre|leaflet|equirectangular|geoArcPath/, 'no projection or map-library code lives in the binding');
-    assert.doesNotMatch(stripComments(mapBinding), /land=\{/, 'no coastline geometry is passed — the graticule fallback is the design target');
+    // Coastlines settled 2026-08-06: the checked-in Natural Earth outlines are
+    // passed explicitly (opt-in per surface, never a WorldMap default, so
+    // map-less pages do not carry 143KB of coordinates). The binding must import
+    // them from the package rather than inlining any geometry of its own.
+    assert.match(stripComments(mapBinding), /useWorldLand\(\)/, 'basemap geometry is loaded through the lazy hook');
+    assert.match(stripComments(mapBinding), /land=\{land\}/, 'and handed to WorldMap');
+    assert.doesNotMatch(stripComments(mapBinding), /coordinates\s*:/, 'no geometry is inlined into the binding');
+    // The geometry must NEVER be reachable by a static import: that would put
+    // ~143KB of coordinates in every bundle touching portal-mojo/charts.
+    const chartsBarrel = await readFile(new URL('../packages/portal-mojo/src/charts/index.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(
+        stripComments(chartsBarrel),
+        /^\s*export\s[^\n]*['"]\.\/worldmap\/world-land['"]/m,
+        'world-land.ts is not re-exported from the charts barrel — it must stay behind the lazy hook',
+    );
 
     // ── 9. The wire: mock contract ──
     const login = async (email) => {

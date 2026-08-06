@@ -48,28 +48,19 @@ export function toneColor(tone: WorldMapTone = 'accent', intensity = 0): string 
     return `color-mix(in srgb, var(--ok) ${okPct}%, var(--warn))`;
 }
 
-/**
- * Event-type → tone, the login palette web-mojo hardcoded as rgba in
- * LoginLocationMapView.js:31-41. Unknown types land on `mute` (the source's
- * grey default) — deliberately silent, since "some other event type" is
- * normal data, not a caller mistake.
- */
-export const LOGIN_EVENT_TONES: Record<string, WorldMapTone> = {
-    success_login: 'ok',
-    success: 'ok',
-    login: 'ok',
-    failed_login: 'bad',
-    failure: 'bad',
-    failed: 'bad',
-    suspicious: 'warn',
-    mfa_required: 'warn',
-    mfa: 'warn',
-};
-
-/** Login event type → tone. Unknown/empty → 'mute'. */
-export function loginEventTone(eventType: string | null | undefined): WorldMapTone {
-    return LOGIN_EVENT_TONES[String(eventType ?? '').toLowerCase()] ?? 'mute';
-}
+// REMOVED 2026-08-06: `LOGIN_EVENT_TONES` / `loginEventTone(eventType)`.
+//
+// Ported from web-mojo's rgba palette at LoginLocationMapView.js:31-41, which
+// keyed off a login "event type" (success_login / failed_login / suspicious).
+// Board #1291 then established from django-mojo source that `UserLoginEvent`
+// has NO `event_type` field and never has — so every real row fell through to
+// the grey `mute` default. That is precisely why web-mojo's login map rendered
+// entirely grey, a bug that went unnoticed for years.
+//
+// The working replacement is `loginRiskTone(row)` in
+// `admin/security/devices/models.ts`: danger on `is_new_country`, warning on
+// `is_new_region`, otherwise success — fields the wire actually sends. Do not
+// reintroduce a tone helper here that keys off an event-type vocabulary.
 
 /** One plotted point. `T` is the consumer's own row, handed back to handlers. */
 export interface WorldMapMarker<T = unknown> {

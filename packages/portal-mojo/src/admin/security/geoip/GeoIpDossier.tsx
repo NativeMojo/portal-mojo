@@ -12,7 +12,7 @@ import {
     MetricCard, formModal, fmt, modal, toast,
     type Chip, type Tone,
 } from '../../../ui';
-import { WorldMap } from '../../../charts';
+import { WorldMap, useWorldLand } from '../../../charts';
 import { useCan } from '../../../client';
 import { EventModel } from '../../incidents/models';
 import { SECURITY_VIEW_PERMS } from '../../security-permissions';
@@ -390,6 +390,10 @@ export function GeoIpDossier({ id, onClose, onOpenLogin, onOpenLocation }: GeoIp
     const loginCount = LoginEventModel.useList({ ip_address: ip, size: 0 }, { enabled: Boolean(ip) && canLogins }).data?.count;
     const deviceCount = UserDeviceLocationModel.useList({ ip_address: ip, size: 0 }, { enabled: Boolean(ip) && canDevices }).data?.count;
 
+    // Basemap for the Overview mini-map, in its own lazily-fetched chunk. Must
+    // sit above the early returns below — it is a hook.
+    const land = useWorldLand(row?.latitude != null && row?.longitude != null);
+
     if (isPending) return <div className="modal-pad dim">Loading GeoIP record…</div>;
     if (!row || error) return <div className="modal-pad text-bad">{error?.message ?? 'GeoIP record not found'}</div>;
 
@@ -555,6 +559,7 @@ export function GeoIpDossier({ id, onClose, onOpenLogin, onOpenLocation }: GeoIp
                                 <div className="geoip-map">
                                     <WorldMap
                                         height={160}
+                                        land={land}
                                         interactive={false}
                                         showLegend={false}
                                         markers={[{

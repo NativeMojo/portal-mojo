@@ -15,13 +15,13 @@ import {
     DEFAULT_VIEW,
     WorldMap,
     countryName,
+    useWorldLand,
     countrySeriesToMarkers,
-    loginEventTone,
     scaleMarkerSize,
     type CountryTotal,
-    type WorldMapLand,
     type WorldMapMarker,
     type WorldMapRoute,
+    type WorldMapTone,
     type WorldMapView,
 } from 'portal-mojo/charts';
 
@@ -48,28 +48,41 @@ const COUNTRY_SERIES: Record<string, number[]> = {
 // Individual login events — the "every login" list mode. `{lat: 0, lng: 0}`
 // is REAL data (Null Island) and must plot; the NaN row must be skipped with
 // a warn, not silently vanish.
+// Shaped like a real `/api/account/logins` row. There is deliberately NO
+// `event_type` here: django-mojo's UserLoginEvent has no such field, which is
+// why web-mojo's login map rendered every dot grey. The tone comes from the
+// two flags the wire does send — the same rule `loginRiskTone` applies in
+// admin/security/devices.
 interface LoginEvent {
     id: string;
     lat: number;
     lng: number;
     city: string;
     ip: string;
-    eventType: string;
+    isNewCountry: boolean;
+    isNewRegion: boolean;
 }
 
 const LOGIN_EVENTS: LoginEvent[] = [
-    { id: 'e1', lat: 38.9, lng: -77.03, city: 'Washington, DC', ip: '198.51.100.14', eventType: 'success_login' },
-    { id: 'e2', lat: 37.77, lng: -122.42, city: 'San Francisco, CA', ip: '198.51.100.22', eventType: 'success_login' },
-    { id: 'e3', lat: 51.51, lng: -0.13, city: 'London, GB', ip: '203.0.113.7', eventType: 'failed_login' },
-    { id: 'e4', lat: 52.52, lng: 13.4, city: 'Berlin, DE', ip: '203.0.113.31', eventType: 'success_login' },
-    { id: 'e5', lat: 35.69, lng: 139.69, city: 'Tokyo, JP', ip: '203.0.113.88', eventType: 'suspicious' },
-    { id: 'e6', lat: -33.87, lng: 151.21, city: 'Sydney, AU', ip: '192.0.2.44', eventType: 'failed_login' },
-    { id: 'e7', lat: 19.08, lng: 72.88, city: 'Mumbai, IN', ip: '192.0.2.90', eventType: 'success_login' },
-    { id: 'e8', lat: -23.55, lng: -46.63, city: 'São Paulo, BR', ip: '192.0.2.117', eventType: 'mfa_required' },
-    { id: 'e9', lat: 0, lng: 0, city: 'Null Island (0, 0)', ip: '192.0.2.0', eventType: 'unknown_event' },
-    { id: 'e10', lat: -77.85, lng: 166.67, city: 'McMurdo, AQ', ip: '192.0.2.201', eventType: 'success_login' },
-    { id: 'e11', lat: Number.NaN, lng: 4.9, city: 'Broken GeoIP row', ip: '192.0.2.255', eventType: 'failed_login' },
+    { id: 'e1', lat: 38.9, lng: -77.03, city: 'Washington, DC', ip: '198.51.100.14', isNewCountry: false, isNewRegion: false },
+    { id: 'e2', lat: 37.77, lng: -122.42, city: 'San Francisco, CA', ip: '198.51.100.22', isNewCountry: false, isNewRegion: true },
+    { id: 'e3', lat: 51.51, lng: -0.13, city: 'London, GB', ip: '203.0.113.7', isNewCountry: true, isNewRegion: false },
+    { id: 'e4', lat: 52.52, lng: 13.4, city: 'Berlin, DE', ip: '203.0.113.31', isNewCountry: false, isNewRegion: false },
+    { id: 'e5', lat: 35.69, lng: 139.69, city: 'Tokyo, JP', ip: '203.0.113.88', isNewCountry: true, isNewRegion: false },
+    { id: 'e6', lat: -33.87, lng: 151.21, city: 'Sydney, AU', ip: '192.0.2.44', isNewCountry: false, isNewRegion: true },
+    { id: 'e7', lat: 19.08, lng: 72.88, city: 'Mumbai, IN', ip: '192.0.2.90', isNewCountry: false, isNewRegion: false },
+    { id: 'e8', lat: -23.55, lng: -46.63, city: 'São Paulo, BR', ip: '192.0.2.117', isNewCountry: true, isNewRegion: false },
+    { id: 'e9', lat: 0, lng: 0, city: 'Null Island (0, 0)', ip: '192.0.2.0', isNewCountry: false, isNewRegion: false },
+    { id: 'e10', lat: -77.85, lng: 166.67, city: 'McMurdo, AQ', ip: '192.0.2.201', isNewCountry: false, isNewRegion: false },
+    { id: 'e11', lat: Number.NaN, lng: 4.9, city: 'Broken GeoIP row', ip: '192.0.2.255', isNewCountry: false, isNewRegion: false },
 ];
+
+/** The demo's local copy of the `loginRiskTone` rule (admin owns the real one). */
+function loginRiskTone(ev: LoginEvent): WorldMapTone {
+    if (ev.isNewCountry) return 'bad';
+    if (ev.isNewRegion) return 'warn';
+    return 'ok';
+}
 
 // Region fixtures for the drill-down (country → its regions), mirroring the
 // shape /api/account/logins/summary?country_code=..&region=true returns.
@@ -91,39 +104,11 @@ const REGIONS: Record<string, { region: string; lat: number; lng: number; count:
     ],
 };
 
-// A SHAPE FIXTURE, not coastlines. Three crude polygons that prove the `land`
-// seam draws and that antimeridian breaking works — real geometry is an open
-// decision (see docs/worldmap.md); when it lands it is passed to this exact
-// prop with no API change.
-const LAND_FIXTURE: WorldMapLand = {
-    type: 'FeatureCollection',
-    features: [
-        {
-            type: 'Feature',
-            properties: { name: 'fixture: Africa-ish' },
-            geometry: {
-                type: 'Polygon',
-                coordinates: [[[-17, 14], [10, 37], [34, 31], [51, 12], [40, -12], [20, -35], [12, -6], [-6, 5], [-17, 14]]],
-            },
-        },
-        {
-            type: 'Feature',
-            properties: { name: 'fixture: Australia-ish' },
-            geometry: {
-                type: 'Polygon',
-                coordinates: [[[113, -22], [131, -12], [143, -11], [153, -28], [146, -39], [129, -32], [115, -34], [113, -22]]],
-            },
-        },
-        {
-            type: 'Feature',
-            properties: { name: 'fixture: antimeridian straddler' },
-            geometry: {
-                type: 'Polygon',
-                coordinates: [[[168, 63], [179, 66], [-179, 65], [-172, 60], [172, 58], [168, 63]]],
-            },
-        },
-    ],
-};
+// Coastlines: the shipped Natural Earth 110m outlines (public domain, checked
+// in, no CDN and no tile server). The toggle turns them off so the ocean +
+// graticule fallback stays visible — rendering correctly without a basemap is
+// a hard requirement. Russia and Fiji straddle the antimeridian, so this also
+// exercises the path-breaking case a naive projection would smear.
 
 const ORIGIN = { lat: 38.958, lng: -77.346, name: 'Reston, VA' };
 
@@ -148,6 +133,7 @@ export function WorldMapDemo() {
     const [drill, setDrill] = useState<string | null>(null);
     const [view, setView] = useState<WorldMapView>(DEFAULT_VIEW);
     const [showLand, setShowLand] = useState(true);
+    const worldLand = useWorldLand(showLand);
     const [emptied, setEmptied] = useState(false);
 
     const push = (line: string) => setLog((prev) => [line, ...prev].slice(0, 6));
@@ -181,7 +167,8 @@ export function WorldMapDemo() {
     // Login events: tone palette + legend buckets, finite-check on the wire row.
     const eventMarkers: WorldMapMarker<LoginEvent>[] = useMemo(
         () => LOGIN_EVENTS.map((ev) => {
-            const tone = loginEventTone(ev.eventType);
+            const tone = loginRiskTone(ev);
+            const flag = ev.isNewCountry ? 'new country' : ev.isNewRegion ? 'new region' : 'seen before';
             return {
                 id: ev.id,
                 lat: ev.lat,
@@ -189,8 +176,8 @@ export function WorldMapDemo() {
                 size: 12,
                 tone,
                 label: ev.city,
-                legendKey: tone === 'ok' ? 'Successful' : tone === 'bad' ? 'Failed' : tone === 'warn' ? 'Suspicious' : 'Other',
-                detail: <><code>{ev.ip}</code> · {ev.eventType}</>,
+                legendKey: tone === 'bad' ? 'New country' : tone === 'warn' ? 'New region' : 'Seen before',
+                detail: <><code>{ev.ip}</code> · {flag}</>,
                 data: ev,
             };
         }),
@@ -208,7 +195,7 @@ export function WorldMapDemo() {
                         </button>
                     )}
                     <button className="btn btn-compact" onClick={() => setShowLand((v) => !v)}>
-                        <i className="bi bi-map" /> {showLand ? 'Hide' : 'Show'} land fixture
+                        <i className="bi bi-map" /> {showLand ? 'Hide' : 'Show'} coastlines
                     </button>
                     <button className="btn btn-compact" onClick={() => setEmptied((v) => !v)}>
                         <i className="bi bi-eraser" /> {emptied ? 'Restore data' : 'Empty state'}
@@ -219,7 +206,7 @@ export function WorldMapDemo() {
                 </div>
                 <WorldMap<CountryTotal>
                     markers={summaryMarkers}
-                    land={showLand ? LAND_FIXTURE : null}
+                    land={showLand ? worldLand : null}
                     height={360}
                     view={view}
                     onViewChange={setView}
@@ -242,9 +229,10 @@ export function WorldMapDemo() {
                     <code> ZZ</code> and the all-zero <code>NU</code> series. Sizes are the source's
                     <code> 18 + intensity × 24</code>; the colour is the <code>scale</code> tone,
                     a token <code>color-mix</code> replacing web-mojo's hardcoded teal→amber rgba.
-                    The land polygons are a <b>shape fixture, not coastlines</b> — no geometry is
-                    bundled; the third polygon straddles the antimeridian to prove the path breaks
-                    instead of smearing.
+                    The basemap is <b>Natural Earth 110m</b>, public domain and checked in — no CDN,
+                    no tile server, no runtime dependency. Toggle it off to see the ocean + graticule
+                    fallback every surface must still read correctly against; Russia and Fiji straddle
+                    the antimeridian, proving the path breaks instead of smearing.
                 </p>
             </div>
 
@@ -255,7 +243,7 @@ export function WorldMapDemo() {
                     height={340}
                     defaultView={DEFAULT_VIEW}
                     status={`${LOGIN_EVENTS.length} events in the feed`}
-                    onMarkerClick={(m) => push(`click → ${m.data?.city} (${m.data?.eventType})`)}
+                    onMarkerClick={(m) => push(`click → ${m.data?.city} (${m.data?.isNewCountry ? 'new country' : m.data?.isNewRegion ? 'new region' : 'seen before'})`)}
                     renderTooltip={(m) => (
                         <>
                             <div className="chart-tip-head">{m.label}</div>

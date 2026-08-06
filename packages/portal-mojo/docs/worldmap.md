@@ -7,7 +7,9 @@ import {
     COUNTRY_CENTROIDS, COUNTRY_OPTIONS, getCountryCentroid, countryName,
     // binding helpers
     countrySeriesToMarkers, countryCodeFromSlug, scaleMarkerSize,
-    toneColor, loginEventTone, landRings, MAP_TONES, LOGIN_EVENT_TONES,
+    toneColor, landRings, MAP_TONES,
+    // basemap geometry — lazily loaded; see "The `land` seam"
+    useWorldLand,
     // projection math
     equirectangular, fitViewToPoints, clampView, splitAntimeridian,
     geoArcPath, graticule, isFinitePoint,
@@ -83,7 +85,7 @@ consumers used and nothing more.
 |---|---|---|---|
 | `markers` | `readonly WorldMapMarker<T>[]` | `[]` | Full replace, like `updateMarkers` |
 | `routes` | `readonly WorldMapRoute[]` | `[]` | Origin→destination arcs |
-| `land` | `WorldMapLand \| null` | `null` | Basemap geometry — nothing is bundled |
+| `land` | `WorldMapLand \| null` | `null` | Basemap geometry. Feed it `useWorldLand()`; `null` draws the graticule fallback |
 | `height` | `number` | `320` | Width is measured (ResizeObserver) |
 | `bounds` | `GeoBounds` | `{west:-180,east:180,south:-58,north:84}` | The geographic crop |
 | `view` / `defaultView` | `WorldMapView` | `DEFAULT_VIEW` | Controlled vs uncontrolled |
@@ -126,13 +128,18 @@ width `1.75 → 6`, opacity `0.45 → 0.95`, color teal→amber — now
 | `warn` | `--warn` | suspicious / MFA-required |
 | `info` | `--info` | informational |
 | `accent` | `--accent` | route origin, default |
-| `mute` | `--mute` | unknown event types |
+| `mute` | `--mute` | neutral / unclassified |
 | `scale` | `color-mix(--ok → --warn)` | the value ramp |
 
-`loginEventTone(eventType)` maps the login event vocabulary
-(`LOGIN_EVENT_TONES`, from `LoginLocationMapView.js:31-41`); unknown types
-land on `mute` — deliberately without a warn, since "some other event type"
-is normal data.
+**There is deliberately no login-tone helper here.** One shipped briefly
+(`loginEventTone` / `LOGIN_EVENT_TONES`, ported from
+`LoginLocationMapView.js:31-41`) and was **removed 2026-08-06**: it keyed off a
+login "event type", and django-mojo's `UserLoginEvent` has no such field, so
+every real row fell through to grey — which is exactly why web-mojo's login map
+rendered entirely grey for years. Tone login rows with `loginRiskTone(row)` from
+`portal-mojo/admin` (`admin/security/devices`): danger on `is_new_country`,
+warning on `is_new_region`, otherwise success. `verify-worldmap.mjs` asserts the
+old names stay gone.
 
 ## Projection contract
 
@@ -186,20 +193,60 @@ are dropped. Results are sorted descending, cut to `maxCountries`, joined to
 `[18, 42]` = the source's `18 + intensity × 24`; `LoginLocationMapView` used
 `× 26`, i.e. `[18, 44]`).
 
-## The `land` seam — an OPEN DECISION
+## The `land` seam — SETTLED 2026-08-06
 
-Country outlines need geometry **neither repo has**, and which one to adopt
-is the repo owner's call, not an agent's:
+Ian's call: **embed the outlines, no library.** `WORLD_LAND` in
+`charts/worldmap/world-land.ts` is Natural Earth 1:110m Admin 0 Countries —
+**public domain**, no attribution required — decoded from the `world-atlas`
+TopoJSON build, rounded to 1 decimal and stripped of sub-visible islets.
+173 countries, 10,443 positions, ~143 KB raw / **~40 KB gzipped**.
 
-1. embed public-domain Natural Earth 110m as a one-time data asset
-   (~50-100 KB, no runtime dependency), or
-2. sanction a maplibre peer-dep for real tiles the way `zod` was sanctioned.
+It is generated **once and checked in**. There is no runtime dependency, no
+CDN fetch and no tile server — which is the whole point: web-mojo pulled
+`maplibre-gl` from unpkg at page load and drew on MapLibre's *demo* tile
+server, so its admin map could not work on an IP-restricted or offline
+deployment. Ours can.
 
-Until then the component ships the ocean/graticule fallback and takes
-geometry through the `land` prop, so **either choice drops in without an API
-change**: option 1 is a new module handed to this existing prop; option 2 is
-a separate tile component reusing this projection and marker model. A future
-agent adding geometry should touch `land` only.
+**Reach it through `useWorldLand()` — never a static import.**
+
+```ts
+import { WorldMap, useWorldLand } from 'portal-mojo/charts';
+
+const land = useWorldLand();            // or useWorldLand(hasCoords) to skip the fetch
+<WorldMap land={land} markers={markers} />
+```
+
+`world-land.ts` is deliberately **not re-exported from the charts barrel**, and
+the hook reaches it with a dynamic `import()`. That is what makes Rollup emit it
+as its own chunk. Measured on `apps/portal`: static export put the coordinates
+in the main bundle (1,472 kB / 426 kB gzipped); behind the hook the main bundle
+is 1,328 kB / 386 kB and `world-land-*.js` is a separate 144 kB / **39.8 kB
+gzipped** chunk fetched only when a map first renders. `verify-admin-devices`
+asserts the barrel never re-exports it.
+
+The hook caches at module scope, so later maps in a session get the geometry on
+first render and concurrent mounts share one request. It returns `null` until
+resolved — not a special case, since a null `land` is just the graticule
+fallback, so the map is fully readable before the coastlines arrive. A failed
+chunk fetch warns and leaves the fallback rather than blanking the map.
+
+Surfaces using it today: `LoginLocationMap` and the GeoIP dossier's mini-map.
+
+Rendering correctly **without** it remains a hard requirement — pass
+`land={null}` (the default) and the ocean + graticule fallback carries the
+markers, legend, tooltips and status line on its own. Both showcase demos keep
+a toggle so the no-geometry case stays visible.
+
+Regenerating (only if you want different precision or a different source):
+decode the TopoJSON, de-quantize with its `transform`, round, and drop outer
+rings under 0.5 square degrees. The file header records the exact parameters.
+Do not hand-edit it.
+
+Precision note: 1:110m is a *coarse* source by design. At the map's rendered
+scale one pixel is roughly 0.36° of longitude, so 0.1° rounding is sub-pixel;
+at the maximum 12× zoom the coarseness of the source itself shows before the
+rounding does. If you ever need street-level fidelity, that is a different
+dataset and a different conversation — not a rounding tweak.
 
 `land` accepts a `FeatureCollection`, a bare feature array, or a single
 `Polygon`/`MultiPolygon`. Unsupported geometry types are skipped with a

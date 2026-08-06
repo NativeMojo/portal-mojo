@@ -152,24 +152,30 @@ SVG, marker geometry or colour ramp lives here.
 - **Drill-down** is *double-click*, on country markers, in summary mode only.
   A single click fires `onCountrySelect` after WorldMap's 250 ms
   double-click-cancellation window — that quarter-second delay is by design.
-- **No coastline geometry is passed.** `land` is deliberately omitted, so the
-  map draws WorldMap's ocean + graticule fallback; the markers, legend,
-  tooltips, drill bar and status line carry the whole story either way. If the
-  repo owner later adopts geometry, it rides `WorldMap`'s `land` prop at the
-  app level, not a per-surface one.
+- **Coastlines come from `useWorldLand()`.** The checked-in
+  public-domain Natural Earth 110m outlines, no CDN and no tile server (see
+  `worldmap.md` → "The `land` seam"). The hook loads them in a separate chunk,
+  so pages without a map never carry the geometry. Rendering
+  correctly *without* it stays a hard requirement: drop the prop and the ocean +
+  graticule fallback still carries the markers, legend, tooltips, drill bar and
+  status line.
 
-### `loginRiskTone` vs `loginEventTone`
+### `loginRiskTone` — and the helper that was deleted
 
-`portal-mojo/charts` exports `loginEventTone(eventType)`, which maps the login
-event-type vocabulary (`success_login`, `failed_login`, `suspicious`, …).
-**`UserLoginEvent` has never had an `event_type` field**, so feeding it a real
-row returns `'mute'` for every marker — exactly the web-mojo bug where every
-dot rendered grey.
+`loginRiskTone(row)` reads fields the wire actually sends: `is_new_country` →
+`bad`, `is_new_region` → `warn`, otherwise `ok`.
 
-`loginRiskTone(row)` is this module's replacement and reads fields the wire
-actually sends: `is_new_country` → `bad`, `is_new_region` → `warn`, otherwise
-`ok`. Both are kept: the charts helper remains correct for any future series
-that really does carry an event type.
+It replaced `loginEventTone(eventType)`, which `portal-mojo/charts` briefly
+exported after being ported from web-mojo. That helper mapped a login
+event-type vocabulary (`success_login`, `failed_login`, `suspicious`, …) — and
+**`UserLoginEvent` has never had an `event_type` field**, so a real row returned
+`'mute'` every time. That is precisely the web-mojo bug where every dot on the
+login map rendered grey.
+
+It was **removed from the package 2026-08-06** rather than kept beside this one:
+a plausible-looking name that silently greys out every marker is a trap, and
+there is no series in django-mojo that carries an event type for it to be
+correct about. `verify-worldmap.mjs` asserts both old names stay gone.
 
 ## The two different date wires
 

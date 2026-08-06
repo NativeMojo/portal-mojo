@@ -21,3 +21,8 @@ export * from './worldmap/WorldMap';
 export * from './worldmap/countryCentroids';
 export * from './worldmap/geo';
 export * from './worldmap/worldmap-data';
+// Basemap geometry is reached through `useWorldLand()` ONLY. `world-land.ts` is
+// deliberately not re-exported here: a static re-export would pull ~143KB of
+// coordinates into every bundle that touches this barrel, which is exactly what
+// the lazy hook exists to avoid.
+export * from './worldmap/use-world-land';

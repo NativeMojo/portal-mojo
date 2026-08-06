@@ -7,8 +7,7 @@
 // Devices / login locations / GeoIP demos (board #1291). Every surface the
 // item ships is reachable from here so the verifier and a human reviewer see
 // the same set: three tables, four KISS detail modals, the map in both modes
-// (with and without injected coastline geometry), and a permission-denied
-// state.
+// (with the shipped coastlines and with none), and a permission-denied state.
 import { useState } from 'react';
 import {
     GeoIpCachePage,
@@ -21,7 +20,7 @@ import {
     showUserDeviceLocationDetail,
 } from 'portal-mojo/admin';
 import { Guarded } from 'portal-mojo/ui';
-import { WorldMap, type WorldMapLand } from 'portal-mojo/charts';
+import { WorldMap, useWorldLand } from 'portal-mojo/charts';
 
 type Surface = 'devices' | 'logins' | 'geoip' | 'map' | 'modals' | 'denied';
 
@@ -34,40 +33,9 @@ const TABS: { key: Surface; label: string; icon: string }[] = [
     { key: 'denied', label: 'Permission denied', icon: 'bi-shield-lock' },
 ];
 
-/**
- * A deliberately crude two-landmass outline. WorldMap ships NO coastline
- * geometry (that is the repo owner's open decision — see docs/worldmap.md),
- * so every #1291 surface is designed against the graticule fallback. This
- * toggle proves the SAME map reads correctly either way.
- */
-const DEMO_LAND: WorldMapLand = {
-    type: 'FeatureCollection',
-    features: [
-        {
-            type: 'Feature',
-            geometry: {
-                type: 'Polygon',
-                coordinates: [[
-                    [-125, 49], [-95, 49], [-82, 42], [-70, 45], [-66, 45],
-                    [-80, 26], [-97, 26], [-107, 31], [-117, 32], [-124, 40], [-125, 49],
-                ]],
-            },
-        },
-        {
-            type: 'Feature',
-            geometry: {
-                type: 'Polygon',
-                coordinates: [[
-                    [-10, 55], [2, 51], [10, 55], [20, 55], [30, 50], [28, 44],
-                    [15, 40], [3, 43], [-9, 43], [-10, 55],
-                ]],
-            },
-        },
-    ],
-};
-
 function MapBindingDemo() {
-    const [land, setLand] = useState(false);
+    const [land, setLand] = useState(true);
+    const worldLand = useWorldLand(land);
     return (
         <div className="flex flex-col gap-3">
             <p className="dim">
@@ -79,7 +47,7 @@ function MapBindingDemo() {
             </p>
             <label className="flex items-center gap-2">
                 <input type="checkbox" checked={land} onChange={(e) => setLand(e.target.checked)} />
-                <span>Inject a demo coastline outline (the <code>land</code> seam)</span>
+                <span>Draw the shipped coastlines (the <code>land</code> prop)</span>
             </label>
             {/* Two independent instances so the graticule fallback and the
                 injected-geometry case can be compared side by side. */}
@@ -97,15 +65,14 @@ function MapBindingDemo() {
             </div>
             <div className="panel panel-pad">
                 <div className="eyebrow">
-                    {land ? 'With injected coastlines' : 'The shipped default — graticule fallback'}
+                    {land ? 'With the shipped coastlines' : 'Coastlines off — the graticule fallback'}
                 </div>
-                {/* `LoginLocationMap` deliberately does NOT expose `land`:
-                    coastline geometry is one app-level decision, not a
-                    per-surface prop. This reaches WorldMap directly to show
-                    what lands when the repo owner makes it — same markers,
+                {/* Every #1291 surface now passes `WORLD_LAND`. The toggle keeps
+                    the no-geometry case visible, because rendering correctly
+                    without a basemap stays a hard requirement — same markers,
                     same tooltips, same legend, either way. */}
                 <WorldMap
-                    land={land ? DEMO_LAND : null}
+                    land={land ? worldLand : null}
                     height={280}
                     markers={[
                         { id: 'us', lat: 39.8, lng: -98.6, size: 34, tone: 'scale', intensity: 1, label: 'United States', value: 1240 },
@@ -113,8 +80,8 @@ function MapBindingDemo() {
                         { id: 'gb', lat: 54, lng: -2.4, size: 20, tone: 'scale', intensity: 0.25, label: 'United Kingdom', value: 260 },
                     ]}
                     status={land
-                        ? 'Injected demo geometry — nothing is bundled; this rides the `land` prop'
-                        : 'No coastlines are shipped: every #1291 surface is designed against this'}
+                        ? 'Natural Earth 110m, checked in — no CDN, no tile server, no runtime dependency'
+                        : 'No geometry: every #1291 surface still reads correctly against this'}
                 />
             </div>
         </div>

@@ -20,13 +20,14 @@
 //   3. **Bounded at 500.** The source docstring says `size=500`; the code
 //      sent `size: 1000` (`:208`). The docstring wins.
 //
-// Rendering correctly with NO coastline geometry is a hard requirement: the
-// `land` prop is deliberately not passed, so WorldMap draws its ocean +
-// graticule fallback and the markers, legend, tooltips, drill bar and status
-// line carry the whole story either way.
+// Coastlines: `WORLD_LAND` (checked-in public-domain Natural Earth 110m, no
+// runtime dependency) is passed as the basemap. Rendering correctly WITHOUT it
+// remains a hard requirement — drop the prop and WorldMap falls back to ocean +
+// graticule, with the markers, legend, tooltips, drill bar and status line
+// carrying the whole story either way.
 import { useMemo, useState, type ReactNode } from 'react';
 import {
-    COUNTRY_CENTROIDS, WorldMap, countryName, scaleMarkerSize,
+    COUNTRY_CENTROIDS, WorldMap, countryName, scaleMarkerSize, useWorldLand,
     type WorldMapMarker,
 } from '../../../charts';
 import { fmt } from '../../../ui';
@@ -209,6 +210,9 @@ export function LoginLocationMap({
 
     const summaryRows = summary.data ?? [];
     const listRows = list.data?.rows ?? [];
+    // Coastlines arrive in their own chunk; until then WorldMap draws the
+    // graticule fallback, which every element of this surface is legible on.
+    const land = useWorldLand();
 
     const markers = useMemo<WorldMapMarker<LoginMarkerData>[]>(() => (
         mode === 'summary'
@@ -284,9 +288,7 @@ export function LoginLocationMap({
             <WorldMap<LoginMarkerData>
                 markers={markers}
                 height={height}
-                // No `land`: coastline geometry is deliberately not shipped
-                // (see docs/worldmap.md). The graticule fallback is what this
-                // surface is designed and verified against.
+                land={land}
                 loading={pending}
                 status={status}
                 emptyText={mode === 'summary' ? 'No login locations to plot' : 'No plottable login events'}

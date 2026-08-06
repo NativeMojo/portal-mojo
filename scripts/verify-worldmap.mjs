@@ -190,11 +190,12 @@ try {
     assert.equal(unknownTone.warnings.length, 1, '…WITH a console.warn, never silently');
     assert.match(unknownTone.warnings[0], /unknown tone/);
 
-    assert.equal(data.loginEventTone('success_login'), 'ok');
-    assert.equal(data.loginEventTone('FAILED_LOGIN'), 'bad');
-    assert.equal(data.loginEventTone('mfa_required'), 'warn');
-    assert.equal(data.loginEventTone('something_else'), 'mute');
-    assert.equal(data.loginEventTone(null), 'mute');
+    // The event-type tone helper is GONE on purpose (2026-08-06): UserLoginEvent
+    // has no `event_type`, so it could only ever return 'mute' for a real row —
+    // web-mojo's all-grey login map. `loginRiskTone` in admin/security/devices
+    // replaces it. Assert it stays gone so nobody reintroduces the trap.
+    assert.equal(data.loginEventTone, undefined, 'loginEventTone must not come back');
+    assert.equal(data.LOGIN_EVENT_TONES, undefined, 'LOGIN_EVENT_TONES must not come back');
 
     // ── Land seam (no geometry is bundled; the prop is the contract) ──
     assert.deepEqual(data.landRings(null), []);
