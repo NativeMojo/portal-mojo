@@ -4,7 +4,7 @@ import { CollectionSelect, modal } from '../../ui';
 import { useCan } from '../../client';
 import {
     GROUP_DIRECTORY_PERMS, USER_DIRECTORY_PERMS, SUPPORTED_FILE_MANAGER_BACKENDS,
-    saveFileManagerAtomic, storageRefreshFailure, type FileManagerRow, type RelationRow, relationId,
+    saveFileManagerAtomic, storageRefreshFailure, storageRelationId, type FileManagerRow, type RelationRow,
 } from './models';
 
 type ManagerEditorMode = 'create' | 'general' | 'credentials' | 'owner';
@@ -28,8 +28,8 @@ function ManagerEditor({ row, mode, close }: { row: FileManagerRow | null; mode:
     const [key, setKey] = useState('');
     const [secret, setSecret] = useState('');
     const [origins, setOrigins] = useState((row?.allowed_origins ?? []).join('\n'));
-    const [group, setGroup] = useState<number | null>(relationId(row?.group));
-    const [user, setUser] = useState<number | null>(relationId(row?.user));
+    const [group, setGroup] = useState<number | null>(storageRelationId(row?.group));
+    const [user, setUser] = useState<number | null>(storageRelationId(row?.user));
     const canSystem = Boolean(me?.is_superuser);
 
     const submit = async (event: React.FormEvent) => {

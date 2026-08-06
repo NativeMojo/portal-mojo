@@ -3,9 +3,9 @@ import { Badge, ModelTable, fmt, modal, toast, type BatchAction, type Column, ty
 import { useCan } from '../../client';
 import { FileManagerDetail } from './FileManagerDetail';
 import { openFileManagerEditor } from './storage-dialogs';
-import { FileManagerModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, USER_DIRECTORY_PERMS, exportFileManagers, relationId, saveFileManagerAtomic, type FileManagerRow } from './models';
+import { FileManagerModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, USER_DIRECTORY_PERMS, exportFileManagers, storageRelationId, saveFileManagerAtomic, type FileManagerRow } from './models';
 
-function scope(row: FileManagerRow): string { return relationId(row.group) != null ? `Group · ${(typeof row.group === 'object' && row.group?.name) || `#${relationId(row.group)}`}` : relationId(row.user) != null ? `User · ${(typeof row.user === 'object' && (row.user.display_name || row.user.name)) || `#${relationId(row.user)}`}` : 'System'; }
+function scope(row: FileManagerRow): string { return storageRelationId(row.group) != null ? `Group · ${(typeof row.group === 'object' && row.group?.name) || `#${storageRelationId(row.group)}`}` : storageRelationId(row.user) != null ? `User · ${(typeof row.user === 'object' && row.user && (row.user.display_name || row.user.name)) || `#${storageRelationId(row.user)}`}` : 'System'; }
 const COLUMNS: Column<FileManagerRow>[] = [
     { key: 'name', label: 'Name', sortable: true, hideable: false },
     { key: 'backend_type', label: 'Backend', sortable: true, render: (row) => <Badge tone={row.backend_type === 's3' ? 'info' : 'muted'}>{row.backend_type}</Badge> },

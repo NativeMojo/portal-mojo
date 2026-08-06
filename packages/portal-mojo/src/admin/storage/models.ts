@@ -146,7 +146,7 @@ function relation(value: unknown): RelationRow | number | null {
     };
 }
 
-export function relationId(value: RelationRow | number | null | undefined): number | null {
+export function storageRelationId(value: RelationRow | number | null | undefined): number | null {
     return typeof value === 'number' ? value : value?.id ?? null;
 }
 
@@ -284,7 +284,7 @@ export async function saveFileManagerAtomic(args: {
         attachStorageRefreshFailure(error, refreshError ?? new Error('Authoritative backend row was not returned'));
         throw error;
     }
-    if (args.expectedOwner && (relationId(authoritative.group) !== args.expectedOwner.group || relationId(authoritative.user) !== args.expectedOwner.user)) {
+    if (args.expectedOwner && (storageRelationId(authoritative.group) !== args.expectedOwner.group || storageRelationId(authoritative.user) !== args.expectedOwner.user)) {
         throw new MojoError('The backend did not attach the requested owner. Check your directory permissions and try again.', 403, 'fk_attach_denied');
     }
     return authoritative;
@@ -325,7 +325,7 @@ export async function saveFileAndReconcileGroup(queryClient: QueryClient, id: nu
     queryClient.removeQueries({ queryKey: FileModel.keys.one(id), exact: true });
     const row = sanitizeFileRow(await mojoGet<FileRow>(FileModel.endpoint, id));
     queryClient.setQueryData(FileModel.keys.one(id), row);
-    if (expectedGroup !== undefined && relationId(row.group) !== expectedGroup) {
+    if (expectedGroup !== undefined && storageRelationId(row.group) !== expectedGroup) {
         throw new MojoError('The backend did not move the file to the requested group.', 403, 'fk_attach_denied');
     }
     return row;
@@ -376,7 +376,7 @@ export const exportFileManagers = createSafeExporter<FileManagerRow>({
     fields: [
         { key: 'id' }, { key: 'name' }, { key: 'backend_type' }, { key: 'is_active' },
         { key: 'is_default' }, { key: 'is_public' }, { key: 'created' },
-        { key: 'scope', value: (row) => relationId(row.group) != null ? `group:${relationId(row.group)}` : relationId(row.user) != null ? `user:${relationId(row.user)}` : 'system' },
+        { key: 'scope', value: (row) => storageRelationId(row.group) != null ? `group:${storageRelationId(row.group)}` : storageRelationId(row.user) != null ? `user:${storageRelationId(row.user)}` : 'system' },
     ],
 });
 
@@ -386,8 +386,8 @@ export const exportFiles = createSafeExporter<FileRow>({
         { key: 'id' }, { key: 'filename' }, { key: 'content_type' }, { key: 'category' },
         { key: 'file_size' }, { key: 'upload_status' }, { key: 'is_active' },
         { key: 'is_public' }, { key: 'created' },
-        { key: 'group_id', value: (row) => relationId(row.group) },
-        { key: 'file_manager_id', value: (row) => relationId(row.file_manager) },
+        { key: 'group_id', value: (row) => storageRelationId(row.group) },
+        { key: 'file_manager_id', value: (row) => storageRelationId(row.file_manager) },
     ],
 });
 

@@ -24,7 +24,7 @@ export function IncompleteEvidence({ evidence }: { evidence: S3FailureEvidence }
 
 function Outcome({ value }: { value: BucketMutationOutcome<unknown> | null }) {
     if (!value) return null;
-    return <div className={`storage-operation-result${value.error ? ' is-error' : ''}`}>{value.error && <p>{message(value.error)}</p>}{value.evidence && <IncompleteEvidence evidence={value.evidence} />}{value.refreshError && <p className="text-warn"><i className="bi bi-exclamation-triangle" /> Authoritative refresh also failed. Refresh manually before another action.</p>}</div>;
+    return <div className={`storage-operation-result${value.error ? ' is-error' : ''}`}>{Boolean(value.error) && <p>{message(value.error)}</p>}{value.evidence && <IncompleteEvidence evidence={value.evidence} />}{Boolean(value.refreshError) && <p className="text-warn"><i className="bi bi-exclamation-triangle" /> Authoritative refresh also failed. Refresh manually before another action.</p>}</div>;
 }
 
 export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose: () => void }) {
