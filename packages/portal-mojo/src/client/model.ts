@@ -23,6 +23,7 @@
 // sniffed from the body — the resp.data heuristics class ends at this layer.
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { mojoCall, mojoDelete, mojoGet, mojoSave, type Envelope } from './client';
+import { withFreshAuth } from './auth';
 import { useModel, useModelList } from './hooks';
 import type { ModelForm, Params } from './types';
 
@@ -138,7 +139,7 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
         useSave: () => {
             const qc = useQueryClient();
             return useMutation({
-                mutationFn: ({ id, changes }: SaveVars) => mojoSave<T>(endpoint, id, changes),
+                mutationFn: ({ id, changes }: SaveVars) => withFreshAuth(() => mojoSave<T>(endpoint, id, changes)),
                 onSuccess: (row) => {
                     // The response body is the server-authoritative record —
                     // paint it immediately, then let invalidation re-sort and
@@ -172,10 +173,10 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
             const qc = useQueryClient();
             return useMutation({
                 mutationFn: async ({ id, payload = {} }: ActionVars): Promise<ActionOutcome<T>> => {
-                    const body = await mojoCall(`${endpoint}/${id}`, {
+                    const body = await withFreshAuth(() => mojoCall(`${endpoint}/${id}`, {
                         method: 'POST',
                         body: { [bodyKey]: payload },
-                    });
+                    }));
                     return { row: returnsRow ? (body.data as T) : null, body };
                 },
                 onSuccess: (outcome, { id }) => {

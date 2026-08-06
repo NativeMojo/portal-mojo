@@ -29,15 +29,21 @@ export const UserModel = defineModel<User>({
 |---|---|
 | `useList(params?)` | `useQuery` list under key `[endpoint, params]` with `keepPreviousData` |
 | `useOne(id \| null)` | one record, key `[endpoint, 'one', id]`; disabled while `id` is null |
-| `useSave()` | mutation `{id, changes}`; `id: null` creates. On success writes the returned row into the one-record cache, then invalidates `[endpoint]`. REJECTS on failure |
+| `useSave()` | mutation `{id, changes}`; `id: null` creates. Handles one fresh-auth 440/retry, then writes the returned row into the one-record cache and invalidates `[endpoint]`. REJECTS on failure |
 | `useDelete()` | mutation `{id}`; removes the one-record cache entry + invalidates |
-| `useAction(name)` | mutation for ONE declared POST_SAVE_ACTION (below). THROWS at render time for an undeclared name |
+| `useAction(name)` | mutation for ONE declared POST_SAVE_ACTION (below), with one fresh-auth 440/retry. THROWS at render time for an undeclared name |
 | `fetchOne(queryClient, id)` | imperative fetch through the same cache key — dedupes with mounted `useOne`s (prefetch pattern) |
 | `invalidate(queryClient)` | invalidate everything under `[endpoint]` |
 | `keys.root / keys.list(params) / keys.one(id)` | key builders for targeted cache surgery |
 
 Cache keys are shared with the generic hooks (`useModelList`, `useModel`),
 so `ModelTable` and model hooks read/invalidate one cache.
+
+Save/action mutation functions use `withFreshAuth` globally. Their original
+variables and declared response mode survive the retry, and cache updates run
+only on final success. Delete remains unwrapped, as do direct `mojoCall`
+mutations; callers opt those in only when the endpoint is both sensitive and
+safe to retry once.
 
 ## POST_SAVE_ACTIONS
 

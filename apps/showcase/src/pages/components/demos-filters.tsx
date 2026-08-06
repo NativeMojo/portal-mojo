@@ -1,21 +1,21 @@
 // Filters demo — a LIVE filtering surface, not an explainer. Every filter
-// type the FilterBar supports is exercised against the mock /api/group (the
-// same wire path the real Groups page uses), the effect shows up in a real
+// type the FilterBar supports is exercised against the mock /api/user (the
+// same wire path the real Users page uses), the effect shows up in a real
 // ModelTable below, and the panel on top prints the exact params the store is
 // sending. That read-out is the teaching payload: "server-side always" is
 // PROVEN here, not asserted — there is no client-side row work anywhere on
 // this page.
 //
-// Groups (not users) because this dataset carries one field of every filter
-// shape: name (text), parent (FK select), kind (3-value multiselect),
-// is_active (boolean), member_count (number), created + last_activity (two
-// dateranges, so the dr_* triple's mutual exclusion is demonstrable).
+// Users because this dataset proves the easy-to-get-wrong DateField boundary:
+// dob is YYYY-MM-DD while last_activity is epoch seconds. It also carries the
+// other filter shapes: email (text), org (FK), verification (multiselect),
+// is_active (boolean), id (number), and two datetime dateranges.
 import { useMemo } from 'react';
 import { useModelList, useTableParams, type Params } from 'portal-mojo/client';
 import {
     Badge, fmt, ModelTable, paramKeyFor, type Column, type FilterDef,
 } from 'portal-mojo/ui';
-import { GroupModel, type GroupRow } from '../../models';
+import { UserModel, type GroupRow, type UserRow } from '../../models';
 import { WireParams } from './demo-wire';
 
 // Stable module constants — a fresh object literal per render would mint a new
@@ -25,26 +25,31 @@ const TOTAL_PARAMS: Params = { start: 0, size: 1 };
 const DAY = 86400_000;
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
 
-const COLUMNS: Column<GroupRow>[] = [
+const COLUMNS: Column<UserRow>[] = [
     {
-        key: 'name', label: 'Group', hideable: false, render: (g) => (
+        key: 'display_name', label: 'User', hideable: false, render: (u) => (
             <div className="cell-user">
-                <span className="cell-avatar"><i className="bi bi-diagram-3" /></span>
+                <span className="cell-avatar"><i className="bi bi-person" /></span>
                 <span>
-                    <span className="cell-name">{g.name}</span>
-                    {g.parent && <span className="cell-sub">in {g.parent.name}</span>}
+                    <span className="cell-name">{u.display_name || u.username}</span>
+                    <span className="cell-sub">{u.email}</span>
                 </span>
             </div>
         ),
     },
-    { key: 'kind', label: 'Kind', render: (g) => <Badge tone="primary">{g.kind}</Badge> },
     {
-        key: 'is_active', label: 'Status', align: 'center',
-        render: (g) => <Badge tone={g.is_active ? 'success' : 'danger'}>{g.is_active ? 'Active' : 'Inactive'}</Badge>,
+        key: 'org', label: 'Org', render: (u) => u.org && typeof u.org === 'object'
+            ? <Badge tone="primary">{u.org.name}</Badge>
+            : <span className="dim">—</span>,
     },
-    { key: 'member_count', label: 'Members', align: 'end', render: (g) => fmt.number(g.member_count) },
-    { key: 'created', label: 'Created', render: (g) => fmt.date(g.created) },
-    { key: 'last_activity', label: 'Last activity', render: (g) => fmt.relative(g.last_activity) },
+    {
+        key: 'is_active', label: 'Status', align: 'center', render: (u) => (
+            <Badge tone={u.is_active ? 'success' : 'danger'}>{u.is_active ? 'Active' : 'Inactive'}</Badge>
+        ),
+    },
+    { key: 'id', label: 'ID', align: 'end', render: (u) => fmt.number(u.id) },
+    { key: 'dob', label: 'DOB (DateField)', render: (u) => fmt.date(u.dob) },
+    { key: 'last_activity', label: 'Last activity', render: (u) => fmt.relative(u.last_activity) },
 ];
 
 /** What each type writes on the wire — derived from the defs, not retyped. */
@@ -56,11 +61,11 @@ function wireKeyOf(def: FilterDef): string {
 
 const TYPE_NOTE: Record<FilterDef['type'], string> = {
     text: 'Free text; the lookup defaults to icontains and is overridable per def (lookup: "startswith").',
-    select: 'One value from a fixed list. These options are fetched from the server (the six orgs), and the wire carries the FK id — Django compares the related row\'s pk.',
+    select: 'One value from server-fetched orgs. The wire carries the FK id — Django compares the embedded relation by pk.',
     multiselect: 'Checkbox dialog. Two or more values collapse to field__in=a,b; exactly one collapses back to the bare field — a field never carries both forms.',
     boolean: 'trueLabel / falseLabel in the dialog; the wire is the string "true" / "false".',
-    number: 'Numeric entry, lookup defaults to gte ("at least this many members").',
-    date: 'A single date bound. Not on this page: /api/group has no DateField — its datetimes are epoch seconds, which a YYYY-MM-DD bound cannot be compared against directly. That is what the dr_* triple is for.',
+    number: 'Numeric entry, lookup defaults to gte ("id at least N"). Fully numeric operands compare numerically, so 10 sorts after 2.',
+    date: 'A real User.dob DateField: both row and bound stay canonical YYYY-MM-DD. It is never coerced through the epoch-seconds datetime path.',
     daterange: 'Writes the dr_field/dr_start/dr_end TRIPLE, so only ONE range can ever be active. Two ranges are defined here (created and last activity) — pick the second and it replaces the first.',
 };
 
@@ -78,29 +83,28 @@ export function FiltersDemo() {
     );
 
     const defs = useMemo<FilterDef[]>(() => [
-        { key: 'name', label: 'Name', type: 'text', placeholder: 'Contains…' },
-        { key: 'parent', label: 'Parent org', type: 'select', options: orgOptions },
+        { key: 'email', label: 'Email', type: 'text', placeholder: 'Contains…' },
+        { key: 'org', label: 'Org', type: 'select', options: orgOptions },
         {
-            key: 'kind', label: 'Kind', type: 'multiselect', options: [
-                { value: 'org', label: 'Org' },
-                { value: 'team', label: 'Team' },
-                { value: 'project', label: 'Project' },
+            key: 'is_email_verified', label: 'Email verification', type: 'multiselect', options: [
+                { value: 'true', label: 'Verified' },
+                { value: 'false', label: 'Unverified' },
             ],
         },
         { key: 'is_active', label: 'Status', type: 'boolean', trueLabel: 'Active', falseLabel: 'Inactive' },
-        { key: 'member_count', label: 'Members', type: 'number' },
-        { key: 'created', label: 'Created', type: 'daterange' },
+        { key: 'id', label: 'ID', type: 'number' },
+        { key: 'dob', label: 'Date of birth', type: 'date' },
+        { key: 'last_login', label: 'Last login', type: 'daterange' },
         { key: 'last_activity', label: 'Last activity', type: 'daterange' },
     ], [orgOptions]);
 
     // Identical endpoint + params to ModelTable's own query, so TanStack hands
     // both callers ONE cached result — the read-out costs no extra request.
-    const filtered = useModelList<GroupRow>('/api/group', p.wire);
-    const total = useModelList<GroupRow>('/api/group', TOTAL_PARAMS);
+    const filtered = useModelList<UserRow>('/api/user', p.wire);
+    const total = useModelList<UserRow>('/api/user', TOTAL_PARAMS);
 
     // One row per TYPE for the legend (two dateranges are defined, but the
-    // shape is the same), plus `date` — defined nowhere here, and the note
-    // says why.
+    // shape is the same).
     const legend = useMemo(() => {
         const byType = new Map<FilterDef['type'], FilterDef>();
         for (const def of defs) if (!byType.has(def.type)) byType.set(def.type, def);
@@ -113,33 +117,37 @@ export function FiltersDemo() {
 
     const samples: { label: string; wire: string; on: boolean; disabled?: boolean; run: () => void }[] = [
         {
-            label: 'Text', wire: 'name__icontains=eng', on: has('name__icontains', 'eng'),
-            run: () => p.setFilter('name__icontains', 'eng'),
+            label: 'Text', wire: 'email__icontains=native', on: has('email__icontains', 'native'),
+            run: () => p.setFilter('email__icontains', 'native'),
         },
         {
-            label: 'Select', wire: `parent=${firstOrg?.value ?? '…'}`,
-            on: !!firstOrg && has('parent', firstOrg.value), disabled: !firstOrg,
-            run: () => firstOrg && p.setFilter('parent', firstOrg.value),
+            label: 'Select', wire: `org=${firstOrg?.value ?? '…'}`,
+            on: !!firstOrg && has('org', firstOrg.value), disabled: !firstOrg,
+            run: () => firstOrg && p.setFilter('org', firstOrg.value),
         },
         {
-            label: 'Multiselect ×2', wire: 'kind__in=org,team', on: has('kind__in', 'org,team'),
-            run: () => p.setFilter('kind__in', ['org', 'team']),
+            label: 'Multiselect ×2', wire: 'is_email_verified__in=true,false', on: has('is_email_verified__in', 'true,false'),
+            run: () => p.setFilter('is_email_verified__in', ['true', 'false']),
         },
         {
-            label: 'Multiselect ×1', wire: 'kind=project', on: has('kind', 'project'),
-            run: () => p.setFilter('kind__in', ['project']),
+            label: 'Multiselect ×1', wire: 'is_email_verified=true', on: has('is_email_verified', 'true'),
+            run: () => p.setFilter('is_email_verified__in', ['true']),
         },
         {
             label: 'Boolean', wire: 'is_active=false', on: has('is_active', 'false'),
             run: () => p.setFilter('is_active', 'false'),
         },
         {
-            label: 'Number', wire: 'member_count__gte=6', on: has('member_count__gte', '6'),
-            run: () => p.setFilter('member_count__gte', '6'),
+            label: 'Number', wire: 'id__gte=10', on: has('id__gte', '10'),
+            run: () => p.setFilter('id__gte', '10'),
         },
         {
-            label: 'Daterange', wire: 'dr_field=created', on: range?.field === 'created',
-            run: () => p.setDateRange('created', isoDaysAgo(365), isoDaysAgo(0)),
+            label: 'DateField', wire: 'dob__gte=1980-01-01', on: has('dob__gte', '1980-01-01'),
+            run: () => p.setFilter('dob__gte', '1980-01-01'),
+        },
+        {
+            label: 'Daterange', wire: 'dr_field=last_login', on: range?.field === 'last_login',
+            run: () => p.setDateRange('last_login', isoDaysAgo(365), isoDaysAgo(0)),
         },
         {
             label: 'Daterange (2nd)', wire: 'dr_field=last_activity', on: range?.field === 'last_activity',
@@ -158,7 +166,7 @@ export function FiltersDemo() {
                     browser.
                 </p>
                 <WireParams
-                    endpoint="/api/group"
+                    endpoint="/api/user"
                     params={p.wire}
                     defs={defs}
                     matched={filtered.data?.count}
@@ -202,11 +210,6 @@ export function FiltersDemo() {
                                 <td className="dim">{TYPE_NOTE[def.type]}</td>
                             </tr>
                         ))}
-                        <tr>
-                            <td><code>date</code></td>
-                            <td><code>field__gte</code></td>
-                            <td className="dim">{TYPE_NOTE.date}</td>
-                        </tr>
                     </tbody>
                 </table>
                 <p className="dim" style={{ marginTop: 12, maxWidth: 700 }}>
@@ -217,11 +220,11 @@ export function FiltersDemo() {
                 </p>
             </div>
 
-            <ModelTable<GroupRow>
-                model={GroupModel}
+            <ModelTable<UserRow>
+                model={UserModel}
                 eyebrow="Playground · filters"
-                title="Groups"
-                searchPlaceholder="Search group names…"
+                title="Users"
+                searchPlaceholder="Search users…"
                 defaultSort="name"
                 columns={COLUMNS}
                 filters={defs}

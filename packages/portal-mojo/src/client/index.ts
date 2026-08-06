@@ -20,4 +20,4 @@ export * from './lookups';
 export * from './markdown';
 export * from './types';
 // Dev affordance: per-endpoint call counts from the mock (single-flight proof).
-export { getMockCallCounts } from './mock';
+export { armMockReauth, getMockCallCounts } from './mock';

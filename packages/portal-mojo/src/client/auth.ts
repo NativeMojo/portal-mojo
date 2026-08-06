@@ -448,7 +448,12 @@ interface PasskeyBeginResponse {
  * the server returns empty allowCredentials and the browser offers every
  * discoverable credential for this domain.
  */
-export async function loginWithPasskey(username?: string): Promise<AuthUser> {
+export interface PasskeyLoginOptions {
+    /** true (default) → localStorage; false → sessionStorage. */
+    remember?: boolean;
+}
+
+export async function loginWithPasskey(username?: string, opts: PasskeyLoginOptions = {}): Promise<AuthUser> {
     if (!isPasskeySupported()) throw new Error('Passkeys are not supported in this browser');
 
     const begin = await mojoCall('/api/auth/passkeys/login/begin', { method: 'POST', body: username ? { username } : {} });
@@ -485,7 +490,7 @@ export async function loginWithPasskey(username?: string): Promise<AuthUser> {
             },
         },
     });
-    return adoptGrant(body.data as TokenGrant);
+    return adoptGrant(body.data as TokenGrant, opts.remember ?? true);
 }
 
 // ── Fresh-auth (step-up) challenges ───────────────────────────────────

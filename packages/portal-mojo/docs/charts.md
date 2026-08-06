@@ -29,11 +29,15 @@ normalized ONLY by `mojoMetrics` in the client into `{labels, datasets}`.
 Malformed feeds degrade to the empty state WITH a console.warn — never a
 crash.
 
-**Two windowing params ride together, deliberately:** the shipped mock
-windows off `range` ('1h'|'24h'|'7d'|'30d') and ignores `dt_*`; the real
-backend windows off `dt_*` and ignores `range`. Components send both for
-quick ranges and only `dt_*` for custom ranges (which the mock therefore
-renders at its default window until it learns `dt_*`).
+**Two windowing params ride together, deliberately:** the real backend uses
+`dt_*` and ignores `range`; components send both for quick ranges and only
+`dt_*` for custom ranges. The mock now gives `dt_start`/`dt_end` precedence,
+accepts either bound alone, and mirrors the backend's inclusive buckets.
+Reverse ranges return an empty series; malformed non-epoch bounds reject.
+Month/year buckets advance by calendar boundaries, not 30/365-day arithmetic.
+The mock caps a pathological request at 400 buckets to keep the showcase
+responsive. It also salts values by `account` so entity-scope demos visibly
+change; that salt is a mock-only presentation affordance, not a server promise.
 
 **Trap (fixed here, do not regress):** `dr_start/dr_end` is the model-LIST
 daterange triple — `/api/metrics/fetch` ignores it silently. web-mojo sent

@@ -902,6 +902,36 @@ function fkValue(v: unknown): unknown {
     return v;
 }
 
+const NUMERIC_WIRE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
+const DATE_WIRE = /^\d{4}(?:-\d{2}(?:-\d{2})?)?$/;
+const DATETIME_WIRE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})$/;
+
+function numericWireValue(value: unknown): number | null {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value !== 'string' || !NUMERIC_WIRE.test(value.trim())) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function temporalWireValue(value: unknown): number | null {
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (!DATE_WIRE.test(text) && !DATETIME_WIRE.test(text)) return null;
+    const parsed = Date.parse(text);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Django-like coercion without treating arbitrary date-looking text as time. */
+function compareWireValues(left: unknown, right: unknown): number {
+    const ln = numericWireValue(left);
+    const rn = numericWireValue(right);
+    if (ln != null && rn != null) return ln - rn;
+    const lt = temporalWireValue(left);
+    const rt = temporalWireValue(right);
+    if (lt != null && rt != null) return lt - rt;
+    return String(left ?? '').localeCompare(String(right ?? ''));
+}
+
 /** Apply one Django-style lookup param to the row set. */
 function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, raw: string): T[] {
     const parts = key.split('__');
@@ -913,14 +943,14 @@ function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, 
     return rows.filter((row) => {
         const v = fkValue(getField(row, field));
         switch (op) {
-            case 'in': return raw.split(',').map((s) => s.trim()).includes(String(v));
+            case 'in': return raw.split(',').map((s) => s.trim()).some((candidate) => compareWireValues(v, candidate) === 0);
             case 'icontains': return String(v ?? '').toLowerCase().includes(raw.toLowerCase());
-            case 'gte': return v != null && String(v) >= raw;
-            case 'lte': return v != null && String(v) <= raw;
+            case 'gte': return v != null && compareWireValues(v, raw) >= 0;
+            case 'lte': return v != null && compareWireValues(v, raw) <= 0;
             case 'isnull': return raw === 'true' ? v == null : v != null;
             default:
                 if (raw === 'true' || raw === 'false') return v === (raw === 'true');
-                return String(v) === raw;
+                return compareWireValues(v, raw) === 0;
         }
     });
 }
@@ -1291,6 +1321,7 @@ const BUCKET_MS: Record<string, number> = {
     days: 864e5,
     weeks: 7 * 864e5,
     months: 30 * 864e5,
+    years: 365 * 864e5,
 };
 
 const SERIES: { slug: string; label: string; base: number; spread: number }[] = [
@@ -1324,36 +1355,97 @@ function sample(slugIndex: number, t: number, base: number, spread: number): num
     return Math.max(0, Math.round(v));
 }
 
+function accountSalt(account: string): number {
+    let hash = 2166136261;
+    for (const ch of account) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619);
+    return hash >>> 0;
+}
+
+function stepMetricBucket(date: Date, granularity: string, direction = 1): Date {
+    const next = new Date(date);
+    if (granularity === 'months') next.setUTCMonth(next.getUTCMonth() + direction, 1);
+    else if (granularity === 'years') next.setUTCFullYear(next.getUTCFullYear() + direction, 0, 1);
+    else next.setTime(next.getTime() + (BUCKET_MS[granularity] ?? BUCKET_MS.hours!) * direction);
+    return next;
+}
+
+function floorMetricBucket(value: number, granularity: string): Date {
+    const date = new Date(value);
+    if (granularity === 'years') return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    if (granularity === 'months') return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+    const bucket = BUCKET_MS[granularity] ?? BUCKET_MS.hours!;
+    return new Date(Math.floor(value / bucket) * bucket);
+}
+
+const DEFAULT_BUCKET_SPANS: Record<string, number> = {
+    minutes: 29 * 60e3,
+    hours: 24 * 3600e3,
+    days: 30 * 864e5,
+    weeks: 11 * 7 * 864e5,
+    months: 12 * 30 * 864e5,
+    years: 11 * 360 * 864e5,
+};
+
+function metricTimes(params: Params, granularity: string): Date[] | { error: string } {
+    const startParam = params.dt_start;
+    const endParam = params.dt_end;
+    const parseBound = (value: unknown): number | null => {
+        if (value == null || value === '') return null;
+        const seconds = numericWireValue(value);
+        return seconds == null ? Number.NaN : seconds * 1000;
+    };
+    let start = parseBound(startParam);
+    let end = parseBound(endParam);
+    if (Number.isNaN(start) || Number.isNaN(end)) return { error: 'dt_start and dt_end must be epoch seconds' };
+
+    if (start == null && end == null && params.range) {
+        const span = RANGE_MS[String(params.range)] ?? RANGE_MS['24h']!;
+        end = Date.now();
+        start = end - span;
+    } else {
+        const span = DEFAULT_BUCKET_SPANS[granularity] ?? DEFAULT_BUCKET_SPANS.hours!;
+        if (start == null && end == null) end = Date.now();
+        if (start == null) start = end! - span;
+        if (end == null) end = start + span;
+    }
+
+    const first = floorMetricBucket(start!, granularity);
+    const last = floorMetricBucket(end!, granularity);
+    if (first.getTime() > last.getTime()) return [];
+
+    const times: Date[] = [];
+    let cursor = first;
+    // The live range is inclusive. The mock caps pathological requests so a
+    // pasted multi-year minute window cannot freeze the showcase.
+    while (cursor.getTime() <= last.getTime() && times.length < 400) {
+        times.push(cursor);
+        cursor = stepMetricBucket(cursor, granularity);
+    }
+    return times;
+}
+
 function fetchMetrics(params: Params) {
-    const range = String(params.range ?? '24h');
     const granularity = String(params.granularity ?? 'hours');
     const wanted = String(params.slugs ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    const span = RANGE_MS[range] ?? RANGE_MS['24h']!;
     const bucket = BUCKET_MS[granularity] ?? BUCKET_MS.hours!;
-    const count = Math.min(400, Math.max(2, Math.round(span / bucket)));
-    // Align the right edge to the current bucket so labels read cleanly.
-    const end = Math.floor(Date.now() / bucket) * bucket;
-
-    const labels: string[] = [];
-    const times: number[] = [];
-    for (let i = count - 1; i >= 0; i--) {
-        const t = end - i * bucket;
-        times.push(t);
-        labels.push(bucketLabel(new Date(t), granularity));
-    }
 
     if (wanted.length === 0) {
         // Backend parity: slug(s) are required, not defaulted.
         return { status: false, error: 'missing required parameter: slug, slugs, or category', error_code: 400 };
     }
+    const window = metricTimes(params, granularity);
+    if (!Array.isArray(window)) return { status: false, error: window.error, error_code: 400 };
+    const labels = window.map((date) => bucketLabel(date, granularity));
+    const times = window.map((date) => date.getTime());
     const picked = SERIES.filter((s) => wanted.includes(s.slug));
     // Longer buckets aggregate more events — scale so totals stay coherent.
     const scale = bucket / 3600e3;
     // Real wire shape (verified live): a slug-keyed series map + labels. No
     // datasets array, no granularity/range echo — the client normalizes.
     const data: Record<string, number[]> = {};
+    const salt = accountSalt(String(params.account ?? 'public'));
     picked.forEach((s, i) => {
-        data[s.slug] = times.map((t) => Math.round(sample(i, t, s.base, s.spread) * Math.max(0.15, scale)));
+        data[s.slug] = times.map((t) => Math.round(sample(i + (salt % 997), t + salt, s.base, s.spread) * Math.max(0.15, scale)));
     });
 
     return { status: true, data: { data, labels } };
@@ -1436,6 +1528,40 @@ function tokenPair(user: User, accessTtl = ACCESS_TTL, authTime?: number) {
 // Pending one-time credentials, keyed the way the server keys them.
 const pendingResetCodes = new Map<string, string>(); // email → 6-digit code
 
+interface PendingMfa {
+    uid: number;
+    methods: string[];
+    expiresAt: number;
+}
+
+const pendingMfa = new Map<string, PendingMfa>();
+const pendingSms = new Map<number, { code: string; expiresAt: number }>();
+let mfaSequence = 0;
+const MOCK_TOTP_CODE = '123456';
+const MOCK_RECOVERY_CODE = 'mock-recovery';
+const MOCK_SMS_CODE = '654321';
+
+function issueMfaToken(user: MockUser, methods: string[], ttl = 300): string {
+    const token = `mfa:mock-${user.id}-${++mfaSequence}`;
+    pendingMfa.set(token, { uid: user.id, methods: [...methods], expiresAt: Date.now() + ttl * 1000 });
+    return token;
+}
+
+/** Runtime truth: every verify/send attempt burns its challenge before validation. */
+function consumeMfaToken(value: unknown): PendingMfa | null {
+    const token = String(value ?? '');
+    const challenge = pendingMfa.get(token);
+    pendingMfa.delete(token);
+    if (!challenge || Date.now() >= challenge.expiresAt) return null;
+    return challenge;
+}
+
+function mfaGrant(challenge: PendingMfa, source: 'totp' | 'recovery' | 'sms', accessTtl: number): unknown {
+    const user = db.users.find((candidate) => candidate.id === challenge.uid);
+    if (!user || !user.is_active) return { status: false, error: 'permission denied', error_code: 401 };
+    return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user), source } };
+}
+
 function authFetch(path: string, body: Record<string, unknown>): unknown {
     // Dev knob: __mock_access_ttl mints a short-lived access token so refresh
     // paths are testable without waiting 6 hours. Mock-only; ignored by the
@@ -1446,7 +1572,54 @@ function authFetch(path: string, body: Record<string, unknown>): unknown {
         case '/api/login': {
             const user = findByEmail(body.username);
             if (!user || !user.is_active || body.password !== MOCK_PASSWORD) return invalidCreds();
+            if (user.requires_mfa) {
+                const methods = ['totp', ...(user.is_phone_verified && user.phone_number ? ['sms'] : []), ...(db.passkeys.some((p) => p.user === user.id && p.is_enabled) ? ['passkey'] : [])];
+                const ttl = typeof body.__mock_mfa_ttl === 'number' ? body.__mock_mfa_ttl : 300;
+                return {
+                    status: true,
+                    data: {
+                        mfa_required: true,
+                        mfa_token: issueMfaToken(user, methods, ttl),
+                        mfa_methods: methods,
+                        expires_in: ttl,
+                    },
+                };
+            }
             return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user) } };
+        }
+        case '/api/auth/totp/verify': {
+            const challenge = consumeMfaToken(body.mfa_token);
+            if (!challenge) return { status: false, error: 'Invalid or expired MFA token', error_code: 401 };
+            if (String(body.code ?? '').trim() !== MOCK_TOTP_CODE) return { status: false, error: 'Invalid code', error_code: 401 };
+            return mfaGrant(challenge, 'totp', accessTtl);
+        }
+        case '/api/auth/totp/recover': {
+            const challenge = consumeMfaToken(body.mfa_token);
+            if (!challenge) return { status: false, error: 'Invalid or expired MFA token', error_code: 401 };
+            if (String(body.recovery_code ?? '').trim() !== MOCK_RECOVERY_CODE) return { status: false, error: 'Invalid recovery code', error_code: 403 };
+            return mfaGrant(challenge, 'recovery', accessTtl);
+        }
+        case '/api/auth/sms/send': {
+            const challenge = consumeMfaToken(body.mfa_token);
+            if (!challenge) return { status: false, error: 'Invalid or expired MFA token', error_code: 401 };
+            const user = db.users.find((candidate) => candidate.id === challenge.uid);
+            if (!user) return { status: false, error: 'permission denied', error_code: 401 };
+            pendingSms.set(user.id, { code: MOCK_SMS_CODE, expiresAt: Date.now() + 600_000 });
+            const ttl = 300;
+            return {
+                status: true,
+                data: { mfa_token: issueMfaToken(user, challenge.methods, ttl), expires_in: ttl },
+            };
+        }
+        case '/api/auth/sms/verify': {
+            const challenge = consumeMfaToken(body.mfa_token);
+            if (!challenge) return { status: false, error: 'Invalid or expired MFA token', error_code: 401 };
+            const pending = pendingSms.get(challenge.uid);
+            pendingSms.delete(challenge.uid);
+            if (!pending || Date.now() >= pending.expiresAt || String(body.code ?? '').trim() !== pending.code) {
+                return { status: false, error: 'Invalid or expired code', error_code: 401 };
+            }
+            return mfaGrant(challenge, 'sms', accessTtl);
         }
         case '/api/token/refresh': {
             const payload = decodeMockJwt(String(body.refresh_token ?? ''));
@@ -1553,6 +1726,13 @@ export function getMockCallCounts(): Record<string, number> {
     return Object.fromEntries(callCounts);
 }
 
+let armedReauth: { method: string; path: string } | null = null;
+
+/** Mock-only one-shot fresh-auth challenge, matched by BOTH method and path. */
+export function armMockReauth(method: string, path: string): void {
+    armedReauth = { method: method.toUpperCase(), path };
+}
+
 const LATENCY_MS = 220;
 
 export interface MockFetchOpts {
@@ -1585,9 +1765,18 @@ function userFromBearer(headers: Record<string, string> | undefined): MockUser |
 
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
-    const key = `${opts.method ?? 'GET'} ${path}`;
+    const method = (opts.method ?? 'GET').toUpperCase();
+    const key = `${method} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     await new Promise((r) => setTimeout(r, LATENCY_MS));
+    if (armedReauth?.method === method && armedReauth.path === path) {
+        // The real @requires_fresh_auth runs after authentication. An armed
+        // endpoint must still answer 401 to an anonymous caller, and that
+        // failed auth must not consume the one-shot challenge.
+        if (!userFromBearer(opts.headers)) return { status: false, error: 'permission denied', error_code: 401 };
+        armedReauth = null;
+        return { status: false, error: 'reauth_required', error_code: 440 };
+    }
     if (path === '/api/auth/generate_api_key') {
         // account/rest/user_api_key.py generate_api_key: mints a long-lived
         // key for the CALLER (@requires_auth — needs the bearer, unlike the

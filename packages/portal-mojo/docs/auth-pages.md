@@ -77,9 +77,11 @@ answers with a full TokenGrant).
 - **Magic link**: request via `sendMagicLink`; the landing auto-exchanges
   `loginWithMagicToken` ONCE (StrictMode-proof ref guard — `ml:` tokens are
   single-use) with progress/error UI.
-- **Passkey**: `loginWithPasskey(username?)` behind `isPasskeySupported()`;
+- **Passkey**: `loginWithPasskey(username?, {remember})` behind `isPasskeySupported()`;
   no username → discoverable-credential prompt. The ceremony is fully built;
   REAL-authenticator verification is deferred (mock validates shape only).
+  The remember choice is explicit because MFA and fresh-auth passkey paths
+  must not promote a sessionStorage session into localStorage.
 
 ## Token-landing URL shapes
 
@@ -131,8 +133,11 @@ Call-site pattern:
 await withFreshAuth(() => save(changes));   // a 440 prompts + retries once
 ```
 
-Nothing auto-wraps yet — `useSave`/`useAction` call sites opt in (a later
-pass may wrap the model hooks' mutationFns).
+`defineModel().useSave()` and `.useAction()` wrap their mutation functions in
+this flow globally. Mutation variables are closed over unchanged and the
+normal success/cache path runs only after the retry succeeds. `useDelete()`
+and direct `mojoCall()` calls remain explicit opt-ins: their sensitivity and
+retry safety are endpoint-specific.
 
 Deployment note: a deployment enforcing `BOUNCER_REQUIRE_TOKEN` gates
 `/api/login` behind the bouncer token, which in-app surfaces do not carry
@@ -164,10 +169,19 @@ bouncer-enforcing deployments.
 ## Mock affordances
 
 Under the mock transport the pages show inline dev hints: password `mojo`
-for any seeded user (e.g. `ian@mojoverify.com`); reset code `123456`; token
-formats `pr:mock-<id>` / `ml:mock-<id>` for landing-page runs. The mock has
-NO MFA endpoints and no 440 trigger — see MERGE-WIRE(mock) notes in the C3
-report for the proposed additions.
+for any seeded user (e.g. `ian@mojoverify.com`); Maya (seeded user 2) requires
+MFA; TOTP `123456`, recovery `mock-recovery`, and SMS `654321`; reset code
+`123456`; token formats `pr:mock-<id>` / `ml:mock-<id>`. MFA tokens are
+expiring and single-use. The mock follows the measured runtime behavior:
+TOTP/recovery/SMS attempts burn the token before code validation, and
+`sms/send` burns then re-issues it (older web docs claiming otherwise are
+stale). Login's mock-only `__mock_mfa_ttl` can make expiry immediate.
+
+Arm a real one-shot 440 path from the dev console with
+`__mojo.armMockReauth('POST', '/api/user/1')`. Matching includes method and
+exact path, runs after bearer authentication, and is consumed only by the
+first authenticated match. This makes anonymous 401, unrelated requests,
+the first matching 440, retry success, and later normal calls reproducible.
 
 ## Deferred (explicitly)
 

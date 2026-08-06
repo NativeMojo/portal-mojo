@@ -213,7 +213,7 @@ export function MfaPanel({ challenge, username, remember, onSuccess, onCancel }:
             )}
 
             {active === 'passkey' && (
-                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void run(() => loginWithPasskey(username))}>
+                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void run(() => loginWithPasskey(username, { remember }))}>
                     {busy ? <i className="bi bi-arrow-repeat spin" /> : <i className="bi bi-fingerprint" />}
                     Use your passkey
                 </button>

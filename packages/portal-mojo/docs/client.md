@@ -43,6 +43,17 @@ desc; filters are Django lookups (`field`, `field__in=a,b`,
 triple is `dr_field/dr_start/dr_end`; datetimes serialize as epoch seconds;
 unknown params are silently ignored by the server.
 
+The executable mock coerces comparisons narrowly: both operands must be
+fully numeric for numeric comparison; temporal comparison only recognizes
+canonical `YYYY[-MM[-DD]]` or full ISO datetime shapes; everything else is
+text. This keeps numeric IDs (`10 > 2`) and `User.dob` DateFields correct
+without turning arbitrary date-looking labels into timestamps. The showcase
+Filters demo exercises both `dob__gte=YYYY-MM-DD` and epoch-backed `dr_*`.
+
+Mock-only contract controls are exported in development: call
+`armMockReauth(method, path)` to make one authenticated method+path match
+answer 440. Ordinary requests and real transports are unaffected.
+
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx

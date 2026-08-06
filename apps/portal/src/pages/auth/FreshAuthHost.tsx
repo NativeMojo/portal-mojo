@@ -114,7 +114,7 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
         setBusy(true);
         setError('');
         try {
-            await loginWithPasskey(username.trim() || undefined);
+            await loginWithPasskey(username.trim() || undefined, { remember });
             settle(true);
         } catch (err) {
             setError(errorMessage(err));
