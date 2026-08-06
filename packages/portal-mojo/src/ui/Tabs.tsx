@@ -65,6 +65,20 @@ export function nextTabKey(items: TabItem[], current: string | null, key: 'Arrow
     return enabled[(at + delta + enabled.length) % enabled.length]!.key;
 }
 
+export function controlledTabHealTransition(
+    previousNotice: string,
+    requested: string | null | undefined,
+    effective: string | null,
+    items: TabItem[],
+): { nextNotice: string; notify: string | null } {
+    // A valid request closes the prior invalid episode. If that same invalid
+    // request returns later, it is a new transition and must notify again.
+    if (requested === effective || effective == null) return { nextNotice: '', notify: null };
+    const notice = `${String(requested)}|${items.filter((item) => !item.disabled).map((item) => item.key).join('|')}|${effective}`;
+    if (notice === previousNotice) return { nextNotice: previousNotice, notify: null };
+    return { nextNotice: notice, notify: effective };
+}
+
 export function Tabs({ items, activeKey, defaultActiveKey, onActiveKeyChange, variant, ariaLabel = 'Tabs', className }: TabsProps) {
     const normalized = useMemo(() => normalizeTabItems(items), [items]);
     const controlled = activeKey !== undefined;
@@ -73,7 +87,6 @@ export function Tabs({ items, activeKey, defaultActiveKey, onActiveKeyChange, va
     const effective = effectiveTabKey(requested, normalized);
     const uid = useId().replace(/:/g, '');
     const refs = useRef(new Map<string, HTMLButtonElement>());
-    const invalidNotice = `${String(requested)}|${normalized.filter((item) => !item.disabled).map((item) => item.key).join('|')}|${effective}`;
     const lastNotice = useRef('');
 
     useEffect(() => {
@@ -81,10 +94,14 @@ export function Tabs({ items, activeKey, defaultActiveKey, onActiveKeyChange, va
     }, [controlled, internalKey, effective]);
 
     useEffect(() => {
-        if (!controlled || requested === effective || effective == null || lastNotice.current === invalidNotice) return;
-        lastNotice.current = invalidNotice;
-        onActiveKeyChange?.(effective);
-    }, [controlled, requested, effective, invalidNotice, onActiveKeyChange]);
+        if (!controlled) {
+            lastNotice.current = '';
+            return;
+        }
+        const transition = controlledTabHealTransition(lastNotice.current, requested, effective, normalized);
+        lastNotice.current = transition.nextNotice;
+        if (transition.notify) onActiveKeyChange?.(transition.notify);
+    }, [controlled, requested, effective, normalized, onActiveKeyChange]);
 
     const select = (key: string, focus = false) => {
         if (!controlled) setInternalKey(key);

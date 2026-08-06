@@ -34,6 +34,14 @@ try {
     assert.equal(tabs.effectiveTabKey('a', roster), 'a');
     assert.equal(tabs.effectiveTabKey('missing', roster), 'a', 'controlled invalid requests paint a valid fallback');
     assert.equal(tabs.effectiveTabKey('b', roster), 'a', 'disabled requests heal');
+    const firstInvalid = tabs.controlledTabHealTransition('', 'missing', 'a', roster);
+    assert.equal(firstInvalid.notify, 'a');
+    const repeatedInvalid = tabs.controlledTabHealTransition(firstInvalid.nextNotice, 'missing', 'a', roster);
+    assert.equal(repeatedInvalid.notify, null, 'one invalid episode notifies once');
+    const validAgain = tabs.controlledTabHealTransition(repeatedInvalid.nextNotice, 'a', 'a', roster);
+    assert.equal(validAgain.nextNotice, '', 'a valid request resets the invalid episode');
+    const sameInvalidAgain = tabs.controlledTabHealTransition(validAgain.nextNotice, 'missing', 'a', roster);
+    assert.equal(sameInvalidAgain.notify, 'a', 'invalid → valid → same invalid notifies again');
     assert.equal(tabs.nextTabKey(roster, 'a', 'ArrowRight'), 'c', 'disabled tabs are skipped');
     assert.equal(tabs.nextTabKey(roster, 'c', 'ArrowRight'), 'a', 'right wraps');
     assert.equal(tabs.nextTabKey(roster, 'a', 'ArrowLeft'), 'c', 'left wraps');
@@ -89,12 +97,13 @@ try {
         readFile(new URL('../apps/portal/src/theme/formview.css', import.meta.url), 'utf8'),
     ]);
     for (const token of ['role="tablist"', 'role="tab"', 'role="tabpanel"', 'aria-controls', 'aria-labelledby', 'tabIndex', 'hidden={!selected}', 'selected ? item.panel : null']) assert(tabsSource.includes(token), `Tabs ARIA/panel invariant: ${token}`);
-    assert.match(tabsSource, /lastNotice\.current === invalidNotice/, 'controlled invalid-key notification de-loops');
+    assert.match(tabsSource, /controlledTabHealTransition\(lastNotice\.current/, 'controlled invalid-key notification uses the resettable de-loop transition');
     assert.match(wizardSource, /finishFlight\.current\.pending/, 'finish is single-flight');
     assert.match(wizardSource, /deferReconcile: busy/, 'roster/reset reconciliation defers while pending');
     assert.match(wizardSource, /const payload = form\.payload\(acceptedFields\)/, 'finish captures roster and payload');
     assert.match(modalSource, /item\.canDismiss\?\.\(\) === false/, 'Escape/backdrop share the dynamic dismissal guard');
     assert.match(coreSource, /profile === 'wizard'/, 'SchemaForm and wizard validation profiles stay distinct');
+    assert.match(coreSource, /field\.type === 'switch'[\s\S]*id=\{errorId\}[\s\S]*id=\{helpId\}/, 'switch errors/help render the aria-describedby targets');
     assert.match(formFieldsSource, /profile: 'schema-form'/);
     assert.match(formFieldsSource, /await onSubmit\(form\.payload\(\)\)/, 'SchemaForm keeps flat hidden-stripped submit');
     assert.match(formViewSource, /\.\.\.allTabs\.flatMap/, 'one autosave field roster still includes all tabs');

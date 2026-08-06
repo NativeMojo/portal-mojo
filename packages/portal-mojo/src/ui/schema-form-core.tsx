@@ -202,10 +202,14 @@ function SchemaField({ field, state, disabled = false }: { field: Field; state: 
 
     if (field.type === 'switch') {
         return (
-            <label className="switch-row" htmlFor={controlId}>
-                <input ref={state.registerFocusTarget(field.name)} id={controlId} aria-invalid={!!error || undefined} aria-describedby={describedBy} type="checkbox" role="switch" className="switch" checked={value === true} disabled={disabled || field.disabled} onChange={(event) => set(event.target.checked)} />
-                <span className="field-label">{field.label}</span>
-            </label>
+            <>
+                <label className="switch-row" htmlFor={controlId}>
+                    <input ref={state.registerFocusTarget(field.name)} id={controlId} aria-invalid={!!error || undefined} aria-describedby={describedBy} type="checkbox" role="switch" className="switch" checked={value === true} disabled={disabled || field.disabled} onChange={(event) => set(event.target.checked)} />
+                    <span className="field-label">{field.label}</span>
+                </label>
+                {error && <span id={errorId} className="field-error">{error}</span>}
+                {field.help && !error && <span id={helpId} className="field-help">{field.help}</span>}
+            </>
         );
     }
 
