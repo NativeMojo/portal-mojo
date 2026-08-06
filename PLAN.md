@@ -85,7 +85,8 @@ fresh-auth 440 step-up modal, MFA panel, password strength+generator,
 `VITE_MOJO_AUTH` switch — awaiting Ian's real-authenticator passkey touch;
 OAuth redirect re-deferred with the wire documented in-seam). Mock parity
 follow-ups filed as #1314. **Remaining Phase 1:** land #1259 after the
-passkey touch — then the admin program epic #1260 (19 accepted children).
+passkey touch. The admin program epic #1260 is underway; the first six-item
+package wave is complete below.
 
 **2026-08-05, wave 4 (detail-view parity):** C4's first-screens pass
 under-built the two flagship detail views — it read the sources but judged
@@ -113,16 +114,34 @@ live). `dev:live` @9009 pass is BLOCKED: the browser hits the mverify bouncer's
 Components as part of Admin app. We want a simple demo app we can publish to
 maestro sites eventually." New workspace app `apps/showcase`: no sidebar/auth/
 admin chrome, mock-only (throws if `VITE_MOJO_API` is set), auto-signs in as
-the mock's fixed `ian@mojoverify.com` identity at boot (mock's `/api/login`
-looks callers up by EMAIL despite the `username` field name — a real trap,
-noted in-file) so a cold-localStorage visitor gets working data-backed demos
-with no login page. Also fixed in passing: `.app`'s CSS grid had no
+the explicit mock-only `showcase.operator@nativemojo.com` identity at boot
+(mock's `/api/login` looks callers up by EMAIL despite the `username` field
+name — a real trap, noted in-file) so a cold-localStorage visitor gets working
+permission-gated, data-backed demos with no login page. Also fixed in passing:
+`.app`'s CSS grid had no
 `grid-template-rows`, so the implicit row auto-sized to content and the
 sidebar grew past 100vh with the page instead of scrolling internally
 (`apps/portal/src/theme.css`) — same fix (`grid-template-rows: minmax(0, 1fr)`
 + `overflow: hidden`) kept `.showcase-shell` correct from the start. Publishing
 `apps/showcase` to maestro sites itself is NOT done — tracked as future work,
 not scaffolded this session.
+
+**2026-08-05, wave 5 (admin packages + RecordFeed):** six approved board items
+were scoped in parallel worktrees, merged as commit stacks, coherence-reviewed,
+then wired and verified centrally. **DONE:** mock contract foundation #1314 ·
+credentials/AdminSection foundation #1284 · RecordFeed + ticket/incident
+adapters #1301 · monitoring (logs + metrics permissions) #1285 · runtime
+settings #1286 · Bouncer signals/devices/signatures #1294. The review pass
+closed important contract gaps: all token material is scrubbed before Query
+cache storage; log request/response content is labeled from `log`, not auxiliary
+`payload`; secret-setting updates preserve django-mojo's direction-sensitive
+field order; Bouncer incidents correlate through `category__startswith` + MUID
+search; unsupported signature deletion is absent; list export reuses normalized
+params so crafted graphs cannot recover `token_nonce`. Browser verification
+covered the standalone showcase and the real portal shell in both themes with
+clean consoles; `typecheck` and both production builds pass. The unused backend
+`BouncerSignal.token_nonce` cleanup is deliberately deferred to django-mojo
+board item #1407 rather than made a portal dependency.
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
