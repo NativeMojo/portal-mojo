@@ -22,7 +22,8 @@ design tokens in both themes. Demos: Develop → Components → Display.
 | `granularity` | `minutes/hours/days/weeks/months` (server default `hours`) |
 | `account` | `'public'` (server default) / `'global'` / `'group-<id>'` / `'user-<id>'` — components default to `'global'` (web-mojo parity) |
 | `dt_start` / `dt_end` | window bounds, **epoch SECONDS** (rule 6) |
-| `category`, `child_kind`, `breakdown` | fan-out modes — pass via `apiParams` (not promoted to props; the admin Metrics Explorer #1300 owns that UX) |
+| `category` | optional category passthrough via `apiParams` |
+| `child_kind`, `breakdown` | typed `MetricsChart` fan-out props (`childKind`, `breakdown`) |
 
 Response is a slug-keyed map `{data: {slug: number[]}, labels: string[]}` —
 normalized ONLY by `mojoMetrics` in the client into `{labels, datasets}`.
@@ -74,7 +75,10 @@ smearing).
     defaultType="line"
     height={280}
     valueFormatter={(n) => ...}                 // tooltips, ticks, dialogs
-    apiParams={{ child_kind: 'store' }}         // passthrough; built-ins overwrite overlaps
+    childKind="store" breakdown={false}         // typed fan-out; overwrites apiParams
+    loadSeries={exactLoader}                    // optional; default is mojoMetrics
+    seriesCacheKey="caller-42:exact-history"   // required stable namespace for custom loaders
+    preserveSeriesLabels                       // keep full-slug/child identity verbatim
     // toggles, all default true:
     showGranularity showDateRange showTypeSwitch showRefresh showStats showDataTable
 />
@@ -92,6 +96,12 @@ smearing).
 - Quick ranges anchor their window at pick time; **Refresh re-anchors at
   now** (web-mojo kept the stale window — deliberate fix). Range switches
   re-point granularity at the nearest sensible bucket.
+- `loadSeries(params)` receives typed `slugs`, `account`, `granularity`,
+  `dt_start`, `dt_end`, and optional fan-out fields. The loader namespace is
+  part of the TanStack key, preventing a custom exact-identity loader from
+  reusing a cached default response with the same wire params.
+- CSV data export neutralizes formula-looking **string** cells before RFC
+  quoting. Negative numeric metrics remain numeric.
 - Deliberately NOT carried: `compactHeader` (MetricsMiniWidget IS the
   compact card), `.export()` (removed in web-mojo too — use
   `exportChartPng`), `withDelta` endpoint switching (KPIStrip covers the

@@ -60,6 +60,12 @@ try {
     assert.deepEqual(admin.SETTINGS_ADMIN_SECTION.routes.map((route) => route.path), ['']);
     assert(admin.ADMIN_SECTIONS.flatMap((section) => section.routes).every((route) => !route.path.includes(':')),
         'shipped Admin record details must not register child routes');
+    const metricsRoutes = admin.MONITORING_ADMIN_SECTION.routes.filter((route) => route.path.startsWith('metrics/'));
+    assert.deepEqual(metricsRoutes.map((route) => route.path), ['metrics/explorer', 'metrics/permissions']);
+    assert.deepEqual(metricsRoutes[0].permissions, ['sys.view_metrics', 'sys.metrics']);
+    assert.deepEqual(metricsRoutes[1].permissions, ['sys.manage_incidents', 'sys.metrics', 'sys.manage_metrics']);
+    assert(admin.adminSectionRoutes([admin.MONITORING_ADMIN_SECTION], { mount: '/system' })
+        .some((route) => route.path === 'system/metrics/explorer'));
 
     const menu = admin.adminSectionsMenu(sections, { mount: '/system', grouped: true });
     const category = menu.items.find((item) => item.id === 'admin:other');

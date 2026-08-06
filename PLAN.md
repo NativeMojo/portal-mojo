@@ -531,6 +531,13 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - Composed FormView permission tab presentation onto Tabs while retaining one autosave reducer over `allTabs`; legacy `.fv-*` styling remains for other callers.
 - Added both-theme CSS, the showcase variants/wizard/modal proof, AI reference docs, and `verify:form-wizard`. Consolidated typecheck/build/browser evidence is owned by the wave orchestrator and is intentionally not claimed here.
 
+### #1300 — Admin Metrics Explorer (2026-08-06)
+
+- Added one global, no-group `/metrics/explorer` workspace under Observability with its exact `sys.view_metrics | sys.metrics` route clause, separate from the existing manage-only permission editor audience.
+- Consumes django-mojo #1438's exact `/api/metrics/discover` envelope through `mojoCall`; account/category/slug catalogs stay backend-authoritative and caller-scoped. Group/User directory conveniences mount only with their independent global view clauses.
+- Preserves full colon-slug identity across the backend's intentionally lossy `/fetch` and `/value/get` responses by splitting duplicate tails, validating exact echoes, and reassembling request order. `/series?with_delta=true`, group fan-out, explicit scalar reads, and `dt_*` history are covered without adding any write or arbitrary model-aggregation surface.
+- Added the injectable `MetricsChart.loadSeries` + cache namespace seam, shared CSV formula neutralization, live-lossy central mock fixtures, both-theme token styles, showcase, AI reference docs, and `verify:admin-metrics-explorer`. Consolidated validation remains owned by the wave orchestrator and is intentionally not claimed here.
+
 ## Working agreements
 
 - **Port from source.** Before building any listed item, read its web-mojo file

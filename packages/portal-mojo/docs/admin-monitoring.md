@@ -1,18 +1,24 @@
 # Admin monitoring
 
 `portal-mojo/admin` packages the immutable Logs feed, one-record log inspector,
-and metrics-permission administration for standalone or embedded admin portals.
+read-only Metrics Explorer, and metrics-permission administration for standalone
+or embedded admin portals. See [admin-metrics-explorer.md](admin-metrics-explorer.md)
+for the discovery, identity, KPI, fan-out, scalar, and cache contracts.
 
 ## Admin registration and gates
 
-`MONITORING_ADMIN_SECTION` contributes two root-relative routes:
+`MONITORING_ADMIN_SECTION` contributes three root-relative routes:
 
 | Route | Component | Any-of gate |
 |---|---|---|
 | `/logs` | `LogsPage` | `sys.manage_logs`, `sys.view_logs`, `sys.security` |
+| `/metrics/explorer` | `MetricsExplorerPage` | `sys.view_metrics`, `sys.metrics` |
 | `/metrics/permissions` | `MetricsPermissionsPage` | `sys.manage_incidents`, `sys.metrics`, `sys.manage_metrics` |
 
-The `sys.` prefix is intentional: these are global operator surfaces and must
+The section clause is the union of these route audiences, while each route
+retains its exact clause. In particular, `sys.view_metrics` reveals only the
+explorer, `sys.metrics` reveals explorer and editor, and `sys.manage_metrics`
+reveals only the editor. The `sys.` prefix is intentional: these are global operator surfaces and must
 not inherit a similarly named active-group permission. `adminSectionRoutes()`
 wraps each component before it mounts, so a denied direct route cannot fetch.
 The backend remains authoritative.
