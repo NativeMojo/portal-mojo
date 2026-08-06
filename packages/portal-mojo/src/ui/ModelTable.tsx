@@ -188,7 +188,15 @@ function MenuDropdown({ button, children, align = 'end' }: {
     );
 }
 
-export function ModelTable<T extends { id: number }>({
+/**
+ * Row identity as django-mojo serves it. Most models use an integer pk, but
+ * some (jobs.Job, jobs.ScheduledTask) declare a 32-char uuid-hex CharField
+ * primary key — so selection, expansion and React keys are keyed on the union
+ * rather than on `number`.
+ */
+export type RowId = number | string;
+
+export function ModelTable<T extends { id: RowId }>({
     model, endpoint, columns, filters = [], presets = [], eyebrow, title,
     searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort, defaultParams,
     selectable = false, batchActions = [],
@@ -353,7 +361,7 @@ export function ModelTable<T extends { id: number }>({
     };
 
     // ── Selection + batch (decoupled: checkboxes need no batchActions) ──
-    const [selected, setSelected] = useState<Set<number>>(() => new Set());
+    const [selected, setSelected] = useState<Set<RowId>>(() => new Set());
     const wireSignature = JSON.stringify(p.wire);
     const prevSignature = useRef(wireSignature);
     useEffect(() => {
@@ -366,7 +374,7 @@ export function ModelTable<T extends { id: number }>({
         }
     }, [wireSignature]);
 
-    const toggleSelected = (id: number) => {
+    const toggleSelected = (id: RowId) => {
         setSelected((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -423,7 +431,7 @@ export function ModelTable<T extends { id: number }>({
 
     // ── Row expand ───────────────────────────────────────────────────────
     const expandEnabled = typeof rowExpand === 'function';
-    const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
+    const [expanded, setExpanded] = useState<Set<RowId>>(() => new Set());
     useEffect(() => {
         // Page change / refetch collapses rows that are no longer present.
         if (!expandEnabled) return;
@@ -434,7 +442,7 @@ export function ModelTable<T extends { id: number }>({
             return next.size === prev.size ? prev : next;
         });
     }, [rows, expandEnabled]);
-    const toggleExpand = (id: number) => {
+    const toggleExpand = (id: RowId) => {
         setExpanded((prev) => {
             const next = new Set(rowExpandMultiple ? prev : []);
             if (prev.has(id)) next.delete(id);

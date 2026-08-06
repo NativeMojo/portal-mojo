@@ -1,8 +1,16 @@
 # ModelTable — the server-driven table
 
 ```ts
-import { ModelTable, ExpandingSearch, type Column, type Preset, type BatchAction } from 'portal-mojo/ui';
+import { ModelTable, ExpandingSearch, type Column, type Preset, type BatchAction, type RowId } from 'portal-mojo/ui';
 ```
+
+## Row identity
+
+The row constraint is `T extends { id: RowId }` where `RowId = number | string`.
+Most django-mojo models use an integer pk, but some declare a 32-char uuid-hex
+`CharField` primary key (`jobs.Job`, `jobs.ScheduledTask`) — so selection,
+expansion, React keys and `BatchAction` targets are all keyed on the union. An
+integer-id table is unaffected; nothing narrows an id back to `number`.
 
 Every sort, filter, search and page is a **wire param the server answers**
 — there is no client-side row work (rule #1). Table state lives in the
