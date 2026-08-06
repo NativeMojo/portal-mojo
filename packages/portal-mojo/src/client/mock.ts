@@ -1402,24 +1402,28 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     // global view and global manage gates independently.
     const securityViewer = at(11);
     securityViewer.is_active = true;
+    securityViewer.is_superuser = false;
     securityViewer.username = 'security.viewer';
     securityViewer.email = 'security.viewer@nativemojo.com';
     securityViewer.display_name = 'Security Viewer';
     securityViewer.permissions = { view_security: true, view_geofence: true };
     const securityManager = at(12);
     securityManager.is_active = true;
+    securityManager.is_superuser = false;
     securityManager.username = 'security.manager';
     securityManager.email = 'security.manager@nativemojo.com';
     securityManager.display_name = 'Security Manager';
     securityManager.permissions = { view_security: true, manage_security: true, manage_geofence: true, manage_settings: true, manage_metrics: true };
     const groupsManager = at(13);
     groupsManager.is_active = true;
+    groupsManager.is_superuser = false;
     groupsManager.username = 'groups.manager';
     groupsManager.email = 'groups.manager@nativemojo.com';
     groupsManager.display_name = 'Groups Manager';
     groupsManager.permissions = { manage_groups: true, groups: true, manage_users: true, users: true };
     const groupsViewer = at(16);
     groupsViewer.is_active = true;
+    groupsViewer.is_superuser = false;
     groupsViewer.username = 'groups.viewer';
     groupsViewer.email = 'groups.viewer@nativemojo.com';
     groupsViewer.display_name = 'Groups Viewer';
@@ -1429,6 +1433,7 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     // the narrower viewer/manager identities above intact for permission tests.
     const showcaseOperator = at(14);
     showcaseOperator.is_active = true;
+    showcaseOperator.is_superuser = false;
     showcaseOperator.username = 'showcase.operator';
     showcaseOperator.email = 'showcase.operator@nativemojo.com';
     showcaseOperator.display_name = 'Showcase Operator';
@@ -1443,6 +1448,7 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     };
     const securityManageOnly = at(15);
     securityManageOnly.is_active = true;
+    securityManageOnly.is_superuser = false;
     securityManageOnly.username = 'security.manage-only';
     securityManageOnly.email = 'security.manage-only@nativemojo.com';
     securityManageOnly.display_name = 'Security Manage Only';

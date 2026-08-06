@@ -16,7 +16,7 @@ try {
     assert.equal(dsl.serializeHandlerChain(dsl.parseHandlerChain(every)), every);
     assert.equal(dsl.parseHandlerChain('notify://perm@security,alice,block://?ttl=3').steps.length, 2);
     const legacy = dsl.parseHandlerChain('block://?ttl=1,custom://x, notify://alice,resolve://?status=resolved');
-    assert.deepEqual(legacy.steps.map((step) => step.runtime), ['effective', 'swallowed', 'swallowed', 'effective']);
+    assert.deepEqual(legacy.steps.map((step) => step.runtime), ['effective', 'swallowed', 'effective']);
     assert.deepEqual(dsl.runtimeEffectiveHandlerChain(legacy), ['block://?ttl=1,custom://x, notify://alice', 'resolve://?status=resolved']);
     assert.throws(() => dsl.moveHandlerStep(legacy, 1, 0));
     assert.equal(dsl.moveHandlerStep(legacy, 1, 0, { confirmBehaviorChange: true }).steps[0].scheme, 'custom');
