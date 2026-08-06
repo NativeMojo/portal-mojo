@@ -1,0 +1,88 @@
++/* Admin monitoring: full log inspector + semantic metrics-permission table. */
+.monitoring-page { display: grid; gap: 14px; }
+.monitoring-page-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.monitoring-page-head h1 { margin: 0; color: var(--ink-strong); font-size: 22px; letter-spacing: -0.02em; }
+.monitoring-page-head p { margin: 3px 0 0; color: var(--mute); }
+.monitoring-table-panel { overflow: hidden; }
+.monitoring-table-scroll { width: 100%; overflow-x: auto; }
+.monitoring-table { width: 100%; border-collapse: collapse; min-width: 820px; }
+.monitoring-table caption.sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.monitoring-table th, .monitoring-table td {
+    padding: 12px 14px; border-bottom: 1px solid var(--line-soft);
+    text-align: left; vertical-align: top;
+}
+.monitoring-table thead th {
+    color: var(--mute); background: var(--surface2);
+    font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.monitoring-table tbody tr:last-child > * { border-bottom: 0; }
+.monitoring-table tbody th { color: var(--ink-strong); font-weight: 650; }
+.monitoring-table .tag-input { min-width: 220px; }
+.monitoring-row-actions { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.monitoring-state { padding: 38px 20px; color: var(--mute); text-align: center; }
+.monitoring-state p { margin: 0 0 12px; }
+.monitoring-state-error { color: var(--bad); }
+
+.monitoring-inspector { min-height: min(640px, 82vh); background: var(--bg); }
+.monitoring-inspector-head {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    padding: 18px 20px; background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.monitoring-inspector-head h2 {
+    margin: 1px 0 2px; color: var(--ink-strong); font-size: 19px;
+    line-height: 1.35; overflow-wrap: anywhere;
+}
+.monitoring-inspector-head p { margin: 0; color: var(--mute); font-size: 12px; }
+.monitoring-inspector-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.monitoring-facts {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+    margin: 18px 20px; overflow: hidden;
+    background: var(--line); border: 1px solid var(--line); border-radius: 10px;
+}
+.monitoring-fact { min-width: 0; padding: 10px 12px; background: var(--surface); }
+.monitoring-fact > span {
+    display: block; color: var(--mute); font-size: 10px;
+    letter-spacing: 0.07em; text-transform: uppercase;
+}
+.monitoring-fact > strong {
+    display: block; margin-top: 2px; color: var(--ink-strong); font-weight: 600;
+    overflow-wrap: anywhere;
+}
+.monitoring-inspector-block {
+    margin: 14px 20px; padding: 14px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px;
+}
+.monitoring-inspector-block > p:last-child { margin-bottom: 0; }
+.monitoring-inspector-block-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-bottom: 8px;
+}
+.monitoring-plain {
+    max-height: 420px; margin: 0; padding: 12px; overflow: auto;
+    color: var(--ink); background: var(--field-bg); border: 1px solid var(--field-line);
+    border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere;
+    font: 12px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
+}
+.monitoring-break { overflow-wrap: anywhere; }
+.monitoring-pairing-note {
+    display: flex; gap: 8px; margin: 14px 20px 20px; padding: 10px 12px;
+    color: var(--info); background: var(--info-soft); border-radius: 8px;
+    font-size: 12.5px;
+}
+@media (max-width: 720px) {
+    .monitoring-page-head { align-items: stretch; flex-direction: column; }
+    .monitoring-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .monitoring-inspector-head { position: static; }
+}
+@media (max-width: 480px) {
+    .monitoring-facts { grid-template-columns: 1fr; }
+    .monitoring-inspector-head, .monitoring-inspector-block { margin-inline: 0; }
+    .monitoring-inspector-head { padding-inline: 14px; }
+    .monitoring-inspector-block { border-inline: 0; border-radius: 0; }
+}
