@@ -29,7 +29,14 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
     const regenerationBusyRef = useRef(false);
     const [regenerationBusy, setRegenerationBusy] = useState(false);
     const [pollState, setPollState] = useState<RenditionPollStop | 'polling' | null>(null);
-    useEffect(() => () => { alive.current = false; pollGeneration.current += 1; }, []);
+    useEffect(() => {
+        alive.current = true;
+        return () => {
+            alive.current = false;
+            initialPollStarted.current = false;
+            pollGeneration.current += 1;
+        };
+    }, []);
 
     const startPoll = async (before: string, targetRoles: readonly string[] | null) => {
         const generation = ++pollGeneration.current;

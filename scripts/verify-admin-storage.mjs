@@ -209,6 +209,8 @@ try {
     assert.match(fileViewSource, /pollGeneration/);
     assert.match(fileViewSource, /regenerationBusyRef/);
     assert.match(fileViewSource, /disabled=\{pollingDisabled\}/);
+    assert.match(fileViewSource, /useEffect\(\(\) => \{\s*alive\.current = true;/);
+    assert.match(fileViewSource, /alive\.current = false;\s*initialPollStarted\.current = false;\s*pollGeneration\.current \+= 1;/);
     const clientSource = await read('packages/portal-mojo/src/client/client.ts');
     assert.match(clientSource, /errorCode = body\.error_code/);
     assert.match(clientSource, /body\.code \?\? legacyStatus/);
