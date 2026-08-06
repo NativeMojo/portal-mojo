@@ -109,8 +109,10 @@ Two negative rules matter:
 - Prose is never regexed into a status transition. If old/new status is not
   structured, the row follows the remaining precedence.
 
-`metadata` is normalized to a plain object, while `raw` preserves the complete
-wire row for domain-specific `renderAddon` consumers.
+`metadata` is normalized to a plain object. `raw` remains wire-shaped, but it
+may be domain-sanitized. Sensitive domains pass `sanitizeRow` and
+`sanitizeText`; the unsanitized failure-restoration draft remains only in a
+component-local ref and never enters MutationCache.
 
 ## Exact optimistic lifecycle
 

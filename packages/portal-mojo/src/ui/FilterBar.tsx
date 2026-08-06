@@ -209,7 +209,7 @@ export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TablePa
                         const on = isActive(defs, active, def);
                         return (
                             <button
-                                key={def.key + def.type}
+                                key={`${paramKeyFor(def)}:${def.label}`}
                                 className={`filter-menu-item${on ? ' filter-on' : ''}`}
                                 onClick={() => {
                                     setOpen(false);

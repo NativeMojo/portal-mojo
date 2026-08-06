@@ -360,7 +360,6 @@ interface MutationContext {
 
 interface SendVariables {
     text: string;
-    originalDraft: string;
 }
 
 function AdapterFeed(props: AdapterRecordFeedProps) {
@@ -369,6 +368,9 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
     const [draft, setDraft] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const ownSendRef = useRef(false);
+    // The unsanitized restoration draft stays component-local. It never enters
+    // MutationCache or Query cache for sensitive adapters.
+    const restoreDraftRef = useRef('');
     const query = useQuery({
         queryKey: adapter.queryKey,
         queryFn: () => adapter.fetch(),
@@ -414,13 +416,13 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
             });
             requestAnimationFrame(() => textareaRef.current?.focus());
         },
-        onError: (_error, variables, context) => {
+        onError: (_error, _variables, context) => {
             if (context?.snapshot) {
                 queryClient.setQueryData(adapter.queryKey, context.snapshot);
             } else {
                 queryClient.removeQueries({ queryKey: adapter.queryKey, exact: true });
             }
-            setDraft(variables.originalDraft);
+            setDraft(restoreDraftRef.current);
             requestAnimationFrame(() => textareaRef.current?.focus());
         },
         onSettled: () => {
@@ -435,8 +437,9 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
     const submit = (text: string, originalDraft: string) => {
         if (mutation.isPending) return;
         ownSendRef.current = true;
+        restoreDraftRef.current = originalDraft;
         setDraft('');
-        mutation.mutate({ text, originalDraft });
+        mutation.mutate({ text: adapter.sanitizeDraft ? adapter.sanitizeDraft(text) : text });
     };
 
     return (

@@ -207,8 +207,8 @@ export async function mojoDelete(endpoint: string, id: number | string): Promise
     await unwrap(`${endpoint}/${id}`, { method: 'DELETE' });
 }
 
-/** Trigger a browser download of an in-memory file. */
-function saveBlob(blob: Blob, filename: string): void {
+/** Trigger a browser download of an in-memory file. Shared by safe client exports. */
+export function downloadBlob(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -242,10 +242,10 @@ export async function mojoDownload(endpoint: string, params: Params, format: 'cs
         const body = (await mockFetch(endpoint, { params: withFormat, headers })) as Envelope;
         if (body.status === false) throw new MojoError(body.error ?? 'Export failed', body.error_code ?? 0);
         const file = body.data as { filename: string; content: string; mime: string };
-        saveBlob(new Blob([file.content], { type: file.mime }), file.filename);
+        downloadBlob(new Blob([file.content], { type: file.mime }), file.filename);
         return;
     }
     const res = await fetch(`${API_BASE}${endpoint}${buildQuery(withFormat)}`, { headers });
     if (!res.ok) throw new MojoError(`Export failed (HTTP ${res.status})`, res.status);
-    saveBlob(await res.blob(), filename);
+    downloadBlob(await res.blob(), filename);
 }

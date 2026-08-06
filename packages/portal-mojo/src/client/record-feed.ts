@@ -16,7 +16,7 @@ export interface RecordFeedItemBase {
     content: string;
     author: RecordFeedAuthor;
     metadata: Record<string, unknown>;
-    /** The untouched django-mojo row, including deferred `media`. */
+    /** Wire-shaped django-mojo row; sensitive-domain adapters may sanitize it. */
     raw: Record<string, unknown>;
     /** Client-only marker used by adapter-mode optimistic rows. */
     pending?: boolean;
@@ -69,10 +69,14 @@ export interface RecordFeedAdapter {
     queryKey: RecordFeedQueryKey;
     fetch(): Promise<RecordFeedPage>;
     addNote(text: string): Promise<RecordFeedItem>;
+    /** Sanitizes optimistic cache and mutation variables for sensitive domains. */
+    sanitizeDraft?(text: string): string;
 }
 
-interface FeedAdapterOptions {
+export interface FeedAdapterOptions {
     groupId?: RecordFeedId | null;
+    sanitizeRow?: (row: Record<string, unknown>) => Record<string, unknown>;
+    sanitizeText?: (text: string) => string;
 }
 
 interface WireFeedUser {
@@ -211,10 +215,12 @@ interface AdapterConfig {
     parentId: RecordFeedId;
     groupId: RecordFeedId | null;
     postKind?: string;
+    sanitizeRow?: (row: Record<string, unknown>) => Record<string, unknown>;
+    sanitizeText?: (text: string) => string;
 }
 
 function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
-    const { kind, endpoint, parentId, groupId, postKind } = config;
+    const { kind, endpoint, parentId, groupId, postKind, sanitizeRow, sanitizeText } = config;
     const queryKey = recordFeedQueryKey(kind, parentId, groupId);
 
     return {
@@ -222,6 +228,7 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
         parentId,
         groupId,
         queryKey,
+        sanitizeDraft: (text) => sanitizeText ? sanitizeText(text) : text,
         async fetch() {
             const page = await mojoList<Record<string, unknown>>(endpoint, {
                 parent: parentId,
@@ -231,7 +238,7 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
                 start: 0,
                 size: 100,
             });
-            const newestFirst = page.rows.map(normalizeRecordFeedItem);
+            const newestFirst = page.rows.map((row) => normalizeRecordFeedItem(sanitizeRow ? sanitizeRow(row) : row));
             return {
                 items: newestFirst.reverse(),
                 count: page.count,
@@ -239,6 +246,7 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
             };
         },
         async addNote(text) {
+            const safeText = sanitizeText ? sanitizeText(text) : text;
             const raw = await mojoSave<Record<string, unknown>>(endpoint, null, {
                 parent: parentId,
                 // django-mojo's generic REST saver consumes ForeignKeys as a
@@ -246,10 +254,11 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
                 // related row, then assigns it. Keep create scope identical
                 // to the group-aware list/cache scope.
                 ...(groupId === null ? {} : { group: groupId }),
-                note: text,
+                note: safeText,
                 ...(postKind ? { kind: postKind } : {}),
             });
-            return normalizeRecordFeedItem(raw);
+            const safeRaw = sanitizeRow ? sanitizeRow(raw) : raw;
+            return normalizeRecordFeedItem(safeRaw);
         },
     };
 }
@@ -264,6 +273,8 @@ export function createTicketNoteAdapter(
         endpoint: '/api/incident/ticket/note',
         parentId,
         groupId: options.groupId ?? null,
+        sanitizeRow: options.sanitizeRow,
+        sanitizeText: options.sanitizeText,
     });
 }
 
@@ -278,5 +289,7 @@ export function createIncidentHistoryAdapter(
         parentId,
         groupId: options.groupId ?? null,
         postKind: 'comment',
+        sanitizeRow: options.sanitizeRow,
+        sanitizeText: options.sanitizeText,
     });
 }

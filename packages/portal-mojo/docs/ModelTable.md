@@ -19,6 +19,8 @@ URL-synced params store. All features below are opt-in props; a bare
     selectable batchActions={BATCH}
     columnChooser persistState persistKey="users"
     exportFormats={['csv', 'json']}
+    exporter={safeExporter}
+    rowTone={(row) => row.priority >= 8 ? 'danger' : null}
     autoRefresh={30}
     rowExpand={(u) => <UserExpand u={u} />}
     {...groupByRecency<User>('last_activity')}
@@ -48,13 +50,18 @@ editable pills; presets are param bundles with DERIVED active state.
 by design). Select-all covers the current page, with an indeterminate
 state. Selection clears when the wire params change (page/sort/filter).
 
-`BatchAction<T> = { key, label, icon?, danger?, confirm?: string | false,
-prepare?, run }`. Runner semantics (TablePage.batchAction port): confirm →
-optional once-per-batch `prepare()` (resolve null to cancel; its value is
+`BatchAction<T>` accepts either `run(row, prepared)` or the mutually exclusive
+`runBatch(rows, prepared)`. Runner semantics: confirm → optional once-per-batch
+`prepare(rows)` (resolve null to cancel; its value is
 passed to every run — e.g. collect ONE disable reason) →
 `Promise.allSettled(rows.map(run))` → toasts `"Label: N item(s) updated"`
 / `"N succeeded, M failed"` (warning) / `"failed for all N"` → always
 clear selection + invalidate.
+
+`runBatch` executes exactly once for selection-wide operations such as incident
+merge. A rejection produces one actionable error; cancellation mutates
+nothing. Selection clears and the endpoint invalidates after a non-cancelled
+attempt. `rowTone(row)` emits semantic danger/warning queue classes.
 
 ## Column chooser + persistState
 
@@ -95,6 +102,9 @@ headers repeat (that repetition is the defined behavior, not a bug).
 
 `exportFormats={['csv','json']}` → server-side export of the WHOLE
 filtered set via `download_format` + `filename` (paging stripped).
+`exporter(format, normalizedParams)` overrides that path. It receives the same
+model-normalized params as the visible query, allowing sensitive domains to use
+bounded, immediately sanitized, allowlisted client exports.
 
 ## Loading states
 

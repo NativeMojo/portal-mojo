@@ -45,7 +45,7 @@ export interface Preset {
     params: Record<string, string>;    // empty {} = the "All" chip
 }
 
-export interface BatchAction<T> {
+interface BatchActionBase<T> {
     key: string;
     label: string;
     icon?: string;
@@ -57,10 +57,14 @@ export interface BatchAction<T> {
      * AFTER the confirm. Resolve null to cancel the batch; the resolved
      * value is passed to every run() call.
      */
-    prepare?: () => Promise<unknown | null>;
-    /** Per-row operation. Rejections count as failures, not aborts. */
-    run: (row: T, prepared: unknown) => Promise<unknown>;
+    prepare?: (rows: T[]) => Promise<unknown | null>;
 }
+export type BatchAction<T> = BatchActionBase<T> & (
+    | { run: (row: T, prepared: unknown) => Promise<unknown>; runBatch?: never }
+    | { run?: never; runBatch: (rows: T[], prepared: unknown) => Promise<unknown> }
+);
+
+export type RowTone = 'danger' | 'warning';
 
 const GROUP_HEADER_STYLES = ['banner', 'mark', 'band', 'rule'] as const;
 export type GroupHeaderStyle = (typeof GROUP_HEADER_STYLES)[number];
@@ -190,7 +194,7 @@ export function ModelTable<T extends { id: number }>({
     autoRefresh = 0,
     rowExpand, rowExpandMultiple = false,
     groupBy, groupHeaderLabel, groupHeaderStyle = 'banner',
-    exportFormats = [],
+    exportFormats = [], exporter, rowTone,
 }: {
     /** A defineModel definition — supplies the endpoint (and, later, schema). */
     model?: ModelDef<T>;
@@ -233,6 +237,10 @@ export function ModelTable<T extends { id: number }>({
     groupHeaderStyle?: GroupHeaderStyle;
     /** Server-side export formats offered in the toolbar. */
     exportFormats?: ('csv' | 'json')[];
+    /** Client-side export override. Receives the already-normalized params. */
+    exporter?: (format: 'csv' | 'json', normalizedParams: Params) => Promise<void>;
+    /** Semantic queue emphasis without coupling callers to table CSS. */
+    rowTone?: (row: T) => RowTone | null;
 }) {
     const resolvedEndpoint = model?.endpoint ?? endpoint;
     if (!resolvedEndpoint) throw new Error('ModelTable: pass `model` or `endpoint`');
@@ -385,10 +393,21 @@ export function ModelTable<T extends { id: number }>({
         }
         let prepared: unknown = null;
         if (action.prepare) {
-            prepared = await action.prepare();
+            prepared = await action.prepare(targets);
             if (prepared === null) return;
         }
-        const results = await Promise.allSettled(targets.map((row) => action.run(row, prepared)));
+        if (action.runBatch) {
+            try {
+                await action.runBatch(targets, prepared);
+                toast.success(`${action.label}: ${targets.length} item(s) updated`);
+            } catch (err) {
+                toast.error(err instanceof Error ? err.message : `${action.label} failed`);
+            }
+            setSelected(new Set());
+            void qc.invalidateQueries({ queryKey: [resolvedEndpoint] });
+            return;
+        }
+        const results = await Promise.allSettled(targets.map((row) => action.run!(row, prepared)));
         const successes = results.filter((r) => r.status === 'fulfilled').length;
         const failures = results.length - successes;
         if (failures === 0) toast.success(`${action.label}: ${successes} item(s) updated`);
@@ -464,12 +483,12 @@ export function ModelTable<T extends { id: number }>({
         try {
             await busyWhile(
                 `Preparing ${format.toUpperCase()} export…`,
-                () => mojoDownload(resolvedEndpoint, listParams, format),
+                () => exporter ? exporter(format, listParams) : mojoDownload(resolvedEndpoint, listParams, format),
             );
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Export failed');
         }
-    }, [resolvedEndpoint, listParams]);
+    }, [resolvedEndpoint, listParams, exporter]);
 
     const leadCols = (expandEnabled ? 1 : 0) + (selectable ? 1 : 0);
     const totalCols = leadCols + visibleColumns.length;
@@ -506,6 +525,7 @@ export function ModelTable<T extends { id: number }>({
                 }
             }
             const isExpanded = expandEnabled && expanded.has(row.id);
+            const tone = rowTone?.(row) ?? null;
             out.push(
                 <tr
                     key={row.id}
@@ -513,6 +533,7 @@ export function ModelTable<T extends { id: number }>({
                         onRowClick ? 'row-click' : '',
                         selected.has(row.id) ? 'row-selected' : '',
                         isExpanded ? 'row-expanded' : '',
+                        tone ? `row-tone-${tone}` : '',
                     ].filter(Boolean).join(' ') || undefined}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
