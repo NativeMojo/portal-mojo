@@ -205,6 +205,35 @@ export function useJobLogs(jobId: string | null) {
     });
 }
 
+/** Runner detail polls its live panes on this tick; sysinfo never joins them. */
+const RUNNER_DETAIL_INTERVAL_MS = 15_000;
+
+/**
+ * A runner's currently-running jobs. `runner_id` IS a real Job field, so
+ * unlike the JobLog case this filter genuinely works.
+ */
+export function useRunnerActiveJobs(runnerId: string | null) {
+    const { can } = useCan(JOBS_VIEW_PERMS);
+    const params: Params = { runner_id: runnerId ?? '', status: 'running', sort: '-started_at', size: 25 };
+    return useQuery({
+        queryKey: [JobModel.endpoint, 'runner-active', runnerId ?? ''],
+        queryFn: () => mojoList<JobRow>(JobModel.endpoint, params),
+        enabled: can && runnerId != null,
+        refetchInterval: RUNNER_DETAIL_INTERVAL_MS,
+    });
+}
+
+/** A runner's most recent completions. */
+export function useRunnerJobHistory(runnerId: string | null) {
+    const { can } = useCan(JOBS_VIEW_PERMS);
+    const params: Params = { runner_id: runnerId ?? '', status: 'completed', sort: '-created', size: 25 };
+    return useQuery({
+        queryKey: [JobModel.endpoint, 'runner-history', runnerId ?? ''],
+        queryFn: () => mojoList<JobRow>(JobModel.endpoint, params),
+        enabled: can && runnerId != null,
+    });
+}
+
 /** How many of a runner's recent jobs feed the two-step log lookup. */
 const RUNNER_LOG_JOB_WINDOW = 25;
 
