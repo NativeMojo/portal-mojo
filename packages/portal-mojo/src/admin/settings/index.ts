@@ -12,6 +12,7 @@ export const SETTINGS_ADMIN_SECTION = {
     id: 'settings',
     title: 'Settings',
     icon: 'bi-gear',
+    navigationGroup: 'operations' as const,
     permissions: SETTINGS_PERMISSIONS,
     routes: [
         { path: '', component: SettingsPage, permissions: SETTINGS_PERMISSIONS },

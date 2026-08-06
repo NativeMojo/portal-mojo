@@ -33,6 +33,32 @@ export * from './monitoring';
 export * from './settings';
 export * from './bouncer';
 
+export type AdminNavigationGroup =
+    | 'identity-access'
+    | 'security'
+    | 'observability'
+    | 'operations'
+    | 'infrastructure'
+    | 'communications'
+    | 'assistant'
+    | 'other';
+
+export const ADMIN_NAVIGATION_GROUPS: Readonly<Record<AdminNavigationGroup, {
+    id: string;
+    label: string;
+    icon: string;
+    order: number;
+}>> = {
+    'identity-access': { id: 'admin:identity-access', label: 'Identity & Access', icon: 'bi-people', order: 10 },
+    security: { id: 'admin:security', label: 'Security', icon: 'bi-shield-check', order: 20 },
+    observability: { id: 'admin:observability', label: 'Observability', icon: 'bi-activity', order: 30 },
+    operations: { id: 'admin:operations', label: 'Operations', icon: 'bi-gear', order: 40 },
+    infrastructure: { id: 'admin:infrastructure', label: 'Infrastructure', icon: 'bi-cloud', order: 50 },
+    communications: { id: 'admin:communications', label: 'Communications', icon: 'bi-chat-dots', order: 60 },
+    assistant: { id: 'admin:assistant', label: 'Assistant', icon: 'bi-stars', order: 70 },
+    other: { id: 'admin:other', label: 'Other', icon: 'bi-grid', order: 80 },
+};
+
 /** One mountable admin area: pages + routes + sidebar contribution + gates. */
 export interface AdminSection {
     /** Stable id; the default route segment (`'users'` → `#/users` standalone, `#/system/users` embedded). */
@@ -50,6 +76,8 @@ export interface AdminSection {
     permissions: string[];
     /** Backend capability key that must be enabled for the section to mount (Phase 2 handshake). */
     capability?: string;
+    /** Operator-domain category. Omitted external sections fall under Other. */
+    navigationGroup?: AdminNavigationGroup;
     /** Mount-point-relative routes (no leading slash). */
     routes: AdminRoute[];
 }
@@ -71,6 +99,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
         basePath: '',
         title: 'Credentials',
         icon: 'bi-key',
+        navigationGroup: 'identity-access',
         permissions: GLOBAL_CREDENTIAL_PERMS,
         routes: [
             {
@@ -118,25 +147,52 @@ function guardedElement(section: AdminSection, route: AdminRoute): ReactNode {
             children: page,
         })
         : page;
-    return createElement(Guarded, {
+    const guarded = createElement(Guarded, {
         permission: section.permissions,
         fallback: createElement(AdminDenied),
         children: routeGuarded,
     });
+    return createElement(AdminGlobalScope, { children: guarded });
+}
+
+/** Admin is global even when embedded beneath a product portal's provider. */
+function AdminGlobalScope({ children }: { children: ReactNode }) {
+    const outer = useContext(GroupContext);
+    if (!outer) return children;
+    return createElement(GroupContext.Provider, {
+        value: { ...outer, group: null, member: null, loading: false },
+        children,
+    });
+}
+
+function routeVisible(section: AdminSection, route: AdminRoute, me: ReturnType<typeof useMe>['data']): boolean {
+    return hasPermission(me ?? null, section.permissions, null)
+        && (!route.permissions || hasPermission(me ?? null, route.permissions, null));
 }
 
 function AdminLanding({ section, mount }: { section: AdminSection; mount: string }) {
     const { data: me } = useMe();
-    const member = useContext(GroupContext)?.member ?? null;
-    const first = section.routes.find((route) =>
-        hasPermission(me ?? null, section.permissions, member)
-        && (!route.permissions || hasPermission(me ?? null, route.permissions, member)));
+    const first = section.routes.find((route) => routeVisible(section, route, me));
     if (!first) return createElement(AdminDenied);
     const base = section.basePath ?? section.id;
     return createElement(Navigate, {
         replace: true,
         to: absolutePath(mount, base, first.path),
     });
+}
+
+function AdminMountLanding({ sections, mount }: { sections: readonly AdminSection[]; mount: string }) {
+    const { data: me } = useMe();
+    for (const section of sections) {
+        const first = section.routes.find((route) => routeVisible(section, route, me));
+        if (first) {
+            return createElement(Navigate, {
+                replace: true,
+                to: absolutePath(mount, section.basePath ?? section.id, first.path),
+            });
+        }
+    }
+    return createElement(AdminDenied);
 }
 
 /**
@@ -150,14 +206,27 @@ export function adminSectionRoutes(
 ): RouteObject[] {
     const mount = relativePath(opts.mount ?? '');
     const routes: RouteObject[] = [];
+    const rootSections = sections.filter((section) => relativePath(section.basePath ?? section.id) === '');
+    const rootHasIndex = rootSections.some((section) =>
+        section.routes.some((route) => relativePath(route.path) === ''));
+    if (mount && rootSections.length > 0 && !rootHasIndex) {
+        routes.push({
+            path: mount,
+            element: createElement(AdminGlobalScope, {
+                children: createElement(AdminMountLanding, { sections: rootSections, mount }),
+            }),
+        });
+    }
     for (const section of sections) {
         const base = relativePath(section.basePath ?? section.id);
         const landing = relativePath(mount, base);
         const hasIndex = section.routes.some((route) => relativePath(route.path) === '');
-        if (landing && !hasIndex) {
+        if (base && landing && !hasIndex) {
             routes.push({
                 path: landing,
-                element: createElement(AdminLanding, { section, mount }),
+                element: createElement(AdminGlobalScope, {
+                    children: createElement(AdminLanding, { section, mount }),
+                }),
             });
         }
         for (const route of section.routes) {
@@ -179,11 +248,53 @@ export function adminSectionRoutes(
  */
 export function adminSectionsMenu(
     sections: readonly AdminSection[],
-    opts: { name?: string; mount?: string; divider?: string } = {},
+    opts: {
+        name?: string;
+        mount?: string;
+        divider?: string;
+        /** Category grouping is opt-in for compatibility with shipped menus. */
+        grouped?: boolean;
+        presentation?: MenuConfig['presentation'];
+    } = {},
 ): MenuConfig {
     const mount = relativePath(opts.mount ?? '');
     const items: MenuItem[] = [];
     if (opts.divider) items.push({ divider: opts.divider });
+
+    if (opts.grouped) {
+        const groups = new Map<AdminNavigationGroup, MenuItem[]>();
+        for (const section of sections) {
+            const group = section.navigationGroup ?? 'other';
+            const base = relativePath(mount, section.basePath ?? section.id);
+            const labeled = section.routes.filter((route) => route.label);
+            const destinations: MenuItem[] = labeled.length > 0
+                ? labeled.map((route) => ({
+                    id: `admin:${section.id}:${route.path || 'index'}`,
+                    label: route.label!,
+                    route: absolutePath(base, route.path),
+                    permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
+                }))
+                : [{
+                    id: `admin:${section.id}`,
+                    label: section.title,
+                    route: absolutePath(base),
+                    permissionClauses: [section.permissions],
+                }];
+            groups.set(group, [...(groups.get(group) ?? []), ...destinations]);
+        }
+        for (const [group, children] of [...groups.entries()].sort((a, b) =>
+            ADMIN_NAVIGATION_GROUPS[a[0]].order - ADMIN_NAVIGATION_GROUPS[b[0]].order)) {
+            const meta = ADMIN_NAVIGATION_GROUPS[group];
+            items.push({ id: meta.id, label: meta.label, icon: meta.icon, children });
+        }
+        return {
+            name: opts.name ?? 'admin',
+            scope: 'admin',
+            presentation: opts.presentation ?? 'static',
+            items,
+        };
+    }
+
     for (const section of sections) {
         const labeled = section.routes.filter((r) => r.label);
         const base = relativePath(mount, section.basePath ?? section.id);
@@ -203,5 +314,5 @@ export function adminSectionsMenu(
             children,
         });
     }
-    return { name: opts.name ?? 'admin', items };
+    return { name: opts.name ?? 'admin', scope: 'admin', presentation: opts.presentation ?? 'static', items };
 }

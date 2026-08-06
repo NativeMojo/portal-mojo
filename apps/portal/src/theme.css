@@ -123,7 +123,9 @@ button { font: inherit; color: inherit; }
     grid-template-columns: 228px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
+    transition: grid-template-columns 160ms ease;
 }
+.app.app-sidebar-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .content { flex: 1; overflow: auto; padding: 20px 24px 40px; }
 
@@ -132,13 +134,22 @@ button { font: inherit; color: inherit; }
     background: var(--sidebar-bg);
     border-right: 1px solid var(--line);
     display: flex; flex-direction: column;
-    overflow-y: auto;
+    overflow: hidden;
     padding: 14px 10px 0;
 }
-.side-brand { display: flex; align-items: center; gap: 9px; padding: 4px 10px 14px; }
+.side-brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px 14px 10px; min-height: 30px; }
+.side-brand-identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .brand-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .brand-name { font-weight: 750; font-size: 14.5px; letter-spacing: -0.01em; color: var(--ink-strong); }
-.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-toggle {
+    display: grid; place-items: center; flex: none;
+    width: 27px; height: 27px; padding: 0;
+    border: 1px solid var(--line); border-radius: 7px;
+    background: var(--surface); color: var(--mute); cursor: pointer;
+}
+.sidebar-toggle:hover { color: var(--ink-strong); background: var(--surface2); }
+.side-nav-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-bottom: 12px; }
+.side-nav { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .side-label {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
@@ -150,6 +161,7 @@ button { font: inherit; color: inherit; }
     padding: 7px 10px; border-radius: 8px;
     color: var(--mute); text-decoration: none; font-size: 13.5px; font-weight: 550;
 }
+.nav-parent { width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left; }
 .nav-item i { font-size: 14px; width: 16px; text-align: center; }
 .nav-item:hover { background: var(--surface2); color: var(--ink-strong); }
 .nav-item.nav-active { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
@@ -158,7 +170,29 @@ button { font: inherit; color: inherit; }
     width: 3px; border-radius: 2px; background: var(--accent);
 }
 .nav-child { padding-left: 34px; font-size: 13px; }
+.nav-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-badge { margin-left: auto; }
+.nav-arrow { margin-left: auto; font-size: 11px !important; transition: transform 140ms ease; }
+.nav-accordion-open > .nav-parent .nav-arrow { transform: rotate(180deg); }
+.nav-submenu { display: flex; flex-direction: column; gap: 2px; }
+.nav-submenu[hidden] { display: none; }
+.nav-search {
+    display: flex; align-items: center; gap: 7px;
+    margin: 1px 0 8px; padding: 7px 9px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); color: var(--mute);
+}
+.nav-search > i { flex: none; }
+.nav-search input {
+    width: 100%; min-width: 0; padding: 0; border: 0; outline: 0;
+    background: transparent; color: var(--ink); font: inherit; font-size: 12.5px;
+}
+.nav-search input::placeholder { color: var(--mute); }
+.nav-search button {
+    display: grid; place-items: center; flex: none; padding: 2px;
+    border: 0; background: none; color: var(--mute); cursor: pointer;
+}
+.nav-search-status { padding: 0 9px 7px; color: var(--mute); font-size: 11.5px; }
 .side-foot {
     margin-top: auto; display: flex; align-items: center; justify-content: space-between;
     padding: 12px 10px; border-top: 1px solid var(--line-soft);
@@ -170,6 +204,40 @@ button { font: inherit; color: inherit; }
 }
 .mode-chip.mode-live { color: var(--ok); background: var(--ok-soft); }
 .side-version { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--mute); }
+
+/* Icon rail — layout width is app-owned; SidebarNav owns accessible labels. */
+.sidebar-collapsed { padding-inline: 8px; overflow: visible; }
+.sidebar-collapsed .side-brand { justify-content: center; padding-inline: 0; }
+.sidebar-collapsed .side-brand-identity { display: none; }
+.sidebar-collapsed .side-nav-scroll { overflow: visible; }
+.sidebar-collapsed .side-label,
+.sidebar-collapsed .nav-text,
+.sidebar-collapsed .nav-arrow,
+.sidebar-collapsed .nav-badge,
+.sidebar-collapsed .side-version,
+.sidebar-collapsed .nav-submenu { display: none; }
+.sidebar-collapsed .nav-item {
+    justify-content: center; width: 100%; min-height: 36px; padding: 7px;
+}
+.sidebar-collapsed .nav-item.nav-active::before { left: -8px; }
+.sidebar-collapsed .side-foot { justify-content: center; padding-inline: 0; }
+.sidebar-collapsed .mode-chip { width: 32px; justify-content: center; padding-inline: 0; }
+.sidebar-collapsed [data-tooltip] { position: relative; }
+.sidebar-collapsed [data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute; z-index: 1000; left: calc(100% + 11px); top: 50%;
+    transform: translateY(-50%) translateX(-3px);
+    width: max-content; max-width: 220px; padding: 6px 9px;
+    border: 1px solid var(--line); border-radius: 7px;
+    background: var(--surface); color: var(--ink-strong); box-shadow: var(--shadow-pop);
+    font-size: 12px; font-weight: 600; line-height: 1.25;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+.sidebar-collapsed [data-tooltip]:hover::after,
+.sidebar-collapsed [data-tooltip]:focus-visible::after {
+    opacity: 1; visibility: visible; transform: translateY(-50%) translateX(0);
+}
 
 /* ============================================================ Group switcher */
 .group-switch-wrap { position: relative; margin: 2px 0 10px; }

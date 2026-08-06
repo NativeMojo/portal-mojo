@@ -1,34 +1,55 @@
-// The portal's menus — data registered into the A4 sidebar engine. The
-// engine resolves the active menu from (route, active group, me); items
-// carry their own permission gates. Admin sections will contribute a menu
-// here via adminSectionsMenu() as Phase 2 pages stabilize.
-import { registerMenus, setDefaultMenu } from 'portal-mojo/ui';
-import { ADMIN_SECTIONS, adminSectionsMenu } from 'portal-mojo/admin';
+// The standalone artifact is one GLOBAL Admin portal. Product portals own
+// their own groupKind menus and GroupProvider; this app deliberately has no
+// active-group navigation or member-derived permission context.
+import { registerMenus, setDefaultMenu, type MenuItem } from 'portal-mojo/ui';
+import {
+    ADMIN_NAVIGATION_GROUPS,
+    ADMIN_SECTIONS,
+    adminSectionsMenu,
+} from 'portal-mojo/admin';
 
-registerMenus([
-    {
-        name: 'main',
-        items: [
-            { divider: 'Main' },
-            { label: 'Dashboard', icon: 'bi-grid-1x2', route: '/' },
-            { label: 'Users', icon: 'bi-people', route: '/users' },
-            { label: 'Groups', icon: 'bi-diagram-3', route: '/groups' },
-            // Own keys — VIEW_PERMS include "owner", so no gate here.
-            { label: 'API Keys', icon: 'bi-key', route: '/apikeys' },
-        ],
-    },
-    {
-        // Active for ANY group kind — kind-specific portals register their
-        // own menus (e.g. groupKind: 'org') ahead of this fallback.
-        name: 'group',
-        groupKind: 'any',
-        items: [
-            { divider: 'Group' },
-            { label: 'Overview', icon: 'bi-diagram-3', route: '/group' },
-            { divider: 'Portal' },
-            { label: 'Back to main', icon: 'bi-arrow-left-short', route: '/' },
-        ],
-    },
-    adminSectionsMenu(ADMIN_SECTIONS, { name: 'admin-sections', divider: 'System' }),
-]);
-setDefaultMenu('main');
+const contributions = adminSectionsMenu(ADMIN_SECTIONS, {
+    name: 'admin-contributions',
+    grouped: true,
+    presentation: 'accordion',
+});
+const contributedById = new Map(
+    contributions.items
+        .filter((item): item is MenuItem & { id: string } => Boolean(item.id))
+        .map((item) => [item.id, item]),
+);
+
+const identityMeta = ADMIN_NAVIGATION_GROUPS['identity-access'];
+const identityContribution = contributedById.get(identityMeta.id);
+const identity: MenuItem = {
+    id: identityMeta.id,
+    label: identityMeta.label,
+    icon: identityMeta.icon,
+    children: [
+        { id: 'admin:users', label: 'Users', route: '/users' },
+        { id: 'admin:groups', label: 'Groups', route: '/groups' },
+        { id: 'admin:personal-api-keys', label: 'Personal API Keys', route: '/apikeys' },
+        ...(identityContribution?.children ?? []),
+    ],
+};
+
+const contributedCategories = contributions.items.filter((item) =>
+    !item.divider && item.id !== identityMeta.id);
+
+registerMenus([{
+    name: 'admin',
+    scope: 'admin',
+    presentation: 'accordion',
+    items: [
+        { divider: 'Admin' },
+        {
+            id: 'admin:overview',
+            label: 'Overview',
+            icon: 'bi-grid-1x2',
+            children: [{ id: 'admin:dashboard', label: 'Dashboard', route: '/' }],
+        },
+        identity,
+        ...contributedCategories,
+    ],
+}]);
+setDefaultMenu('admin');

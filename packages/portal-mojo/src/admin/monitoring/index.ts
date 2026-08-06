@@ -20,6 +20,7 @@ export const MONITORING_ADMIN_SECTION: AdminSection = {
     basePath: '',
     title: 'Monitoring',
     icon: 'bi-activity',
+    navigationGroup: 'observability',
     permissions: [
         ...LOGS_ADMIN_PERMISSIONS,
         ...METRICS_PERMISSIONS_ADMIN_PERMISSIONS,

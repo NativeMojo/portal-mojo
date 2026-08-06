@@ -28,7 +28,16 @@ if (import.meta.env.DEV) {
 import { ThemeProvider } from 'portal-mojo/ui';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
-import { GroupOverviewPage } from './pages/GroupOverviewPage';
+
+// This artifact is the fleet-wide Admin, never a group-scoped product portal.
+// Remove stale deep-link scope without erasing another portal's remembered
+// active_group_id. Preserve every unrelated real-search parameter and hash.
+const adminSearch = new URLSearchParams(window.location.search);
+if (adminSearch.has('group')) {
+    adminSearch.delete('group');
+    const query = adminSearch.toString();
+    window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+}
 
 // Hash routing so the built dist works from any static mount (including
 // served by django-mojo) with zero server rewrite config. The auth pages are
@@ -42,7 +51,6 @@ const router = createHashRouter([
         children: [
             { index: true, element: <DashboardPage /> },
             { path: 'users', element: <UsersPage /> },
-            { path: 'group', element: <GroupOverviewPage /> },
             ...adminRoutes,
         ],
     },
@@ -67,9 +75,7 @@ createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
             <ThemeProvider>
-                <mojo.GroupProvider>
-                    <RouterProvider router={router} />
-                </mojo.GroupProvider>
+                <RouterProvider router={router} />
             </ThemeProvider>
         </QueryClientProvider>
     </StrictMode>,

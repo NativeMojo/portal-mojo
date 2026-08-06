@@ -18,9 +18,12 @@
 // portal-mojo/admin adminSectionsMenu) — sections never own the sidebar.
 import { matchPath } from 'react-router-dom';
 import { hasPermission, type Me, type MemberLike } from '../client/me';
+import type { PermSpec } from '../client/model';
 import type { Group } from '../client/group-context';
 
 export interface MenuItem {
+    /** Stable identity for route-less parents (accordion state, aria ids). */
+    id?: string;
     /** Section label row (the side-label idiom). Mutually exclusive with route. */
     divider?: string;
     label?: string;
@@ -30,6 +33,11 @@ export interface MenuItem {
     children?: MenuItem[];
     /** Permission name(s) required to see the item (ANY-of; member-aware). */
     permissions?: string | string[];
+    /**
+     * Additional permission clauses: ANY within one clause, AND across clauses.
+     * `permissions`, when present, is evaluated as one more required clause.
+     */
+    permissionClauses?: PermSpec[];
     /** Only visible when the active group's kind matches. */
     requiresGroupKind?: string | string[];
     badge?: { text: string; tone?: 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'primary' };
@@ -37,6 +45,10 @@ export interface MenuItem {
 
 export interface MenuConfig {
     name: string;
+    /** Shell metadata. Omitted group menus infer `group`; others infer `global`. */
+    scope?: 'admin' | 'group' | 'account' | 'global';
+    /** Route-less parents stay static unless a consumer explicitly opts in. */
+    presentation?: 'static' | 'accordion';
     /**
      * null/undefined → a global menu. A kind string/array scopes the menu to
      * active groups of that kind; 'any' matches every kind (used as the
@@ -113,10 +125,28 @@ export function routesMatch(itemRoute: string, pathname: string): boolean {
 export function itemVisible(item: MenuItem, ctx: MenuContext): boolean {
     if (item.divider) return true;
     if (item.permissions && !hasPermission(ctx.me, item.permissions, ctx.member)) return false;
+    if (item.permissionClauses?.some((clause) => !hasPermission(ctx.me, clause, ctx.member))) return false;
     if (item.requiresGroupKind) {
         if (!groupKindMatches(item.requiresGroupKind, ctx.group?.kind)) return false;
     }
     return true;
+}
+
+/** Visible immediate children, shared by route resolution and SidebarNav. */
+export function visibleMenuChildren(item: MenuItem, ctx: MenuContext): MenuItem[] {
+    return (item.children ?? []).filter((child) => itemVisible(child, ctx));
+}
+
+/** Does this item's visible subtree own the current route? */
+export function itemContainsRoute(item: MenuItem, pathname: string, ctx: MenuContext): boolean {
+    if (!itemVisible(item, ctx)) return false;
+    if (item.route && routesMatch(item.route, pathname)) return true;
+    return visibleMenuChildren(item, ctx).some((child) => itemContainsRoute(child, pathname, ctx));
+}
+
+/** Effective scope with backward-compatible groupKind inference. */
+export function menuScope(menu: MenuConfig): NonNullable<MenuConfig['scope']> {
+    return menu.scope ?? (menu.groupKind ? 'group' : 'global');
 }
 
 function menuHasVisibleItems(menu: MenuConfig, ctx: MenuContext): boolean {
@@ -125,12 +155,7 @@ function menuHasVisibleItems(menu: MenuConfig, ctx: MenuContext): boolean {
 
 /** Does this menu own the route (visible items + children considered)? */
 export function menuContainsRoute(menu: MenuConfig, pathname: string, ctx: MenuContext): boolean {
-    const walk = (items: MenuItem[]): boolean => items.some((item) => {
-        if (!itemVisible(item, ctx)) return false;
-        if (item.route && routesMatch(item.route, pathname)) return true;
-        return item.children ? walk(item.children) : false;
-    });
-    return walk(menu.items);
+    return menu.items.some((item) => itemContainsRoute(item, pathname, ctx));
 }
 
 /** Is a group menu eligible at all under the current context? */

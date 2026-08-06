@@ -15,6 +15,7 @@ export const BOUNCER_ADMIN_SECTION: AdminSection = {
     basePath: 'security/bouncer',
     title: 'Bouncer',
     icon: 'bi-shield-check',
+    navigationGroup: 'security',
     permissions: BOUNCER_VIEW_PERMS,
     routes: [
         {
