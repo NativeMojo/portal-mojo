@@ -45,6 +45,7 @@ import { AdminMonitoringDemo } from './demos-admin-monitoring';
 import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
+import { AdminRulesDemo } from './demos-admin-rules';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
@@ -313,6 +314,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-incidents', title: 'Incidents & events', icon: 'bi-shield-exclamation',
                 blurb: 'Priority incident triage, immutable day-grouped events, forensic details, sanitized exports, and selection-wide merge semantics.',
                 render: () => <AdminIncidentsDemo />,
+            },
+            {
+                key: 'admin-rules', title: 'Rule Engine', icon: 'bi-diagram-3',
+                blurb: 'Always-inactive rule creation and a lossless, runtime-aware ordered handler DSL editor with explicit legacy warnings.',
+                render: () => <AdminRulesDemo />,
             },
         ],
     },

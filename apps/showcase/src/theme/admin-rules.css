@@ -1,0 +1,13 @@
+.admin-rules-page { display: grid; gap: 12px; }
+.rule-priority-warning { padding: 10px 12px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); background: var(--warn-soft); }
+.handler-chip-row { display: flex; flex-wrap: wrap; gap: 4px; }.table-cell-subtitle { display: block; color: var(--mute); font-weight: 400; margin-top: 2px; }
+.handler-chain-builder { display: grid; gap: 12px; }.handler-chain-heading, .handler-step > header, .handler-section-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.handler-chain-heading small, .handler-step header small { display: block; color: var(--mute); font-weight: 400; }.handler-chain-empty { padding: 24px; text-align: center; color: var(--mute); border: 1px dashed var(--line); border-radius: 10px; background: var(--surface2); }
+.handler-step { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }.handler-step-warning { border-color: var(--warn); background: linear-gradient(var(--warn-soft), var(--warn-soft)), var(--surface); }
+.handler-step > header > div:nth-child(2) { flex: 1; }.handler-order { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.handler-order-controls, .demo-actions { display: flex; flex-wrap: wrap; gap: 5px; }.handler-step-fields { display: grid; grid-template-columns: minmax(150px, .45fr) minmax(220px, 1fr); gap: 10px; margin-top: 12px; }
+.handler-advanced { margin-top: 10px; }.handler-advanced summary { cursor: pointer; color: var(--accent); }.handler-param { display: grid; grid-template-columns: minmax(100px, .5fr) 1fr auto; gap: 8px; align-items: center; margin-top: 8px; }
+.handler-raw { white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--field-bg); color: var(--ink); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.handler-issue { margin-top: 6px; padding: 6px 8px; border-radius: 6px; font-size: 12px; }.handler-issue-warning { color: var(--warn); background: var(--warn-soft); }.handler-issue-error { color: var(--bad); background: var(--bad-soft); }
+.handler-demo-warning { color: var(--warn); }.handler-demo-error { color: var(--bad); }
+@media (max-width: 720px) { .handler-chain-heading, .handler-step > header, .handler-section-actions { align-items: flex-start; flex-direction: column; }.handler-step-fields { grid-template-columns: 1fr; }.handler-param { grid-template-columns: 1fr; }.handler-order-controls { width: 100%; } }
