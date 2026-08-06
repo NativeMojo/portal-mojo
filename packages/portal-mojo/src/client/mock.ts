@@ -2403,6 +2403,27 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         // metrics-denied notice instead of the KPI strip and country list.
         view_metrics: true,
     };
+    const metricsViewer = at(24);
+    metricsViewer.is_active = true;
+    metricsViewer.is_superuser = false;
+    metricsViewer.username = 'metrics.viewer';
+    metricsViewer.email = 'metrics.viewer@nativemojo.com';
+    metricsViewer.display_name = 'Metrics Viewer';
+    metricsViewer.permissions = { view_metrics: true };
+    const metricsManager = at(25);
+    metricsManager.is_active = true;
+    metricsManager.is_superuser = false;
+    metricsManager.username = 'metrics.manager';
+    metricsManager.email = 'metrics.manager@nativemojo.com';
+    metricsManager.display_name = 'Metrics Permissions Manager';
+    metricsManager.permissions = { manage_metrics: true };
+    const metricsOperator = at(26);
+    metricsOperator.is_active = true;
+    metricsOperator.is_superuser = false;
+    metricsOperator.username = 'metrics.operator';
+    metricsOperator.email = 'metrics.operator@nativemojo.com';
+    metricsOperator.display_name = 'Metrics Operator';
+    metricsOperator.permissions = { metrics: true };
     // Jobs identities — the view/manage split for the jobs control plane.
     // jobs.viewer must be able to read every jobs surface and issue ZERO
     // denied requests; jobs.operator additionally holds the write grants.
@@ -4419,15 +4440,64 @@ const METRIC_CATEGORY_SLUGS: Record<string, string[]> = {
         'geofence:blocks:region:US-NY',
     ],
     firewall: ['firewall:blocks', 'firewall:blocks:country:CN', 'firewall:broadcasts'],
+    auth: ['auth:failures', 'auth:successes'],
+    collisions: ['foo:count', 'bar:count'],
+    growth: ['baseline:new_users'],
 };
 
 const SERIES: { slug: string; label: string; base: number; spread: number }[] = [
     { slug: 'api_calls', label: 'API Calls', base: 240, spread: 90 },
     { slug: 'logins', label: 'Logins', base: 70, spread: 34 },
     { slug: 'errors', label: 'Errors', base: 12, spread: 10 },
+    { slug: 'auth:failures', label: 'Authentication Failures', base: 18, spread: 9 },
+    { slug: 'auth:successes', label: 'Authentication Successes', base: 92, spread: 31 },
+    { slug: 'foo:count', label: 'Foo Count', base: 31, spread: 8 },
+    { slug: 'bar:count', label: 'Bar Count', base: 74, spread: 17 },
+    { slug: 'baseline:new_users', label: 'New Users', base: 7, spread: 3 },
     ...JOBS_METRIC_SERIES,
     ...GEOFENCE_METRIC_SERIES,
 ];
+
+/** Live-shaped maintained registries. Discovery exposes only these names. */
+const METRIC_ACCOUNT_CATEGORIES: Record<string, Record<string, string[]>> = {
+    public: {
+        traffic: ['api_calls'],
+    },
+    global: {
+        auth: METRIC_CATEGORY_SLUGS.auth!,
+        collisions: METRIC_CATEGORY_SLUGS.collisions!,
+        growth: METRIC_CATEGORY_SLUGS.growth!,
+        geofence: METRIC_CATEGORY_SLUGS.geofence!,
+        jobs: JOBS_METRIC_SERIES.map((series) => series.slug),
+    },
+    'group-1': {
+        auth: ['auth:failures', 'auth:successes'],
+        collisions: ['foo:count', 'bar:count'],
+    },
+    'user-14': {
+        activity: ['logins'],
+    },
+    'ops-private': {
+        operations: ['errors', 'jobs.failed'],
+    },
+    'finance-hidden': {
+        billing: ['billing:revenue'],
+    },
+};
+
+/** Custom account policy is independent from the manage-only permissions table. */
+const METRIC_ACCOUNT_VIEW_POLICY: Record<string, 'public' | string[]> = {
+    'ops-private': ['view_metrics'],
+    'finance-hidden': ['finance_metrics'],
+};
+
+const METRIC_SCALAR_VALUES: Record<string, Record<string, unknown>> = {
+    public: { 'status:release': '2026.08' },
+    global: { 'limits:max_users': 5000, 'feature:maintenance': false },
+    'group-1': { 'limits:max_members': 250 },
+    'user-14': { 'preferences:quota': 25 },
+    'ops-private': { 'threshold:error_budget': 0.03 },
+};
 
 function bucketLabel(d: Date, granularity: string): string {
     switch (granularity) {
@@ -4523,31 +4593,117 @@ function metricTimes(params: Params, granularity: string): Date[] | { error: str
     return times;
 }
 
-function fetchMetrics(params: Params) {
+function metricValues(slug: string, times: readonly number[], granularity: string, account: string): number[] {
+    const definition = SERIES.find((series) => series.slug === slug);
+    if (!definition) return times.map(() => 0);
+    const bucket = BUCKET_MS[granularity] ?? BUCKET_MS.hours!;
+    const scale = bucket / 3600e3;
+    const salt = accountSalt(account);
+    const index = SERIES.indexOf(definition);
+    return times.map((time) => Math.round(sample(index + (salt % 997), time + salt, definition.base, definition.spread) * Math.max(0.15, scale)));
+}
+
+function fetchMetrics(params: Params, caller?: MockUser) {
     const granularity = String(params.granularity ?? 'hours');
     const wanted = String(params.slugs ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    const bucket = BUCKET_MS[granularity] ?? BUCKET_MS.hours!;
+    const account = String(params.account ?? 'public');
 
     if (wanted.length === 0) {
         // Backend parity: slug(s) are required, not defaulted.
         return { status: false, error: 'missing required parameter: slug, slugs, or category', error_code: 400 };
     }
+    if (!canViewMetricsAccount(caller, account)) return permissionDenied(caller ? 403 : 401);
     const window = metricTimes(params, granularity);
     if (!Array.isArray(window)) return { status: false, error: window.error, error_code: 400 };
     const labels = window.map((date) => bucketLabel(date, granularity));
     const times = window.map((date) => date.getTime());
-    const picked = SERIES.filter((s) => wanted.includes(s.slug));
-    // Longer buckets aggregate more events — scale so totals stay coherent.
-    const scale = bucket / 3600e3;
-    // Real wire shape (verified live): a slug-keyed series map + labels. No
-    // datasets array, no granularity/range echo — the client normalizes.
     const data: Record<string, number[]> = {};
-    const salt = accountSalt(String(params.account ?? 'public'));
-    picked.forEach((s, i) => {
-        data[s.slug] = times.map((t) => Math.round(sample(i + (salt % 997), t + salt, s.base, s.spread) * Math.max(0.15, scale)));
-    });
+    const childKind = String(params.child_kind ?? '').trim();
+    const breakdown = String(params.breakdown ?? 'false').toLowerCase() === 'true';
+
+    if (childKind) {
+        const match = account.match(/^group-([1-9]\d*)$/);
+        if (!match) return { status: false, error: 'child_kind requires account=group-<parent_id>', error_code: 400 };
+        const parentId = Number(match[1]);
+        if (!db.groups.some((group) => group.id === parentId)) return { status: false, error: `${account} not found`, error_code: 400 };
+        if (breakdown && wanted.length !== 1) return { status: false, error: `breakdown=true requires a single slug, got ${wanted.length}`, error_code: 400 };
+        let children = db.groups
+            .filter((group) => group.is_active && Number(group.parent?.id ?? 0) === parentId && group.kind === childKind)
+            .map((group) => ({ id: group.id, name: group.name }));
+        // Deliberate same-name siblings exercise the live `name#id` identity.
+        if (parentId === 1 && childKind === 'team' && children.length >= 2) {
+            children = children.map((child, index) => index < 2 ? { ...child, name: 'Operations' } : child);
+        }
+        if (breakdown) {
+            const counts = new Map<string, number>();
+            for (const child of children) counts.set(child.name, (counts.get(child.name) ?? 0) + 1);
+            const groups: Record<string, number> = {};
+            for (const child of children) {
+                const key = counts.get(child.name)! > 1 ? `${child.name}#${child.id}` : child.name;
+                data[key] = metricValues(wanted[0]!, times, granularity, `group-${child.id}`);
+                groups[key] = child.id;
+            }
+            return { status: true, data: { data, labels, groups } };
+        }
+        for (const slug of wanted) {
+            const tail = slug.split(':').at(-1)!;
+            const sum = times.map(() => 0);
+            for (const child of children) {
+                const values = metricValues(slug, times, granularity, `group-${child.id}`);
+                values.forEach((value, index) => { sum[index] = (sum[index] ?? 0) + value; });
+            }
+            data[tail] = sum;
+        }
+        return { status: true, data: { data, labels } };
+    }
+
+    // Live `/fetch` intentionally truncates every identity to the final colon
+    // segment. A collision overwrites here; the explorer adapter must split.
+    for (const slug of wanted) data[slug.split(':').at(-1)!] = metricValues(slug, times, granularity, account);
 
     return { status: true, data: { data, labels } };
+}
+
+function fetchMetricPoint(params: Params, caller?: MockUser) {
+    const account = String(params.account ?? 'public');
+    if (!canViewMetricsAccount(caller, account)) return permissionDenied(caller ? 403 : 401);
+    const slugs = String(params.slugs ?? params.slug ?? '').split(',').map((slug) => slug.trim()).filter(Boolean);
+    if (!slugs.length) return { status: false, error: 'missing required parameter: slug or slugs', error_code: 400 };
+    const whenSeconds = numericWireValue(params.when);
+    if (whenSeconds == null) return { status: false, error: 'when is required', error_code: 400 };
+    const granularity = String(params.granularity ?? 'hours');
+    const currentAt = floorMetricBucket(whenSeconds * 1000, granularity);
+    const previousAt = stepMetricBucket(currentAt, granularity, -1);
+    const data: Record<string, number> = {};
+    const prev_data: Record<string, number> = {};
+    const deltas: Record<string, { delta: number; delta_pct?: number }> = {};
+    for (const slug of slugs) {
+        const current = metricValues(slug, [currentAt.getTime()], granularity, account)[0] ?? 0;
+        const previous = slug === 'baseline:new_users'
+            ? 0
+            : metricValues(slug, [previousAt.getTime()], granularity, account)[0] ?? 0;
+        data[slug] = current;
+        prev_data[slug] = previous;
+        deltas[slug] = {
+            delta: current - previous,
+            ...(previous > 0 ? { delta_pct: Math.round((((current - previous) / previous) * 100) * 100) / 100 } : {}),
+        };
+    }
+    return {
+        status: true, data, prev_data, deltas, slugs,
+        when: currentAt.toISOString(), prev_when: previousAt.toISOString(), granularity, account,
+    };
+}
+
+function fetchMetricScalars(params: Params, caller?: MockUser) {
+    const account = String(params.account ?? 'public');
+    if (!canViewMetricsAccount(caller, account)) return permissionDenied(caller ? 403 : 401);
+    const slugs = String(params.slugs ?? '').split(',').map((slug) => slug.trim()).filter(Boolean);
+    if (!slugs.length) return { status: false, error: 'missing required parameter: slugs', error_code: 400 };
+    const values = METRIC_SCALAR_VALUES[account] ?? {};
+    const data: Record<string, unknown> = {};
+    for (const slug of slugs) data[slug.split(':').at(-1)!] = values[slug] ?? params.default ?? null;
+    return { status: true, data, slugs, account };
 }
 
 // ── Auth endpoints ────────────────────────────────────────────────────
@@ -4832,7 +4988,7 @@ const callCounts = new Map<string, number>();
 export interface MockRequestHistoryEntry {
     method: string;
     path: string;
-    /** Only non-sensitive DNS query values needed by contract verification. */
+    /** Only non-sensitive DNS/metrics query values needed by contract verification. */
     params?: Params;
 }
 
@@ -4898,6 +5054,42 @@ function hasGlobalPermission(user: MockUser | undefined, permissions: string[]):
     if (!user) return false;
     if (user.is_superuser) return true;
     return permissions.some((permission) => Boolean(user.permissions[permission]));
+}
+
+const METRICS_VIEW_GRANTS = ['view_metrics', 'metrics'];
+
+/** Shared live account-policy gate for every mock metrics read surface. */
+function canViewMetricsAccount(user: MockUser | undefined, account: string): boolean {
+    if (account === 'public') return true;
+    if (account === 'global') return hasGlobalPermission(user, METRICS_VIEW_GRANTS);
+    if (account.startsWith('group-')) {
+        const suffix = account.slice('group-'.length);
+        if (!/^[1-9]\d*$/.test(suffix)) return false;
+        const groupId = Number(suffix);
+        if (!db.groups.some((group) => group.id === groupId) || !user) return false;
+        if (hasGlobalPermission(user, METRICS_VIEW_GRANTS)) return true;
+        const member = db.members.find((row) => row.group === groupId && row.user === user.id && row.is_active);
+        return Boolean(member && ['view_metrics', 'metrics'].some((permission) => Boolean(member.permissions[permission])));
+    }
+    if (account.startsWith('user-')) {
+        const suffix = account.slice('user-'.length);
+        if (!/^[1-9]\d*$/.test(suffix) || !user) return false;
+        return hasGlobalPermission(user, METRICS_VIEW_GRANTS) || user.id === Number(suffix);
+    }
+    const policy = METRIC_ACCOUNT_VIEW_POLICY[account];
+    if (policy === 'public') return true;
+    return Array.isArray(policy) && hasGlobalPermission(user, policy);
+}
+
+function metricsAccountCategories(account: string): Record<string, string[]> {
+    return METRIC_ACCOUNT_CATEGORIES[account] ?? {};
+}
+
+function metricsAccountSlugs(account: string, category?: string | null): string[] {
+    const categories = metricsAccountCategories(account);
+    return category == null
+        ? Object.values(categories).flat()
+        : [...(categories[category] ?? [])];
 }
 
 function groupCanManage(user: MockUser | undefined, groupId: number): boolean {
@@ -6082,6 +6274,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     const safeDnsParams = path === '/api/dnsman/credential/group-choice'
         || path === '/api/dnsman/registrar/discover'
+        || path.startsWith('/api/metrics/')
         ? { ...(opts.params ?? {}) }
         : undefined;
     requestHistory.push({ method, path, ...(safeDnsParams ? { params: safeDnsParams } : {}) });
@@ -6315,6 +6508,64 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         }));
         return { status: true, data: { holders, count: holders.length, capped } };
     }
+    // #1438 permission-filtered registry discovery. Counts are computed only
+    // after hidden accounts are removed, so pagination is not an oracle.
+    if (path === '/api/metrics/discover') {
+        const caller = userFromBearer(opts.headers);
+        const params = opts.params ?? {};
+        const allowed = new Set(['resource', 'account', 'category', 'search', 'start', 'size']);
+        if (Object.keys(params).some((key) => !allowed.has(key))) return { status: false, error: 'Invalid metrics discovery query', error_code: 400 };
+        const resource = String(params.resource ?? '');
+        if (!['accounts', 'categories', 'slugs'].includes(resource)) return { status: false, error: 'Invalid metrics discovery query', error_code: 400 };
+        const parseInteger = (value: unknown, fallback: number, minimum: number, maximum?: number): number | null => {
+            const input = value == null ? fallback : value;
+            if (typeof input === 'boolean' || (typeof input !== 'number' && typeof input !== 'string')) return null;
+            if (typeof input === 'string' && (!input || input.trim() !== input || !/^\d+$/.test(input))) return null;
+            const parsed = Number(input);
+            return Number.isInteger(parsed) && parsed >= minimum && (maximum == null || parsed <= maximum) ? parsed : null;
+        };
+        const start = parseInteger(params.start, 0, 0);
+        const size = parseInteger(params.size, 50, 1, 500);
+        const search = params.search == null ? '' : params.search;
+        const accountValue = params.account;
+        const categoryValue = params.category;
+        if (start == null || size == null || typeof search !== 'string' || search.length > 128
+            || (accountValue != null && (typeof accountValue !== 'string' || accountValue.length > 256))
+            || (categoryValue != null && (typeof categoryValue !== 'string' || categoryValue.length > 256))) {
+            return { status: false, error: 'Invalid metrics discovery query', error_code: 400 };
+        }
+        if (resource === 'accounts' && (accountValue != null || categoryValue != null)) return { status: false, error: 'Invalid metrics discovery query', error_code: 400 };
+        if (resource === 'categories' && (typeof accountValue !== 'string' || !accountValue || categoryValue != null)) return { status: false, error: 'Invalid metrics discovery query', error_code: 400 };
+        if (resource === 'slugs' && (typeof accountValue !== 'string' || !accountValue)) return { status: false, error: 'Invalid metrics discovery query', error_code: 400 };
+
+        let items: string[];
+        let filters: Record<string, unknown>;
+        if (resource === 'accounts') {
+            if (!hasGlobalPermission(caller, METRICS_VIEW_GRANTS)) return permissionDenied(caller ? 403 : 401);
+            items = [...new Set(['public', 'global', ...Object.keys(METRIC_ACCOUNT_CATEGORIES)])]
+                .filter((candidate) => canViewMetricsAccount(caller, candidate));
+            filters = { search };
+        } else {
+            const account = String(accountValue);
+            if (!canViewMetricsAccount(caller, account)) return permissionDenied(caller ? 403 : 401);
+            if (resource === 'categories') {
+                items = Object.keys(metricsAccountCategories(account));
+                filters = { account, search };
+            } else {
+                const category = categoryValue == null ? null : String(categoryValue);
+                items = metricsAccountSlugs(account, category);
+                filters = { account, category, search };
+            }
+        }
+        const needle = search.toLocaleLowerCase();
+        const visible = [...new Set(items)].filter((item) => !needle || item.toLocaleLowerCase().includes(needle)).sort();
+        const data = visible.slice(start, start + size);
+        return {
+            status: true, resource, filters, data, start, size,
+            count: visible.length, page_count: data.length,
+            next_start: start + size < visible.length ? start + size : null,
+        };
+    }
     // `/api/metrics/category_slugs` answers a FLAT envelope — a raw
     // JsonResponse, so there is no `data` wrapper (categories.py:199-217).
     if (path === '/api/metrics/category_slugs') {
@@ -6322,12 +6573,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const category = String(opts.params?.category ?? '');
         if (!category) return { status: false, error: 'missing required parameter: category', error_code: 400 };
         const account = String(opts.params?.account ?? 'public');
-        if (account === 'global') {
-            // `check_view_permissions`: exactly ["view_metrics","metrics"].
-            if (!caller) return permissionDenied(401);
-            if (!hasGlobalPermission(caller, ['view_metrics', 'metrics'])) return permissionDenied();
-        }
-        return { status: true, slugs: METRIC_CATEGORY_SLUGS[category] ?? [], category, account };
+        if (!canViewMetricsAccount(caller, account)) return permissionDenied(caller ? 403 : 401);
+        return { status: true, slugs: metricsAccountSlugs(account, category), category, account };
     }
     // ── IP sets — /api/incident/ipset (+ /<pk>) ──
     const ipSetMatch = path.match(/^\/api\/incident\/ipset(?:\/(\d+))?$/);
@@ -8025,7 +8272,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const result = listRows(db.logs as unknown as Record<string, unknown>[], params, search, '-id');
         return { ...result, graph: graphParam ?? 'list', data: (result.data as unknown as MockLog[]).map((l) => serializeLog(l, rowGraph)) };
     }
-    if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {});
+    if (path === '/api/metrics/fetch') return fetchMetrics(opts.params ?? {}, userFromBearer(opts.headers));
+    if (path === '/api/metrics/series') return fetchMetricPoint(opts.params ?? {}, userFromBearer(opts.headers));
+    if (path === '/api/metrics/value/get') return fetchMetricScalars(opts.params ?? {}, userFromBearer(opts.headers));
     if (path === '/api/docit/render') {
         // Backend parity — mojo/apps/docit/rest/render.py: POST only, the
         // `markdown` field is required, 400KB cap, and the handler returns a
