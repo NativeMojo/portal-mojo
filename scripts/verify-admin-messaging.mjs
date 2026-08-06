@@ -32,7 +32,7 @@ try{
  assert.equal(models.PublicMessageModel.normalizeListParams({group:1,sort:'metadata'}).group,undefined);
  assert.equal(models.PublicMessageModel.normalizeListParams({sort:'metadata'}).sort,'-created');
  const canary='AKIA1234567890123456';
- assert(!JSON.stringify(sanitize.sanitizeDomainRow({id:1,name:'x',region:'x',created:1,modified:1,status:'x',receiving_enabled:false,dns_mode:'manual',aws_key:canary,aws_secret:canary,nested:{token:canary}})).includes(canary));
+ assert(!JSON.stringify(sanitize.sanitizeEmailDomainRow({id:1,name:'x',region:'x',created:1,modified:1,status:'x',receiving_enabled:false,dns_mode:'manual',aws_key:canary,aws_secret:canary,nested:{token:canary}})).includes(canary));
  assert(!JSON.stringify(sanitize.sanitizeSentMessageRow({id:1,created:1,modified:1,mailbox:null,to_addresses:[],cc_addresses:[],subject:'x',status:'failed',ses_message_id:null,template_context:{canary},metadata:{canary}})).includes(canary));
  const contact=sanitize.sanitizePublicMessageRow({id:1,created:1,modified:1,kind:'support',status:'open',name:'A',email:'a@b.co',subject:'x',group:null,message:'m',metadata:{company:'C',unknown:canary},ip_address:'1.1.1.1',user_agent:'x'});
  assert.deepEqual(contact.metadata,{company:'C'});assert.equal(contact.metadata_withheld,true);assert(!JSON.stringify(contact).includes(canary));
