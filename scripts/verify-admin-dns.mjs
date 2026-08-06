@@ -113,10 +113,22 @@ try {
         }
     }
     const choices = await mock.mockFetch('/api/dnsman/credential/group-choice', {
-        headers: manager, params: { search: 'north', start: 0, size: 25 },
+        headers: manager, params: { search: 'aCmE', start: 0, size: 1 },
     });
     assert.equal(choices.status, true);
-    assert(choices.data.length > 0);
+    assert.deepEqual(
+        { count: choices.count, start: choices.start, size: choices.size, names: choices.data.map((row) => row.name) },
+        { count: 1, start: 0, size: 1, names: ['Acme Corp'] },
+        'choice search is case-insensitive and preserves bounded paging metadata',
+    );
+    const emptyChoices = await mock.mockFetch('/api/dnsman/credential/group-choice', {
+        headers: manager, params: { search: 'not-a-real-group-name', start: 0, size: 25 },
+    });
+    assert.deepEqual(
+        { count: emptyChoices.count, data: emptyChoices.data },
+        { count: 0, data: [] },
+        'a valid non-matching search returns the exact empty list contract',
+    );
     const chosen = choices.data[0];
     const exact = await mock.mockFetch('/api/dnsman/credential/group-choice', {
         headers: manager, params: { id: String(chosen.id) },
