@@ -1311,6 +1311,15 @@ const GEOIP_SEEDS: GeoIpSeed[] = [
     // ── The private-range row the live wire really produces: created by
     //    geolocate(), never enriched, provider 'internal', never expires. ──
     { ip: '127.0.0.1', cc: null, country: null, region: 'Private', rc: null, city: null, lat: null, lng: null, tz: null, provider: 'internal', lastSeenHours: 5 },
+
+    // ── #1287 additions: enough BLOCKED rows for the Blocked IPs table to
+    //    show its presets and batch actions with a real page of data. ──
+    { ip: '223.5.5.5', cc: 'CN', country: 'China', region: 'Zhejiang', rc: 'CN-33', city: 'Hangzhou', lat: 30.2741, lng: 120.1551, tz: 'Asia/Shanghai', asn: 'AS37963', asnOrg: 'Alibaba Cloud', isp: 'Aliyun', connection: 'hosting', cloud: true, datacenter: true, attacker: true, threat: 'critical', blockedReason: 'Geofence: country not allowed', blockedInDays: null, blockCount: 9, lastSeenHours: 1 },
+    { ip: '95.24.7.9', cc: 'RU', country: 'Russian Federation', region: 'Moscow', rc: 'RU-MOW', city: 'Moscow', lat: 55.7558, lng: 37.6173, tz: 'Europe/Moscow', asn: 'AS8402', asnOrg: 'Corbina Telecom', isp: 'Beeline', connection: 'residential', threat: 'high', blockedReason: 'Repeated login failures', blockedInDays: 3, blockCount: 5, lastSeenHours: 3 },
+    { ip: '91.121.88.7', cc: 'FR', country: 'France', region: 'Hauts-de-France', rc: 'FR-HDF', city: 'Roubaix', lat: 50.6942, lng: 3.1746, tz: 'Europe/Paris', asn: 'AS16276', asnOrg: 'OVH SAS', isp: 'OVH', connection: 'hosting', datacenter: true, abuser: true, threat: 'high', blockedReason: 'auto:ruleset', blockedInDays: null, blockCount: 3, lastSeenHours: 8 },
+    { ip: '41.90.12.66', cc: 'KE', country: 'Kenya', region: 'Nairobi', rc: 'KE-30', city: 'Nairobi', lat: -1.2921, lng: 36.8219, tz: 'Africa/Nairobi', asn: 'AS36866', asnOrg: 'Jamii Telecom', isp: 'Jamii', connection: 'business', threat: 'medium', blockedReason: 'Credential stuffing', blockedInDays: 12, blockCount: 1, lastSeenHours: 16 },
+    // Blocked AND whitelisted: `block_active` must answer NOT blocked.
+    { ip: '203.0.113.14', cc: 'GB', country: 'United Kingdom', region: 'England', rc: 'GB-ENG', city: 'Manchester', lat: 53.4808, lng: -2.2426, tz: 'Europe/London', asn: 'AS5089', asnOrg: 'Virgin Media', isp: 'Virgin', connection: 'business', threat: 'medium', blockedReason: 'Rate limit tripped', blockedInDays: 9, blockCount: 2, whitelistReason: 'Partner integration — reviewed', whitelistInDays: 60, lastSeenHours: 2 },
 ];
 
 function buildGeoIps(): MockGeoIp[] {
@@ -1587,26 +1596,55 @@ function applyGeoIpSave(row: MockGeoIp, body: Record<string, unknown>, caller: M
             const reason = String(dict.reason ?? `manual block: by ${caller.username}`);
             const ttl = Number(dict.ttl ?? 600) || 0;
             mockGeoIpBlock(row, reason, ttl);
+            // #1287: every enforcement action leaves a `firewall:*` Log row —
+            // the four payload shapes are NOT uniform (geolocated_ip.py).
+            recordFirewallLog(row, 'firewall:block', {
+                ip: row.ip_address, reason, ttl: ttl || null,
+                blocked_until: row.blocked_until == null ? null : new Date(row.blocked_until * 1000).toISOString(),
+                block_count: row.block_count,
+                trigger: reason === 'auto:ruleset' ? 'auto:incident_rule' : 'manual',
+            }, caller, `blocked ${row.ip_address}`);
         } else if (action === 'unblock') {
             const reason = typeof value === 'string' && value ? value : `manual unblock: by ${caller.username}`;
             row.is_blocked = false;
             row.blocked_until = null;
             row.blocked_reason = `unblocked: ${reason}`;
+            recordFirewallLog(row, 'firewall:unblock', {
+                ip: row.ip_address, reason, trigger: 'manual',
+            }, caller, `unblocked ${row.ip_address}`);
         } else if (action === 'whitelist') {
             const dict = isPlainObject(value) ? value : {};
             const reason = typeof value === 'string' && value
                 ? value
                 : String(dict.reason ?? `manual whitelist: by ${caller.username}`);
             const ttl = Number(dict.ttl ?? 0) || 0;
+            const until = typeof dict.until === 'string' && dict.until ? dict.until : null;
+            const wasBlocked = row.is_blocked;
             row.is_whitelisted = true;
             row.whitelisted_reason = reason;
-            row.whitelisted_until = ttl > 0 ? now + ttl : null;
+            // `on_action_whitelist` accepts `ttl` OR an `until` datetime; an
+            // unparseable `until` is a 400 ("Invalid 'until' datetime").
+            if (until != null) {
+                const parsed = Date.parse(until);
+                if (!Number.isFinite(parsed)) return "Invalid 'until' datetime for whitelist";
+                row.whitelisted_until = Math.floor(parsed / 1000);
+            } else {
+                row.whitelisted_until = ttl > 0 ? now + ttl : null;
+            }
             // A whitelist CLEARS an active block.
             if (row.is_blocked) { row.is_blocked = false; row.blocked_until = null; }
+            recordFirewallLog(row, 'firewall:whitelist', {
+                ip: row.ip_address, reason,
+                until: row.whitelisted_until == null ? null : new Date(row.whitelisted_until * 1000).toISOString(),
+                was_blocked: wasBlocked, trigger: 'manual',
+            }, caller, `whitelisted ${row.ip_address}`);
         } else if (action === 'unwhitelist') {
             row.is_whitelisted = false;
             row.whitelisted_reason = null;
             row.whitelisted_until = null;
+            recordFirewallLog(row, 'firewall:unwhitelist', {
+                ip: row.ip_address, trigger: 'manual',
+            }, caller, `removed the whitelist for ${row.ip_address}`);
         }
         row.modified = now;
     }
@@ -2125,7 +2163,19 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     groupsManager.username = 'groups.manager';
     groupsManager.email = 'groups.manager@nativemojo.com';
     groupsManager.display_name = 'Groups Manager';
-    groupsManager.permissions = { manage_groups: true, groups: true, manage_users: true, users: true };
+    // #1287: one non-superuser bypass holder, so /api/geo/bypass_holders has
+    // both of its `source` values to serve.
+    groupsManager.permissions = { manage_groups: true, groups: true, manage_users: true, users: true, bypass_geofence: true };
+    // #1287: `view_geofence` and NOTHING else — the persona that proves the
+    // network-security section reveals Geofencing alone, and that the metrics
+    // strip, the blocks table and the Last-change chip issue NO request.
+    const geofenceViewer = at(19);
+    geofenceViewer.is_active = true;
+    geofenceViewer.is_superuser = false;
+    geofenceViewer.username = 'geofence.viewer';
+    geofenceViewer.email = 'geofence.viewer@nativemojo.com';
+    geofenceViewer.display_name = 'Geofence Viewer';
+    geofenceViewer.permissions = { view_geofence: true };
     const groupsViewer = at(16);
     groupsViewer.is_active = true;
     groupsViewer.is_superuser = false;
@@ -2152,6 +2202,11 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         users: true,
         // The jobs catch-all grant (view + manage + scheduled tasks in one).
         jobs: true,
+        // #1287: `check_view_permissions` demands view_metrics|metrics for
+        // `account="global"` — `manage_metrics` does NOT imply it. Without
+        // this the showcase's geofence blocks tab would render its
+        // metrics-denied notice instead of the KPI strip and country list.
+        view_metrics: true,
     };
     // Jobs identities — the view/manage split for the jobs control plane.
     // jobs.viewer must be able to read every jobs surface and issue ZERO
@@ -2190,7 +2245,10 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
             login: { methods: ['password', 'passkey'] },
             private_operator_note: 'must never reach the public auth config',
         },
-        geofence: { countries: { deny: ['CN'] } },
+        // #1287 FIXTURE CORRECTION: real DSL. `{countries: {deny: [...]}}` is
+        // not a shape `validate_rule` accepts, and it forced the group panel's
+        // editor into "can't represent this" JSON mode on every load.
+        geofence: { country: { not_in: ['KP'] } },
     });
     groups[1]!.metadata = mergeDicts(groups[1]!.metadata, {
         auth_config: {
@@ -2677,6 +2735,704 @@ function buildTaskResults(): MockTaskResult[] {
 
 // ══ end jobs engine fixtures ═════════════════════════════════════════
 
+// ══ Network security fixtures (board #1287) ══════════════════════════
+// IP sets, geofence evidence and firewall log rows. The matching request
+// handling lives in ONE block inside mockFetch, banner-marked
+// "Network security — wire implementation".
+//
+// Sources: mojo/apps/incident/models/ipset.py, mojo/apps/account/rest/
+// geofence.py, mojo/apps/account/services/geofence/{engine,evidence}.py,
+// mojo/apps/account/models/geolocated_ip.py, mojo/apps/metrics/rest/
+// {categories,helpers}.py.
+
+/** `IPSet` — every model field, including the two no graph ever serializes. */
+interface MockIPSet {
+    id: number;
+    created: number;
+    modified: number;
+    name: string;
+    kind: string;
+    description: string | null;
+    source: string;
+    source_url: string | null;
+    /** Never serialized by ANY graph — present so the mock can prove it. */
+    source_key: string | null;
+    /** `detailed` graph only. */
+    data: string;
+    is_enabled: boolean;
+    cidr_count: number;
+    last_synced: number | null;
+    sync_error: string | null;
+    [field: string]: unknown;
+}
+
+const IPSET_VIEW_PERMS_MOCK = ['view_security', 'security'];
+const IPSET_SAVE_PERMS_MOCK = ['manage_security', 'security'];
+/** `DELETE_PERMS = ["manage_security"]` — deliberately WITHOUT `security`. */
+const IPSET_DELETE_PERMS_MOCK = ['manage_security'];
+const IPSET_ACTIONS = new Set(['sync', 'enable', 'disable', 'refresh_source']);
+const IPSET_WRITABLE_FIELDS = new Set([
+    'name', 'kind', 'description', 'source', 'source_url', 'source_key', 'data', 'is_enabled',
+]);
+/** `IPSet.THREAT_CACHE_SETS` — cache-only threat lists, never kernel sets. */
+const IPSET_CACHE_ONLY_MOCK = new Set(['tor_exits', 'blocklist_de']);
+
+function cidrBlock(prefix: string, count: number): string {
+    const lines: string[] = [];
+    for (let i = 0; i < count; i++) lines.push(`${prefix}.${i}.0/24`);
+    return lines.join('\n');
+}
+
+/** The seed shape, spelled out: `MockIPSet`'s index signature would otherwise
+ *  swallow every property in an `Omit<>` and lose the spread's inference. */
+interface MockIPSetSeed {
+    name: string;
+    kind: string;
+    description: string | null;
+    source: string;
+    source_url: string | null;
+    source_key: string | null;
+    data: string;
+    is_enabled: boolean;
+    cidr_count: number;
+    last_synced: number | null;
+    sync_error: string | null;
+}
+
+function buildIPSets(): MockIPSet[] {
+    const now = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const seed: MockIPSetSeed[] = [
+        {
+            name: 'country_cn', kind: 'country', description: 'Country block: China',
+            source: 'ipdeny', source_url: 'https://www.ipdeny.com/ipblocks/data/countries/cn.zone',
+            source_key: null, data: cidrBlock('223.0', 40), is_enabled: true, cidr_count: 40,
+            last_synced: now - 2 * DAY, sync_error: null,
+        },
+        {
+            name: 'country_ru', kind: 'country', description: 'Country block: Russia',
+            source: 'ipdeny', source_url: 'https://www.ipdeny.com/ipblocks/data/countries/ru.zone',
+            source_key: null, data: cidrBlock('95.24', 24), is_enabled: true, cidr_count: 24,
+            last_synced: now - 2 * DAY, sync_error: null,
+        },
+        {
+            // Staged: created but never enabled — the default this module ships.
+            name: 'country_kp', kind: 'country', description: 'Country block: North Korea',
+            source: 'ipdeny', source_url: null, source_key: null, data: '', is_enabled: false,
+            cidr_count: 0, last_synced: null, sync_error: null,
+        },
+        {
+            name: 'abuse_ips', kind: 'abuse', description: 'AbuseIPDB confidence-100 blacklist',
+            source: 'abuseipdb', source_url: null, source_key: 'abuseipdb-sentinel-secret',
+            data: cidrBlock('45.83', 12), is_enabled: true, cidr_count: 12,
+            last_synced: now - 6 * 3600, sync_error: null,
+        },
+        {
+            name: 'dc_aws', kind: 'datacenter', description: 'AWS published ranges',
+            source: 'manual', source_url: 'https://example.test/aws-ranges.txt', source_key: null,
+            data: '', is_enabled: false, cidr_count: 0, last_synced: null, sync_error: null,
+        },
+        {
+            // A manual set whose stored count is real because the list was
+            // written through `data` (which routes through set_data()).
+            name: 'office_deny', kind: 'custom', description: 'Ranges we never want to see',
+            source: 'manual', source_url: null, source_key: null,
+            data: '192.0.2.0/24\n198.51.100.0/24\n203.0.113.0/24', is_enabled: false,
+            cidr_count: 3, last_synced: null, sync_error: null,
+        },
+        {
+            name: 'dc_hetzner', kind: 'datacenter', description: 'Hetzner ranges',
+            source: 'manual', source_url: 'https://example.test/hetzner.txt', source_key: null,
+            data: '', is_enabled: false, cidr_count: 0, last_synced: now - 9 * DAY,
+            sync_error: 'HTTPSConnectionPool(host=\'example.test\'): Max retries exceeded',
+        },
+        // The two cache-only rows `IPSet.ensure_threat_caches()` creates.
+        {
+            name: 'tor_exits', kind: 'abuse', description: 'Tor exit nodes (geoip detection cache)',
+            source: 'tor', source_url: null, source_key: null, data: cidrBlock('185.220', 18),
+            is_enabled: false, cidr_count: 18, last_synced: now - 3600, sync_error: null,
+        },
+        {
+            name: 'blocklist_de', kind: 'abuse', description: 'blocklist.de aggregate (geoip detection cache)',
+            source: 'blocklist_de', source_url: null, source_key: null, data: cidrBlock('91.121', 30),
+            is_enabled: false, cidr_count: 30, last_synced: now - 3600, sync_error: null,
+        },
+    ];
+    return seed.map((row, index) => ({
+        ...row,
+        id: 7100 + index,
+        created: now - 120 * DAY,
+        modified: row.last_synced ?? now - 30 * DAY,
+    }));
+}
+
+/**
+ * `GRAPHS = {default: exclude [data, source_key], detailed: exclude [source_key]}`.
+ * An unknown graph name falls back to `default` (serializer.py:185-192), so
+ * `source_key` has no escape hatch at all.
+ */
+function serializeIPSet(row: MockIPSet, graph: string): Record<string, unknown> {
+    const { source_key: _key, data, ...rest } = row;
+    if (graph === 'detailed') return { ...rest, data };
+    if (graph !== 'default' && graph !== 'list') {
+        console.warn(`mock /api/incident/ipset: unknown graph "${graph}" — serving "default"`);
+    }
+    return rest;
+}
+
+/**
+ * `set_data(cidr_list)` = `"\n".join(cidr_list)` + `cidr_count = len(...)`,
+ * and `on_rest_save_field` prefers `set_<key>` over a plain assignment. So a
+ * posted LIST is correct and a posted STRING interleaves a newline between
+ * every CHARACTER — reproduced verbatim so the trap is executable, not folklore.
+ */
+function applyIPSetData(row: MockIPSet, value: unknown): void {
+    const parts = Array.isArray(value) ? value.map(String) : [...String(value ?? '')];
+    row.data = parts.join('\n');
+    row.cidr_count = parts.length;
+}
+
+interface MockIPSetSaveResult { error?: string; code?: number }
+
+function applyIPSetSave(row: MockIPSet, body: Record<string, unknown>, all: MockIPSet[]): MockIPSetSaveResult {
+    const now = Math.floor(Date.now() / 1000);
+    const actions: [string, unknown][] = [];
+    for (const [key, value] of Object.entries(body)) {
+        if (IPSET_ACTIONS.has(key)) { actions.push([key, value]); continue; }
+        if (!IPSET_WRITABLE_FIELDS.has(key)) continue;
+        if (key === 'data') { applyIPSetData(row, value); continue; }
+        if (key === 'is_enabled') { row.is_enabled = Boolean(value); continue; }
+        if (key === 'name') {
+            const name = String(value);
+            if (all.some((other) => other !== row && other.name === name)) {
+                return { error: 'IP set with this Name already exists.', code: 400 };
+            }
+            row.name = name;
+            continue;
+        }
+        row[key] = value === '' ? null : value;
+    }
+    for (const [action] of actions) {
+        if (action === 'enable') {
+            // `on_action_enable` — the ONLY path that runs this check, and the
+            // whole reason `is_enabled` is never written as a plain field.
+            if (IPSET_CACHE_ONLY_MOCK.has(row.name)) {
+                return {
+                    error: `'${row.name}' is a cache-only threat list for geoip detection — `
+                        + 'enabling it would kernel-block every listed IP fleet-wide and is not permitted',
+                    code: 400,
+                };
+            }
+            row.is_enabled = true;
+            row.last_synced = now;
+            row.sync_error = null;
+        } else if (action === 'disable') {
+            row.is_enabled = false;
+        } else if (action === 'sync') {
+            // `sync()` is a SILENT no-op for a disabled or cache-only set.
+            if (row.is_enabled && !IPSET_CACHE_ONLY_MOCK.has(row.name)) {
+                row.last_synced = now;
+                row.sync_error = null;
+            }
+        } else if (action === 'refresh_source') {
+            // `refresh_from_source()` returns False immediately for manual.
+            if (row.source !== 'manual') {
+                row.cidr_count = Math.max(1, row.cidr_count || 12);
+                row.data = row.data || cidrBlock('198.18', row.cidr_count);
+                row.sync_error = null;
+                row.last_synced = now;
+            }
+        }
+        row.modified = now;
+    }
+    return {};
+}
+
+// ── Geofence evidence (services/geofence/evidence.py) ─────────────────
+// metadata keys are the reporter's OWN: `geofence_scope` (never `scope` — the
+// top-level Event column stays "global"), `changed_by` on a config change
+// (never `username`), and `reason`/`region_code`/`rule_level` on a block.
+
+function buildGeofenceEvents(): MockIncidentEvent[] {
+    const now = Math.floor(Date.now() / 1000);
+    const HOUR = 3600;
+    const seeds: {
+        cat: 'geofence_block' | 'geofence_exempt' | 'geofence_config';
+        level: number; hours: number; ip: string | null; cc: string | null;
+        title: string; details: string; metadata: Record<string, unknown>;
+    }[] = [
+        {
+            cat: 'geofence_block', level: 3, hours: 1, ip: '223.5.5.5', cc: 'CN',
+            title: 'Geofence block: country_not_allowed',
+            details: 'Geofence blocked 223.5.5.5 (country_not_allowed) on /api/login',
+            metadata: {
+                reason: 'country_not_allowed', rule_level: 'system', geofence_scope: 'auth',
+                country_code: 'CN', region_code: null,
+                abuse: { tor: false, vpn: false, datacenter: false, proxy: false },
+                detail: 'Service is not available in your country.',
+            },
+        },
+        {
+            cat: 'geofence_block', level: 5, hours: 3, ip: '185.220.101.44', cc: 'NL',
+            title: 'Geofence block: tor_detected',
+            details: 'Geofence blocked 185.220.101.44 (tor_detected) on /api/login',
+            metadata: {
+                reason: 'tor_detected', rule_level: 'system', geofence_scope: 'auth',
+                country_code: 'NL', region_code: null, username: 'unknown',
+                abuse: { tor: true, vpn: false, datacenter: false, proxy: false },
+                detail: 'Tor traffic is not permitted.',
+            },
+        },
+        {
+            cat: 'geofence_block', level: 6, hours: 7, ip: '10.0.9.44', cc: null,
+            title: 'Geofence fail-open: lookup_failed',
+            details: 'Geofence fail-open 10.0.9.44 (lookup_failed) on /api/login',
+            metadata: {
+                reason: 'lookup_failed', rule_level: null, geofence_scope: 'auth',
+                country_code: null, region_code: null,
+                detail: 'Geolocation lookup failed.',
+            },
+        },
+        {
+            cat: 'geofence_block', level: 7, hours: 12, ip: '198.51.100.66', cc: 'CN',
+            title: 'Geofence block: rule_invalid',
+            details: 'Geofence blocked 198.51.100.66 (rule_invalid) on /api/login',
+            metadata: {
+                reason: 'rule_invalid', rule_level: 'system', geofence_scope: 'auth',
+                country_code: 'CN', region_code: null,
+                detail: 'Geofence configuration is invalid; access denied.',
+            },
+        },
+        {
+            cat: 'geofence_block', level: 5, hours: 26, ip: '95.24.7.9', cc: 'RU',
+            title: 'Geofence block: country_not_allowed',
+            details: 'Geofence blocked 95.24.7.9 (country_not_allowed) on /api/login',
+            metadata: {
+                reason: 'country_not_allowed', rule_level: 'group', geofence_scope: 'auth',
+                country_code: 'RU', region_code: null,
+                detail: 'Service is not available in your country.',
+            },
+        },
+        {
+            cat: 'geofence_block', level: 3, hours: 40, ip: '73.92.14.5', cc: 'US',
+            title: 'Geofence block: region_not_allowed',
+            details: 'Geofence blocked 73.92.14.5 (region_not_allowed) on /api/login',
+            metadata: {
+                reason: 'region_not_allowed', rule_level: 'system', geofence_scope: 'auth',
+                country_code: 'US', region_code: 'US-CA',
+                detail: 'Service is not available in your region.',
+            },
+        },
+        {
+            cat: 'geofence_exempt', level: 3, hours: 4, ip: '203.0.113.9', cc: 'GB',
+            title: 'Geofence exemption used',
+            details: 'Allowlisted 203.0.113.9 bypassed a geofence block on /api/login',
+            metadata: {
+                reason: 'ip_allowlisted', geofence_scope: 'auth',
+                allowlist_source: 'geoip', allowlist_reason: 'London office egress',
+                would_block_reason: 'country_not_allowed',
+                country_code: 'GB', region_code: null, username: 'ian',
+            },
+        },
+        {
+            cat: 'geofence_exempt', level: 3, hours: 30, ip: '203.0.113.14', cc: 'GB',
+            title: 'Geofence exemption used',
+            details: 'Allowlisted 203.0.113.14 bypassed a geofence block on /api/login',
+            metadata: {
+                reason: 'ip_allowlisted', geofence_scope: 'auth',
+                allowlist_source: 'setting', allowlist_reason: 'Office egress',
+                would_block_reason: 'datacenter_detected',
+                country_code: 'GB', region_code: null,
+            },
+        },
+        {
+            cat: 'geofence_config', level: 3, hours: 5, ip: null, cc: null,
+            title: 'Geofence rules updated (system)',
+            details: 'Platform geofence rules replaced',
+            metadata: {
+                target: 'system', changed_by: 'security.manager', changed_by_id: 12,
+                user_name: 'Security Manager',
+                old: { country: { not_in: ['CN'] } },
+                new: { country: { not_in: ['CN', 'RU'] }, abuse: { tor: false } },
+            },
+        },
+        {
+            cat: 'geofence_config', level: 3, hours: 50, ip: null, cc: null,
+            title: 'Geofence allowlist updated',
+            details: 'Network exemption list replaced',
+            metadata: {
+                target: 'allowlist', changed_by: 'security.manager', changed_by_id: 12,
+                user_name: 'Security Manager',
+            },
+        },
+    ];
+    return seeds.map((seed, index) => ({
+        id: 8800 - index,
+        created: now - seed.hours * HOUR,
+        level: seed.level,
+        // The reporter never passes `scope=`, so the Event COLUMN stays global.
+        scope: 'global',
+        category: seed.cat,
+        source_ip: seed.ip,
+        hostname: 'auth-1',
+        uid: null,
+        // Populated by Event.sync_metadata from the geolocated source IP.
+        country_code: seed.cc,
+        title: seed.title,
+        details: seed.details,
+        model_name: null,
+        model_id: null,
+        metadata: { server: 'auth-1', ...seed.metadata },
+        group_id: null,
+        incident: null,
+    }));
+}
+
+// ── Firewall log rows (GeoLocatedIP.log(..., 'firewall:*')) ───────────
+// `path` is the ADMIN's request path and `ip` the ADMIN's address — both come
+// from the ambient request. The blocked address lives ONLY in `payload.ip`,
+// and the payload shape differs per kind.
+
+let firewallLogSeq = 100300;
+
+function firewallLogRow(
+    kind: string,
+    payload: Record<string, unknown>,
+    opts: { created: number; modelId: number; username: string | null; uid: number; message: string },
+): MockLog {
+    return {
+        id: firewallLogSeq++,
+        created: opts.created,
+        level: 'info',
+        kind,
+        method: 'POST',
+        path: `/api/system/geoip/${opts.modelId}`,
+        payload: JSON.stringify(payload),
+        ip: '10.1.2.7',
+        duid: null,
+        uid: opts.uid,
+        gid: 0,
+        username: opts.username,
+        user_agent: 'Mozilla/5.0 (portal-mojo admin)',
+        log: opts.message,
+        model_name: 'account.GeoLocatedIP',
+        model_id: opts.modelId,
+    };
+}
+
+function buildFirewallLogs(): MockLog[] {
+    const now = Math.floor(Date.now() / 1000);
+    const HOUR = 3600;
+    return [
+        firewallLogRow('firewall:block', {
+            ip: '185.220.101.44', reason: 'auto:threat_escalation', ttl: null,
+            blocked_until: null, block_count: 4, trigger: 'auto:incident_rule',
+        }, { created: now - 2 * HOUR, modelId: 4108, username: null, uid: 0, message: 'blocked 185.220.101.44 permanently (auto:threat_escalation)' }),
+        firewallLogRow('firewall:block', {
+            ip: '45.33.32.156', reason: 'Credential stuffing from a VPN exit', ttl: 604800,
+            blocked_until: new Date((now + 6 * 86400) * 1000).toISOString(), block_count: 2, trigger: 'manual',
+        }, { created: now - 5 * HOUR, modelId: 4109, username: 'security.manager', uid: 12, message: 'blocked 45.33.32.156 for 7 days' }),
+        firewallLogRow('firewall:unblock', {
+            ip: '104.28.14.33', reason: 'False positive — scraper was ours', trigger: 'manual',
+        }, { created: now - 20 * HOUR, modelId: 4110, username: 'security.manager', uid: 12, message: 'unblocked 104.28.14.33' }),
+        firewallLogRow('firewall:whitelist', {
+            ip: '203.0.113.9', reason: 'London office egress', until: null, was_blocked: false, trigger: 'manual',
+        }, { created: now - 30 * HOUR, modelId: 4111, username: 'ian', uid: 1, message: 'whitelisted 203.0.113.9' }),
+        firewallLogRow('firewall:whitelist', {
+            ip: '198.51.100.77', reason: 'Temporary contractor egress',
+            until: new Date((now - 10 * 86400) * 1000).toISOString(), was_blocked: true, trigger: 'manual',
+        }, { created: now - 40 * HOUR, modelId: 4112, username: 'ian', uid: 1, message: 'whitelisted 198.51.100.77 until it expired' }),
+        firewallLogRow('firewall:unwhitelist', {
+            ip: '198.51.100.77', trigger: 'manual',
+        }, { created: now - 3 * HOUR, modelId: 4112, username: 'security.manager', uid: 12, message: 'removed the whitelist for 198.51.100.77' }),
+    ];
+}
+
+/**
+ * Called from `applyGeoIpSave` so a geoip enforcement action leaves the same
+ * firewall trail the backend writes. #1287.
+ */
+function recordFirewallLog(
+    row: MockGeoIp, kind: string, payload: Record<string, unknown>, caller: MockUser, message: string,
+): void {
+    db.logs.unshift(firewallLogRow(kind, payload, {
+        created: Math.floor(Date.now() / 1000),
+        modelId: row.id,
+        username: caller.username,
+        uid: caller.id,
+        message,
+    }));
+}
+
+// ── Geofence DSL validation (services/geofence/dsl.py) ────────────────
+// Top-level keys {country, region, abuse}; operators {in, not_in, eq}; abuse
+// flags {tor, vpn, datacenter, proxy}. The messages mirror the validator's,
+// because they are what the Rules tab shows inline on a 400.
+
+const GEO_RULE_TOP_KEYS = ['country', 'region', 'abuse'];
+const GEO_RULE_OPS = ['eq', 'in', 'not_in'];
+const GEO_ABUSE_FLAGS = ['tor', 'vpn', 'datacenter', 'proxy'];
+
+function validateGeoRule(rule: Record<string, unknown>): string | null {
+    for (const [key, body] of Object.entries(rule)) {
+        if (!GEO_RULE_TOP_KEYS.includes(key)) {
+            return `geofence rule: unknown key '${key}'; valid keys are ${JSON.stringify(GEO_RULE_TOP_KEYS)}`;
+        }
+        if (!isPlainObject(body)) return `geofence rule: '${key}' must be a dict`;
+        if (key === 'abuse') {
+            for (const [flag, value] of Object.entries(body)) {
+                if (!GEO_ABUSE_FLAGS.includes(flag)) {
+                    return `geofence rule: 'abuse' has unknown flag '${flag}'; valid flags are ${JSON.stringify(GEO_ABUSE_FLAGS)}`;
+                }
+                if (value !== true && value !== false && value !== null) {
+                    return `geofence rule: 'abuse.${flag}' must be true, false or null`;
+                }
+            }
+            continue;
+        }
+        for (const [op, value] of Object.entries(body)) {
+            if (!GEO_RULE_OPS.includes(op)) {
+                return `geofence rule: '${key}' has unknown operator '${op}'; valid operators are ${JSON.stringify(GEO_RULE_OPS)}`;
+            }
+            if ((op === 'in' || op === 'not_in') && !Array.isArray(value)) {
+                return `geofence rule: '${key}.${op}' must be a list`;
+            }
+            if (op === 'eq' && typeof value !== 'string') {
+                return `geofence rule: '${key}.eq' must be a string`;
+            }
+        }
+    }
+    return null;
+}
+
+const ALLOWLIST_ENTRY_KEYS = new Set(['cidr', 'ip', 'reason', 'until']);
+
+function validateGeoAllowlist(entries: unknown[]): string | null {
+    for (let index = 0; index < entries.length; index++) {
+        const entry = entries[index];
+        if (typeof entry === 'string') {
+            if (!entry.trim()) return `geofence allowlist entry ${index}: empty value`;
+            continue;
+        }
+        if (!isPlainObject(entry)) return `geofence allowlist entry ${index}: must be a string or a dict`;
+        for (const key of Object.keys(entry)) {
+            if (!ALLOWLIST_ENTRY_KEYS.has(key)) {
+                return `geofence allowlist entry ${index}: unknown key '${key}'`;
+            }
+        }
+        const cidr = entry.cidr ?? entry.ip;
+        if (typeof cidr !== 'string' || !cidr.trim()) {
+            return `geofence allowlist entry ${index}: 'cidr' is required`;
+        }
+        const [network, bits] = cidr.trim().split('/');
+        const validBits = bits === undefined || (/^\d{1,2}$/.test(bits) && Number(bits) <= 32);
+        if (ipv4ToInt(String(network)) == null || !validBits) {
+            return `geofence allowlist entry ${index}: invalid CIDR/IP '${cidr}' (each octet must be 0-255)`;
+        }
+        if (entry.reason != null && typeof entry.reason !== 'string') {
+            return `geofence allowlist entry ${index}: 'reason' must be a string`;
+        }
+        if (entry.until != null && !Number.isFinite(Date.parse(String(entry.until)))) {
+            return `geofence allowlist entry ${index}: could not parse 'until'`;
+        }
+    }
+    return null;
+}
+
+/** `entry_active(norm)` — expired entries are LISTED with active=false. */
+function normalizeMockAllowlistEntry(entry: unknown): Record<string, unknown> {
+    if (!isPlainObject(entry)) {
+        return { cidr: String(entry), reason: null, until: null, active: true };
+    }
+    const until = entry.until == null || entry.until === '' ? null : String(entry.until);
+    const parsed = until == null ? null : Date.parse(until);
+    return {
+        cidr: String(entry.cidr ?? entry.ip ?? ''),
+        reason: entry.reason == null ? null : String(entry.reason),
+        until,
+        active: parsed == null || !Number.isFinite(parsed) ? true : parsed > Date.now(),
+    };
+}
+
+// ── The geofence engine, at the fidelity a simulator needs ────────────
+
+const GEO_DETAIL_MAP: Record<string, string> = {
+    no_rules: 'No geofence rules configured.',
+    disabled: 'Geofencing is disabled.',
+    bypass: 'Bypass permission granted.',
+    ip_allowlisted: 'IP is allowlisted; geofence exemption applied.',
+    no_rules_strict: 'Geofencing is required but no rules are configured; access denied.',
+    passed: 'Allowed.',
+    lookup_failed: 'Geolocation lookup failed.',
+    private_ip: 'Private or reserved IP.',
+    country_not_allowed: 'Service is not available in your country.',
+    region_not_allowed: 'Service is not available in your region.',
+    tor_detected: 'Tor traffic is not permitted.',
+    vpn_detected: 'VPN traffic is not permitted.',
+    proxy_detected: 'Proxy traffic is not permitted.',
+    datacenter_detected: 'Datacenter traffic is not permitted.',
+    rule_invalid: 'Geofence configuration is invalid; access denied.',
+    group_inactive: 'The requested group is inactive; evaluating system rules only.',
+};
+
+function ipv4ToInt(ip: string): number | null {
+    const parts = ip.trim().split('.');
+    if (parts.length !== 4) return null;
+    let value = 0;
+    for (const part of parts) {
+        const octet = Number(part);
+        if (!Number.isInteger(octet) || octet < 0 || octet > 255) return null;
+        value = value * 256 + octet;
+    }
+    return value;
+}
+
+function ipInCidr(ip: string, cidr: string): boolean {
+    const [network, bitsRaw] = cidr.split('/');
+    const bits = bitsRaw == null ? 32 : Number(bitsRaw);
+    const target = ipv4ToInt(ip);
+    const base = ipv4ToInt(String(network));
+    if (target == null || base == null || !Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+    if (bits === 0) return true;
+    const mask = bits === 32 ? 0xFFFFFFFF : ~((1 << (32 - bits)) - 1) >>> 0;
+    return ((target & mask) >>> 0) === ((base & mask) >>> 0);
+}
+
+function isPrivateIpv4(ip: string): boolean {
+    return /^(10\.|127\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip.trim());
+}
+
+interface MockGeoInput {
+    country_code?: string | null;
+    region_code?: string | null;
+    is_tor?: boolean;
+    is_vpn?: boolean;
+    is_proxy?: boolean;
+    is_datacenter?: boolean;
+}
+
+/** Evaluate one rule against a geo dict; returns the failing reason or null. */
+function evaluateGeoRule(rule: unknown, geo: MockGeoInput): string | null {
+    if (!isPlainObject(rule)) return null;
+    const cc = String(geo.country_code ?? '').toUpperCase();
+    const rc = String(geo.region_code ?? '').toUpperCase();
+
+    const country = isPlainObject(rule.country) ? rule.country : null;
+    if (country) {
+        const list = (values: unknown): string[] => Array.isArray(values) ? values.map((v) => String(v).toUpperCase()) : [];
+        if (Array.isArray(country.in) && cc && !list(country.in).includes(cc)) return 'country_not_allowed';
+        if (Array.isArray(country.not_in) && cc && list(country.not_in).includes(cc)) return 'country_not_allowed';
+        if (typeof country.eq === 'string' && cc && country.eq.toUpperCase() !== cc) return 'country_not_allowed';
+    }
+
+    const region = isPlainObject(rule.region) ? rule.region : null;
+    if (region && rc) {
+        const list = (values: unknown): string[] => Array.isArray(values) ? values.map((v) => String(v).toUpperCase()) : [];
+        if (Array.isArray(region.not_in) && list(region.not_in).includes(rc)) return 'region_not_allowed';
+        if (Array.isArray(region.in) && !list(region.in).includes(rc)) return 'region_not_allowed';
+        if (typeof region.eq === 'string' && region.eq.toUpperCase() !== rc) return 'region_not_allowed';
+    }
+
+    const abuse = isPlainObject(rule.abuse) ? rule.abuse : null;
+    if (abuse) {
+        for (const flag of GEO_ABUSE_FLAGS) {
+            if (abuse[flag] === false && geo[`is_${flag}` as keyof MockGeoInput] === true) return `${flag}_detected`;
+        }
+    }
+    return null;
+}
+
+/**
+ * `GeoFenceEngine.simulate` — no bypass shortcut, no cache, no evidence, and
+ * `enabled` set at the TOP LEVEL of the returned decision (engine.py:473).
+ */
+function simulateGeoDecision(ip: string, geoBody: Record<string, unknown> | null, group?: MockGroup): Record<string, unknown> {
+    const enabled = true; // GEOFENCE_ENABLED for this fixture deployment.
+    let geo: MockGeoInput = {};
+    if (geoBody) {
+        geo = {
+            country_code: geoBody.country_code == null ? null : String(geoBody.country_code).toUpperCase(),
+            region_code: geoBody.region_code == null ? null : String(geoBody.region_code).toUpperCase(),
+            is_tor: geoBody.is_tor === true,
+            is_vpn: geoBody.is_vpn === true,
+            is_proxy: geoBody.is_proxy === true,
+            is_datacenter: geoBody.is_datacenter === true,
+        };
+    } else if (ip) {
+        const cached = db.geoIps.find((row) => row.ip_address === ip);
+        geo = cached
+            ? {
+                country_code: cached.country_code, region_code: cached.region_code,
+                is_tor: cached.is_tor, is_vpn: cached.is_vpn,
+                is_proxy: cached.is_proxy, is_datacenter: cached.is_datacenter,
+            }
+            : {};
+    }
+
+    const abuse = {
+        tor: geo.is_tor === true, vpn: geo.is_vpn === true,
+        datacenter: geo.is_datacenter === true, proxy: geo.is_proxy === true,
+    };
+    const base = (allowed: boolean, reason: string, ruleLevel: string | null = null) => ({
+        allowed, reason, detail: GEO_DETAIL_MAP[reason] ?? '',
+        ip: ip || null,
+        // `country` and `country_code` carry the SAME value; likewise region.
+        country: geo.country_code ?? null, country_code: geo.country_code ?? null,
+        region: geo.region_code ?? null, region_code: geo.region_code ?? null,
+        abuse, checked_at: new Date().toISOString(),
+        rule_level: ruleLevel, strict_posture: false,
+        enabled,
+    });
+
+    // The shadow decision — what the rules say, ignoring exemptions.
+    const shadow = (() => {
+        if (ip && isPrivateIpv4(ip)) return base(true, 'private_ip');
+        if (ip && !geoBody && !db.geoIps.some((row) => row.ip_address === ip)) return base(true, 'lookup_failed');
+        const systemFail = evaluateGeoRule(db.geoRules, geo);
+        if (systemFail) return base(false, systemFail, 'system');
+        const groupRule = group?.metadata.geofence;
+        if (groupRule) {
+            const groupFail = evaluateGeoRule(groupRule, geo);
+            if (groupFail) return base(false, groupFail, 'group');
+        }
+        if (!Object.keys(db.geoRules).length && !groupRule) return base(true, 'no_rules');
+        return base(true, 'passed');
+    })();
+
+    // The allowlist is consulted only when an IP was supplied.
+    if (ip) {
+        const settingHit = db.geoAllowlist
+            .map(normalizeMockAllowlistEntry)
+            .find((entry) => entry.active === true && ipInCidr(ip, String(entry.cidr)));
+        const geoipHit = db.geoIps.find((row) => row.ip_address === ip && mockWhitelistActive(row));
+        if (settingHit || geoipHit) {
+            const decision: Record<string, unknown> = base(true, 'ip_allowlisted');
+            decision.rule_level = null; // `_allowlisted_decision` never copies it.
+            decision.allowlist_source = settingHit ? 'setting' : 'geoip';
+            decision.allowlist_reason = settingHit ? settingHit.reason : geoipHit?.whitelisted_reason ?? null;
+            decision.allowlist_until = settingHit
+                ? settingHit.until
+                : geoipHit?.whitelisted_until == null ? null : new Date(geoipHit.whitelisted_until * 1000).toISOString();
+            if (shadow.reason === 'lookup_failed') {
+                // The engine genuinely does not know — both stay null.
+                decision.would_block = null;
+                decision.would_block_reason = null;
+            } else {
+                decision.would_block = shadow.allowed === false;
+                decision.would_block_reason = shadow.allowed ? null : shadow.reason;
+            }
+            return decision;
+        }
+    }
+
+    if (group && !isEffectivelyActive(group)) {
+        return { ...shadow, reason: 'group_inactive', detail: GEO_DETAIL_MAP.group_inactive, group_inactive: true };
+    }
+    return shadow;
+}
+
+// ══ end network security fixtures ════════════════════════════════════
+
 const users = buildUsers();
 const groups = buildGroups();
 decorateUsers(users, groups);
@@ -2694,13 +3450,15 @@ const db = {
     groups,
     members: buildMembers(users, groups),
     apiKeys: buildApiKeys(),
-    logs: buildLogs(users, groups),
+    // #1287: firewall rows ride the same Log table the monitoring page reads.
+    logs: [...buildFirewallLogs(), ...buildLogs(users, groups)],
     devices: deviceRows,
     geoIps: geoIpRows,
     deviceLocations: buildDeviceLocations(deviceRows, geoIpRows),
     pushDevices: buildPushDevices(),
     loginEvents: loginEventRows,
-    incidentEvents: buildIncidentEvents(),
+    // #1287: the geofence evidence plane shares the incident Event table.
+    incidentEvents: [...buildIncidentEvents(), ...buildGeofenceEvents()],
     passkeys: buildPasskeys(),
     oauthConnections: buildOAuthConnections(),
     notificationPrefs: buildNotificationPrefs(),
@@ -2713,8 +3471,16 @@ const db = {
         ['group-1', { view_permissions: ['view_metrics', 'metrics'], write_permissions: null }],
         ['user-1', { view_permissions: null, write_permissions: 'metrics' }],
     ]),
-    geoRules: { countries: { deny: ['CN'] } } as Record<string, unknown>,
-    geoAllowlist: [{ cidr: '203.0.113.0/24', reason: 'Office egress', until: null }] as unknown[],
+    // #1287 FIXTURE CORRECTION. `{countries: {deny: [...]}}` is not the DSL —
+    // top-level keys are {country, region, abuse} and operators are
+    // {in, not_in, eq}, so the old value would have been REJECTED by the
+    // backend's own `validate_rule` (which the POST handler now enforces here).
+    geoRules: { country: { not_in: ['CN', 'RU'] }, abuse: { tor: false } } as Record<string, unknown>,
+    geoAllowlist: [
+        { cidr: '203.0.113.0/24', reason: 'Office egress', until: null },
+        { cidr: '198.51.100.0/24', reason: 'Partner VPN — expired', until: '2026-01-31T00:00:00Z' },
+    ] as unknown[],
+    ipSets: buildIPSets(),
     tickets: buildTickets(),
     incidentRecords: buildIncidents(),
     ticketNotes: buildTicketNotes(),
@@ -3359,11 +4125,49 @@ const JOBS_METRIC_SERIES: { slug: string; label: string; base: number; spread: n
     }),
 ];
 
+/**
+ * #1287: the geofence slug family, exactly as `services/geofence/evidence.py`
+ * records it — the base counters plus the per-country breakdown
+ * (`geofence:blocks:country:<CC>`) that `/api/metrics/category_slugs` lists
+ * and the blocks tab sums server-side. The per-REGION family
+ * (`geofence:blocks:region:<RC>`) is recorded by the backend too but is not
+ * consumed by any surface here, so it is listed and left unplotted.
+ */
+const GEOFENCE_COUNTRY_WEIGHTS: [string, number][] = [
+    ['CN', 34], ['RU', 21], ['BR', 12], ['NL', 9], ['IN', 7],
+    ['VN', 5], ['IR', 4], ['US', 3],
+];
+const GEOFENCE_METRIC_SERIES: { slug: string; label: string; base: number; spread: number }[] = [
+    { slug: 'geofence:blocks', label: 'Geofence Blocks', base: 96, spread: 40 },
+    { slug: 'geofence:exempt', label: 'Exempt Passes', base: 11, spread: 8 },
+    ...GEOFENCE_COUNTRY_WEIGHTS.map(([code, base]) => ({
+        slug: `geofence:blocks:country:${code}`,
+        label: `Blocks · ${code}`,
+        base,
+        spread: Math.max(2, Math.round(base / 3)),
+    })),
+];
+
+/** The registry `/api/metrics/category_slugs` reads (a SET server-side, so the
+ *  wire order is nondeterministic — the mock shuffles nothing but the client
+ *  must not depend on order either). */
+const METRIC_CATEGORY_SLUGS: Record<string, string[]> = {
+    geofence: [
+        'geofence:blocks',
+        'geofence:exempt',
+        ...GEOFENCE_COUNTRY_WEIGHTS.map(([code]) => `geofence:blocks:country:${code}`),
+        'geofence:blocks:region:US-CA',
+        'geofence:blocks:region:US-NY',
+    ],
+    firewall: ['firewall:blocks', 'firewall:blocks:country:CN', 'firewall:broadcasts'],
+};
+
 const SERIES: { slug: string; label: string; base: number; spread: number }[] = [
     { slug: 'api_calls', label: 'API Calls', base: 240, spread: 90 },
     { slug: 'logins', label: 'Logins', base: 70, spread: 34 },
     { slug: 'errors', label: 'Errors', base: 12, spread: 10 },
     ...JOBS_METRIC_SERIES,
+    ...GEOFENCE_METRIC_SERIES,
 ];
 
 function bucketLabel(d: Date, granularity: string): string {
@@ -5086,7 +5890,13 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const canManage = hasGlobalPermission(caller, ['manage_geofence', 'security']);
         if (opts.method === 'POST') {
             if (!canManage) return permissionDenied();
+            if (opts.body?.rule === undefined) return { status: false, error: "'rule' is required", error_code: 400 };
             if (!isPlainObject(opts.body?.rule)) return { status: false, error: "'rule' must be a dict", error_code: 400 };
+            // #1287: server-side DSL validation, so an invalid rule can never
+            // be stored here either — and the client's inline 400 has a real
+            // message to surface.
+            const invalid = validateGeoRule(opts.body.rule);
+            if (invalid) return { status: false, error: invalid, error_code: 400 };
             db.geoRules = { ...opts.body.rule };
             return { status: true, data: { rule: db.geoRules, source: 'setting', modified: new Date().toISOString() } };
         }
@@ -5097,7 +5907,39 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { status: true, data: { removed } };
         }
         if (!canView) return permissionDenied();
-        return { status: true, data: { system: { rule: db.geoRules, source: 'setting', modified: new Date().toISOString() }, posture: { enabled: true, fail_closed: false, fail_closed_scopes: [], allow_private_ips: true, strict_posture: false, cache_ttl: 300 }, allowlist_summary: { setting_entries: db.geoAllowlist.length, geoip_active: 0 }, evaluation_order: ['system', 'group'], enforced_endpoints: [{ endpoint: 'POST /api/login', scope: 'auth', after_auth: true }] } };
+        // #1287: `group` is present ONLY when the request carried group_uuid,
+        // and `geoip_active` counts real whitelist-active rows.
+        const groupUuid = String(opts.params?.group_uuid ?? '').trim();
+        let groupBlock: Record<string, unknown> | undefined;
+        if (groupUuid) {
+            const group = db.groups.find((candidate) => candidate.uuid === groupUuid);
+            if (!group) return { status: false, error: 'Unknown group', error_code: 400 };
+            const strict = group.metadata.geofence_strict;
+            groupBlock = {
+                id: group.id, uuid: group.uuid, is_active: group.is_active,
+                rule: group.metadata.geofence ?? {},
+                strict_posture: strict ?? null,
+                strict_posture_effective: Boolean(strict),
+            };
+        }
+        return {
+            status: true,
+            data: {
+                system: { rule: db.geoRules, source: 'setting', modified: new Date().toISOString() },
+                ...(groupBlock ? { group: groupBlock } : {}),
+                posture: { enabled: true, fail_closed: false, fail_closed_scopes: ['auth'], allow_private_ips: true, strict_posture: false, cache_ttl: 300 },
+                allowlist_summary: {
+                    setting_entries: db.geoAllowlist.length,
+                    geoip_active: db.geoIps.filter(mockWhitelistActive).length,
+                },
+                evaluation_order: ['system', 'group'],
+                enforced_endpoints: [
+                    { endpoint: 'mojo.apps.account.rest.auth.on_login', scope: 'auth', after_auth: true },
+                    { endpoint: 'mojo.apps.account.rest.auth.on_request_code', scope: 'auth' },
+                    { endpoint: 'mojo.apps.incident.rest.ossec.on_alert', scope: 'ingest' },
+                ],
+            },
+        };
     }
     if (path === '/api/geo/allowlist') {
         const caller = userFromBearer(opts.headers);
@@ -5105,13 +5947,143 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const canManage = hasGlobalPermission(caller, ['manage_geofence', 'security']);
         if (opts.method === 'POST') {
             if (!canManage) return permissionDenied();
-            if (!Array.isArray(opts.body?.entries)) return { status: false, error: "'entries' is required (a list; may be empty)", error_code: 400 };
+            if (opts.body?.entries === undefined) return { status: false, error: "'entries' is required (a list; may be empty)", error_code: 400 };
+            if (!Array.isArray(opts.body?.entries)) return { status: false, error: "'entries' must be a list", error_code: 400 };
+            const invalid = validateGeoAllowlist(opts.body.entries);
+            if (invalid) return { status: false, error: invalid, error_code: 400 };
             db.geoAllowlist = [...opts.body.entries];
             return { status: true, data: { entries: db.geoAllowlist } };
         }
         if (!hasGlobalPermission(caller, ['view_geofence', 'manage_geofence', 'security'])) return permissionDenied();
-        return { status: true, data: { setting: db.geoAllowlist.map((entry) => isPlainObject(entry) ? { cidr: entry.cidr ?? entry.ip, reason: entry.reason ?? null, until: entry.until ?? null, active: true } : { cidr: entry, reason: null, until: null, active: true }), geoip: [] } };
+        // #1287: `active` is computed from `until`, and the geoip leg is the
+        // real whitelist projection — expired entries are LISTED, never hidden.
+        return {
+            status: true,
+            data: {
+                setting: db.geoAllowlist.map(normalizeMockAllowlistEntry),
+                geoip: db.geoIps
+                    .filter((row) => row.is_whitelisted)
+                    .slice(0, 500)
+                    .map((row) => ({
+                        ip: row.ip_address,
+                        reason: row.whitelisted_reason ?? null,
+                        until: row.whitelisted_until == null ? null : new Date(row.whitelisted_until * 1000).toISOString(),
+                        active: mockWhitelistActive(row),
+                    })),
+            },
+        };
     }
+    // ══ Network security — wire implementation (board #1287) ══════════
+    // Fixtures live in the "Network security fixtures" block above.
+    if (path === '/api/geo/simulate') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['view_geofence', 'manage_geofence', 'security'])) return permissionDenied();
+        const ip = String(opts.body?.ip ?? '').trim();
+        const geoBody = opts.body?.geo;
+        if (!ip && geoBody === undefined) return { status: false, error: "Provide 'ip' or 'geo'", error_code: 400 };
+        if (geoBody !== undefined && !isPlainObject(geoBody)) return { status: false, error: "'geo' must be a dict", error_code: 400 };
+        const groupUuid = String(opts.body?.group_uuid ?? '').trim();
+        let group: MockGroup | undefined;
+        if (groupUuid) {
+            group = db.groups.find((candidate) => candidate.uuid === groupUuid);
+            // `_resolve_group_param` 400s on an UNKNOWN uuid but deliberately
+            // returns an INACTIVE group — inactive is legal and is evaluated.
+            if (!group) return { status: false, error: 'Unknown group', error_code: 400 };
+        }
+        return { status: true, data: simulateGeoDecision(ip, isPlainObject(geoBody) ? geoBody : null, group) };
+    }
+    if (path === '/api/geo/bypass_holders') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['view_geofence', 'manage_geofence', 'security'])) return permissionDenied();
+        const matched = db.users.filter((user) => user.is_superuser || Boolean(user.permissions.bypass_geofence));
+        const capped = matched.length > 200;
+        const holders = matched.slice(0, 200).map((user) => ({
+            id: user.id,
+            username: user.username,
+            is_active: user.is_active,
+            source: user.permissions.bypass_geofence ? 'permission' : 'superuser',
+            value: user.permissions.bypass_geofence ?? null,
+        }));
+        return { status: true, data: { holders, count: holders.length, capped } };
+    }
+    // `/api/metrics/category_slugs` answers a FLAT envelope — a raw
+    // JsonResponse, so there is no `data` wrapper (categories.py:199-217).
+    if (path === '/api/metrics/category_slugs') {
+        const caller = userFromBearer(opts.headers);
+        const category = String(opts.params?.category ?? '');
+        if (!category) return { status: false, error: 'missing required parameter: category', error_code: 400 };
+        const account = String(opts.params?.account ?? 'public');
+        if (account === 'global') {
+            // `check_view_permissions`: exactly ["view_metrics","metrics"].
+            if (!caller) return permissionDenied(401);
+            if (!hasGlobalPermission(caller, ['view_metrics', 'metrics'])) return permissionDenied();
+        }
+        return { status: true, slugs: METRIC_CATEGORY_SLUGS[category] ?? [], category, account };
+    }
+    // ── IP sets — /api/incident/ipset (+ /<pk>) ──
+    const ipSetMatch = path.match(/^\/api\/incident\/ipset(?:\/(\d+))?$/);
+    if (ipSetMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, IPSET_VIEW_PERMS_MOCK)) return permissionDenied();
+        const canSave = hasGlobalPermission(caller, IPSET_SAVE_PERMS_MOCK);
+        const canDelete = hasGlobalPermission(caller, IPSET_DELETE_PERMS_MOCK);
+        const graph = String(opts.params?.graph ?? 'default');
+        if (ipSetMatch[1]) {
+            const row = db.ipSets.find((candidate) => candidate.id === Number(ipSetMatch[1]));
+            if (!row) return { status: false, error: 'IPSet not found', error_code: 404 };
+            if (method === 'DELETE') {
+                // DELETE_PERMS is `manage_security` ONLY — the broader
+                // `security` grant does NOT satisfy it.
+                if (!canDelete) return permissionDenied();
+                db.ipSets = db.ipSets.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST' && opts.body) {
+                if (!canSave) return permissionDenied();
+                const result = applyIPSetSave(row, opts.body, db.ipSets);
+                if (result.error) return { status: false, error: result.error, error_code: result.code ?? 400 };
+            }
+            return { status: true, data: serializeIPSet(row, graph), graph };
+        }
+        if (method === 'DELETE') return { status: false, error: 'DELETE not allowed on the collection', error_code: 403 };
+        if (method === 'POST' && opts.body) {
+            if (!canSave) return permissionDenied();
+            const now = Math.floor(Date.now() / 1000);
+            const created: MockIPSet = {
+                id: Math.max(0, ...db.ipSets.map((candidate) => candidate.id)) + 1,
+                created: now, modified: now,
+                name: '', kind: 'custom', description: null, source: 'manual',
+                source_url: null, source_key: null, data: '',
+                // The model default is True, but this module never posts
+                // `is_enabled` — a set created through the portal is staged.
+                is_enabled: false, cidr_count: 0, last_synced: null, sync_error: null,
+            };
+            const result = applyIPSetSave(created, opts.body, db.ipSets);
+            if (result.error) return { status: false, error: result.error, error_code: result.code ?? 400 };
+            if (!created.name) return { status: false, error: 'name is required', error_code: 400 };
+            db.ipSets.push(created);
+            return { status: true, data: serializeIPSet(created, graph), graph };
+        }
+        const result = listRows(
+            db.ipSets as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            // `SEARCH_FIELDS = ["name", "description"]`.
+            (row) => `${row.name} ${row.description ?? ''}`,
+            'name',
+        );
+        if (opts.params?.download_format) {
+            return exportRows(
+                (result.data as unknown as MockIPSet[]).map((row) => serializeIPSet(row, graph)),
+                opts.params,
+                'IPSet',
+            );
+        }
+        return { ...result, graph, data: (result.data as unknown as MockIPSet[]).map((row) => serializeIPSet(row, graph)) };
+    }
+    // ══ end network security wire ════════════════════════════════════
     // ── Settings — plaintext stays private; secrets serialize masked ─────
     const oneSetting = path.match(/^\/api\/settings\/(\d+)$/);
     if (oneSetting || path === '/api/settings') {
