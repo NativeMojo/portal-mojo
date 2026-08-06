@@ -113,6 +113,17 @@ The mock-only component showcase signs in as
 narrow `security.viewer`, `security.manager`, `groups.manager`, and Ian
 fixtures remain unchanged for permission-boundary verification.
 
+DNSMan's mock contract is central-state-backed and capability-first. Stable
+identities `dns.viewer@nativemojo.com` and `dns.manager@nativemojo.com`
+(password `mojo`) exercise the exact global view/manage split. Credential
+assignment searches only `/api/dnsman/credential/group-choice`; an exact
+selection hydrates with `?id=…`, and inactive or over-depth groups never
+appear. First-link verification failure creates no row. Failed rotation marks
+the existing row unverified while retaining its old masks. Successful raw
+keys are used only by the imperative call and are never stored in mock state
+or returned. Registrar confirmation tokens, legal-contact PII, WHOIS PII, and
+certificate material likewise stay outside model/query state.
+
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx
