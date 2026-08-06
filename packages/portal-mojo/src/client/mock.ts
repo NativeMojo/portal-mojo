@@ -2539,7 +2539,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data, size: 10, start: 0, count: data.length };
     }
     // ── Shared record feeds: newest 100, parent/group scoped, graph=default ──
-    const ticketNoteMatch = path.match(/^\/api\/ticket\/note(?:\/(\d+))?$/);
+    const ticketNoteMatch = path.match(/^\/api\/incident\/ticket\/note(?:\/(\d+))?$/);
     if (ticketNoteMatch) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
@@ -2567,19 +2567,18 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const result = listRows(db.ticketNotes as unknown as Record<string, unknown>[], params, (row) => String(row.note ?? ''), '-created');
         return { ...result, graph: 'default', data: (result.data as unknown as MockTicketNote[]).map(serializeTicketNote) };
     }
-    const incidentHistoryMatch = path.match(/^\/api\/incident(?:\/(\d+))?\/history(?:\/(\d+))?$/);
+    const incidentHistoryMatch = path.match(/^\/api\/incident\/incident(?:\/(\d+))?\/history$/);
     if (incidentHistoryMatch) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
-        const parentFromPath = incidentHistoryMatch[1] ? Number(incidentHistoryMatch[1]) : null;
-        const detailId = incidentHistoryMatch[2] ? Number(incidentHistoryMatch[2]) : null;
+        const detailId = incidentHistoryMatch[1] ? Number(incidentHistoryMatch[1]) : null;
         if (detailId != null) {
             const row = db.incidentHistory.find((candidate) => candidate.id === detailId);
             if (!row) return { status: false, error: 'IncidentHistory not found', error_code: 404 };
             return { status: true, data: serializeIncidentHistory(row), graph: 'default' };
         }
         if (opts.method === 'POST' && opts.body) {
-            const parentId = parentFromPath ?? Number(opts.body.parent ?? 0);
+            const parentId = Number(opts.body.parent ?? 0);
             const parent = db.incidents.get(parentId);
             if (!parent) return { status: false, error: 'Incident not found', error_code: 404 };
             const now = Math.floor(Date.now() / 1000);
@@ -2596,7 +2595,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { status: true, data: serializeIncidentHistory(row), graph: 'default' };
         }
         const requestedSize = Number(opts.params?.size ?? 100);
-        const params: Params = { ...(opts.params ?? {}), ...(parentFromPath != null ? { parent: parentFromPath } : {}), start: Number(opts.params?.start ?? 0), size: Math.min(100, Math.max(0, requestedSize)), sort: '-created', graph: 'default' };
+        const params: Params = { ...(opts.params ?? {}), start: Number(opts.params?.start ?? 0), size: Math.min(100, Math.max(0, requestedSize)), sort: '-created', graph: 'default' };
         const result = listRows(db.incidentHistory as unknown as Record<string, unknown>[], params, (row) => String(row.note ?? ''), '-created');
         return { ...result, graph: 'default', data: (result.data as unknown as MockIncidentHistory[]).map(serializeIncidentHistory) };
     }
