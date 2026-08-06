@@ -1,0 +1,26 @@
+.mojo-tabs { min-width: 0; }
+.mojo-tab-list { display: flex; gap: .25rem; overflow-x: auto; scrollbar-width: thin; }
+.mojo-tab { flex: 0 0 auto; border: 0; border-radius: .4rem; background: transparent; color: var(--mute); cursor: pointer; font: inherit; font-weight: 600; padding: .55rem .8rem; }
+.mojo-tab:hover:not(:disabled) { color: var(--ink-strong); }
+.mojo-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mojo-tab[aria-selected="true"] { color: var(--accent); }
+.mojo-tab:disabled { cursor: not-allowed; opacity: .45; }
+.mojo-tab-panel[hidden] { display: none; }
+[data-tab-variant="minimal"] .mojo-tab[aria-selected="true"] { background: var(--accent-soft); }
+[data-tab-variant="traditional"] .mojo-tab-list { gap: 0; border-bottom: 1px solid var(--line); }
+[data-tab-variant="traditional"] .mojo-tab { border: 1px solid transparent; border-radius: .45rem .45rem 0 0; margin-bottom: -1px; }
+[data-tab-variant="traditional"] .mojo-tab[aria-selected="true"] { background: var(--surface); border-color: var(--line) var(--line) var(--surface); }
+[data-tab-variant="underline"] .mojo-tab[aria-selected="true"],
+[data-tab-variant="underline-all"] .mojo-tab[aria-selected="true"] { box-shadow: inset 0 -2px var(--accent); }
+[data-tab-variant="underline-all"] .mojo-tab-list { border-bottom: 1px solid var(--line); }
+[data-tab-variant="pills"] .mojo-tab { border: 1px solid var(--line); }
+[data-tab-variant="pills"] .mojo-tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); }
+[data-tab-variant="pills-solid"] .mojo-tab[aria-selected="true"] { background: var(--accent); color: white; }
+[data-tab-variant="segmented"] .mojo-tab-list { width: fit-content; border-radius: .55rem; background: var(--surface2); padding: .2rem; }
+[data-tab-variant="segmented"] .mojo-tab[aria-selected="true"] { background: var(--surface); box-shadow: var(--shadow); color: var(--ink-strong); }
+[data-tab-variant="btn-group"] .mojo-tab-list { gap: 0; }
+[data-tab-variant="btn-group"] .mojo-tab { border: 1px solid var(--line); border-radius: 0; margin-left: -1px; }
+[data-tab-variant="btn-group"] .mojo-tab:first-child { border-radius: .4rem 0 0 .4rem; margin-left: 0; }
+[data-tab-variant="btn-group"] .mojo-tab:last-child { border-radius: 0 .4rem .4rem 0; }
+[data-tab-variant="btn-group"] .mojo-tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: white; }
+.mojo-tab-panels { padding-top: 1rem; }

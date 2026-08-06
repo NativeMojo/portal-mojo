@@ -26,6 +26,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [admin-network-security.md](admin-network-security.md) | Perimeter control — blocked IPs, the firewall log, kernel IP sets and the geofencing page (posture, rules, simulator, evidence, exemptions), with the DSL projection and every backend correction the port encodes |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
+| [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
 | [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
 | [idioms.md](idioms.md) | ArmedButton (two-step confirm), `undoToast` (grace-period undo), `progressToast` — the dangerous-action trio |

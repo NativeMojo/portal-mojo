@@ -50,6 +50,11 @@ export interface RegistryFieldProps {
     invalid?: boolean;
     /** Surface-level lock (the field's own `disabled` is also honored). */
     disabled?: boolean;
+    /** Stable control metadata supplied by schema-driven form surfaces. */
+    controlId?: string;
+    ariaDescribedBy?: string;
+    /** Optional focus registration; composite renderers may adopt it. */
+    focusTarget?: (node: HTMLElement | null) => void;
     /** THE change pipeline: called once per commit with the next state value. */
     commit: (value: FieldValue) => void;
 }

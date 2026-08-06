@@ -39,6 +39,8 @@ interface ModalItem extends BaseItem {
     variant: 'modal';
     size: ModalSize;
     flush: boolean; // no body padding (DetailView-style)
+    /** Dynamic dismissal gate. Explicit close(value) always bypasses it. */
+    canDismiss?: () => boolean;
 }
 
 interface DrawerItem extends BaseItem {
@@ -61,10 +63,20 @@ function emit() {
     listeners.forEach((fn) => fn());
 }
 
-function open<T>(render: (close: (value: T) => void) => ReactNode, opts: { size?: ModalSize; flush?: boolean } = {}): Promise<T | null> {
+export interface ModalOptions {
+    size?: ModalSize;
+    flush?: boolean;
+    /** Guards Escape/backdrop dismissal. Programmatic close still succeeds. */
+    canDismiss?: () => boolean;
+}
+
+function open<T>(render: (close: (value: T) => void) => ReactNode, opts: ModalOptions = {}): Promise<T | null> {
     return new Promise<T | null>((resolve) => {
         const id = nextId++;
+        let settled = false;
         const close = (value: unknown) => {
+            if (settled) return;
+            settled = true;
             stack = stack.filter((m) => m.id !== id);
             emit();
             resolve(value as T | null);
@@ -74,6 +86,7 @@ function open<T>(render: (close: (value: T) => void) => ReactNode, opts: { size?
             variant: 'modal',
             size: opts.size ?? 'md',
             flush: opts.flush ?? false,
+            canDismiss: opts.canDismiss,
             render: render as (close: (value: unknown) => void) => ReactNode,
             resolve: close,
         }];
@@ -191,12 +204,17 @@ function ModalDialog({ item }: { item: ModalItem }) {
         ref.current?.showModal();
     }, []);
 
+    const dismiss = () => {
+        if (item.canDismiss?.() === false) return;
+        item.resolve(null);
+    };
+
     return (
         <dialog
             ref={ref}
             className={`mojo-modal mojo-modal-${item.size}${item.flush ? ' mojo-modal-flush' : ''}`}
-            onCancel={(e) => { e.preventDefault(); item.resolve(null); }}
-            onMouseDown={(e) => { if (e.target === ref.current) item.resolve(null); }}
+            onCancel={(e) => { e.preventDefault(); dismiss(); }}
+            onMouseDown={(e) => { if (e.target === ref.current) dismiss(); }}
         >
             {item.render(item.resolve)}
         </dialog>

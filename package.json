@@ -23,6 +23,7 @@
         "verify:admin-devices": "node scripts/verify-admin-devices.mjs",
         "verify:admin-jobs": "node scripts/verify-admin-jobs.mjs",
         "verify:admin-network": "node scripts/verify-admin-network.mjs",
-        "verify:worldmap": "node scripts/verify-worldmap.mjs"
+        "verify:worldmap": "node scripts/verify-worldmap.mjs",
+        "verify:form-wizard": "node scripts/verify-form-wizard.mjs"
     }
 }

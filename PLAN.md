@@ -524,6 +524,13 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - Split change pipelines (buttongroup wrote `this.data` but no input → value
   absent from every submit) — controlled inputs only.
 
+### #1305 — Tabs and FormWizard foundation (2026-08-06)
+
+- Added an accessible controlled/uncontrolled `Tabs` primitive with eight token-only variants, aliases, keyboard navigation, deterministic selection healing, and persistent ARIA panel shells.
+- Extracted SchemaForm's controlled submit state/rendering into an internal shared core and built `FormWizard` over one cross-section store, including hidden-field payload rules, richer validation, roster/reset reconciliation, async single-flight finish, and the guarded `formWizardModal` helper.
+- Composed FormView permission tab presentation onto Tabs while retaining one autosave reducer over `allTabs`; legacy `.fv-*` styling remains for other callers.
+- Added both-theme CSS, the showcase variants/wizard/modal proof, AI reference docs, and `verify:form-wizard`. Consolidated typecheck/build/browser evidence is owned by the wave orchestrator and is intentionally not claimed here.
+
 ## Working agreements
 
 - **Port from source.** Before building any listed item, read its web-mojo file

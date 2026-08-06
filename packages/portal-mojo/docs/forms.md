@@ -291,6 +291,8 @@ shown) — plus the explicit-precision override, `outputFormat:'date'`, the
 
 ## Pitfalls
 
+`SchemaForm` and `FormWizard` share one controlled submit-state/rendering core. SchemaForm intentionally keeps its original lazy initialization and required/email-only submit contract; FormWizard adds cross-section validation, focus, reset, and roster reconciliation. `FormView` does **not** use that submit store: it retains the one autosave reducer across flat fields and all tabs. See [tabs-and-form-wizard.md](tabs-and-form-wizard.md).
+
 - Never uncontrolled inputs, never a second value pipeline — the
   buttongroup/checklistdropdown bug class stays impossible only while this
   holds.
