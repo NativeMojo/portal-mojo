@@ -49,6 +49,7 @@ import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminMembersDemo } from './demos-admin-members';
 import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
+import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 
 interface DemoSection {
     key: string;
@@ -266,6 +267,16 @@ const GROUPS: DemoGroup[] = [
                 key: 'charts-pie', title: 'PieChart', icon: 'bi-pie-chart',
                 blurb: 'Native SVG pie/doughnut: all three input shapes, golden-angle colors, center labels, label-keyed arc tween, slice click, PNG export.',
                 render: () => <ChartsPieDemo />,
+            },
+            {
+                key: 'worldmap', title: 'WorldMap', icon: 'bi-globe-americas',
+                blurb: 'Dependency-free geo map — no tiles, no CDN, no network: sized country markers, the login tone palette, legend toggles, double-click drill-down, the injectable land seam, and the off-bounds counter.',
+                render: () => <WorldMapDemo />,
+            },
+            {
+                key: 'worldmap-routes', title: 'WorldMap routes', icon: 'bi-broadcast-pin',
+                blurb: 'Origin→country arcs with intensity-driven width/opacity, antimeridian splitting, the animation opt-out, interactive on vs off, and COUNTRY_OPTIONS (where ES is Spain again).',
+                render: () => <WorldMapRoutesDemo />,
             },
             {
                 key: 'markdown', title: 'MarkdownView', icon: 'bi-markdown',

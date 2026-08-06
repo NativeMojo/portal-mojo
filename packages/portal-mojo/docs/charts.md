@@ -22,7 +22,7 @@ design tokens in both themes. Demos: Develop → Components → Display.
 | `granularity` | `minutes/hours/days/weeks/months` (server default `hours`) |
 | `account` | `'public'` (server default) / `'global'` / `'group-<id>'` / `'user-<id>'` — components default to `'global'` (web-mojo parity) |
 | `dt_start` / `dt_end` | window bounds, **epoch SECONDS** (rule 6) |
-| `category`, `child_kind`, `breakdown` | fan-out modes — pass via `apiParams` (not promoted to props; the admin Metrics Explorer #1291 owns that UX) |
+| `category`, `child_kind`, `breakdown` | fan-out modes — pass via `apiParams` (not promoted to props; the admin Metrics Explorer #1300 owns that UX) |
 
 Response is a slug-keyed map `{data: {slug: number[]}, labels: string[]}` —
 normalized ONLY by `mojoMetrics` in the client into `{labels, datasets}`.
@@ -272,3 +272,11 @@ none; inline such resources before exporting anything that does.
 `granularitiesForSpanMs`, `ymdRangeToEpochSeconds`, `toNumber` — all in
 `charts/stats.ts`, no DOM/React, shared by every surface above (web-mojo
 carried two diverging copies of the stats math; here there is one).
+
+## WorldMap
+
+`portal-mojo/charts` also exports `WorldMap` — the dependency-free geo map
+(markers, routes, drill-down, the country centroid table) plus its projection
+math. It has its own page: **[worldmap.md](worldmap.md)**. Note that
+`charts/pie-math` exports `arcPath` and the map's arc helper is therefore
+`geoArcPath`.

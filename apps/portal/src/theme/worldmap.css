@@ -1,0 +1,97 @@
+/* WorldMap (board #1426) — the dependency-free geo map. Tokens only: the
+   ocean, graticule, land, routes and markers all ride theme variables, so
+   light and dark come from the same rules and a theme flip needs no
+   re-render (the component never computes a hex).
+
+   NOTE: this file is kept byte-identical between apps/portal/src/theme/ and
+   apps/showcase/src/theme/ — edit both or neither. */
+
+.worldmap { width: 100%; }
+
+.worldmap-area {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface2);
+    touch-action: none;
+}
+.worldmap-interactive { cursor: grab; }
+.worldmap-dragging { cursor: grabbing; }
+
+.worldmap-svg { display: block; }
+
+/* ── Basemap ───────────────────────────────────────────────────────── */
+.worldmap-ocean { fill: var(--surface2); }
+.worldmap-grat-line { stroke: var(--line-soft); stroke-width: 1; }
+.worldmap-grat-major { stroke: var(--line); stroke-width: 1; }
+/* Land only draws when the consumer injects geometry — nothing is bundled. */
+.worldmap-land path { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+
+/* ── Routes ────────────────────────────────────────────────────────── */
+.worldmap-route {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+/* Dash flow is an ADDITION over web-mojo (whose LineStrings were static), so
+   it is opt-out via `animateRoutes` and lives behind the motion query. */
+@media (prefers-reduced-motion: no-preference) {
+    .worldmap-routes-flow .worldmap-route {
+        stroke-dasharray: 6 10;
+        animation: worldmap-route-flow 1.6s linear infinite;
+    }
+    @keyframes worldmap-route-flow {
+        to { stroke-dashoffset: -16; }
+    }
+}
+
+/* ── Markers ───────────────────────────────────────────────────────── */
+.worldmap-marker {
+    stroke: var(--surface);
+    stroke-width: 1.5;
+    cursor: pointer;
+    transition: opacity 120ms ease;
+    opacity: 0.88;
+}
+.worldmap-marker:hover,
+.worldmap-marker-hot { opacity: 1; stroke-width: 2.5; }
+
+.worldmap-icons { position: absolute; inset: 0; pointer-events: none; }
+.worldmap-icon {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    color: var(--surface);
+    line-height: 1;
+}
+
+/* ── Overlays ──────────────────────────────────────────────────────── */
+.worldmap-empty,
+.worldmap-loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--mute); font-size: 13.5px;
+    pointer-events: none;
+}
+.worldmap-loading { background: color-mix(in srgb, var(--surface2) 70%, transparent); }
+
+/* Reuses .chart-tip's card, minus its centering transform — this tooltip is
+   clamped in JS against the map area, so left/top are already final. */
+.worldmap-tip { transform: none; min-width: 0; max-width: 240px; }
+.worldmap-tip-detail {
+    margin-top: 3px;
+    color: var(--mute); font-size: 12px; line-height: 1.4;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────── */
+.worldmap-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+    padding: 7px 2px 0;
+    color: var(--mute); font-size: 12px;
+}
+.worldmap-foot-count {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; color: var(--warn);
+    background: var(--warn-soft); border-radius: 999px; padding: 2px 9px;
+}
