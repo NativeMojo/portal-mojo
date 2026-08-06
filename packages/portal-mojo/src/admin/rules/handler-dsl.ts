@@ -146,12 +146,17 @@ export function moveHandlerStep(chain: HandlerChain, from: number, to: number, o
     if (from === to) return chain;
     const source = chain.steps[from]; const target = chain.steps[to];
     if (!source || !target) throw new Error('Handler step does not exist.');
-    if ((source.runtime !== 'effective' || target.runtime !== 'effective') && !options.confirmBehaviorChange) {
-        throw new Error('Moving skipped or swallowed content can change backend behavior. Confirm the behavior change first.');
-    }
     const ordered = chain.steps.map((step) => step.raw);
     const [moved] = ordered.splice(from, 1); ordered.splice(to, 0, moved!);
-    return parseHandlerChain(ordered.join(','));
+    const next = parseHandlerChain(ordered.join(','));
+    const effectiveCount = (value: HandlerChain) => value.steps.filter((step) => step.runtime === 'effective').length;
+    const changesReachability = source.runtime !== 'effective' || target.runtime !== 'effective'
+        || effectiveCount(next) !== effectiveCount(chain)
+        || (source.runtime === 'effective' && next.steps[to]?.runtime !== 'effective');
+    if (changesReachability && !options.confirmBehaviorChange) {
+        throw new Error('Moving this content changes which specs the backend can dispatch. Confirm the behavior change first.');
+    }
+    return next;
 }
 
 export function removeHandlerStep(chain: HandlerChain, index: number, options: { confirmBehaviorChange?: boolean } = {}): HandlerChain {

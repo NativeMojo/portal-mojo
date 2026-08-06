@@ -20,6 +20,7 @@ try {
     assert.deepEqual(dsl.runtimeEffectiveHandlerChain(legacy), ['block://?ttl=1,custom://x, notify://alice', 'resolve://?status=resolved']);
     assert.throws(() => dsl.moveHandlerStep(legacy, 1, 0));
     assert.equal(dsl.moveHandlerStep(legacy, 1, 0, { confirmBehaviorChange: true }).steps[0].scheme, 'custom');
+    assert.throws(() => dsl.moveHandlerStep(dsl.parseHandlerChain(' notify://alice,block://?ttl=1'), 0, 1), /changes which specs/);
     assert.throws(() => dsl.removeHandlerStep(legacy, 1));
     const duplicates = dsl.parseHandlerChain('ticket://?priority=9&priority=2&future=keep');
     const edited = dsl.updateHandlerStep(duplicates, 0, { param: { key: 'priority', value: '7' } });
