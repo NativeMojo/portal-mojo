@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
 } from '../../client';
@@ -112,9 +112,11 @@ function normalizeGroupChoiceParams(params: Params): Params {
     if (keys.some((key) => !['id', 'search', 'start', 'size'].includes(key))) throw new Error('Invalid credential group-choice query');
     if (keys.includes('id')) {
         if (keys.length !== 1) throw new Error('Invalid credential group-choice query');
-        const id = Number(params.id);
-        if (!Number.isSafeInteger(id) || id < 1) throw new Error('Invalid credential group-choice query');
-        return { id };
+        const text = String(params.id);
+        if (!/^[0-9]+$/.test(text) || BigInt(text) < 1n || BigInt(text) > 9223372036854775807n) {
+            throw new Error('Invalid credential group-choice query');
+        }
+        return { id: text };
     }
     const search = String(params.search ?? '').trim();
     const start = Number(params.start ?? 0);
@@ -273,6 +275,6 @@ export async function revokeCertificate(certificate: number): Promise<Certificat
     return sanitizeCertificateRow(await postData<CertificateRow>('/api/dnsman/certificate/revoke', { certificate }));
 }
 
-export async function invalidateDnsCredentials(queryClient: { invalidateQueries: (args: { queryKey: readonly unknown[] }) => Promise<unknown> }): Promise<void> {
+export async function invalidateDnsCredentials(queryClient: QueryClient): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: DnsCredentialModel.keys.root });
 }
