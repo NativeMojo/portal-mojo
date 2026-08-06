@@ -1,18 +1,17 @@
 // group-sections/IdentitySection.tsx — GroupIdentitySection port
 // (GroupView.js:354-731) at source fidelity, in the house autosave idiom:
 // web-mojo's pencil-prompt-per-row grid collapses into ONE FormView autosave
-// surface carrying every field the source edited — name, kind (combo over
-// the full known-kind catalog + free entry), parent (collection picker),
-// uuid, and the metadata.* settings (timezone / short_name / domain /
+// surface carrying the safely editable fields — name, kind (combo over
+// the full known-kind catalog + free entry), uuid, and the metadata.*
+// settings (timezone / short_name / domain /
 // auth_domain / portal / email_template). Dotted names → partial dicts →
 // the backend's JSONField dict-merge, so editing one key never clobbers the
 // rest of metadata.
 //
-// Two fields live OUTSIDE the FormView, each with a dedicated control:
-//   · parent — the row value is an OBJECT ({id, name, …}); the autosave
-//     machine's toDisplay would stringify it to "[object Object]", so the
-//     CollectionSelect binds the row value directly and saves {parent: id}.
-//   · eod_hour — the source saved a NUMBER (0–23, or null to clear) and
+// Parent assignment stays read-only until the backend can reject hierarchy
+// cycles. Existing parents may only be cleared to the top level. EOD hour
+// lives outside FormView because the source saved a NUMBER (0–23, or null
+// to clear) and
 //     select values ride the form pipeline as strings.
 //
 // UUID extras (source onActionGenerateUuid): when unset, a Generate button
