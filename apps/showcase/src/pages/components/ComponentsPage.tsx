@@ -42,6 +42,7 @@ import { LoadingDemo } from './demos-loading';
 import { RecordFeedDemo } from './demos-record-feed';
 import { AdminCredentialsDemo } from './demos-admin-credentials';
 import { AdminMonitoringDemo } from './demos-admin-monitoring';
+import { AdminMetricsExplorerDemo } from './demos-admin-metrics-explorer';
 import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
@@ -337,6 +338,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-monitoring', title: 'Monitoring', icon: 'bi-activity',
                 blurb: 'Stored request/response inspection and Redis-backed metrics-permission administration with exact operator gates.',
                 render: () => <AdminMonitoringDemo />,
+            },
+            {
+                key: 'admin-metrics-explorer', title: 'Metrics Explorer', icon: 'bi-graph-up',
+                blurb: 'Permission-safe recorded-metrics discovery with full colon-slug identity, KPI deltas, group fan-out, and exact scalar reads.',
+                render: () => <AdminMetricsExplorerDemo />,
             },
             {
                 key: 'admin-settings', title: 'Runtime settings', icon: 'bi-gear',

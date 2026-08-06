@@ -78,8 +78,12 @@ export const GRANULARITY_NOUN: Record<string, string> = {
 // ── CSV (source _downloadCsv, split so the string builder is testable) ──
 
 export function csvEscape(v: unknown): string {
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = String(v ?? '');
+    // Spreadsheet applications treat these string prefixes as formulas even
+    // inside a valid CSV cell. Numeric negatives remain numeric by checking
+    // the original value before adding the neutralizing apostrophe.
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function buildCsv(headers: readonly string[], rows: readonly (readonly unknown[])[]): string {

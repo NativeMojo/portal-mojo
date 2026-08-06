@@ -15,7 +15,7 @@
 // ignores the other's param.
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { mojoMetrics } from '../client/client';
+import { mojoMetrics, type MetricsResponse } from '../client/client';
 import type { Params } from '../client/types';
 import { DateRangePicker } from '../ui/date/DateRangePicker';
 import { modal } from '../ui/modal';
@@ -24,6 +24,18 @@ import { SeriesChart, type ChartType } from './SeriesChart';
 import { granularitiesForSpanMs, quickRangeWindow, ymdRangeToEpochSeconds } from './stats';
 
 export interface Granularity { value: string; label: string; short: string }
+
+export interface MetricsFetchParams extends Params {
+    slugs: string;
+    account: string;
+    granularity: string;
+    dt_start: number;
+    dt_end: number;
+    child_kind?: string;
+    breakdown?: boolean;
+}
+
+export type MetricsSeriesLoader = (params: MetricsFetchParams) => Promise<MetricsResponse>;
 
 export const GRANULARITIES: Granularity[] = [
     { value: 'minutes', label: 'Minutes', short: 'MIN' },
@@ -57,6 +69,37 @@ const TYPES: { value: ChartType; icon: string; title: string }[] = [
 /** 'api_calls' → 'Api Calls' — the default legend name for an unmapped slug. */
 function humanizeSlug(slug: string): string {
     return slug.split(/[_-]/).map((w) => (w ? w[0]!.toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+function metricTail(slug: string): string {
+    return slug.split(':').at(-1) ?? slug;
+}
+
+/**
+ * Live `/fetch` labels datasets with only the final colon segment. Repair
+ * that identity for default chart callers when the configured slug set makes
+ * the mapping unique. A duplicate tail remains an error: only an exact loader
+ * can safely split and reassemble those requests.
+ */
+export function remapMetricSeriesIdentity(response: MetricsResponse, requestedSlugs: readonly string[]): MetricsResponse {
+    const requested = [...new Set(requestedSlugs)];
+    const requestedSet = new Set(requested);
+    const byTail = new Map<string, string[]>();
+    for (const slug of requested) {
+        const tail = metricTail(slug);
+        byTail.set(tail, [...(byTail.get(tail) ?? []), slug]);
+    }
+    return {
+        ...response,
+        datasets: response.datasets.map((dataset) => {
+            if (requestedSet.has(dataset.label)) return dataset;
+            const candidates = byTail.get(dataset.label) ?? [];
+            if (candidates.length > 1) {
+                throw new Error(`MetricsChart: response key "${dataset.label}" is ambiguous for ${candidates.join(', ')}; use an exact series loader.`);
+            }
+            return candidates.length === 1 ? { ...dataset, label: candidates[0]! } : dataset;
+        }),
+    };
 }
 
 /** The active window: a quick range anchored at pick time, or custom days. */
@@ -96,6 +139,8 @@ export interface MetricsChartProps {
     slugs: string[];
     /** Display names per slug — the wire only carries raw slugs. */
     seriesLabels?: Record<string, string>;
+    /** Keep loader-provided identities verbatim (full slugs or fan-out child labels). */
+    preserveSeriesLabels?: boolean;
     /** 'public' | 'global' | 'group-<id>' | 'user-<id>'. */
     account?: string;
     defaultRange?: string;
@@ -106,11 +151,20 @@ export interface MetricsChartProps {
     valueFormatter?: (v: number) => string;
     /**
      * Forward-compatible passthrough for /api/metrics/fetch params the
-     * component doesn't promote (category, child_kind, breakdown, …).
+     * component doesn't promote (for example category). Fan-out uses the
+     * typed childKind/breakdown props below.
      * Spread FIRST — the built-ins overwrite any overlap. Developer-
      * controlled values only; they land on the URL.
      */
     apiParams?: Params;
+    /** Typed history boundary. Existing callers retain the lossy shared loader. */
+    loadSeries?: MetricsSeriesLoader;
+    /** Stable cache namespace; custom loaders must not share default results. */
+    seriesCacheKey?: string;
+    /** Group fan-out child kind. Built in here so it overwrites apiParams. */
+    childKind?: string;
+    /** Fan-out breakdown. Built in here so it overwrites apiParams. */
+    breakdown?: boolean;
     showGranularity?: boolean;
     /** Gates the quick ranges AND the custom-range dialog. */
     showDateRange?: boolean;
@@ -124,6 +178,7 @@ export function MetricsChart({
     title,
     slugs,
     seriesLabels = {},
+    preserveSeriesLabels = false,
     account = 'global',
     defaultRange = '24h',
     defaultGranularity = 'hours',
@@ -131,6 +186,10 @@ export function MetricsChart({
     height = 280,
     valueFormatter,
     apiParams,
+    loadSeries = mojoMetrics,
+    seriesCacheKey = 'metrics/fetch',
+    childKind,
+    breakdown,
     showGranularity = true,
     showDateRange = true,
     showTypeSwitch = true,
@@ -169,8 +228,10 @@ export function MetricsChart({
     }
     const effective = allowed.includes(granularity) ? granularity : allowed[allowed.length - 1]!;
 
-    const wire: Params = {
+    const wire: MetricsFetchParams = {
         ...apiParams,
+        ...(childKind ? { child_kind: childKind } : {}),
+        ...(breakdown !== undefined ? { breakdown } : {}),
         slugs: slugs.join(','),
         granularity: effective,
         account,
@@ -182,12 +243,20 @@ export function MetricsChart({
     };
 
     const query = useQuery({
-        queryKey: ['metrics', wire],
-        queryFn: () => mojoMetrics(wire),
-        select: (res) => ({
-            ...res,
-            datasets: res.datasets.map((d) => ({ ...d, label: seriesLabels[d.label] ?? humanizeSlug(d.label) })),
-        }),
+        queryKey: ['metrics', seriesCacheKey, wire],
+        queryFn: () => loadSeries(wire),
+        select: (res) => {
+            const identitySafe = loadSeries === mojoMetrics
+                ? remapMetricSeriesIdentity(res, slugs)
+                : res;
+            return {
+                ...identitySafe,
+                datasets: identitySafe.datasets.map((d) => ({
+                    ...d,
+                    label: seriesLabels[d.label] ?? (preserveSeriesLabels ? d.label : humanizeSlug(d.label)),
+                })),
+            };
+        },
     });
 
     // Switching range re-points granularity at the nearest sensible bucket
