@@ -38,3 +38,20 @@ Details compose the shipped RightPanel, StatusPanel, KnownFieldsCard,
 StackTraceView, and RecordFeed. Ticket/rule/AI/network-response/dashboard
 controls remain excluded. Bouncer discovery stays category-prefix plus MUID
 search because its reporter writes MUID into incident details.
+
+## Backend evidence
+
+The contract was checked against django-mojo source rather than inferred from
+the mock:
+
+- `mojo/apps/incident/models/incident.py`: `Incident.RestMeta` search,
+  permissions and graphs; `POST_SAVE_ACTIONS`; `Incident.on_action_merge`.
+- `mojo/apps/incident/models/event.py`: `Event.RestMeta` search, permissions,
+  graph, severity definition, and unsafe CSV metadata fields.
+- `mojo/apps/incident/models/history.py`: `IncidentHistory.RestMeta`, including
+  view/save clauses, JSON replacement and `CAN_DELETE = False`.
+- `mojo/apps/incident/rest/event.py`: incident, history and event route mounts.
+
+No disposable live Django records were available during this batch build, so
+mutation evidence is source contract plus the focused mock verifier. A closing
+live pass should remain read-only unless disposable incidents exist.
