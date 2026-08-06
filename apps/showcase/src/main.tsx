@@ -19,27 +19,41 @@ mojo.initAuth();
 if (!mojo.usingMockTransport()) {
     throw new Error('apps/showcase is mock-only — do not point it at a real VITE_MOJO_API');
 }
-// The mock's /api/login looks callers up by EMAIL even though the field is
-// named `username` on the wire. Use the dedicated mock-only showcase operator
-// so every permission-gated component demo is interactive without turning the
-// narrower security/groups fixtures into accidental superusers.
-mojo.login('showcase.operator@nativemojo.com', 'mojo').catch((err: unknown) => {
-    console.error('Showcase auto-login failed — demos will run signed out:', err);
-});
-
 const queryClient = new QueryClient({
     defaultOptions: { queries: { ...mojo.mojoQueryDefaults().queries, staleTime: 30_000 } },
 });
 mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
+const root = createRoot(document.getElementById('root')!);
 
-createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-        <QueryClientProvider client={queryClient}>
-            <ThemeProvider>
-                <HashRouter>
-                    <App />
-                </HashRouter>
-            </ThemeProvider>
-        </QueryClientProvider>
-    </StrictMode>,
-);
+async function bootstrap() {
+    // The mock's /api/login looks callers up by EMAIL even though the field is
+    // named `username` on the wire. Do not mount data demos until this settles:
+    // an anonymous first query can otherwise outlive login invalidation and
+    // replace the authenticated result with its late 401 response.
+    try {
+        await mojo.login('showcase.operator@nativemojo.com', 'mojo');
+    } catch (error) {
+        console.error('Showcase auto-login failed:', error);
+        root.render(
+            <StrictMode>
+                <ThemeProvider>
+                    <main className="showcase-shell"><div className="panel panel-pad" role="alert"><h1>Showcase unavailable</h1><p>The local demo identity could not sign in. Reload to retry.</p></div></main>
+                </ThemeProvider>
+            </StrictMode>,
+        );
+        return;
+    }
+    root.render(
+        <StrictMode>
+            <QueryClientProvider client={queryClient}>
+                <ThemeProvider>
+                    <HashRouter>
+                        <App />
+                    </HashRouter>
+                </ThemeProvider>
+            </QueryClientProvider>
+        </StrictMode>,
+    );
+}
+
+void bootstrap();
