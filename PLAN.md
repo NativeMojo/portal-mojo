@@ -102,9 +102,10 @@ rotate is apikey-auth-only while managers read tokens via `?graph=token`.
 Groups · Sys/App Perms · API Keys · Devices · Logins · Audit · Notifications ·
 Metadata) plus the header lifecycle (avatar, org chip, login-throttle badge,
 presence, disable reasons + history accordion, full kebab). Two documented
-seams: the Logins **Map** tab (web-mojo used MapLibre — list ships at parity,
-map awaits a dependency sanction like zod's) and avatar upload (multipart
-POST). Mock-verified dark+light, console clean, perm-gating exercised from
+seams: the Logins **Map** tab (web-mojo used MapLibre — list shipped at
+parity first; the map SHIPPED with #1291 over #1426's dependency-free
+`WorldMap`, so no dependency sanction was ever needed) and avatar upload
+(multipart POST). Mock-verified dark+light, console clean, perm-gating exercised from
 both a plain and a superuser session (sys-perm autosave re-badges the header
 live). `dev:live` @9009 pass is BLOCKED: the browser hits the mverify bouncer's
 "Are you human?" interstitial, which an agent must not click through.
@@ -211,9 +212,9 @@ packages. Username changes use `change_username`, direct combined MFA writes
 retry fresh auth, and lifecycle batches exclude rows already in the target
 state. The mock no longer invents arbitrary-user key generation or targeted
 notification preferences. Caller-only key creation uses the transient,
-pre-cache secret split. Avatar upload and the login map/device dossier remain
-deferred to multipart/fileman and #1291 respectively. Focused verification:
-`npm run verify:admin-users`.
+pre-cache secret split. Avatar upload remains deferred to multipart/fileman;
+the login map and the device/GeoIP dossiers SHIPPED with #1291. Focused
+verification: `npm run verify:admin-users`.
 
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.

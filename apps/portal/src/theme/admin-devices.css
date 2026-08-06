@@ -1,0 +1,263 @@
+/* Devices, login locations and GeoIP admin surfaces (board #1291).
+   Tokens only — light and dark come from the same rules, so a theme flip
+   needs no re-render and no recomputed colour.
+
+   NOTE: this file is kept byte-identical between apps/portal/src/theme/ and
+   apps/showcase/src/theme/ — edit both or neither. verify-admin-devices.mjs
+   asserts it, the same discipline worldmap.css follows. */
+
+/* ── Shared tone utilities ─────────────────────────────────────────────
+   `.text-ok` shipped in theme.css; its two siblings never did, so thirty
+   existing `className="text-bad"` call sites across the toolkit (bouncer,
+   incidents, rules, monitoring) rendered error text in the body colour.
+   Defining them here fixes those too — they are tokens, not new design. */
+.text-bad { color: var(--bad); }
+.text-warn { color: var(--warn); }
+
+/* A link-shaped button: cross-record navigation inside a flat row must be a
+   real <button>, not an <a href="#">, so it never competes with the router. */
+.btn-link {
+    appearance: none;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-align: left;
+}
+.btn-link:hover { text-decoration: underline; }
+.btn-link code { color: inherit; }
+
+/* ── GeoIP dossier ─────────────────────────────────────────────────── */
+.geoip-flag { margin-right: 6px; font-size: 14px; line-height: 1; }
+.geoip-cc { margin-left: 6px; font-size: 11px; }
+
+.geoip-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 12px 0 4px;
+}
+
+.geoip-map { margin: 12px 0 4px; }
+
+.geoip-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 4px;
+}
+
+/* Wide inner tables scroll inside their own container — the modal body must
+   never scroll horizontally. */
+.geoip-local-table {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+}
+.geoip-local-table .tbl { min-width: 620px; }
+
+.geoip-raw {
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface2);
+}
+.geoip-raw-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.geoip-raw-body {
+    margin: 0;
+    padding: 12px;
+    max-height: 420px;
+    overflow: auto;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* ── User device table + dossier ───────────────────────────────────── */
+.ud-id { display: inline-flex; align-items: center; gap: 7px; }
+.ud-id i { color: var(--mute); }
+
+.ud-presence { display: inline-flex; align-items: center; gap: 7px; }
+.ud-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: var(--mute);
+}
+.ud-presence-online .ud-dot { background: var(--ok); }
+.ud-presence-never .ud-dot { background: var(--line); }
+
+.ud-ua-block {
+    margin: 4px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface2);
+    color: var(--mute);
+    font-size: 11.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Location / login / sibling feed rows — one shape, three consumers. */
+.ud-loc-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    appearance: none;
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+    background: none;
+    color: inherit;
+    padding: 10px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+}
+.ud-loc-row:hover { background: var(--surface2); }
+.ud-loc-main { flex: 1; min-width: 0; }
+.ud-loc-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink-strong);
+}
+.ud-loc-title i { color: var(--mute); }
+.ud-loc-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--mute);
+}
+.ud-loc-meta code { font-size: 11px; }
+.ud-loc-when { flex: none; font-size: 12px; color: var(--mute); }
+
+.ud-session {
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.ud-session-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--ink-strong);
+}
+.ud-session-head .ud-loc-when { margin-left: auto; }
+.ud-session-meta { margin-top: 3px; font-size: 12px; }
+.ud-session-tabs {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0 0 0 12px;
+    border-left: 2px solid var(--line);
+}
+.ud-session-tabs li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    padding: 3px 0;
+}
+
+.ud-shared-hint { margin-top: 10px; font-size: 12.5px; }
+
+/* UserDetail's Devices and Logins rows became real <button>s in #1291 (they
+   open the dossier / the login-event modal). The shared `.us-*` rules in
+   user-admin.css were written for <div>s, so the button chrome is reset here
+   and the two inner spans regain their block flow. */
+button.us-device-row,
+button.us-login-row {
+    width: 100%;
+    text-align: left;
+    appearance: none;
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+    background: none;
+    color: inherit;
+    cursor: pointer;
+}
+button.us-device-row:hover,
+button.us-login-row:hover { background: var(--surface2); }
+button.us-device-row .us-row-info,
+button.us-login-row .us-row-info { display: block; }
+button.us-device-row .us-row-meta,
+button.us-login-row .us-row-meta { display: block; }
+
+/* ── Device-location detail ────────────────────────────────────────── */
+.udl-risk-icon { margin-left: 8px; font-size: 12px; }
+
+/* ── Login location map ────────────────────────────────────────────── */
+.login-location-map { display: block; }
+
+.lm-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.lm-drill { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.lm-modes { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+.lm-tip-chips {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+}
+.lm-tip-hint { margin-top: 5px; font-size: 11px; }
+.lm-tip-user { margin-top: 7px; width: 100%; justify-content: center; }
+
+/* ── Login locations page ──────────────────────────────────────────── */
+.login-locations-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.ll-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.ll-head .us-tabs { margin-bottom: 0; border-bottom: none; }
+.ll-scope {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+}
+
+/* ── Dashboard panel ───────────────────────────────────────────────── */
+.dash-login-map { display: flex; flex-direction: column; gap: 10px; }
+
+@media (max-width: 640px) {
+    .ll-head { align-items: flex-start; }
+    .lm-modes { margin-left: 0; }
+}

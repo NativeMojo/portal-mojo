@@ -3,10 +3,13 @@
 // metrics chart (stats / view-data / custom-range dialogs on the header),
 // scoped mini widgets, and a user-base doughnut + verified ring built from
 // the same count queries.
-import { useModelList, type User } from 'portal-mojo/client';
+import { useCan, useModelList, type User } from 'portal-mojo/client';
 import { Badge, fmt, modal } from 'portal-mojo/ui';
 import { KPIStrip, MetricsChart, MetricsMiniWidget, PieChart } from 'portal-mojo/charts';
-import { UserDetail } from 'portal-mojo/admin';
+import {
+    LOGIN_SUMMARY_PERMS, LoginLocationMap, UserDetail,
+    showLoginEventDetail, showUserDeviceDetailByDuid,
+} from 'portal-mojo/admin';
 import { GroupModel } from '../models';
 
 const ENDPOINT = '/api/user';
@@ -14,6 +17,39 @@ const ENDPOINT = '/api/user';
 function useCount(filters: Record<string, string>) {
     const q = useModelList<User>(ENDPOINT, { size: 0, ...filters });
     return q.data?.count;
+}
+
+/** YYYY-MM-DD — `/account/logins/summary` parses only dr_start / dr_end. */
+function isoDay(offsetDays: number): string {
+    return new Date(Date.now() - offsetDays * 86400000).toISOString().slice(0, 10);
+}
+
+/**
+ * Login locations · last 30 days — AdminDashboardPage.js:325-380 parity,
+ * drawn through #1426's WorldMap. Rendered only when the caller can read the
+ * aggregation endpoint, so a permission-less session issues no request.
+ */
+function LoginLocationsPanel({ onOpenUser }: { onOpenUser: (id: number) => void }) {
+    const { can } = useCan(LOGIN_SUMMARY_PERMS);
+    if (!can) return null;
+    return (
+        <div className="panel panel-pad dash-login-map">
+            <div>
+                <div className="eyebrow">Security</div>
+                <h3 className="panel-subtitle">Login locations · last 30 days</h3>
+            </div>
+            <LoginLocationMap
+                height={360}
+                drStart={isoDay(30)}
+                drEnd={isoDay(0)}
+                onOpenUser={onOpenUser}
+                onOpenLogin={(id) => showLoginEventDetail(id, {
+                    onOpenUser,
+                    onOpenDeviceByDuid: showUserDeviceDetailByDuid,
+                })}
+            />
+        </div>
+    );
 }
 
 export function DashboardPage() {
@@ -118,6 +154,8 @@ export function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            <LoginLocationsPanel onOpenUser={openUser} />
 
             <div className="grid gap-4 lg:grid-cols-5">
                 <div className="lg:col-span-3">
