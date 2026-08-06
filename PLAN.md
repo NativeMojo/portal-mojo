@@ -143,6 +143,22 @@ clean consoles; `typecheck` and both production builds pass. The unused backend
 `BouncerSignal.token_nonce` cleanup is deliberately deferred to django-mojo
 board item #1407 rather than made a portal dependency.
 
+**2026-08-05, wave 6 (global Admin navigation):** Ian corrected the shell
+model after reviewing the first package wave: Admin is one system-wide,
+no-group workspace, while active-group navigation belongs only to a product's
+custom portal. Board item **#1408** replaced the standalone portal's mixed
+global/group menus and `GroupSwitcher` with one searchable accordion sidebar
+(Overview · Identity & Access · Security · Observability · Operations), plus a
+persisted 64px icon rail with keyboard expansion and tooltips. Admin section
+metadata now supplies navigation domains and composes section + route
+permission clauses; section-title keywords make domain searches such as
+"Bouncer" discover their child pages. Standalone boot strips stale `?group=`,
+does not mount `GroupProvider`, and the embedded Admin boundary masks product
+group membership too. Existing product menus stay static by default and may
+opt into accordion presentation, so A3/A4's group routing remains available
+without leaking into Admin. Dual-mount root sections now emit exactly one
+shared `/system` landing. Plan snapshot `f75418c`; implementation `9f59136`.
+
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
 The web-mojo source of record is `/Users/ians/Projects/mojo/nativemojo/web-mojo`
@@ -190,16 +206,18 @@ mountable two ways from the same code:
 2. **Embedded admin** — a product's custom portal (its own app on portal-mojo)
    imports the same sections and registers them under a "System" area gated by
    `view_admin`, beside its product pages. **Default** for products that have a
-   portal anyway — one deployment, shared group context; the frontend mirror of
-   the one-CRUD-API/permissions-gate backend philosophy. (web-mojo's proven
-   model across all three existing portals.)
+   portal anyway — one deployment and one auth session, but the Admin area is
+   still global: its navigation and grants do not inherit the product's active
+   group. (web-mojo's proven model across all three existing portals.)
 
 Design constraints this puts on Chunk A (build them in from the start):
 - Admin section routes are **mount-point relative** (root in standalone,
   `#/system/…` when embedded).
 - Sections **contribute** sidebar groups; they never own the sidebar. The A4
   sidebar engine's registry serves global / group / `group.kind` menus AND
-  contributed admin sections through the same mechanism.
+  contributed admin sections through the same mechanism. The standalone shell
+  assembles all contributions into one global accordion; custom portals retain
+  ownership of their separate, active-group product menus.
 - Section visibility = permissions (now) ∧ backend capabilities (later).
 
 ## Stack (decided, with reasons)

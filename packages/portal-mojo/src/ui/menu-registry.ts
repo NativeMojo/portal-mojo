@@ -27,6 +27,8 @@ export interface MenuItem {
     /** Section label row (the side-label idiom). Mutually exclusive with route. */
     divider?: string;
     label?: string;
+    /** Extra quick-navigation terms that are never rendered. */
+    keywords?: string[];
     icon?: string;
     /** Absolute route within the hash router, e.g. '/users'. */
     route?: string;

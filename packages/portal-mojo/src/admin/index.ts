@@ -271,12 +271,14 @@ export function adminSectionsMenu(
                 ? labeled.map((route) => ({
                     id: `admin:${section.id}:${route.path || 'index'}`,
                     label: route.label!,
+                    keywords: [section.title],
                     route: absolutePath(base, route.path),
                     permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
                 }))
                 : [{
                     id: `admin:${section.id}`,
                     label: section.title,
+                    keywords: [section.title],
                     route: absolutePath(base),
                     permissionClauses: [section.permissions],
                 }];

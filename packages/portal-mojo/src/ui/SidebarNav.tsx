@@ -74,7 +74,8 @@ function filterTree(item: MenuItem, query: string): MenuItem | null {
     const children = (item.children ?? [])
         .map((child) => filterTree(child, query))
         .filter((child): child is MenuItem => child != null);
-    const selfMatch = (item.label ?? '').toLocaleLowerCase().includes(query);
+    const selfMatch = [item.label ?? '', ...(item.keywords ?? [])]
+        .some((value) => value.toLocaleLowerCase().includes(query));
     if (!selfMatch && children.length === 0) return null;
     return item.children ? { ...item, children: selfMatch ? item.children : children } : item;
 }
@@ -186,29 +187,36 @@ function AccordionItem({
     const open = searching || openKey === key;
     const disclosureId = `${idPrefix}-${domToken(key)}`;
     const label = item.label ?? key;
+    const activate = () => {
+        if (collapsed) {
+            setOpenKey(key);
+            onRequestExpand?.();
+        } else {
+            setOpenKey((current) => current === key ? null : key);
+        }
+    };
 
     return (
         <div className={`nav-accordion${open ? ' nav-accordion-open' : ''}`}>
             <button
                 type="button"
                 className={`nav-item nav-parent${active ? ' nav-active' : ''}`}
-                aria-expanded={open}
-                aria-controls={disclosureId}
+                aria-expanded={collapsed ? undefined : open}
+                aria-controls={collapsed ? undefined : disclosureId}
                 aria-label={collapsed ? label : undefined}
                 data-tooltip={collapsed ? label : undefined}
-                onClick={() => {
-                    if (collapsed) {
-                        setOpenKey(key);
-                        onRequestExpand?.();
-                    } else {
-                        setOpenKey((current) => current === key ? null : key);
+                onClick={activate}
+                onKeyDown={(event) => {
+                    if (collapsed && (event.key === 'Enter' || event.key === ' ')) {
+                        event.preventDefault();
+                        activate();
                     }
                 }}
             >
                 {item.icon && <i className={`bi ${item.icon}`} />}
                 <span className="nav-text">{label}</span>
                 {item.badge && <span className={`chip chip-${item.badge.tone ?? 'muted'} nav-badge`}>{item.badge.text}</span>}
-                <i className="bi bi-chevron-down nav-arrow" aria-hidden="true" />
+                {!collapsed && <i className="bi bi-chevron-down nav-arrow" aria-hidden="true" />}
             </button>
             {!collapsed && (
                 <div id={disclosureId} className="nav-submenu" hidden={!open}>
