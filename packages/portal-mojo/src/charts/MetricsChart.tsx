@@ -15,7 +15,7 @@
 // ignores the other's param.
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { mojoMetrics } from '../client/client';
+import { mojoMetrics, type MetricsResponse } from '../client/client';
 import type { Params } from '../client/types';
 import { DateRangePicker } from '../ui/date/DateRangePicker';
 import { modal } from '../ui/modal';
@@ -24,6 +24,18 @@ import { SeriesChart, type ChartType } from './SeriesChart';
 import { granularitiesForSpanMs, quickRangeWindow, ymdRangeToEpochSeconds } from './stats';
 
 export interface Granularity { value: string; label: string; short: string }
+
+export interface MetricsFetchParams extends Params {
+    slugs: string;
+    account: string;
+    granularity: string;
+    dt_start: number;
+    dt_end: number;
+    child_kind?: string;
+    breakdown?: boolean;
+}
+
+export type MetricsSeriesLoader = (params: MetricsFetchParams) => Promise<MetricsResponse>;
 
 export const GRANULARITIES: Granularity[] = [
     { value: 'minutes', label: 'Minutes', short: 'MIN' },
@@ -96,6 +108,8 @@ export interface MetricsChartProps {
     slugs: string[];
     /** Display names per slug — the wire only carries raw slugs. */
     seriesLabels?: Record<string, string>;
+    /** Keep loader-provided identities verbatim (full slugs or fan-out child labels). */
+    preserveSeriesLabels?: boolean;
     /** 'public' | 'global' | 'group-<id>' | 'user-<id>'. */
     account?: string;
     defaultRange?: string;
@@ -106,11 +120,20 @@ export interface MetricsChartProps {
     valueFormatter?: (v: number) => string;
     /**
      * Forward-compatible passthrough for /api/metrics/fetch params the
-     * component doesn't promote (category, child_kind, breakdown, …).
+     * component doesn't promote (for example category). Fan-out uses the
+     * typed childKind/breakdown props below.
      * Spread FIRST — the built-ins overwrite any overlap. Developer-
      * controlled values only; they land on the URL.
      */
     apiParams?: Params;
+    /** Typed history boundary. Existing callers retain the lossy shared loader. */
+    loadSeries?: MetricsSeriesLoader;
+    /** Stable cache namespace; custom loaders must not share default results. */
+    seriesCacheKey?: string;
+    /** Group fan-out child kind. Built in here so it overwrites apiParams. */
+    childKind?: string;
+    /** Fan-out breakdown. Built in here so it overwrites apiParams. */
+    breakdown?: boolean;
     showGranularity?: boolean;
     /** Gates the quick ranges AND the custom-range dialog. */
     showDateRange?: boolean;
@@ -124,6 +147,7 @@ export function MetricsChart({
     title,
     slugs,
     seriesLabels = {},
+    preserveSeriesLabels = false,
     account = 'global',
     defaultRange = '24h',
     defaultGranularity = 'hours',
@@ -131,6 +155,10 @@ export function MetricsChart({
     height = 280,
     valueFormatter,
     apiParams,
+    loadSeries = mojoMetrics,
+    seriesCacheKey = 'metrics/fetch',
+    childKind,
+    breakdown,
     showGranularity = true,
     showDateRange = true,
     showTypeSwitch = true,
@@ -169,8 +197,10 @@ export function MetricsChart({
     }
     const effective = allowed.includes(granularity) ? granularity : allowed[allowed.length - 1]!;
 
-    const wire: Params = {
+    const wire: MetricsFetchParams = {
         ...apiParams,
+        ...(childKind ? { child_kind: childKind } : {}),
+        ...(breakdown !== undefined ? { breakdown } : {}),
         slugs: slugs.join(','),
         granularity: effective,
         account,
@@ -182,11 +212,14 @@ export function MetricsChart({
     };
 
     const query = useQuery({
-        queryKey: ['metrics', wire],
-        queryFn: () => mojoMetrics(wire),
+        queryKey: ['metrics', seriesCacheKey, wire],
+        queryFn: () => loadSeries(wire),
         select: (res) => ({
             ...res,
-            datasets: res.datasets.map((d) => ({ ...d, label: seriesLabels[d.label] ?? humanizeSlug(d.label) })),
+            datasets: res.datasets.map((d) => ({
+                ...d,
+                label: seriesLabels[d.label] ?? (preserveSeriesLabels ? d.label : humanizeSlug(d.label)),
+            })),
         }),
     });
 

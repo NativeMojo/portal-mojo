@@ -14,6 +14,12 @@ export const METRICS_PERMISSIONS_ADMIN_PERMISSIONS = [
     'sys.manage_metrics',
 ];
 
+/** Exact global read clause used by metrics account discovery/history. */
+export const METRICS_EXPLORER_PERMISSIONS = [
+    'sys.view_metrics',
+    'sys.metrics',
+];
+
 /** /api/logs default graph. Stored request, response, and message rows share it. */
 export interface LogRow {
     id: number;
