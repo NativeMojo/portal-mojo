@@ -108,6 +108,11 @@ read-only `/api/incident/incident` mock follows the real reporter contract:
 Bouncer device investigations filter the security category and search the
 incident details for the device MUID, without invented model linkage.
 
+The mock-only component showcase signs in as
+`showcase.operator@nativemojo.com`, an explicit broad demo identity. The
+narrow `security.viewer`, `security.manager`, `groups.manager`, and Ian
+fixtures remain unchanged for permission-boundary verification.
+
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx

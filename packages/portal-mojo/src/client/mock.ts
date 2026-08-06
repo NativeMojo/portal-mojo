@@ -1260,6 +1260,23 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     groupsManager.email = 'groups.manager@nativemojo.com';
     groupsManager.display_name = 'Groups Manager';
     groupsManager.permissions = { manage_groups: true, groups: true, manage_users: true, users: true };
+    // The published showcase has no login screen, so it uses one explicit
+    // mock-only operator that can exercise every data-backed admin demo. Keep
+    // the narrower viewer/manager identities above intact for permission tests.
+    const showcaseOperator = at(14);
+    showcaseOperator.is_active = true;
+    showcaseOperator.username = 'showcase.operator';
+    showcaseOperator.email = 'showcase.operator@nativemojo.com';
+    showcaseOperator.display_name = 'Showcase Operator';
+    showcaseOperator.permissions = {
+        security: true,
+        manage_settings: true,
+        manage_metrics: true,
+        manage_groups: true,
+        groups: true,
+        manage_users: true,
+        users: true,
+    };
 
     // Auth-config inheritance fixtures: defaults -> deployment -> root -> child.
     groups[0]!.metadata = mergeDicts(groups[0]!.metadata, {
@@ -1377,7 +1394,7 @@ function compareWireValues(left: unknown, right: unknown): number {
 function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, raw: string): T[] {
     const parts = key.split('__');
     const lookup = parts.length > 1 ? parts[parts.length - 1] : 'exact';
-    const known = ['exact', 'in', 'icontains', 'gte', 'lte', 'isnull'];
+    const known = ['exact', 'in', 'icontains', 'startswith', 'gte', 'lte', 'isnull'];
     const field = known.includes(lookup) && parts.length > 1 ? parts.slice(0, -1).join('__') : key;
     const op = known.includes(lookup) && parts.length > 1 ? lookup : 'exact';
 
@@ -1386,6 +1403,7 @@ function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, 
         switch (op) {
             case 'in': return raw.split(',').map((s) => s.trim()).some((candidate) => compareWireValues(v, candidate) === 0);
             case 'icontains': return String(v ?? '').toLowerCase().includes(raw.toLowerCase());
+            case 'startswith': return String(v ?? '').startsWith(raw);
             case 'gte': return v != null && compareWireValues(v, raw) >= 0;
             case 'lte': return v != null && compareWireValues(v, raw) <= 0;
             case 'isnull': return raw === 'true' ? v == null : v != null;
@@ -2655,7 +2673,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
         if (!hasGlobalPermission(caller, ['view_security', 'security'])) return permissionDenied();
-        if (opts.method !== 'GET') return { status: false, error: 'Incident mutation is not available in this mock surface', error_code: 403 };
+        if (opts.method && opts.method !== 'GET') return { status: false, error: 'Incident mutation is not available in this mock surface', error_code: 403 };
         const detailId = incidentMatch[1] ? Number(incidentMatch[1]) : null;
         if (detailId != null) {
             const row = db.incidentRecords.find((candidate) => candidate.id === detailId);

@@ -20,13 +20,12 @@ if (!mojo.usingMockTransport()) {
     throw new Error('apps/showcase is mock-only — do not point it at a real VITE_MOJO_API');
 }
 // The mock's /api/login looks callers up by EMAIL even though the field is
-// named `username` on the wire (mock.ts authFetch) — 'ian' the username
-// 401s, 'ian@mojoverify.com' the email succeeds.
-if (!mojo.getAccessToken()) {
-    mojo.login('ian@mojoverify.com', 'mojo').catch((err: unknown) => {
-        console.error('Showcase auto-login failed — demos will run signed out:', err);
-    });
-}
+// named `username` on the wire. Use the dedicated mock-only showcase operator
+// so every permission-gated component demo is interactive without turning the
+// narrower security/groups fixtures into accidental superusers.
+mojo.login('showcase.operator@nativemojo.com', 'mojo').catch((err: unknown) => {
+    console.error('Showcase auto-login failed — demos will run signed out:', err);
+});
 
 const queryClient = new QueryClient({
     defaultOptions: { queries: { ...mojo.mojoQueryDefaults().queries, staleTime: 30_000 } },
