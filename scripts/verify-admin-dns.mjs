@@ -239,8 +239,10 @@ try {
     assert(!mockSource.includes("path === '/api/dnsman/certificate/material'"));
     assert.match(await read('apps/showcase/src/pages/components/ComponentsPage.tsx'), /admin-dns/);
     const showcaseSource = await read('apps/showcase/src/pages/components/demos-admin-dns.tsx');
-    assert.equal((showcaseSource.match(/<ProviderCredentialsPage \/>/g) ?? []).length, 3,
-        'manager, viewer and unavailable legs render the shipped page');
+    assert.equal((showcaseSource.match(/<ProviderCredentialsPage \/>/g) ?? []).length, 1,
+        'one selected URL-owning surface mounts across manager, viewer and unavailable legs');
+    assert.match(showcaseSource, /surface === 'credentials'/);
+    assert.match(showcaseSource, /setSearchParams\(isolated/);
     assert.match(showcaseSource, /dns\.viewer@nativemojo\.com/);
     assert.match(showcaseSource, /setMockDnsConfigMalformed\(leg === 'unavailable'\)/);
     assert.match(await read('packages/portal-mojo/docs/admin-dns.md'), /Both themes|Themes and showcase/i);
