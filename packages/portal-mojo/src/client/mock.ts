@@ -5038,10 +5038,17 @@ export function armMockReauth(method: string, path: string): void {
 }
 
 let dnsConfigMalformed = false;
+let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
+let dnsFailNextRead = false;
 
 /** Showcase-only fail-closed state; production transports never call this. */
 export function setMockDnsConfigMalformed(value: boolean): void {
     dnsConfigMalformed = value;
+}
+
+/** Verifier-only one-shot DNS transport outcomes; all state still lives in db.dnsRecords. */
+export function armMockDnsWriteFault(mode: 'reject' | 'ambiguous' | 'reconcile'): void {
+    dnsWriteFault = mode;
 }
 
 const LATENCY_MS = 220;
@@ -6902,7 +6909,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             if (!credential.verified) return { status: false, error: credential.last_error || 'Provider credential is not verified', error_code: 400 };
         }
         const records = db.dnsRecords.get(domain.id) ?? [];
-        if (method === 'GET') return { status: true, data: { domain: domain.name, provider: domain.provider, records: records.map((record) => ({ ...record, record_values: [...record.record_values] })) } };
+        if (method === 'GET') {
+            if (dnsFailNextRead) { dnsFailNextRead = false; return { status: false, error: 'Mock provider reconciliation read failed', error_code: 503 }; }
+            return { status: true, data: { domain: domain.name, provider: domain.provider, records: records.map((record) => ({ ...record, record_values: [...record.record_values] })) } };
+        }
         const type = String(bodyOrParams.type ?? '').toUpperCase();
         const rawName = String(bodyOrParams.name ?? '').trim().toLowerCase().replace(/\.+$/, '');
         const name = !rawName || rawName === '@' ? domain.name : rawName.includes('.') ? rawName : `${rawName}.${domain.name}`;
@@ -6915,10 +6925,12 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (name === domain.name && ['NS', 'SOA'].includes(type)) return { status: false, error: `The apex ${type} record set cannot be changed`, error_code: 400 };
         const index = records.findIndex((record) => record.type === type && record.name.toLowerCase().replace(/\.+$/, '') === name);
         if (path.endsWith('/delete')) {
+            if (dnsWriteFault === 'reject') { dnsWriteFault = null; return { status: false, error: 'Mock provider rejected the write', error_code: 503 }; }
             if ('record_values' in bodyOrParams) return { status: false, error: 'Whole-set deletion does not accept record_values', error_code: 400 };
             if (domain.provider === 'godaddy') return { status: false, error: 'GoDaddy cannot delete the last value in a record set', error_code: 400 };
             if (index >= 0) records.splice(index, 1);
         } else {
+            if (dnsWriteFault === 'reject') { dnsWriteFault = null; return { status: false, error: 'Mock provider rejected the write', error_code: 503 }; }
             if (!Array.isArray(bodyOrParams.record_values) || bodyOrParams.record_values.length === 0 || bodyOrParams.record_values.some((value) => typeof value !== 'string' || value === '')) return { status: false, error: 'record_values must be a non-empty list', error_code: 400 };
             const ttl = Number(bodyOrParams.ttl);
             if (!Number.isInteger(ttl) || ttl <= 0) return { status: false, error: 'ttl must be a positive integer', error_code: 400 };
@@ -6930,6 +6942,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             else records.push(next);
         }
         db.dnsRecords.set(domain.id, records);
+        if (dnsWriteFault === 'ambiguous') { dnsWriteFault = null; return { status: false, error: 'Mock transport lost the applied response', error_code: 503 }; }
+        if (dnsWriteFault === 'reconcile') { dnsWriteFault = null; dnsFailNextRead = true; }
         return { status: true, data: { status: true, ...(domain.provider === 'route53' ? { change_id: `mock-change-${Date.now()}` } : {}), provider: domain.provider } };
     }
 

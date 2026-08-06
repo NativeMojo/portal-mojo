@@ -25,4 +25,3 @@ export function DomainsPage() {
     };
     return <ModelTable<DomainRow> model={DomainModel} eyebrow="Infrastructure · DNS" title="Domains" searchable searchPlaceholder="Search domain names" columns={columns} filters={filters} defaultParams={{ sort: 'name' }} columnChooser persistState persistKey="admin:dns:domains" onRowClick={(row) => void open(row)} />;
 }
-

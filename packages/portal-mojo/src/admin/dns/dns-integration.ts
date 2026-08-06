@@ -22,4 +22,3 @@ export function registerDnsAdminIntegration(adapter: DnsAdminIntegration): () =>
 export function getDnsAdminIntegration(): DnsAdminIntegration | null {
     return Object.keys(integration).length ? integration : null;
 }
-
