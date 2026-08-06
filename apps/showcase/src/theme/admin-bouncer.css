@@ -1,0 +1,57 @@
+/* Bouncer admin surfaces + leaf showcase switcher. Tokens only. */
+.bouncer-token-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.bouncer-code-token {
+    padding: 3px 7px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface2);
+    color: var(--ink-strong);
+    overflow-wrap: anywhere;
+}
+
+.bouncer-risk { font-variant-numeric: tabular-nums; }
+.bouncer-risk-success { color: var(--ok); }
+.bouncer-risk-warning { color: var(--warn); }
+.bouncer-risk-danger { color: var(--bad); }
+.bouncer-risk-info { color: var(--accent); }
+.bouncer-risk-muted { color: var(--mute); }
+
+.bouncer-local-table {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+}
+
+.bouncer-local-table .tbl { min-width: 700px; }
+
+.bouncer-local-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--surface2);
+}
+
+.bouncer-local-pager > div,
+.bouncer-demo-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bouncer-demo-tabs { flex-wrap: wrap; margin-bottom: 8px; }
+.bouncer-demo-hint { margin: 0 0 16px; }
+
+@media (max-width: 640px) {
+    .bouncer-local-pager { align-items: stretch; flex-direction: column; }
+    .bouncer-local-pager > div .btn { flex: 1; }
+}
