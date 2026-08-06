@@ -45,6 +45,7 @@ import { AdminMonitoringDemo } from './demos-admin-monitoring';
 import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
+import { AdminNetworkDemo } from './demos-admin-network';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminJobsDemo } from './demos-admin-jobs';
@@ -339,6 +340,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-devices', title: 'Devices, logins & GeoIP', icon: 'bi-laptop',
                 blurb: 'Fleet-wide device triage, the login-location world map with country drill-down, and the GeoIP dossier with expiry-aware enforcement and a never-cached raw provider record.',
                 render: () => <AdminDevicesDemo />,
+            },
+            {
+                key: 'admin-network', title: 'Network security', icon: 'bi-hdd-network',
+                blurb: 'Perimeter control: blocked IPs with honest expiry state, the firewall log with the target IP pulled out of the payload, kernel IP sets created disabled behind an armed enable, and the geofencing page — posture header, rules editor, simulator, evidence log and exemptions.',
+                render: () => <AdminNetworkDemo />,
             },
             {
                 key: 'admin-incidents', title: 'Incidents & events', icon: 'bi-shield-exclamation',

@@ -236,6 +236,11 @@ const GEOIP_FILTERS = new Set([
     'is_known_attacker', 'is_known_abuser', 'is_threat',
     'is_blocked', 'is_whitelisted', 'block_count__gte',
     'last_seen__gte', 'last_seen__lte', 'created__gte', 'created__lte',
+    // #1287 (Blocked IPs) additions. `threat_level` is nullable and
+    // `blocked_until` null means PERMANENT, so both need an isnull lookup to
+    // be filterable at all — web-mojo offered a literal `none` threat value,
+    // which matched no row on any deployment.
+    'threat_level__isnull', 'blocked_until__isnull',
 ]);
 
 export function normalizeGeoIpListParams(params: Params): Params {

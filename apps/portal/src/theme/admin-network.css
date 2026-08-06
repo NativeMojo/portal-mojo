@@ -1,0 +1,406 @@
+/* Network security admin surfaces (board #1287): Blocked IPs, Firewall Log,
+   IP Sets and the Geofencing page.
+
+   Tokens only — light and dark come from the same rules, so a theme flip needs
+   no re-render and no recomputed colour.
+
+   NOTE: this file is kept byte-identical between apps/portal/src/theme/ and
+   apps/showcase/src/theme/ — edit both or neither. verify-admin-network.mjs
+   asserts it, the same discipline admin-devices.css and worldmap.css follow.
+
+   Everything here is namespaced `netsec-*` (shared across the four surfaces)
+   or `geo-*` (the geofencing page). No bare house class is redefined: `.panel`,
+   `.chip*`, `.seg*`, `.btn*`, `.field*`, `.switch*`, `.tbl`, `.empty-state`,
+   `.dim`, `.text-ok/.text-bad/.text-warn` and `.btn-link` all come from
+   theme.css and admin-devices.css. */
+
+/* ── Shared card shell ─────────────────────────────────────────────────
+   `.panel` supplies the surface, border, radius and shadow; these two add the
+   head/body rhythm that theme.css deliberately leaves to the domain. */
+.netsec-card { margin-bottom: 14px; }
+
+.netsec-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 650;
+    color: var(--ink-strong);
+}
+.netsec-card-head > .eyebrow,
+.netsec-card-head > .btn { margin-left: auto; }
+
+.netsec-card-body { padding: 16px 18px; }
+.netsec-card-body > p:last-child { margin-bottom: 0; }
+
+/* ── Action rows (armed buttons live here) ─────────────────────────── */
+.netsec-action-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* ── Explanatory notes ────────────────────────────────────────────────
+   The 404-degradation panel, the cache-only warning, the permission-denied
+   notices. Icon left, prose right, bounded. */
+.netsec-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface2);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 14px;
+}
+.netsec-note i { font-size: 15px; line-height: 1.35; flex: none; }
+.netsec-note code { font-size: 12px; }
+.netsec-note-info { border-color: var(--info); background: var(--info-soft); color: var(--info); }
+.netsec-note-info b { color: var(--info); }
+.netsec-note-warn { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.netsec-note-warn b { color: var(--warn); }
+
+/* ── Threat / signal chip grid (Blocked IP detail) ─────────────────── */
+.netsec-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 12px;
+}
+
+/* ── IP set CIDR data ─────────────────────────────────────────────── */
+.netsec-cidr-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.netsec-cidr-block {
+    max-height: 420px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface2);
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre;
+}
+
+.netsec-break { word-break: break-all; }
+.netsec-cache-chip { margin-left: 8px; }
+
+/* Wide inner tables scroll inside their own container — the page and the
+   modal body must never scroll horizontally. */
+.netsec-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+
+.netsec-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+/* ══ Geofencing page ═══════════════════════════════════════════════ */
+
+.geofencing-page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ── Posture header ───────────────────────────────────────────────── */
+.geo-posture { padding: 18px 20px; }
+
+.geo-posture-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.geo-posture-icon {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.geo-posture-title { margin-right: auto; }
+.geo-posture-title h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+    color: var(--ink-strong);
+}
+.geo-posture-title p { margin: 2px 0 0; font-size: 12.5px; }
+
+.geo-status-pill { padding: 5px 12px; font-size: 12px; }
+
+.geo-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.geo-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface2);
+    color: var(--mute);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+.geo-chip b { color: var(--ink-strong); font-weight: 700; }
+.geo-chip.warn { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.geo-chip.warn b { color: var(--warn); }
+.geo-chip.bad { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+.geo-chip.bad b { color: var(--bad); }
+.geo-chip.ok { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+.geo-chip.ok b { color: var(--ok); }
+
+.geo-endpoints { margin-top: 14px; }
+.geo-endpoints > summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--accent);
+}
+.geo-endpoint-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.geo-endpoint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+.geo-endpoint code { word-break: break-all; }
+
+.geo-endpoints-empty { margin: 14px 0 0; font-size: 12.5px; }
+.geo-posture-foot { margin: 12px 0 0; font-size: 12px; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────── */
+.geo-tabs { display: flex; }
+.geo-tabs .seg { flex-wrap: wrap; }
+.geo-tab-body { display: block; }
+
+/* ── The two-column tab layout ────────────────────────────────────── */
+.geo-two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+.geo-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+@media (max-width: 960px) {
+    .geo-two-col { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Plain-language rule clauses ──────────────────────────────────── */
+.geo-clause {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+}
+.geo-clause:last-child { border-bottom: none; }
+.geo-clause i { font-size: 14px; line-height: 1.4; flex: none; }
+.geo-clause-block i { color: var(--bad); }
+.geo-clause-warn i { color: var(--warn); }
+.geo-clause-ok i { color: var(--ok); }
+.geo-clause-note { color: var(--mute); }
+.geo-clause-note i { color: var(--mute); }
+
+.geo-modified { margin: 10px 0 0; font-size: 12px; }
+
+/* ── Editor + save row ────────────────────────────────────────────── */
+.geo-rule-editor { display: flex; flex-direction: column; gap: 12px; }
+.geo-rule-form { display: flex; flex-direction: column; gap: 12px; }
+.geo-rule-json {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
+}
+.geo-rule-flags { display: flex; flex-direction: column; }
+.geo-rule-toggle { align-self: flex-start; font-size: 12.5px; }
+
+.geo-save-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-top: 1px solid var(--line-soft);
+    padding-top: 14px;
+    margin-top: 14px;
+}
+.geo-status { font-size: 12.5px; }
+.geo-remove-override { margin-left: auto; }
+
+/* ── Change history ───────────────────────────────────────────────── */
+.geo-history {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+.geo-history li {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 12.5px;
+}
+.geo-history li:last-child { border-bottom: none; }
+.geo-history-when { color: var(--mute); white-space: nowrap; }
+.geo-history-who { font-weight: 650; color: var(--ink-strong); white-space: nowrap; }
+.geo-history-what { color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.geo-history-foot { margin: 10px 0 0; font-size: 12px; }
+
+/* ── Simulator ────────────────────────────────────────────────────── */
+.geo-sim-form { display: flex; flex-direction: column; gap: 12px; }
+
+.geo-sim-result {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+.geo-sim-band {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    font-weight: 650;
+}
+.geo-sim-band i { font-size: 16px; }
+.geo-sim-allowed .geo-sim-band { background: var(--ok-soft); color: var(--ok); }
+.geo-sim-blocked .geo-sim-band { background: var(--bad-soft); color: var(--bad); }
+.geo-sim-exempt .geo-sim-band { background: var(--info-soft); color: var(--info); }
+.geo-sim-body { padding: 14px 16px; }
+.geo-sim-would {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    color: var(--warn);
+}
+.geo-sim-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 12px;
+    color: var(--mute);
+}
+.geo-sim-meta-item b { color: var(--ink-strong); font-weight: 650; }
+
+/* ── Blocks log activity strip ────────────────────────────────────── */
+.geo-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.geo-chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+}
+.geo-chart { margin-bottom: 14px; }
+.geo-cat-seg { display: flex; margin-bottom: 12px; }
+
+/* ── Top blocked countries ────────────────────────────────────────── */
+.geo-country-bars {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    counter-reset: geo-country;
+}
+.geo-country-bars li {
+    display: grid;
+    grid-template-columns: minmax(120px, 200px) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+}
+.geo-country-label {
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.geo-country-bar {
+    display: block;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--surface2);
+    overflow: hidden;
+}
+.geo-country-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--bad);
+}
+.geo-country-bars b { color: var(--ink-strong); font-variant-numeric: tabular-nums; }
+
+/* ── Exemptions ───────────────────────────────────────────────────── */
+.geo-exemptions { display: block; }
+.geo-exempt-table { font-size: 12.5px; }
+.geo-exempt-table thead th { white-space: nowrap; }
+/* Expired entries render INACTIVE and are never hidden — an auditor needs to
+   see that an exemption existed, not just that it lapsed. */
+.geo-row-expired td { opacity: 0.6; }
+.geo-row-expired code { text-decoration: line-through; }
