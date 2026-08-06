@@ -159,6 +159,25 @@ opt into accordion presentation, so A3/A4's group routing remains available
 without leaking into Admin. Dual-mount root sections now emit exactly one
 shared `/system` landing. Plan snapshot `f75418c`; implementation `9f59136`.
 
+**2026-08-05, wave 7a (Admin identity + security operations):** six approved
+board items landed sequentially from isolated worktrees and are **DONE**:
+Tickets + shared right panel #1413 · Incidents/Events #1414 · Rule Engine
+#1415 · Members #1411 · Groups #1410 · Users #1412. Security operations now
+has permission-pinned tables and detail panels, sanitized bounded forensic
+projections, safe whole-result export, ticket activity/actions, and an
+always-inactive RuleSet workflow with a lossless handler-chain editor. Identity
+now has reusable Member and User packages, a no-oracle admission chooser,
+system-pinned global gates, lifecycle batches, and the existing full-fidelity
+Group/User detail surfaces composed into the one no-group Admin sidenav.
+Arbitrary raw incident JSON, unsafe Group move/delete, arbitrary-user key
+creation, and targeted notification mutations remain deliberately absent.
+The consolidated close passed all seven admin verifiers, all three TypeScript
+workspaces, portal/showcase production builds, `git diff --check`, and browser
+smoke in both themes with clean console and no horizontal overflow. Build-only
+warnings remain for large bundles and Incident/Event static/dynamic import
+overlap; code splitting is a later optimization, not a Wave 7A correctness
+blocker.
+
 **2026-08-05, wave 7a residual (Groups Admin #1410):** the app-local Groups
 surface now carries system-pinned route, menu, section, and action gates;
 restores the useful legacy column inventory; and offers real, reason-aware
