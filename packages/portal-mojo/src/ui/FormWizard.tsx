@@ -102,6 +102,8 @@ export function FormWizard(props: FormWizardProps) {
     const fields = useMemo(() => sections.flatMap((section) => section.fields), [sections]);
     const mode = normalizeWizardMode(props.mode as string);
     const [activeKey, setActiveKey] = useState<string | null>(() => sections[0]?.key ?? null);
+    const activeKeyRef = useRef(activeKey);
+    activeKeyRef.current = activeKey;
     const [busy, setBusy] = useState(false);
     const finishFlight = useRef(createWizardSingleFlight());
     const resetRef = useRef(resetKey);
@@ -112,7 +114,8 @@ export function FormWizard(props: FormWizardProps) {
         const resetChanged = !Object.is(resetRef.current, resetKey);
         const healed = resetChanged ? sections[0]?.key ?? null : healWizardSection(activeKey, sections);
         resetRef.current = resetKey;
-        if (healed !== activeKey) {
+        if (healed !== activeKeyRef.current) {
+            activeKeyRef.current = healed;
             setActiveKey(healed);
             if (!resetChanged && healed) onStepChange?.(healed);
         }
@@ -122,7 +125,8 @@ export function FormWizard(props: FormWizardProps) {
     const activeSection = sections[activeIndex] ?? null;
 
     const go = (key: string) => {
-        if (busy || key === activeKey || !sections.some((section) => section.key === key)) return;
+        if (busy || key === activeKeyRef.current || !sections.some((section) => section.key === key)) return;
+        activeKeyRef.current = key;
         setActiveKey(key);
         onStepChange?.(key);
     };

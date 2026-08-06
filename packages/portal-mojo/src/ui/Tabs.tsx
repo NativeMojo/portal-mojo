@@ -103,10 +103,10 @@ export function Tabs({ items, activeKey, defaultActiveKey, onActiveKeyChange, va
     return (
         <div className={className ? `mojo-tabs ${className}` : 'mojo-tabs'} data-tab-variant={variantName}>
             <div className="mojo-tab-list" role="tablist" aria-label={ariaLabel}>
-                {normalized.map((item) => {
+                {normalized.map((item, index) => {
                     const selected = item.key === effective;
-                    const tabId = `tab-${uid}-${item.key}`;
-                    const panelId = `panel-${uid}-${item.key}`;
+                    const tabId = `tab-${uid}-${index}`;
+                    const panelId = `panel-${uid}-${index}`;
                     return (
                         <button
                             ref={(node) => { if (node) refs.current.set(item.key, node); else refs.current.delete(item.key); }}
@@ -130,10 +130,10 @@ export function Tabs({ items, activeKey, defaultActiveKey, onActiveKeyChange, va
                 })}
             </div>
             <div className="mojo-tab-panels">
-                {normalized.map((item) => {
+                {normalized.map((item, index) => {
                     const selected = item.key === effective;
                     return (
-                        <div key={item.key} id={`panel-${uid}-${item.key}`} role="tabpanel" aria-labelledby={`tab-${uid}-${item.key}`} hidden={!selected} className="mojo-tab-panel">
+                        <div key={item.key} id={`panel-${uid}-${index}`} role="tabpanel" aria-labelledby={`tab-${uid}-${index}`} hidden={!selected} className="mojo-tab-panel">
                             {selected ? item.panel : null}
                         </div>
                     );
