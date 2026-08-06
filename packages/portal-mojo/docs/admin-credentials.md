@@ -38,6 +38,18 @@ import {
 <GroupApiKeysSection group={{ id: 42, name: 'Acme' }} />
 ```
 
+Both fixed-group credential sections accept an optional permission override:
+
+```tsx
+<GroupApiKeysSection group={group} permission={GLOBAL_CREDENTIAL_PERMS} />
+<WebhookSubscriptionsSection group={group} permission={GLOBAL_CREDENTIAL_PERMS} />
+```
+
+Omitting `permission` preserves group-portal behavior through
+`GROUP_CREDENTIAL_PERMS`. The app-local global Group Admin passes the
+system-pinned `GLOBAL_CREDENTIAL_PERMS`; the wrapper checks that clause before
+mounting its list, so denied operators issue no credential background query.
+
 Creation uses `useCreateGroupApiKey()`, not the generic model save hook. The
 backend create echo contains `{token, ...row}`; the hook splits it immediately,
 writes only the safe row to TanStack Query, and passes the token through a

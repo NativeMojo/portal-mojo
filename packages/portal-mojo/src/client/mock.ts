@@ -1418,6 +1418,12 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     groupsManager.email = 'groups.manager@nativemojo.com';
     groupsManager.display_name = 'Groups Manager';
     groupsManager.permissions = { manage_groups: true, groups: true, manage_users: true, users: true };
+    const groupsViewer = at(16);
+    groupsViewer.is_active = true;
+    groupsViewer.username = 'groups.viewer';
+    groupsViewer.email = 'groups.viewer@nativemojo.com';
+    groupsViewer.display_name = 'Groups Viewer';
+    groupsViewer.permissions = { view_groups: true };
     // The published showcase has no login screen, so it uses one explicit
     // mock-only operator that can exercise every data-backed admin demo. Keep
     // the narrower viewer/manager identities above intact for permission tests.
@@ -2003,15 +2009,32 @@ function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
         if (GROUP_ACTIONS.has(key)) actionEntries.push([key, value]);
         else if (!GROUP_NO_SAVE.has(key)) fields[key] = value;
     }
-    if (isPlainObject(fields.metadata) && 'auth_config' in fields.metadata) {
+    if (isPlainObject(fields.metadata) && fields.metadata.auth_config !== null && 'auth_config' in fields.metadata) {
         const error = validateAuthConfig(fields.metadata.auth_config);
         if (error) return { status: false, error, error_code: 400 };
+    }
+    if ('parent' in fields) {
+        const rawParent = fields.parent;
+        if (rawParent == null || rawParent === '') fields.parent = null;
+        else {
+            const parent = db.groups.find((candidate) => candidate.id === Number(rawParent));
+            if (!parent) return { status: false, error: 'Group not found', error_code: 404 };
+            fields.parent = groupBasic(parent);
+        }
     }
     const target = group as unknown as Record<string, unknown>;
     for (const [key, value] of Object.entries(fields)) {
         const existing = target[key];
         // JSONField dict-merge parity (metadata), plain assign otherwise.
-        target[key] = isPlainObject(value) && isPlainObject(existing) ? mergeDicts(existing, value) : value;
+        if (key === 'metadata' && isPlainObject(value) && isPlainObject(existing)) {
+            const merged = mergeDicts(existing, value);
+            // objict JSON merge deletes a nested key when explicitly sent
+            // as null. This is how auth overrides return to inheritance.
+            if ('auth_config' in value && value.auth_config === null) delete merged.auth_config;
+            target[key] = merged;
+        } else {
+            target[key] = isPlainObject(value) && isPlainObject(existing) ? mergeDicts(existing, value) : value;
+        }
     }
     for (const [action, value] of actionEntries) {
         const dict = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
@@ -2526,6 +2549,14 @@ function groupCanManage(user: MockUser | undefined, groupId: number): boolean {
     const member = db.members.find((row) => row.group === groupId && row.user === user.id && row.is_active);
     if (member && ['admin', 'manage_group', 'manage_members'].some((permission) => Boolean(member.permissions[permission]))) return true;
     // Same deterministic group-context identity as /api/group/<id>/member.
+    return user.id === 1 && groupId % 2 === 1;
+}
+
+function groupCanRead(user: MockUser | undefined, groupId: number): boolean {
+    if (!user) return false;
+    if (hasGlobalPermission(user, ['view_groups', 'manage_groups', 'manage_group', 'groups'])) return true;
+    const member = db.members.find((row) => row.group === groupId && row.user === user.id && row.is_active);
+    if (member) return true;
     return user.id === 1 && groupId % 2 === 1;
 }
 
@@ -3639,19 +3670,35 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     }
     const oneGroup = path.match(/^\/api\/group\/(\d+)$/);
     if (oneGroup) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
         const group = db.groups.find((g) => g.id === Number(oneGroup[1]));
         if (!group) return { status: false, error: 'Group not found', error_code: 404 };
+        if (!groupCanRead(caller, group.id)) return permissionDenied();
+        if (opts.method === 'DELETE') {
+            return { status: false, error: 'DELETE not allowed: Group', error_code: 403 };
+        }
         if (opts.method === 'POST' && opts.body) {
+            if (!groupCanManage(caller, group.id)) return permissionDenied();
+            if (('disable' in opts.body || 'reactivate' in opts.body)
+                && !hasGlobalPermission(caller, ['manage_groups', 'groups'])) return permissionDenied();
             return saveGroup(group, opts.body);
         }
         return { status: true, data: serializeGroup(group), graph: 'default' };
     }
     if (path === '/api/group') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canViewAll = hasGlobalPermission(caller, ['view_groups', 'manage_groups', 'manage_group', 'groups']);
+        const visibleGroups = canViewAll
+            ? db.groups
+            : db.groups.filter((group) => group.is_active && groupCanRead(caller, group.id));
         if (opts.params?.download_format) {
-            const full = listRows(db.groups as unknown as Record<string, unknown>[], { ...opts.params, start: 0, size: db.groups.length }, (g) => String(g.name), 'name');
+            const full = listRows(visibleGroups as unknown as Record<string, unknown>[], { ...opts.params, start: 0, size: visibleGroups.length }, (g) => String(g.name), 'name');
             return exportRows(full.data as Record<string, unknown>[], opts.params, 'Group');
         }
         if (opts.method === 'POST' && opts.body) {
+            if (!hasGlobalPermission(caller, ['manage_groups', 'manage_group', 'groups'])) return permissionDenied();
             // Create parity: parent arrives as an id, embeds as the basic
             // graph; uuid stays null until generated (live rows show both).
             const body = opts.body;
@@ -3676,7 +3723,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             db.groups.push(group);
             return { status: true, data: serializeGroup(group), graph: 'default' };
         }
-        return listRows(db.groups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
+        return listRows(visibleGroups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
     }
     // User API keys — /api/account/api_keys (account/rest/user_api_key.py).
     // No DELETE (CAN_DELETE defaults false); the kill switch is the `revoke`

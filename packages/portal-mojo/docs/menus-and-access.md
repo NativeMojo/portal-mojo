@@ -42,6 +42,12 @@ portal owns its group-scoped menus and switcher. When it embeds Admin sections,
 those routes still run inside a global-scope boundary so active-member grants
 cannot satisfy `sys.*` or Admin section permission checks.
 
+Until the identity bundle is fully consolidated, the app-local `/users` and
+`/groups` routes must carry their own system-pinned route and menu clauses in
+addition to nested control gates. A Group opened from `/groups` is inspected
+route data only: it must not call `setActiveGroup`, add `?group=`, or treat an
+active product membership as Admin authority.
+
 `<SidebarNav collapsed onRequestExpand>` provides the compact icon rail.
 Collapsed category buttons expose CSS tooltips and expand on click, Enter, or
 Space. Accordion search matches labels plus `keywords` and reports its result

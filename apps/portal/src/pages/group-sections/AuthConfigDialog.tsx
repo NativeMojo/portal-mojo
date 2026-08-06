@@ -20,11 +20,12 @@
 // Opened from the GroupDetail kebab ("Configure Auth", sys.groups /
 // sys.manage_groups — GROUP_AUTH_PERMS), as a modal per the source ("the
 // multi-tab form is too heavy for the side-nav").
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MultiSelectDropdown, TagInput, modal, toast } from 'portal-mojo/ui';
+import { JsonBlock, MultiSelectDropdown, TagInput, modal, toast } from 'portal-mojo/ui';
 import { mojoCall } from 'portal-mojo/client';
 import { GroupModel, type GroupRow } from '../../models';
+import { buildAuthConfigDiff, resolveAuthConfigChain } from './auth-config';
 
 // ── Allowed tokens (must match django-mojo auth_config schema) ────────
 
@@ -35,12 +36,14 @@ const LOGIN_METHOD_OPTS = [
     { value: 'magic', label: 'Magic link' },
     { value: 'google', label: 'Google' },
     { value: 'apple', label: 'Apple' },
+    { value: 'github', label: 'GitHub' },
 ];
 
 const REGISTRATION_METHOD_OPTS = [
     { value: 'password', label: 'Password' },
     { value: 'google', label: 'Google' },
     { value: 'apple', label: 'Apple' },
+    { value: 'github', label: 'GitHub' },
 ];
 
 const LAYOUT_OPTS = [
@@ -75,11 +78,6 @@ const CANONICAL_REG_FIELDS = [
     { name: 'dob', label: 'Date of birth' },
     { name: 'password', label: 'Password' },
 ];
-const CANONICAL_REG_NAMES = new Set(CANONICAL_REG_FIELDS.map((f) => f.name));
-
-// Must match the server's identifier rule (register_schema._EXTRA_NAME_RE).
-const EXTRA_FIELD_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/;
-
 // register_schema.DEFAULT_FIELDS — seeds the grid when neither the group's
 // own override nor the resolved config specify `registration.fields`.
 const DEFAULT_REG_FIELDS: RegField[] = [
@@ -100,9 +98,9 @@ const STATIC_DEFAULTS = {
     },
     registration: {
         enabled: true, fields: null, extra_fields: [], identity_field: '', min_age: null,
-        methods: ['password', 'google', 'apple'], passkey_prompt: 'off',
+        methods: ['password', 'google', 'apple', 'github'], passkey_prompt: 'off',
     },
-    login: { methods: ['password', 'sms', 'passkey', 'magic', 'google', 'apple'] },
+    login: { methods: ['password', 'sms', 'passkey', 'magic', 'google', 'apple', 'github'] },
 } as const;
 
 // Theme text fields: form name + dotted path under `auth_config` + help copy.
@@ -159,23 +157,6 @@ function getPath(obj: unknown, path: string): unknown {
     return cur;
 }
 
-function setPath(obj: Record<string, unknown>, path: string, value: unknown): void {
-    const keys = path.split('.');
-    let cur = obj;
-    for (let i = 0; i < keys.length - 1; i += 1) {
-        const k = keys[i]!;
-        if (cur[k] == null || typeof cur[k] !== 'object') cur[k] = {};
-        cur = cur[k] as Record<string, unknown>;
-    }
-    cur[keys[keys.length - 1]!] = value;
-}
-
-function sameSet(a: unknown, b: unknown): boolean {
-    const sa = [...(Array.isArray(a) ? a : [])].map(String).sort();
-    const sb = [...(Array.isArray(b) ? b : [])].map(String).sort();
-    return sa.length === sb.length && sa.every((v, i) => v === sb[i]);
-}
-
 interface RegField { name: string; required: boolean; verify: string | null }
 
 type FormState = Record<string, unknown>;
@@ -229,22 +210,6 @@ function assembleRegFields(fd: FormState): RegField[] {
  * trim, drop blanks, dedupe, drop canonical collisions and names failing
  * the server's identifier rule — the saved config always passes validation.
  */
-function assembleExtraFields(fd: FormState): { name: string }[] {
-    const raw = fd.reg_extra_fields;
-    const parts = Array.isArray(raw) ? raw.map(String) : String(raw ?? '').split(',');
-    const seen = new Set<string>();
-    const arr: { name: string }[] = [];
-    for (const part of parts) {
-        const name = String(part ?? '').trim();
-        if (!name || seen.has(name)) continue;
-        if (CANONICAL_REG_NAMES.has(name)) continue;
-        if (!EXTRA_FIELD_NAME_RE.test(name)) continue;
-        seen.add(name);
-        arr.push({ name });
-    }
-    return arr;
-}
-
 /** The flat form baseline from own override + resolved config. */
 function buildBaseline(own: unknown, resolved: unknown): FormState {
     const base: FormState = {};
@@ -288,24 +253,6 @@ function buildPlaceholders(resolved: unknown): Record<string, string> {
         ph[d.form] = v == null ? '' : String(v);
     }
     return ph;
-}
-
-function isDifferent(cur: unknown, base: unknown, kind: DescriptorKind): boolean {
-    if (kind === 'array') return !sameSet(cur, base);
-    if (kind === 'bool') return !!cur !== !!base;
-    if (kind === 'int') {
-        const a = cur === '' || cur == null ? null : Number(cur);
-        const b = base === '' || base == null ? null : Number(base);
-        return a !== b;
-    }
-    return String(cur ?? '').trim() !== String(base ?? '').trim();
-}
-
-function normalizeForSave(cur: unknown, kind: DescriptorKind): unknown {
-    if (kind === 'array') return [...(Array.isArray(cur) ? cur : [])];
-    if (kind === 'bool') return !!cur;
-    if (kind === 'int') return cur === '' || cur == null ? null : Number(cur);
-    return cur == null ? '' : String(cur);
 }
 
 // ── The dialog ────────────────────────────────────────────────────────
@@ -378,40 +325,75 @@ function SelectField({ name, label, help, value, options, onChange, disabled, co
 function AuthConfigBody({ group, close }: { group: GroupRow; close: () => void }) {
     const save = GroupModel.useSave();
 
-    // The resolved (inherited) config for placeholders + fallbacks. On any
-    // failure the documented defaults stand in (source _fetchResolved).
+    // Reconstruct inheritance from authorized detail reads. The public
+    // group_uuid resolver intentionally drops inactive groups, so it cannot
+    // be the Admin source of truth for this editor.
     const resolvedQuery = useQuery({
-        queryKey: ['auth-config-resolved', group.uuid ?? group.id],
+        queryKey: ['auth-config-resolved-admin', group.id, group.modified],
         queryFn: async (): Promise<unknown> => {
-            const body = await mojoCall('/api/auth/config', {
-                params: group.uuid ? { group_uuid: group.uuid } : {},
-            });
-            const cfg = body.data;
-            return cfg && typeof cfg === 'object' ? cfg : STATIC_DEFAULTS;
+            const deployment = await mojoCall('/api/auth/config');
+            const deploymentConfig = deployment.data && typeof deployment.data === 'object'
+                ? deployment.data as Record<string, unknown> : STATIC_DEFAULTS;
+            const chain: GroupRow[] = [group];
+            const seen = new Set<number>([group.id]);
+            let parentId = group.parent?.id ?? null;
+            while (parentId != null) {
+                if (seen.has(parentId)) throw new Error('The group hierarchy contains a cycle.');
+                seen.add(parentId);
+                const response = await mojoCall(`${GroupModel.endpoint}/${parentId}`);
+                const parent = response.data as GroupRow | undefined;
+                if (!parent || parent.id !== parentId) throw new Error(`Parent group #${parentId} was not returned.`);
+                chain.unshift(parent);
+                parentId = parent.parent?.id ?? null;
+            }
+            return resolveAuthConfigChain(deploymentConfig, chain);
         },
         retry: false,
     });
-    const resolved = resolvedQuery.isError ? STATIC_DEFAULTS : resolvedQuery.data;
+    const resolved = resolvedQuery.data;
 
     const own = useMemo(() => {
         const v = group.metadata?.auth_config;
         return v && typeof v === 'object' ? v : {};
     }, [group.metadata]);
 
-    // Baseline + placeholders freeze once the resolved config settles; the
-    // editable state seeds from the baseline (and re-baselines after save).
+    // Baseline + placeholders initialize in an effect keyed to the loaded
+    // inheritance snapshot. A background refresh never wipes dirty edits.
     const ready = resolved !== undefined;
     const baseline = useMemo(() => (ready ? buildBaseline(own, resolved) : null), [ready, own, resolved]);
     const placeholders = useMemo(() => (ready ? buildPlaceholders(resolved) : {}), [ready, resolved]);
 
     const [values, setValues] = useState<FormState | null>(null);
     const [savedBaseline, setSavedBaseline] = useState<FormState | null>(null);
-    if (baseline && values === null) {
+    const [loadedKey, setLoadedKey] = useState('');
+    const baselineKey = ready ? `${group.id}:${group.modified}:${resolvedQuery.dataUpdatedAt}` : '';
+    useEffect(() => {
+        if (!baseline || baselineKey === loadedKey) return;
+        const dirty = values != null && savedBaseline != null
+            && JSON.stringify(values) !== JSON.stringify(savedBaseline);
+        if (dirty) return;
         setValues({ ...baseline });
         setSavedBaseline({ ...baseline });
-    }
+        setLoadedKey(baselineKey);
+    }, [baseline, baselineKey, loadedKey, savedBaseline, values]);
     const [tab, setTab] = useState<TabKey>('base');
     const [status, setStatus] = useState<{ text: string; tone: 'muted' | 'ok' | 'bad' }>({ text: '', tone: 'muted' });
+
+    if (resolvedQuery.isError) {
+        return (
+            <div className="modal-pad">
+                <h2 className="modal-title">Configure Auth — {group.name}</h2>
+                <p className="text-bad">
+                    Inherited policy is unavailable because the complete parent chain could not be loaded.
+                    Overrides are shown read-only; Save and Reset remain disabled to avoid deriving a mutation from partial policy.
+                </p>
+                <JsonBlock value={own} label="This group's auth overrides" defaultOpen />
+                <div className="ga-geo-save-row" style={{ marginTop: 14 }}>
+                    <button className="btn" onClick={close}>Close</button>
+                </div>
+            </div>
+        );
+    }
 
     if (!values || !savedBaseline) {
         return (
@@ -443,28 +425,10 @@ function AuthConfigBody({ group, close }: { group: GroupRow; close: () => void }
             return;
         }
 
-        // Diff against the baseline — only changed fields ride the payload,
-        // so untouched fields keep inheriting.
-        const payload: Record<string, unknown> = {};
-        let changed = false;
-        for (const d of FIELD_DESCRIPTORS) {
-            if (isDifferent(values[d.form], savedBaseline[d.form], d.kind)) {
-                setPath(payload, d.path, normalizeForSave(values[d.form], d.kind));
-                changed = true;
-            }
-        }
-        const baseFields = assembleRegFields(savedBaseline);
-        if (JSON.stringify(regFields) !== JSON.stringify(baseFields)) {
-            setPath(payload, 'registration.fields', regFields);
-            changed = true;
-        }
-        const curExtra = assembleExtraFields(values);
-        const baseExtra = assembleExtraFields(savedBaseline);
-        if (JSON.stringify(curExtra) !== JSON.stringify(baseExtra)) {
-            setPath(payload, 'registration.extra_fields', curExtra);
-            changed = true;
-        }
-        if (!changed) {
+        // Only changed keys ride the payload, so untouched fields continue
+        // inheriting. The pure helper is shared with contract verification.
+        const payload = buildAuthConfigDiff(values, savedBaseline);
+        if (!payload) {
             setStatus({ text: 'No changes to save.', tone: 'muted' });
             return;
         }
@@ -477,6 +441,24 @@ function AuthConfigBody({ group, close }: { group: GroupRow; close: () => void }
             toast.success('Auth config saved');
         } catch (err) {
             fail(err instanceof Error ? err.message : 'Failed to save auth config');
+        }
+    };
+
+    const resetOverrides = async () => {
+        const confirmed = await modal.confirm({
+            title: 'Reset auth overrides',
+            message: `Remove this group's auth overrides and return ${group.name} to inherited policy?`,
+            confirmText: 'Reset overrides',
+            danger: true,
+        });
+        if (!confirmed) return;
+        setStatus({ text: 'Resetting…', tone: 'muted' });
+        try {
+            await save.mutateAsync({ id: group.id, changes: { metadata: { auth_config: null } } });
+            toast.success('Auth overrides reset to inherited policy');
+            close();
+        } catch (err) {
+            fail(err instanceof Error ? err.message : 'Failed to reset auth overrides');
         }
     };
 
@@ -672,6 +654,13 @@ function AuthConfigBody({ group, close }: { group: GroupRow; close: () => void }
                 <span className={`ga-geo-status ${status.tone === 'bad' ? 'ga-status-bad' : status.tone === 'ok' ? 'ga-status-ok' : 'dim'}`}>
                     {status.text}
                 </span>
+                <button
+                    className="btn btn-danger"
+                    disabled={save.isPending || Object.keys(own).length === 0}
+                    onClick={() => void resetOverrides()}
+                >
+                    <i className="bi bi-arrow-counterclockwise" /> Reset Overrides
+                </button>
                 <button className="btn" onClick={close}>Close</button>
                 <button className="btn btn-primary" disabled={save.isPending} onClick={() => void doSave()}>
                     <i className="bi bi-check-lg" /> Save Auth Config

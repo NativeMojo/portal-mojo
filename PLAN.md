@@ -159,6 +159,21 @@ opt into accordion presentation, so A3/A4's group routing remains available
 without leaking into Admin. Dual-mount root sections now emit exactly one
 shared `/system` landing. Plan snapshot `f75418c`; implementation `9f59136`.
 
+**2026-08-05, wave 7a residual (Groups Admin #1410):** the app-local Groups
+surface now carries system-pinned route, menu, section, and action gates;
+restores the useful legacy column inventory; and offers real, reason-aware
+deactivate/reactivate batches only. Delete remains absent because Group has no
+`CAN_DELETE`; move and parent assignment/reparenting remain absent until the
+backend authoritatively rejects hierarchy cycles (an existing parent can be
+cleared to root). The #1411 `GroupMembersPanel`/admission flows and shared
+identity registries are reused. Credential and audit peeks no longer issue
+denied background requests. Auth configuration includes GitHub, reconstructs
+inactive-group inheritance from authorized root-to-leaf detail reads, fails
+closed on a partial chain, and supports null-reset to inherited policy. Mock
+Group reads preserve product membership behavior on shared `/api/group` while
+matching lifecycle, parent-graph, auth-reset, and DELETE contracts. Focused
+verification command: `npm run verify:admin-groups`.
+
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
 The web-mojo source of record is `/Users/ians/Projects/mojo/nativemojo/web-mojo`
