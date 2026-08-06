@@ -2419,7 +2419,39 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         // this the showcase's geofence blocks tab would render its
         // metrics-denied notice instead of the KPI strip and country list.
         view_metrics: true,
+        // #1298 Storage demo: category grant covers backends/files; account
+        // bucket operations retain their independent manage_aws gate.
+        files: true,
+        manage_aws: true,
     };
+    const storageViewer = at(31);
+    storageViewer.is_active = true;
+    storageViewer.is_superuser = false;
+    storageViewer.username = 'storage.viewer';
+    storageViewer.email = 'storage.viewer@nativemojo.com';
+    storageViewer.display_name = 'Storage Viewer';
+    storageViewer.permissions = { view_fileman: true };
+    const storageManager = at(32);
+    storageManager.is_active = true;
+    storageManager.is_superuser = false;
+    storageManager.username = 'storage.manager';
+    storageManager.email = 'storage.manager@nativemojo.com';
+    storageManager.display_name = 'Storage Manager';
+    storageManager.permissions = { manage_files: true, view_groups: true, view_users: true };
+    const bucketManager = at(33);
+    bucketManager.is_active = true;
+    bucketManager.is_superuser = false;
+    bucketManager.username = 'bucket.manager';
+    bucketManager.email = 'bucket.manager@nativemojo.com';
+    bucketManager.display_name = 'Bucket Manager';
+    bucketManager.permissions = { manage_aws: true };
+    const storageMember = at(34);
+    storageMember.is_active = true;
+    storageMember.is_superuser = false;
+    storageMember.username = 'storage.member';
+    storageMember.email = 'storage.member@nativemojo.com';
+    storageMember.display_name = 'Storage Member Only';
+    storageMember.permissions = {};
     const metricsViewer = at(24);
     metricsViewer.is_active = true;
     metricsViewer.is_superuser = false;
@@ -3716,6 +3748,86 @@ members.push({
 });
 groups[0]!.member_count += 1;
 
+interface MockStorageBucket {
+    id: string;
+    name: string;
+    created: number;
+    is_public: boolean;
+    objects: number;
+    versions: number;
+    markers: number;
+    uploads: number;
+    incompleteMode?: 'access' | 'empty';
+}
+
+interface MockFileManager {
+    id: number; created: number; name: string; use: string; backend_type: string; backend_url: string;
+    is_active: boolean; is_default: boolean; is_public: boolean; aws_region: string | null;
+    aws_key_masked: string | null; aws_secret_masked: string | null; allowed_origins: string[];
+    assume_role_arn: string | null; has_external_id: boolean; group: number | null; user: number | null;
+}
+
+interface MockStorageFile {
+    id: number; created: number; modified: number; filename: string; file_size: number | null;
+    content_type: string; category: string; upload_status: string; is_active: boolean; is_public: boolean;
+    group: number | null; user: number | null; file_manager: number; metadata: Record<string, unknown>;
+    url: string | null;
+    rendition_demo?: 'initial' | 'failed' | 'expired';
+    rendition_reads?: number;
+}
+
+interface MockStorageRendition {
+    id: number; original_file: number; created: number; modified: number; filename: string; file_size: number | null;
+    content_type: string; category: string; role: string; upload_status: string; width?: number; height?: number; url: string | null;
+}
+
+interface MockStorageShare {
+    id: number; code: string; url: string; source: string; hit_count: number; expires_at: number | null;
+    is_active: boolean; track_clicks: boolean; metadata: Record<string, unknown>; created: number; modified: number;
+    user: number; group: number | null; file: number;
+}
+
+function buildStorageBuckets(): MockStorageBucket[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 'mojo-private-assets', name: 'mojo-private-assets', created: now - 460 * 86400, is_public: false, objects: 18, versions: 27, markers: 3, uploads: 1 },
+        { id: 'mojo-public-media', name: 'mojo-public-media', created: now - 330 * 86400, is_public: true, objects: 42, versions: 52, markers: 0, uploads: 0 },
+        { id: 'mojo-partial-demo', name: 'mojo-partial-demo', created: now - 20 * 86400, is_public: false, objects: 7, versions: 9, markers: 1, uploads: 1, incompleteMode: 'empty' },
+    ];
+}
+
+function buildFileManagers(): MockFileManager[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 4101, created: now - 410 * 86400, name: 'Private uploads', use: 'uploads', backend_type: 's3', backend_url: 's3://mojo-private-assets/uploads', is_active: true, is_default: true, is_public: false, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••7D2Q', aws_secret_masked: '••••••••••m9p', allowed_origins: ['https://admin.example.test'], assume_role_arn: null, has_external_id: false, group: 1, user: null },
+        { id: 4102, created: now - 320 * 86400, name: 'Public media', use: 'media', backend_type: 's3', backend_url: 's3://mojo-public-media/media', is_active: true, is_default: false, is_public: true, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••3K8M', aws_secret_masked: '••••••••••r2x', allowed_origins: ['https://example.test'], assume_role_arn: null, has_external_id: false, group: null, user: 14 },
+        { id: 4103, created: now - 70 * 86400, name: 'Local archive', use: 'archive', backend_type: 'file', backend_url: '/srv/mojo/archive', is_active: false, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: 2, user: null },
+    ];
+}
+
+function buildStorageFiles(): MockStorageFile[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 5101, created: now - 7200, modified: now - 3600, filename: 'launch-photo.jpg', file_size: 2845312, content_type: 'image/jpeg', category: 'image', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: { width: 2400, height: 1600, camera: 'Demo camera' }, url: '/mock-storage/files/5101' },
+        { id: 5102, created: now - 6400, modified: now - 3200, filename: 'briefing.mp4', file_size: 18124544, content_type: 'video/mp4', category: 'video', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: { duration: 42 }, url: '/mock-storage/files/5102' },
+        { id: 5103, created: now - 5400, modified: now - 2500, filename: 'field-note.mp3', file_size: 4125440, content_type: 'audio/mpeg', category: 'audio', upload_status: 'completed', is_active: true, is_public: false, group: 2, user: 14, file_manager: 4101, metadata: { duration: 31 }, url: '/mock-storage/files/5103' },
+        { id: 5104, created: now - 4400, modified: now - 2200, filename: 'quarterly-report.pdf', file_size: 940122, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: true, group: null, user: 14, file_manager: 4102, metadata: { pages: 14 }, url: 'https://files.example.test/report.pdf' },
+        { id: 5105, created: now - 1800, modified: now - 900, filename: 'unsafe-link.txt', file_size: 112, content_type: 'text/plain', category: 'text', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: 'javascript:alert(1)' },
+        { id: 5106, created: now - 600, modified: now - 600, filename: 'rendering-slides.pptx', file_size: 802114, content_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', category: 'presentation', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5106', rendition_demo: 'initial' },
+        { id: 5107, created: now - 500, modified: now - 500, filename: 'renderer-failure.pdf', file_size: 402114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5107', rendition_demo: 'failed' },
+        { id: 5108, created: now - 400, modified: now - 400, filename: 'renderer-expired.pdf', file_size: 302114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5108', rendition_demo: 'expired' },
+    ];
+}
+
+function buildStorageRenditions(): MockStorageRendition[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 6101, original_file: 5101, created: now - 3500, modified: now - 3500, filename: 'launch-photo-thumb.jpg', file_size: 42811, content_type: 'image/jpeg', category: 'image', role: 'thumbnail', upload_status: 'completed', width: 320, height: 213, url: '/mock-storage/renditions/6101' },
+        { id: 6102, original_file: 5101, created: now - 3400, modified: now - 3400, filename: 'launch-photo-preview.jpg', file_size: 284001, content_type: 'image/jpeg', category: 'image', role: 'preview', upload_status: 'completed', width: 1280, height: 853, url: '/mock-storage/renditions/6102' },
+        { id: 6103, original_file: 5102, created: now - 3100, modified: now - 3100, filename: 'briefing-poster.jpg', file_size: 94411, content_type: 'image/jpeg', category: 'image', role: 'poster', upload_status: 'completed', width: 1280, height: 720, url: '/mock-storage/renditions/6103' },
+    ];
+}
+
 const db = {
     users,
     groups,
@@ -3774,6 +3886,12 @@ const db = {
     jobRunners: buildJobRunners(),
     scheduledTasks: buildScheduledTasks(),
     taskResults: buildTaskResults(),
+    storageBuckets: buildStorageBuckets(),
+    fileManagers: buildFileManagers(),
+    storageFiles: buildStorageFiles(),
+    fileRenditions: buildStorageRenditions(),
+    storageRenditionJobs: new Map<number, { roles: string[]; detailGets: number; finalStatus: 'completed' | 'failed' | 'expired' }>(),
+    storageShares: [] as MockStorageShare[],
     // The scheduler lock, as `control/force-scheduler-lead` sees it: a Redis
     // string key whose VALUE is the holder. Deleting it is the whole control.
     jobsSchedulerLock: 'runner-mojo-web-01-engine' as string | null,
@@ -5087,6 +5205,335 @@ function hasGlobalPermission(user: MockUser | undefined, permissions: string[]):
     return permissions.some((permission) => Boolean(user.permissions[permission]));
 }
 
+const STORAGE_VIEW_GRANTS = ['view_fileman', 'manage_files', 'files'];
+const STORAGE_MANAGE_GRANTS = ['manage_files', 'files'];
+const STORAGE_BUCKET_GRANTS = ['manage_aws', 'files'];
+const STORAGE_GROUP_DIRECTORY_GRANTS = ['view_groups', 'manage_groups', 'manage_group', 'groups'];
+const STORAGE_USER_DIRECTORY_GRANTS = ['users', 'view_users', 'manage_users'];
+
+function storageRelation(kind: 'group' | 'user', id: number | null): Record<string, unknown> | null {
+    if (id == null) return null;
+    if (kind === 'group') {
+        const row = db.groups.find((candidate) => candidate.id === id);
+        return row ? { id: row.id, name: row.name } : null;
+    }
+    const row = db.users.find((candidate) => candidate.id === id);
+    return row ? { id: row.id, name: row.display_name, display_name: row.display_name, email: row.email } : null;
+}
+
+function serializeStorageManager(row: MockFileManager): Record<string, unknown> {
+    return {
+        id: row.id, created: row.created, name: row.name, use: row.use,
+        backend_type: row.backend_type, backend_url: row.backend_url,
+        is_active: row.is_active, is_default: row.is_default, is_public: row.is_public,
+        aws_region: row.aws_region, aws_key_masked: row.aws_key_masked,
+        aws_secret_masked: row.aws_secret_masked, allowed_origins: [...row.allowed_origins],
+        assume_role_arn: row.assume_role_arn, has_external_id: row.has_external_id,
+        group: storageRelation('group', row.group), user: storageRelation('user', row.user),
+    };
+}
+
+function serializeStorageRendition(row: MockStorageRendition): Record<string, unknown> {
+    return {
+        id: row.id, created: row.created, modified: row.modified, filename: row.filename,
+        file_size: row.file_size, content_type: row.content_type, category: row.category,
+        role: row.role, upload_status: row.upload_status,
+        ...(row.width == null ? {} : { width: row.width }), ...(row.height == null ? {} : { height: row.height }),
+        url: row.url,
+    };
+}
+
+function serializeStorageFile(row: MockStorageFile): Record<string, unknown> {
+    const renditions: Record<string, unknown> = {};
+    for (const rendition of db.fileRenditions.filter((candidate) => candidate.original_file === row.id)) {
+        renditions[rendition.role] = serializeStorageRendition(rendition);
+    }
+    return {
+        id: row.id, created: row.created, modified: row.modified, filename: row.filename,
+        file_size: row.file_size, content_type: row.content_type, category: row.category,
+        upload_status: row.upload_status, is_active: row.is_active, is_public: row.is_public,
+        group: storageRelation('group', row.group), user: storageRelation('user', row.user),
+        file_manager: (() => {
+            const manager = db.fileManagers.find((candidate) => candidate.id === row.file_manager);
+            return manager ? { id: manager.id, name: manager.name } : null;
+        })(),
+        metadata: { ...row.metadata }, url: row.url,
+        thumbnail: (renditions.thumbnail as Record<string, unknown> | undefined)?.url ?? null,
+        renditions,
+    };
+}
+
+function serializeStorageShare(row: MockStorageShare): Record<string, unknown> {
+    return {
+        id: row.id, code: row.code, url: row.url, source: row.source, hit_count: row.hit_count,
+        expires_at: row.expires_at, is_active: row.is_active, track_clicks: row.track_clicks,
+        metadata: { ...row.metadata }, created: row.created, modified: row.modified,
+        user: storageRelation('user', row.user), group: storageRelation('group', row.group),
+    };
+}
+
+function maskStorageCredential(value: unknown, prefix = ''): string | null {
+    if (typeof value !== 'string' || value.trim() === '') return null;
+    const clean = value.trim();
+    return `${prefix}${'•'.repeat(8)}${clean.slice(-3)}`;
+}
+
+function storageIncomplete(bucket: MockStorageBucket, action: 'create' | 'empty' | 'set_public', extra: Record<string, unknown> = {}) {
+    return {
+        status: false, code: 409, error: `S3 bucket ${action} did not reach a verified state`,
+        error_code: 's3_operation_incomplete',
+        data: {
+            name: bucket.name, action, complete: false, mutation_state: 'partial',
+            ...(action === 'empty' ? {
+                counts: { deleted_objects: 2, deleted_versions: 1, deleted_markers: 0, aborted_uploads: 0 },
+                failed: { objects: 0, versions: 1, markers: 0, uploads: 0 },
+                remaining: { objects: null, versions: null, markers: null, uploads: null },
+            } : {}),
+            failure: { operation: action === 'empty' ? 'delete_objects' : 'put_public_access_block', provider_code: 'AccessDenied', retryable: false },
+            ...extra,
+        },
+    };
+}
+
+function completeMockRendition(file: MockStorageFile, role: string): void {
+    const now = Math.floor(Date.now() / 1000);
+    const existing = db.fileRenditions.find((row) => row.original_file === file.id && row.role === role);
+    if (existing) {
+        existing.modified = Math.max(existing.modified + 1, now);
+        existing.upload_status = 'completed';
+        return;
+    }
+    db.fileRenditions.push({
+        id: Math.max(6100, ...db.fileRenditions.map((row) => row.id)) + 1,
+        original_file: file.id, created: now, modified: now,
+        filename: `${file.filename}-${role}.jpg`, file_size: 64000,
+        content_type: 'image/jpeg', category: 'image', role, upload_status: 'completed',
+        width: role === 'thumbnail' ? 320 : 1280, height: role === 'thumbnail' ? 180 : 720,
+        url: `/mock-storage/renditions/${file.id}-${role}`,
+    });
+}
+
+/** Renderer work becomes observable only through later authoritative detail GETs. */
+function advanceMockRenditionLifecycle(file: MockStorageFile): void {
+    if (file.rendition_demo === 'initial') {
+        file.rendition_reads = (file.rendition_reads ?? 0) + 1;
+        if (file.rendition_reads >= 2) {
+            completeMockRendition(file, 'thumbnail');
+            completeMockRendition(file, 'preview');
+            file.rendition_demo = undefined;
+        }
+    }
+    const job = db.storageRenditionJobs.get(file.id);
+    if (!job) return;
+    job.detailGets += 1;
+    if (job.detailGets < 2) return;
+    if (job.finalStatus === 'completed') {
+        for (const role of job.roles) completeMockRendition(file, role);
+    } else {
+        file.upload_status = job.finalStatus;
+        file.modified = Math.max(file.modified + 1, Math.floor(Date.now() / 1000));
+    }
+    db.storageRenditionJobs.delete(file.id);
+}
+
+function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown> | undefined {
+    if (!path.startsWith('/api/aws/s3/bucket')
+        && !path.startsWith('/api/fileman/manager')
+        && !path.startsWith('/api/fileman/file')
+        && !path.startsWith('/api/shortlink/link')) return undefined;
+    const caller = userFromBearer(opts.headers);
+    if (!caller) return permissionDenied(401);
+    const method = (opts.method ?? 'GET').toUpperCase();
+
+    const bucketMatch = path.match(/^\/api\/aws\/s3\/bucket(?:\/(.+))?$/);
+    if (bucketMatch) {
+        if (!hasGlobalPermission(caller, STORAGE_BUCKET_GRANTS)) return permissionDenied();
+        if (method === 'DELETE') return { status: false, code: 405, error: 'S3 bucket method is not supported', error_code: 'method_not_allowed' };
+        const name = bucketMatch[1] == null ? null : decodeURIComponent(bucketMatch[1]);
+        if (method === 'GET') {
+            if (opts.params?.__mock_error === 'work_limit') {
+                return { status: false, code: 503, error: 'S3 bucket inventory reached its work limit', error_code: 'work_limit', data: { complete: false, mutation_state: 'none', failure: { operation: 'list_buckets', provider_code: 'WorkLimit', retryable: true } } };
+            }
+            if (name == null) {
+                const data = db.storageBuckets.map(({ id, name: bucketName, created }) => ({ id, name: bucketName, created }));
+                return { status: true, code: 200, data, count: data.length, size: data.length };
+            }
+            const bucket = db.storageBuckets.find((candidate) => candidate.name === name);
+            return bucket ? { status: true, code: 200, data: { id: bucket.id, name: bucket.name, exists: true } }
+                : { status: false, code: 404, error: 'S3 bucket was not found', error_code: 's3_not_found' };
+        }
+        if (method !== 'POST' || name == null) return { status: false, code: 400, error: 'Bucket name is required', error_code: 'invalid_request' };
+        const body = opts.body ?? {};
+        const keys = Object.keys(body);
+        if (keys.some((key) => !['set_public', 'empty'].includes(key)) || ('set_public' in body && 'empty' in body)) {
+            return { status: false, code: 400, error: 'Unknown S3 bucket action', error_code: 'invalid_request' };
+        }
+        let bucket = db.storageBuckets.find((candidate) => candidate.name === name);
+        if (!('set_public' in body) && !('empty' in body)) {
+            const createdNew = !bucket;
+            if (!bucket) {
+                const now = Math.floor(Date.now() / 1000);
+                bucket = { id: name, name, created: now, is_public: false, objects: 0, versions: 0, markers: 0, uploads: 0 };
+                db.storageBuckets.push(bucket);
+            }
+            if (createdNew && name === 'mojo-create-incomplete-demo') {
+                return storageIncomplete(bucket, 'create', { created_new: true, requested_public: false, configured_public: null, safety_lock: 'applied' });
+            }
+            return { status: true, code: 200, data: { id: name, name, created_new: createdNew } };
+        }
+        if (!bucket) return { status: false, code: 404, error: 'S3 bucket was not found', error_code: 's3_not_found' };
+        if ('set_public' in body) {
+            if (typeof body.set_public !== 'boolean') return { status: false, code: 400, error: 'set_public must be a boolean', error_code: 'invalid_request' };
+            if (bucket.incompleteMode === 'access') {
+                return storageIncomplete(bucket, 'set_public', { requested_public: body.set_public, is_public: null, configured_public: null, safety_lock: 'applied' });
+            }
+            bucket.is_public = body.set_public;
+            return { status: true, code: 200, data: { name, is_public: bucket.is_public, configured_public: bucket.is_public, complete: true, mutation_state: 'complete' } };
+        }
+        const empty = body.empty;
+        if (!isPlainObject(empty) || Object.keys(empty).length !== 1 || empty.confirm_name !== name) {
+            return { status: false, code: 400, error: 'empty confirm_name must exactly match the bucket name', error_code: 'invalid_request' };
+        }
+        if (bucket.incompleteMode === 'empty') {
+            bucket.objects = Math.max(0, bucket.objects - 2);
+            bucket.versions = Math.max(0, bucket.versions - 1);
+            return storageIncomplete(bucket, 'empty');
+        }
+        const result = { name, complete: true, mutation_state: 'complete', deleted_objects: bucket.objects, deleted_versions: bucket.versions, deleted_markers: bucket.markers, aborted_uploads: bucket.uploads };
+        bucket.objects = 0; bucket.versions = 0; bucket.markers = 0; bucket.uploads = 0;
+        return { status: true, code: 200, data: result };
+    }
+
+    const managerMatch = path.match(/^\/api\/fileman\/manager(?:\/(\d+))?$/);
+    if (managerMatch) {
+        if (!hasGlobalPermission(caller, STORAGE_VIEW_GRANTS)) return permissionDenied();
+        const id = managerMatch[1] == null ? null : Number(managerMatch[1]);
+        const manager = id == null ? null : db.fileManagers.find((candidate) => candidate.id === id);
+        if (id != null && !manager) return { status: false, error: 'FileManager not found', error_code: 404 };
+        if (method === 'DELETE') return { status: false, code: 405, error: 'FileManager deletion is unavailable', error_code: 'method_not_allowed' };
+        if (method === 'GET' && manager) return { status: true, data: serializeStorageManager(manager), graph: 'default' };
+        if (method === 'GET') {
+            const serialized = db.fileManagers.map(serializeStorageManager);
+            const result = listRows(serialized, opts.params ?? {}, (row) => `${row.name} ${row.backend_type} ${row.backend_url}`, '-created');
+            return { ...result, graph: 'list' };
+        }
+        if (method !== 'POST' || !hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS)) return permissionDenied();
+        const body = opts.body ?? {};
+        for (const action of ['test_connection', 'check_cors', 'fix_cors', 'clone'] as const) {
+            if (!(action in body)) continue;
+            if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };
+            if ((action === 'check_cors' || action === 'fix_cors') && manager.backend_type !== 's3') return { status: true, data: { status: false, error: 'CORS management is only supported for S3 backends.' } };
+            if (action === 'clone') {
+                const clone = { ...manager, id: Math.max(...db.fileManagers.map((row) => row.id)) + 1, created: Math.floor(Date.now() / 1000), name: `Clone of ${manager.name}`, is_default: false };
+                db.fileManagers.push(clone);
+                return { status: true, data: { status: true, id: clone.id } };
+            }
+            return { status: true, data: { status: true, ...(action === 'test_connection' ? {} : { result: { ok: true, origins: [...manager.allowed_origins] } }) } };
+        }
+        if (!manager) {
+            const requestedGroup = body.group == null ? null : Number(body.group);
+            const requestedUser = body.user == null ? null : Number(body.user);
+            if (requestedGroup == null && requestedUser == null && !caller.is_superuser) return permissionDenied();
+            if (requestedGroup != null && !hasGlobalPermission(caller, STORAGE_GROUP_DIRECTORY_GRANTS)) return permissionDenied();
+            if (requestedUser != null && !hasGlobalPermission(caller, STORAGE_USER_DIRECTORY_GRANTS)) return permissionDenied();
+        }
+        const target = manager ?? (() => {
+            const backendType = String(body.backend_type ?? 'file');
+            if (!['file', 's3'].includes(backendType)) return null;
+            const created: MockFileManager = { id: Math.max(...db.fileManagers.map((row) => row.id)) + 1, created: Math.floor(Date.now() / 1000), name: String(body.name ?? 'Storage backend'), use: String(body.use ?? 'uploads'), backend_type: backendType, backend_url: String(body.backend_url ?? ''), is_active: body.is_active == null ? true : Boolean(body.is_active), is_default: Boolean(body.is_default), is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: body.group == null ? null : Number(body.group), user: body.user == null ? null : Number(body.user) };
+            db.fileManagers.push(created);
+            return created;
+        })();
+        if (!target) return { status: false, error: 'Unsupported storage backend', error_code: 400 };
+        if ('name' in body) target.name = String(body.name ?? '');
+        if ('use' in body) target.use = String(body.use ?? '');
+        if ('backend_url' in body) target.backend_url = String(body.backend_url ?? '');
+        if ('aws_region' in body) target.aws_region = body.aws_region == null ? null : String(body.aws_region);
+        if ('assume_role_arn' in body) target.assume_role_arn = body.assume_role_arn == null ? null : String(body.assume_role_arn);
+        for (const field of ['is_active', 'is_default', 'is_public'] as const) if (field in body) target[field] = Boolean(body[field]);
+        if (Array.isArray(body.allowed_origins)) target.allowed_origins = body.allowed_origins.map(String);
+        if (body.aws_key != null) target.aws_key_masked = maskStorageCredential(body.aws_key, 'AKIA');
+        if (body.aws_secret != null) target.aws_secret_masked = maskStorageCredential(body.aws_secret);
+        if ('group' in body && hasGlobalPermission(caller, STORAGE_GROUP_DIRECTORY_GRANTS)) target.group = body.group == null ? null : Number(body.group);
+        if ('user' in body && hasGlobalPermission(caller, STORAGE_USER_DIRECTORY_GRANTS)) target.user = body.user == null ? null : Number(body.user);
+        return { status: true, data: serializeStorageManager(target), graph: 'default' };
+    }
+
+    const fileMatch = path.match(/^\/api\/fileman\/file(?:\/(\d+))?$/);
+    if (fileMatch) {
+        if (!hasGlobalPermission(caller, STORAGE_VIEW_GRANTS)) return permissionDenied();
+        const id = fileMatch[1] == null ? null : Number(fileMatch[1]);
+        const file = id == null ? null : db.storageFiles.find((candidate) => candidate.id === id);
+        if (id != null && !file) return { status: false, error: 'File not found', error_code: 404 };
+        if (method === 'GET' && file) {
+            advanceMockRenditionLifecycle(file);
+            return { status: true, data: serializeStorageFile(file), graph: 'default' };
+        }
+        if (method === 'GET') {
+            const serialized = db.storageFiles.map(serializeStorageFile);
+            const result = listRows(serialized, opts.params ?? {}, (row) => `${row.filename} ${row.content_type}`, '-created');
+            return { ...result, graph: 'list' };
+        }
+        if (!hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS)) return permissionDenied();
+        if (method === 'DELETE' && file) {
+            db.storageFiles = db.storageFiles.filter((candidate) => candidate.id !== file.id);
+            db.fileRenditions = db.fileRenditions.filter((candidate) => candidate.original_file !== file.id);
+            for (const share of db.storageShares.filter((candidate) => candidate.file === file.id)) share.is_active = false;
+            return { status: 'deleted' } as unknown as Record<string, unknown>;
+        }
+        if (method !== 'POST' || !file) return { status: false, error: 'File creation/upload is unavailable', error_code: 405 };
+        const body = opts.body ?? {};
+        if ('regenerate_renditions' in body) {
+            const roles = Array.isArray(body.regenerate_renditions) ? [...new Set(body.regenerate_renditions.map(String).filter(Boolean))].slice(0, 20) : null;
+            const existingRoles = db.fileRenditions.filter((row) => row.original_file === file.id).map((row) => row.role);
+            const wanted = roles ?? (existingRoles.length > 0 ? existingRoles : ['thumbnail', 'preview']);
+            const finalStatus = file.rendition_demo === 'failed' ? 'failed' : file.rendition_demo === 'expired' ? 'expired' : 'completed';
+            db.storageRenditionJobs.set(file.id, { roles: wanted, detailGets: 0, finalStatus });
+            return { status: true, data: { queued: true, roles } };
+        }
+        if ('share' in body) {
+            const options = isPlainObject(body.share) ? body.share : {};
+            const now = Math.floor(Date.now() / 1000);
+            const days = Math.max(0, Math.min(3650, Number(options.expire_days ?? 30)));
+            const id = Math.max(0, ...db.storageShares.map((row) => row.id)) + 1;
+            const code = `share${id}`;
+            const share: MockStorageShare = { id, code, url: `/s/${code}`, source: 'fileman-share', hit_count: 0, expires_at: days > 0 ? now + days * 86400 : null, is_active: true, track_clicks: Boolean(options.track_clicks), metadata: { note: String(options.note ?? '').slice(0, 512) }, created: now, modified: now, user: caller.id, group: file.group, file: file.id };
+            db.storageShares.push(share);
+            return { status: true, data: { url: share.url, code, expires_at: share.expires_at, track_clicks: share.track_clicks } };
+        }
+        if ('filename' in body) file.filename = String(body.filename);
+        if ('is_public' in body) file.is_public = Boolean(body.is_public);
+        if ('group' in body && hasGlobalPermission(caller, STORAGE_GROUP_DIRECTORY_GRANTS)) file.group = body.group == null ? null : Number(body.group);
+        file.modified = Math.floor(Date.now() / 1000);
+        return { status: true, data: serializeStorageFile(file), graph: 'default' };
+    }
+
+    const shareMatch = path.match(/^\/api\/shortlink\/link(?:\/(\d+))?$/);
+    if (shareMatch) {
+        const id = shareMatch[1] == null ? null : Number(shareMatch[1]);
+        const canManageAll = hasGlobalPermission(caller, ['manage_shortlinks']);
+        const requestedFile = opts.params?.file == null ? null : Number(opts.params.file);
+        const requestedSource = opts.params?.source == null ? null : String(opts.params.source);
+        const visible = db.storageShares.filter((row) => (canManageAll || row.user === caller.id)
+            && (requestedFile == null || row.file === requestedFile)
+            && (requestedSource == null || row.source === requestedSource));
+        if (id != null) {
+            const share = visible.find((row) => row.id === id);
+            if (!share) return permissionDenied();
+            if (method === 'DELETE') return { status: false, error: 'Visible shares are retained for audit', error_code: 405 };
+            if (method === 'POST' && opts.body && opts.body.is_active === false) { share.is_active = false; share.modified = Math.floor(Date.now() / 1000); }
+            return { status: true, data: serializeStorageShare(share), graph: 'default' };
+        }
+        const serialized = visible.map(serializeStorageShare);
+        const params = { ...(opts.params ?? {}) };
+        delete params.file;
+        delete params.source;
+        const result = listRows(serialized, params, (row) => `${row.code} ${row.source}`, '-created');
+        return { ...result, graph: 'default' };
+    }
+    return undefined;
+}
+
 const METRICS_VIEW_GRANTS = ['view_metrics', 'metrics'];
 
 /** Shared live account-policy gate for every mock metrics read surface. */
@@ -6318,6 +6765,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         armedReauth = null;
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
+    const storageResult = storageFetch(path, opts);
+    if (storageResult !== undefined) return storageResult;
     if (path === '/api/auth/generate_api_key') {
         // account/rest/user_api_key.py generate_api_key: mints a long-lived
         // key for the CALLER (@requires_auth — needs the bearer, unlike the

@@ -53,6 +53,7 @@ import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminJobsDemo } from './demos-admin-jobs';
 import { AdminMembersDemo } from './demos-admin-members';
 import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
+import { AdminStorageDemo } from './demos-admin-storage';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
@@ -319,6 +320,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Admin',
         sections: [
+            {
+                key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
+                blurb: 'Global S3 buckets, masked storage backends, capability-safe files, sharing and finite rendition convergence — with explicit destructive confirmation and no upload or deletion shortcuts.',
+                render: () => <AdminStorageDemo />,
+            },
             {
                 key: 'admin-users', title: 'Users', icon: 'bi-people',
                 blurb: 'Reusable full-fidelity Users table and 14-section detail with system-pinned permissions and caller-only secrets.',

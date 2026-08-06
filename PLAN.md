@@ -253,6 +253,22 @@ overflow, across showcase and the real portal shell; fail-closed gating confirme
 expands one-way). `dev:live` @9009 remains blocked for agents by the mverify bouncer
 interstitial.
 
+**2026-08-06, wave 8 Storage Admin (#1298):** the global/no-group Infrastructure
+workspace now contributes Buckets, Backends, and Files against completed
+django-mojo #1439 (honest, finite S3 operations) and #1440 (masked FileManager
+graphs). Buckets use the complete account inventory and KISS detail modals;
+empty requires an ArmedButton, exact-name confirmation, and fresh auth, while
+partial/unknown provider evidence survives the shared client boundary and every
+POST actively refreshes in `finally`. Backends keep credential writes outside
+MutationCache, never prefill secrets, require explicit authorized owner scope,
+and refetch/compare FKs. Files add safe selection batches, modal FileView,
+capability-URL validation, modal-local sharing, playback-stable native media,
+and 5-second/12-attempt rendition convergence. Upload remains parked in #1264;
+bucket deletion and FileManager deletion remain absent. The executable contract
+is `npm run verify:admin-storage`; the showcase exposes all three pages plus
+playable/unsafe/rendition and cancellable destructive modal evidence for the
+central light/dark browser close.
+
 **2026-08-05, wave 7a residual (Groups Admin #1410):** the app-local Groups
 surface now carries system-pinned route, menu, section, and action gates;
 restores the useful legacy column inventory; and offers real, reason-aware
