@@ -3,25 +3,57 @@
 // fail-closed states reviewers need to exercise with the stable identities.
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
     ProviderCredentialsPage,
 } from 'portal-mojo/admin';
 import {
     getAuthSnapshot, login, mojoGet, setMockDnsConfigMalformed, type Me,
 } from 'portal-mojo/client';
+import { AdminDnsRecordsDemo } from './demos-admin-dns-records';
 
 type Leg = 'manager' | 'viewer' | 'unavailable';
+type Surface = 'credentials' | 'domains' | 'records';
 
 const LEGS: Array<{ key: Leg; label: string }> = [
     { key: 'manager', label: 'Manager — live' },
     { key: 'viewer', label: 'Viewer contract' },
     { key: 'unavailable', label: 'Capability unavailable' },
 ];
+const SURFACES: Array<{ key: Surface; label: string }> = [
+    { key: 'credentials', label: 'Credentials' },
+    { key: 'domains', label: 'Domains' },
+    { key: 'records', label: 'DNS Records' },
+];
 
 export function AdminDnsDemo() {
     const [leg, setLeg] = useState<Leg>('manager');
+    const [surface, setSurface] = useState<Surface | null>(null);
+    const [pendingSurface, setPendingSurface] = useState<Surface | null>('credentials');
     const [switching, setSwitching] = useState(true);
     const queryClient = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const selectSurface = (nextSurface: Surface) => {
+        if (surface === nextSurface && pendingSurface == null) return;
+        setPendingSurface(nextSurface);
+        // Commit an empty slot first. This unmounts DnsRecordsPage before its
+        // absent-domain effect can race the URL reset and restore `domain`.
+        setSurface(null);
+    };
+
+    useEffect(() => {
+        if (surface !== null || pendingSurface == null) return;
+        const isolated = new URLSearchParams();
+        const demo = searchParams.get('demo');
+        if (demo) isolated.set('demo', demo);
+        if (isolated.toString() !== searchParams.toString()) {
+            setSearchParams(isolated, { replace: true });
+            return; // wait for the router to publish the clean params
+        }
+        setSurface(pendingSurface);
+        setPendingSurface(null);
+    }, [surface, pendingSurface, searchParams, setSearchParams]);
 
     useEffect(() => {
         let active = true;
@@ -57,12 +89,15 @@ export function AdminDnsDemo() {
 
     return (
         <div style={{ display: 'grid', gap: 14 }}>
+            <div className="seg" style={{ flexWrap: 'wrap' }} aria-label="DNS showcase surface">
+                {SURFACES.map((entry) => <button key={entry.key} type="button" disabled={switching || surface === null} className={`seg-btn${(surface ?? pendingSurface) === entry.key ? ' seg-active' : ''}`} onClick={() => selectSurface(entry.key)}>{entry.label}</button>)}
+            </div>
             <div className="seg" style={{ flexWrap: 'wrap' }}>
                 {LEGS.map((entry) => (
                     <button
                         key={entry.key}
                         type="button"
-                        disabled={switching}
+                        disabled={switching || surface === null}
                         className={`seg-btn${leg === entry.key ? ' seg-active' : ''}`}
                         onClick={() => setLeg(entry.key)}
                     >
@@ -72,46 +107,15 @@ export function AdminDnsDemo() {
             </div>
 
             {switching && <div className="panel panel-pad dim">Switching controlled DNS identity…</div>}
+            {!switching && surface === null && <div className="panel panel-pad dim">Switching DNS showcase surface…</div>}
 
-            {!switching && leg === 'manager' && (
-                <>
-                    <div className="panel panel-pad">
-                        <div className="eyebrow">Executable manager leg</div>
-                        <p className="dim" style={{ marginBottom: 0 }}>
-                            Link with <code>invalid</code> in either secret to see first-link rejection;
-                            use any other pair for a verified row. Open a row to rotate (failed rotation
-                            preserves both masks), retire/activate, inspect masked detail, or arm deletion.
-                        </p>
-                    </div>
-                    <ProviderCredentialsPage />
-                </>
-            )}
-
-            {!switching && leg === 'viewer' && (
-                <>
-                    <div className="panel panel-pad">
-                        <div className="eyebrow">Executable viewer leg</div>
-                        <p className="dim" style={{ marginBottom: 0 }}>
-                            The real page is signed in as the stable DNS viewer. Safe rows and masked
-                            detail remain available; every mutation control is absent.
-                        </p>
-                    </div>
-                    <ProviderCredentialsPage />
-                </>
-            )}
-
-            {!switching && leg === 'unavailable' && (
-                <>
-                    <div className="panel panel-pad">
-                        <div className="eyebrow">Executable fail-closed leg</div>
-                        <p className="dim" style={{ marginBottom: 0 }}>
-                            The real manager page receives a deliberately malformed config response;
-                            no provider defaults or dependent controls may render.
-                        </p>
-                    </div>
-                    <ProviderCredentialsPage />
-                </>
-            )}
+            {!switching && surface !== null && <>
+                <div className="panel panel-pad">
+                    <div className="eyebrow">{leg === 'manager' ? 'Executable manager leg' : leg === 'viewer' ? 'Executable viewer leg' : 'Executable fail-closed leg'}</div>
+                    <p className="dim" style={{ marginBottom: 0 }}>{leg === 'manager' ? 'The real selected surface runs with manager controls against the central mock.' : leg === 'viewer' ? 'The stable DNS viewer can inspect safe state while every mutation control remains absent.' : 'The manager receives a deliberately malformed capability response, so dependent controls fail closed.'}</p>
+                </div>
+                {surface === 'credentials' ? <ProviderCredentialsPage /> : <AdminDnsRecordsDemo surface={surface} />}
+            </>}
         </div>
     );
 }

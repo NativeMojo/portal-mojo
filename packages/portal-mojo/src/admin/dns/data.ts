@@ -1,4 +1,5 @@
 import type { DnsCapabilities, DnsProviderCapability, DnsRecordRow, DomainRow } from './models';
+import { recordKey } from './dns-data';
 
 export function providerLabel(provider: string | null | undefined): string {
     const key = String(provider ?? '').trim().toLowerCase();
@@ -27,5 +28,5 @@ export function isManagementOnly(domain: Pick<DomainRow, 'provider'> | string, c
 
 /** Provider records are live and id-less; type+normalized name is the stable set identity. */
 export function dnsRecordKey(record: Pick<DnsRecordRow, 'type' | 'name'>): string {
-    return `${record.type.trim().toUpperCase()}|${record.name.trim().toLowerCase().replace(/\.+$/, '')}`;
+    return recordKey(record);
 }

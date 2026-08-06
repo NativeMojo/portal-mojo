@@ -365,8 +365,8 @@ const GROUPS: DemoGroup[] = [
                 render: () => <AdminNetworkDemo />,
             },
             {
-                key: 'admin-dns', title: 'DNS', icon: 'bi-globe2',
-                blurb: 'Global DNS provider credentials with strict capability gating, exact eligible-group lookup, masked KISS detail, and imperative secret verification outside the query cache.',
+                key: 'admin-dns', title: 'DNS domains & records', icon: 'bi-globe2',
+                blurb: 'Global DNS credentials, domain inventory/KISS detail, and safe live complete-set records with explicit corrections, stale preflight, and provider-specific refusal states.',
                 render: () => <AdminDnsDemo />,
             },
             {

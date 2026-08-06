@@ -1,9 +1,9 @@
-import { useQuery, type QueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
 } from '../../client';
 import {
-    DnsCredentialModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
+    DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
     sanitizeRegistrarDiscoveryResponse,
     type CertificateRow, type DnsCapabilities, type DnsCredentialRow,
     type DnsGroupChoice, type DnsProviderCapability, type DnsRecordRow,
@@ -11,7 +11,7 @@ import {
     type RegistrarDiscoveryResponse, type RegistrarSearchRow, type RegistrantContact, type RegistrantContactResponse,
     type WhoisResponse,
 } from './models';
-import { dnsRecordKey } from './data';
+import { recordKey, sameRecordOwnerSnapshot, snapshotRecordOwner, type RecordOwnerSnapshot } from './dns-data';
 
 export const DNS_GROUP_CHOICE_ENDPOINT = '/api/dnsman/credential/group-choice';
 
@@ -20,6 +20,7 @@ export const dnsKeys = {
     capabilities: (group?: number | null) => ['dnsman', 'config', group ?? 'global'] as const,
     groupChoices: (params: Params) => ['dnsman', 'credential-group-choice', params] as const,
     groupChoice: (id: number) => ['dnsman', 'credential-group-choice', 'one', id] as const,
+    records: (domainId: number) => ['dnsman', 'records', domainId] as const,
 };
 
 function object(value: unknown, where: string): Record<string, unknown> {
@@ -239,21 +240,154 @@ export async function assignHouseDomain(input: { domain: number; group: number }
     return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/assign-group', input));
 }
 
-export async function listDnsRecords(domain: number): Promise<DnsRecordSetResponse> {
-    const response = await mojoCall('/api/dnsman/dns', { params: { domain } });
-    const payload = response.data as DnsRecordSetResponse;
-    return { ...payload, records: payload.records.map((record) => ({ ...record, id: dnsRecordKey(record) })) };
+export function parseDnsRecordSetResponse(value: unknown): DnsRecordSetResponse {
+    const payload = object(value, 'record response');
+    if (Object.keys(payload).some((key) => !['domain', 'provider', 'records'].includes(key))) throw new Error('DNS administration unavailable: malformed record response');
+    if (typeof payload.domain !== 'string' || !payload.domain || typeof payload.provider !== 'string' || !payload.provider || !Array.isArray(payload.records)) {
+        throw new Error('DNS administration unavailable: malformed record response');
+    }
+    const records = payload.records.map((value, index): DnsRecordRow => {
+        const record = object(value, `records[${index}]`);
+        if (Object.keys(record).some((key) => !['type', 'name', 'record_values', 'ttl'].includes(key))) throw new Error(`DNS administration unavailable: malformed records[${index}]`);
+        if (typeof record.type !== 'string' || !record.type || typeof record.name !== 'string' || !record.name
+            || !Array.isArray(record.record_values) || record.record_values.some((item) => typeof item !== 'string')
+            || !Number.isInteger(record.ttl) || Number(record.ttl) < 0 || 'id' in record) {
+            throw new Error(`DNS administration unavailable: malformed records[${index}]`);
+        }
+        return { type: record.type, name: record.name, record_values: [...record.record_values] as string[], ttl: Number(record.ttl) };
+    });
+    return { domain: payload.domain, provider: payload.provider, records };
 }
 
-export function upsertDnsRecord(domain: number, record: DnsRecordRow): Promise<{ status: true; change_id: string; provider: string }> {
-    return postData('/api/dnsman/dns', {
-        domain, type: record.type, name: record.name,
-        record_values: record.record_values, ttl: record.ttl,
+/** Direct, uncached read used for confirmation-window preflight/reconciliation. */
+export async function fetchDnsRecords(domain: number): Promise<DnsRecordSetResponse> {
+    const response = await mojoCall('/api/dnsman/dns', { params: { domain } });
+    return parseDnsRecordSetResponse(response.data);
+}
+
+/** Compatibility alias; unlike #1429 it remains strictly id-less. */
+export const listDnsRecords = fetchDnsRecords;
+
+export function useDnsRecords(domain: number | null, enabled = true) {
+    return useQuery({
+        queryKey: dnsKeys.records(domain ?? 0),
+        queryFn: () => fetchDnsRecords(domain!),
+        enabled: enabled && domain != null,
     });
 }
 
-export function deleteDnsRecord(domain: number, record: Pick<DnsRecordRow, 'type' | 'name'> & { record_values?: string[] }): Promise<{ status: true; change_id: string; provider: string }> {
-    return postData('/api/dnsman/dns/delete', { domain, ...record });
+export interface DnsWriteResponse { status: true; provider: string; change_id: string | null }
+export function parseDnsWriteResponse(value: unknown): DnsWriteResponse {
+    const response = object(value, 'record write response');
+    if (Object.keys(response).some((key) => !['status', 'provider', 'change_id'].includes(key))
+        || response.status !== true || typeof response.provider !== 'string' || !response.provider
+        || !(typeof response.change_id === 'string' || response.change_id === null)) {
+        throw new Error('DNS administration unavailable: malformed record write response');
+    }
+    return { status: true, provider: response.provider, change_id: response.change_id };
+}
+export async function upsertDnsRecord(domain: number, record: DnsRecordRow): Promise<DnsWriteResponse> {
+    const response = await mojoCall('/api/dnsman/dns', { method: 'POST', body: {
+        domain, type: record.type, name: record.name,
+        record_values: record.record_values, ttl: record.ttl,
+    } });
+    return parseDnsWriteResponse(response);
+}
+
+export async function deleteDnsRecordSet(domain: number, record: Pick<DnsRecordRow, 'type' | 'name'>): Promise<DnsWriteResponse> {
+    const response = await mojoCall('/api/dnsman/dns/delete', { method: 'POST', body: { domain, type: record.type, name: record.name } });
+    return parseDnsWriteResponse(response);
+}
+export const deleteDnsRecord = deleteDnsRecordSet;
+
+export class DnsStaleSnapshotError extends Error {
+    constructor() { super('The live record set changed after this editor opened. Refresh and review the new values before trying again.'); this.name = 'DnsStaleSnapshotError'; }
+}
+export interface DnsOperationResult<T> {
+    response?: T;
+    live: DnsRecordSetResponse | null;
+    applied: boolean;
+    ambiguousApplied: boolean;
+}
+export interface CoordinateDnsOperationOptions<T> {
+    opening: RecordOwnerSnapshot;
+    fetchFresh: () => Promise<DnsRecordSetResponse>;
+    write: () => Promise<T>;
+    intended: DnsRecordRow | null;
+    reconcile?: (live: DnsRecordSetResponse) => void | Promise<void>;
+    /** Required cache-safety boundary after every attempted write. */
+    invalidate: () => void | Promise<void>;
+}
+function intendedMatches(live: DnsRecordSetResponse, intended: DnsRecordRow | null, opening: RecordOwnerSnapshot): boolean {
+    const exact = live.records.find((record) => recordKey(record) === opening.key) ?? null;
+    if (intended == null) return exact == null;
+    return !!exact && exact.ttl === intended.ttl && exact.type === intended.type && exact.name.toLowerCase().replace(/\.+$/, '') === intended.name.toLowerCase().replace(/\.+$/, '')
+        && exact.record_values.length === intended.record_values.length && exact.record_values.every((value, index) => value === intended.record_values[index]);
+}
+
+/** Executable confirm -> fresh preflight -> immediate write -> finally reconcile sequence. */
+export async function coordinateDnsRecordOperation<T>(options: CoordinateDnsOperationOptions<T>): Promise<DnsOperationResult<T>> {
+    const preflight = await options.fetchFresh();
+    const current = snapshotRecordOwner(preflight.records, options.opening.exact?.type ?? options.intended?.type ?? options.opening.key.split('|')[0]!, options.opening.owner);
+    if (!sameRecordOwnerSnapshot(options.opening, current)) {
+        await options.reconcile?.(preflight);
+        throw new DnsStaleSnapshotError();
+    }
+    let response: T | undefined;
+    let requestError: unknown;
+    let reconciliationError: unknown;
+    let invalidationError: unknown;
+    let live: DnsRecordSetResponse | null = null;
+    try {
+        response = await options.write();
+    } catch (error) {
+        requestError = error;
+    } finally {
+        try {
+            live = await options.fetchFresh();
+            await options.reconcile?.(live);
+        } catch (error) {
+            reconciliationError = error;
+        }
+        try {
+            await options.invalidate();
+        } catch (error) {
+            invalidationError = error;
+        }
+    }
+    const applied = live != null && intendedMatches(live, options.intended, options.opening);
+    if (requestError) {
+        if (applied) {
+            const error = requestError instanceof Error ? requestError : new Error(String(requestError));
+            Object.assign(error, { dnsLiveStateApplied: true });
+        }
+        throw requestError;
+    }
+    if (reconciliationError) throw reconciliationError;
+    if (invalidationError) throw invalidationError;
+    return { response, live, applied, ambiguousApplied: false };
+}
+
+export function useDnsRecordCoordinator(domain: number) {
+    const queryClient = useQueryClient();
+    return async <T>(options: Omit<CoordinateDnsOperationOptions<T>, 'fetchFresh' | 'reconcile' | 'invalidate'>) => coordinateDnsRecordOperation({
+        ...options,
+        fetchFresh: () => fetchDnsRecords(domain),
+        reconcile: async (live) => {
+            queryClient.setQueryData(dnsKeys.records(domain), live);
+        },
+        invalidate: async () => {
+            await queryClient.invalidateQueries({ queryKey: dnsKeys.records(domain) });
+        },
+    });
+}
+
+export async function resolveDnsDomainByName(normalizedName: string): Promise<number | null> {
+    const target = normalizedName.trim().toLowerCase().replace(/\.+$/, '');
+    if (!target) return null;
+    const page = await mojoList<DomainRow>(DomainModel.endpoint, DomainModel.normalizeListParams?.({ search: target, sort: 'name', size: 50 }) ?? { search: target, sort: 'name', size: 50 });
+    const exact = page.rows.map(sanitizeDomainRow).find((row) => row.name.toLowerCase().replace(/\.+$/, '') === target);
+    return exact && Number.isInteger(exact.id) && exact.id > 0 ? exact.id : null;
 }
 
 /** Legal-contact PII: imperative and deliberately outside Query. */
