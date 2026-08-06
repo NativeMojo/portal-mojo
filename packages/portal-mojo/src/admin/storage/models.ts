@@ -416,10 +416,11 @@ export function useBuckets() {
 }
 
 export interface BucketMutationOutcome<T> { data?: T; error?: unknown; evidence?: S3FailureEvidence | null; refreshError?: unknown }
-export async function postBucketAndRefresh<T>(queryClient: QueryClient, name: string, body: Record<string, unknown>, parse: (value: unknown) => T): Promise<BucketMutationOutcome<T>> {
+export async function postBucketAndRefresh<T>(queryClient: QueryClient, name: string, body: Record<string, unknown>, parse: (value: unknown) => T, freshAuth = false): Promise<BucketMutationOutcome<T>> {
     const outcome: BucketMutationOutcome<T> = {};
     try {
-        const response = await mojoCall(`/api/aws/s3/bucket/${encodeURIComponent(name)}`, { method: 'POST', body });
+        const request = () => mojoCall(`/api/aws/s3/bucket/${encodeURIComponent(name)}`, { method: 'POST', body });
+        const response = freshAuth ? await withFreshAuth(request) : await request();
         outcome.data = parse(response.data);
     } catch (error) {
         outcome.error = error;
@@ -443,7 +444,7 @@ export function setBucketPublic(queryClient: QueryClient, name: string, value: b
 export function emptyBucket(queryClient: QueryClient, name: string, confirmedName: string): Promise<BucketMutationOutcome<BucketEmptyResult>> {
     if (name !== confirmedName) return Promise.resolve({ error: new MojoError('Bucket name does not match.', 400, 'invalid_request') });
     const body = { empty: { confirm_name: name } };
-    return withFreshAuth(() => postBucketAndRefresh(queryClient, name, body, parseBucketEmpty));
+    return postBucketAndRefresh(queryClient, name, body, parseBucketEmpty, true);
 }
 
 export function deleteFile(id: number): Promise<void> { return mojoDelete(FileModel.endpoint, id); }
