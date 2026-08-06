@@ -404,6 +404,26 @@ interface MockIncidentHistory {
     [field: string]: unknown;
 }
 
+interface MockIncident {
+    id: number;
+    created: number;
+    priority: number;
+    state: string;
+    status: string;
+    scope: string;
+    category: string;
+    country_code: string | null;
+    title: string | null;
+    details: string | null;
+    model_name: string | null;
+    model_id: number | null;
+    source_ip: string | null;
+    hostname: string | null;
+    metadata: Record<string, unknown>;
+    group_id: number | null;
+    [field: string]: unknown;
+}
+
 interface MockBouncerDevice {
     id: number;
     muid: string;
@@ -502,6 +522,36 @@ function buildIncidentHistory(): MockIncidentHistory[] {
         { id: 801, parent: 601, created: now - 600, group: 1, kind: 'note', to: null, user: 1, state: 2, priority: 7, note: 'Escalated after the fifth failed delivery.', media: null, metadata: {} },
         { id: 800, parent: 601, created: now - 5400, group: 1, kind: 'state', to: null, user: 12, state: 1, priority: 5, note: 'Investigation opened.', media: null, metadata: { old_state: 0 } },
         { id: 799, parent: 602, created: now - 2 * 86400, group: 2, kind: 'note', to: 2, user: null, state: 1, priority: 3, note: 'Automated monitor linked related events.', media: null, metadata: {} },
+    ];
+}
+
+function buildIncidents(): MockIncident[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        {
+            id: 603, created: now - 7100, priority: 7, state: 'open', status: 'investigating',
+            scope: 'account', category: 'security:bouncer:block', country_code: 'CN',
+            title: 'Automated client blocked at login',
+            // The real reporter writes the MUID into details; it does not bind
+            // the generic model_name/model_id relation to BouncerDevice.
+            details: 'Bouncer blocked muid-bot-003 after webdriver, headless, and rapid-navigation signals.',
+            model_name: null, model_id: null, source_ip: '198.51.100.66', hostname: 'auth.example.test',
+            metadata: { decision: 'block', risk_score: 94 }, group_id: null,
+        },
+        {
+            id: 601, created: now - 600, priority: 7, state: 'open', status: 'escalated',
+            scope: 'group', category: 'delivery:webhook', country_code: 'US',
+            title: 'Webhook receiver failures', details: 'Five consecutive delivery failures.',
+            model_name: null, model_id: null, source_ip: null, hostname: 'hooks.example.test',
+            metadata: {}, group_id: 1,
+        },
+        {
+            id: 602, created: now - 2 * 86400, priority: 3, state: 'open', status: 'new',
+            scope: 'group', category: 'account:review', country_code: 'US',
+            title: 'Account review requested', details: 'Automated monitor linked related events.',
+            model_name: null, model_id: null, source_ip: null, hostname: null,
+            metadata: {}, group_id: 2,
+        },
     ];
 }
 
@@ -1263,6 +1313,7 @@ const db = {
     geoAllowlist: [{ cidr: '203.0.113.0/24', reason: 'Office egress', until: null }] as unknown[],
     tickets: new Map<number, { group: number | null }>([[501, { group: 1 }], [502, { group: 2 }]]),
     incidents: new Map<number, { group: number | null }>([[601, { group: 1 }], [602, { group: 2 }]]),
+    incidentRecords: buildIncidents(),
     ticketNotes: buildTicketNotes(),
     incidentHistory: buildIncidentHistory(),
     bouncerDevices: buildBouncerDevices(),
@@ -2599,6 +2650,26 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const result = listRows(db.incidentHistory as unknown as Record<string, unknown>[], params, (row) => String(row.note ?? ''), '-created');
         return { ...result, graph: 'default', data: (result.data as unknown as MockIncidentHistory[]).map(serializeIncidentHistory) };
     }
+    const incidentMatch = path.match(/^\/api\/incident\/incident(?:\/(\d+))?$/);
+    if (incidentMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['view_security', 'security'])) return permissionDenied();
+        if (opts.method !== 'GET') return { status: false, error: 'Incident mutation is not available in this mock surface', error_code: 403 };
+        const detailId = incidentMatch[1] ? Number(incidentMatch[1]) : null;
+        if (detailId != null) {
+            const row = db.incidentRecords.find((candidate) => candidate.id === detailId);
+            if (!row) return { status: false, error: 'Incident not found', error_code: 404 };
+            return { status: true, data: { ...row }, graph: 'default' };
+        }
+        const result = listRows(
+            db.incidentRecords as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (row) => `${row.title ?? ''} ${row.details ?? ''}`,
+            '-created',
+        );
+        return { ...result, graph: 'default' };
+    }
     // ── Bouncer operator data ─────────────────────────────────────────
     const bouncerViewPerms = ['manage_users', 'view_security', 'manage_security', 'security', 'users'];
     const bouncerSavePerms = ['manage_users', 'manage_security', 'security', 'users'];
@@ -2647,11 +2718,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (signatureMatch[1]) {
             const row = db.botSignatures.find((candidate) => candidate.id === Number(signatureMatch[1]));
             if (!row) return { status: false, error: 'BotSignature not found', error_code: 404 };
-            if (opts.method === 'DELETE') {
-                if (!hasGlobalPermission(caller, bouncerSavePerms)) return permissionDenied();
-                db.botSignatures = db.botSignatures.filter((candidate) => candidate.id !== row.id);
-                return { status: 'deleted' };
-            }
+            if (opts.method === 'DELETE') return { status: false, error: 'DELETE not allowed: BotSignature', error_code: 403 };
             if (opts.method === 'POST' && opts.body) {
                 if (!hasGlobalPermission(caller, bouncerSavePerms)) return permissionDenied();
                 const sigType = 'sig_type' in opts.body ? String(opts.body.sig_type) : row.sig_type;

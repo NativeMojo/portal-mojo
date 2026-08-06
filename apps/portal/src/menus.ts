@@ -15,11 +15,6 @@ registerMenus([
             { label: 'Groups', icon: 'bi-diagram-3', route: '/groups' },
             // Own keys — VIEW_PERMS include "owner", so no gate here.
             { label: 'API Keys', icon: 'bi-key', route: '/apikeys' },
-            { divider: 'System' },
-            // logit rest VIEW_PERMS: manage_logs|view_logs|security|admin —
-            // the client-side gate mirrors it (admin/superuser pass any).
-            { label: 'Logs', icon: 'bi-journal-text', route: '/logs', permissions: ['view_logs', 'manage_logs', 'security'] },
-            { label: 'Settings', icon: 'bi-gear', route: '/settings', permissions: 'view_admin' },
         ],
     },
     {
@@ -34,6 +29,6 @@ registerMenus([
             { label: 'Back to main', icon: 'bi-arrow-left-short', route: '/' },
         ],
     },
-    adminSectionsMenu(ADMIN_SECTIONS, { name: 'admin-credentials', divider: 'System' }),
+    adminSectionsMenu(ADMIN_SECTIONS, { name: 'admin-sections', divider: 'System' }),
 ]);
 setDefaultMenu('main');

@@ -7,7 +7,7 @@
 // dedupe through the TanStack cache.
 import { useQuery } from '@tanstack/react-query';
 import { mojoCall } from 'portal-mojo/client';
-import { LogModel } from '../../../../../packages/portal-mojo/src/admin/monitoring';
+import { LogModel } from 'portal-mojo/admin';
 import {
     DeviceModel, IncidentEventModel, LoginEventModel, MemberModel, PushDeviceModel,
     ApiKeyModel,

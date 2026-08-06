@@ -13,6 +13,9 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [auth.md](auth.md) | Login flows, token upkeep, hosted-auth (bouncer page) bridge, auth events |
 | [auth-pages.md](auth-pages.md) | The in-app auth pages: routes + guard, `VITE_MOJO_AUTH` switch, fresh-auth (440 step-up) modal, MFA panel, password tools |
 | [admin-credentials.md](admin-credentials.md) | Group API keys and webhook subscriptions — dual-mount pages, permission registry, secret-safe create/reveal/rotation |
+| [admin-monitoring.md](admin-monitoring.md) | Logs and metrics-permissions admin — safe stored-record inspection and exact Redis-backed permission mutations |
+| [admin-settings.md](admin-settings.md) | Runtime settings admin — direction-aware atomic writes, write-only secrets, and global/group scope |
+| [admin-bouncer.md](admin-bouncer.md) | Bouncer decisions, device investigations, and bot-signature administration with token-safe caching |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |

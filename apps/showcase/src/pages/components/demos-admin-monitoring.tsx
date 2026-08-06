@@ -1,10 +1,8 @@
 import { useState } from 'react';
-// MERGE-WIRE: switch to `portal-mojo/admin` after the orchestrator adds the
-// monitoring barrel to the shared admin entry point.
 import {
     LogInspector,
     type LogRow,
-} from '../../../../../packages/portal-mojo/src/admin/monitoring';
+} from 'portal-mojo/admin';
 
 const NOW = Math.floor(Date.now() / 1000);
 

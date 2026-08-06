@@ -28,7 +28,6 @@ if (import.meta.env.DEV) {
 import { ThemeProvider } from 'portal-mojo/ui';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { GroupOverviewPage } from './pages/GroupOverviewPage';
 
 // Hash routing so the built dist works from any static mount (including
@@ -43,7 +42,6 @@ const router = createHashRouter([
         children: [
             { index: true, element: <DashboardPage /> },
             { path: 'users', element: <UsersPage /> },
-            { path: 'settings', element: <SettingsPage /> },
             { path: 'group', element: <GroupOverviewPage /> },
             ...adminRoutes,
         ],

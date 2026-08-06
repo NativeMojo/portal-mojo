@@ -24,8 +24,14 @@ import {
     GroupApiKeysPage,
     WebhookSubscriptionsPage,
 } from './credentials';
+import { MONITORING_ADMIN_SECTION } from './monitoring';
+import { SETTINGS_ADMIN_SECTION } from './settings';
+import { BOUNCER_ADMIN_SECTION } from './bouncer';
 
 export * from './credentials';
+export * from './monitoring';
+export * from './settings';
+export * from './bouncer';
 
 /** One mountable admin area: pages + routes + sidebar contribution + gates. */
 export interface AdminSection {
@@ -77,6 +83,9 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
             },
         ],
     },
+    MONITORING_ADMIN_SECTION,
+    SETTINGS_ADMIN_SECTION,
+    BOUNCER_ADMIN_SECTION,
 ];
 
 function relativePath(...parts: Array<string | undefined>): string {

@@ -1,10 +1,8 @@
-// MERGE-WIRE: after portal-mojo/admin exports ./settings, replace this relative
-// import with `portal-mojo/admin` and register AdminSettingsDemo in ComponentsPage.
 import {
     SettingsPage,
     buildSettingPayload,
     type SettingRow,
-} from '../../../../../packages/portal-mojo/src/admin/settings';
+} from 'portal-mojo/admin';
 
 const SECRET_ROW: SettingRow = {
     id: 402,

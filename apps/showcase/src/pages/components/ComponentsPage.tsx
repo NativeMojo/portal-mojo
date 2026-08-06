@@ -40,6 +40,9 @@ import { IdiomsDemo } from './demos-idioms';
 import { LoadingDemo } from './demos-loading';
 import { RecordFeedDemo } from './demos-record-feed';
 import { AdminCredentialsDemo } from './demos-admin-credentials';
+import { AdminMonitoringDemo } from './demos-admin-monitoring';
+import { AdminSettingsDemo } from './demos-admin-settings';
+import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
@@ -283,6 +286,21 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-credentials', title: 'Credentials', icon: 'bi-key',
                 blurb: 'Reusable group API-key and webhook administration, including one-shot token handling, explicit audited reveals, and permission-aware controls.',
                 render: () => <AdminCredentialsDemo />,
+            },
+            {
+                key: 'admin-monitoring', title: 'Monitoring', icon: 'bi-activity',
+                blurb: 'Stored request/response inspection and Redis-backed metrics-permission administration with exact operator gates.',
+                render: () => <AdminMonitoringDemo />,
+            },
+            {
+                key: 'admin-settings', title: 'Runtime settings', icon: 'bi-gear',
+                blurb: 'Real global/group settings with write-only secrets and direction-aware atomic transition payloads.',
+                render: () => <AdminSettingsDemo />,
+            },
+            {
+                key: 'admin-bouncer', title: 'Bouncer', icon: 'bi-shield-check',
+                blurb: 'Risk decisions, device investigation, and supported bot-signature administration without caching token nonces.',
+                render: () => <AdminBouncerDemo />,
             },
         ],
     },

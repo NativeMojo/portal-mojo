@@ -10,13 +10,11 @@
 import { defineModel, type Group, type Params, type User } from 'portal-mojo/client';
 
 // Canonical monitoring models live with their reusable admin package.
-// MERGE-WIRE: switch this compatibility re-export to `portal-mojo/admin` once
-// the orchestrator adds the monitoring barrel to the shared admin entry point.
 export {
     LogModel,
     LOG_LEVEL_OPTIONS,
     type LogRow,
-} from '../../../packages/portal-mojo/src/admin/monitoring';
+} from 'portal-mojo/admin';
 
 /**
  * The user row as the DEFAULT (one-record) graph serializes it — measured in

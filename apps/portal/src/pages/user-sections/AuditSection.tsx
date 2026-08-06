@@ -11,7 +11,7 @@
 // the tab's error text, not a crash.
 import { useState } from 'react';
 import { Badge, Eyebrow, fmt } from 'portal-mojo/ui';
-import { LogModel, type LogRow } from '../../../../../packages/portal-mojo/src/admin/monitoring';
+import { LogModel, type LogRow } from 'portal-mojo/admin';
 import { IncidentEventModel, type UserRow } from '../../models';
 import {
     DISABLE_REASON_BADGES, disableBlock, groupRowsByDay,

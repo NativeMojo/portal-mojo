@@ -1,11 +1,9 @@
-// MERGE-WIRE: switch this relative package import to `portal-mojo/admin`,
-// import AdminBouncerDemo in ComponentsPage, and register it in Admin.
 import { useState } from 'react';
 import {
     BotSignaturesPage,
     BouncerDevicesPage,
     BouncerSignalsPage,
-} from '../../../../../packages/portal-mojo/src/admin/bouncer';
+} from 'portal-mojo/admin';
 
 type Surface = 'signals' | 'devices' | 'signatures';
 

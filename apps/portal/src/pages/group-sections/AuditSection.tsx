@@ -4,7 +4,7 @@
 // rendered as a DAY-GROUPED timeline: one date heading per day, a Timeline
 // under each, tones mapped from the log level (LOG_LEVEL_TONE).
 import { Eyebrow, Timeline, fmt, type TimelineItem } from 'portal-mojo/ui';
-import { LogModel, type LogRow } from '../../../../../packages/portal-mojo/src/admin/monitoring';
+import { LogModel, type LogRow } from 'portal-mojo/admin';
 import { type GroupRow } from '../../models';
 import { LOG_TONE, groupAuditParams } from './shared';
 

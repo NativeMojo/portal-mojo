@@ -98,11 +98,15 @@ user in the response, and keep `media` null.
 
 Bouncer operator data is available to the stable global security identities:
 signals and devices provide seeded list/detail graphs, while bot signatures
-exercise create, update, uniqueness validation, and delete. The security
+exercise create, update, uniqueness validation, and enable/disable; DELETE
+matches the live endpoint's denial. The security
 viewer is read-only; the security manager can mutate supported resources.
 Signal detail deliberately omits `token_nonce`: it is neither needed by the
 admin portal nor safe to type, store, or cache as operator-facing data. Block
-and monitor decisions are also seeded into the incident-event feed.
+and monitor decisions are also seeded into the incident-event feed. The
+read-only `/api/incident/incident` mock follows the real reporter contract:
+Bouncer device investigations filter the security category and search the
+incident details for the device MUID, without invented model linkage.
 
 ## `mojoQueryDefaults()`
 

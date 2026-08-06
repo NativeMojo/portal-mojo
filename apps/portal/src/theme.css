@@ -9,6 +9,8 @@
 @import "./theme/calendar.css";
 @import "./theme/markdown.css";
 @import "./theme/record-feed.css";
+@import "./theme/admin-monitoring.css";
+@import "./theme/admin-bouncer.css";
 @import "./theme/multiselect-dropdown.css";
 @import "./theme/datepicker.css";
 @import "./theme/formview.css";
