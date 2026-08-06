@@ -1,0 +1,147 @@
+/* Playground: the Filters + Expanding-search demo surfaces.
+   Both pages were prose-only/empty before — these styles serve the two
+   things that make them test beds instead of explainers: the live WIRE
+   read-out (what the params store is actually sending) and the search
+   component's three resting states shown side by side.
+
+   MERGE-WIRE: theme.css @import — add `@import "./theme/demos-filters.css";`
+   to apps/portal/src/theme.css beside the other per-component imports.
+
+   Tokens only; every value flips with data-theme (light AND dark). */
+
+/* ── Wire read-out ──────────────────────────────────────────────────── */
+.wirebox { display: flex; flex-direction: column; gap: 10px; }
+
+.wirebox-req {
+    display: block;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; line-height: 1.6;
+    padding: 10px 12px; border-radius: 8px;
+    background: var(--surface2); border: 1px solid var(--line);
+    color: var(--ink-strong);
+    word-break: break-all;
+}
+.wirebox-req .req-verb { color: var(--mute); }
+.wirebox-req .req-path { color: var(--ink-strong); font-weight: 650; }
+.wirebox-req .req-q { color: var(--accent); }
+
+.wire-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.wire-tbl th {
+    text-align: left; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--mute); font-weight: 550;
+    padding: 0 14px 6px 0; border-bottom: 1px solid var(--line);
+}
+.wire-tbl td { padding: 7px 14px 7px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.wire-tbl tr:last-child td { border-bottom: 0; }
+.wire-k, .wire-v {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    white-space: nowrap;
+}
+.wire-k { color: var(--ink-strong); font-weight: 650; }
+.wire-v { color: var(--accent); }
+.wire-why { color: var(--mute); font-size: 12.5px; }
+.wire-empty { color: var(--mute); font-style: italic; font-size: 12.5px; padding: 6px 0; }
+
+/* Role tag: which part of the contract a param belongs to. */
+.wire-role {
+    display: inline-block; font-size: 10px; letter-spacing: 0.06em;
+    text-transform: uppercase; font-weight: 700;
+    padding: 2px 6px; border-radius: 5px; white-space: nowrap;
+    background: var(--surface2); color: var(--mute); border: 1px solid var(--line);
+}
+.wire-role--paging { color: var(--mute); }
+.wire-role--sort { color: var(--info); background: var(--info-soft); border-color: transparent; }
+.wire-role--search { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+.wire-role--filter { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.wire-role--range { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
+
+/* A visible pulse when the outgoing params change — the point of the panel. */
+@keyframes wire-pulse {
+    from { box-shadow: 0 0 0 2px var(--accent-soft); }
+    to { box-shadow: 0 0 0 0 transparent; }
+}
+.wire-flash { animation: wire-pulse 0.7s ease-out; }
+@media (prefers-reduced-motion: reduce) { .wire-flash { animation: none; } }
+
+.wire-result {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    font-size: 13px; color: var(--mute);
+}
+.wire-result b { color: var(--ink-strong); font-size: 15px; }
+
+/* ── Filters demo: the one-click type sampler ───────────────────────── */
+.fdemo-try { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.fdemo-try .btn { font-family: inherit; }
+.fdemo-try .btn code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; color: var(--mute); margin-left: 6px;
+}
+.fdemo-try .btn.is-on { border-color: var(--accent); color: var(--accent); }
+.fdemo-try .btn.is-on code { color: var(--accent); }
+
+.fdemo-legend { margin-top: 14px; }
+.fdemo-legend td:first-child { white-space: nowrap; }
+.fdemo-legend i { width: 18px; color: var(--mute); }
+
+/* ── Expanding search demo: the three resting states ────────────────── */
+.sdemo-stages {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px; margin-top: 12px;
+}
+.sdemo-stage {
+    border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px 14px; background: var(--surface2);
+    display: flex; flex-direction: column; gap: 8px;
+}
+.sdemo-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sdemo-stage-label {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--mute);
+}
+/* The stage floor makes a 30px icon read as "a component sitting here"
+   rather than as an empty panel — the exact confusion this page had. */
+.sdemo-stage-floor {
+    display: flex; align-items: center; min-height: 46px;
+    padding: 6px 8px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--line);
+}
+.sdemo-stage-note { font-size: 12px; color: var(--mute); margin: 0; }
+.sdemo-stage-note code { font-size: 11.5px; }
+
+/* ── Event log: typed vs committed, so 300ms is observable ──────────── */
+.sdemo-log {
+    margin-top: 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface2); overflow: hidden;
+    max-height: 232px; overflow-y: auto;
+}
+.sdemo-log-row {
+    display: grid; grid-template-columns: 84px 92px 1fr auto;
+    gap: 10px; align-items: baseline;
+    padding: 6px 12px; border-bottom: 1px solid var(--line-soft);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px;
+}
+.sdemo-log-row:last-child { border-bottom: 0; }
+.sdemo-log-t { color: var(--mute); }
+.sdemo-log-kind { font-weight: 700; letter-spacing: 0.04em; }
+.sdemo-log--typed .sdemo-log-kind { color: var(--mute); }
+.sdemo-log--commit { background: var(--accent-soft); }
+.sdemo-log--commit .sdemo-log-kind { color: var(--accent); }
+.sdemo-log-val { color: var(--ink-strong); word-break: break-all; }
+.sdemo-log-delta { color: var(--ok); white-space: nowrap; }
+.sdemo-log-empty { padding: 14px 12px; color: var(--mute); font-size: 12.5px; font-style: italic; }
+
+/* ── Server results list (search demo) ──────────────────────────────── */
+.sdemo-results { margin-top: 12px; border-top: 1px solid var(--line); }
+.sdemo-hit {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 2px; border-bottom: 1px solid var(--line-soft);
+}
+.sdemo-hit:last-child { border-bottom: 0; }
+.sdemo-hit-name { font-weight: 600; color: var(--ink-strong); font-size: 13.5px; }
+.sdemo-hit-meta {
+    color: var(--mute); font-size: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.sdemo-hit-spacer { flex: 1; }

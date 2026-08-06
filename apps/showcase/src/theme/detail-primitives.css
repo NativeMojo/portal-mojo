@@ -1,0 +1,246 @@
+/* ============================================================
+   Detail primitives — StatusPanel, FlowStrip, Timeline,
+   KnownFieldsCard, MetadataSection, StackTraceView.
+
+   Ported from web-mojo src/core/css/core.css (the "StatusPanel",
+   "Timeline", "KnownFieldsCard", "FlowStrip" blocks) and the
+   inline <style> blocks AdminMetadataSection/StackTraceView
+   shipped. Bootstrap variables map onto mojo tokens:
+     --bs-tertiary-bg            → --surface2
+     --bs-secondary-color        → --mute
+     --bs-emphasis-color         → --ink-strong
+     --bs-body-color             → --ink
+     --bs-border-color           → --line
+     --bs-border-color-translucent → --line-soft
+     rgba(--bs-<tone>-rgb, .10)  → --<tone>-soft
+   so everything reads correctly under BOTH data-theme values —
+   the two ported <style> blocks were hardcoded light-only.
+   ============================================================ */
+
+/* ============================================================ StatusPanel */
+/* Borderless flat surface; the tone-tinted bg + colored state eyebrow carry
+   the whole signal. Container queries (not media queries) stack the actions
+   below the headline under ~480px — the panel is routinely nested in a modal. */
+.detail-status-panel {
+    container-type: inline-size;
+    border: 0;
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    background: var(--surface2);
+}
+@container (max-width: 480px) {
+    .detail-status-panel { flex-direction: column; align-items: stretch; gap: 12px; }
+    .detail-status-panel .detail-status-actions { flex-wrap: wrap; }
+}
+.detail-status-panel .detail-status-headline { min-width: 0; flex: 1; }
+.detail-status-panel .detail-status-state {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600;
+    margin-bottom: 3px; color: var(--mute);
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.detail-status-panel .detail-status-dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    background: currentColor; box-shadow: 0 0 8px currentColor;
+}
+.detail-status-panel .detail-status-icon { font-size: 14px; line-height: 1; }
+.detail-status-panel .detail-status-line {
+    font-size: 16px; font-weight: 650; line-height: 1.25; letter-spacing: -0.01em;
+    margin: 0 0 3px; color: var(--ink-strong);
+}
+.detail-status-panel .detail-status-meta { color: var(--mute); font-size: 12.5px; line-height: 1.45; }
+.detail-status-panel .detail-status-meta code {
+    font-size: 12px; background: var(--surface); border-radius: 5px; padding: 1px 5px; color: var(--ink);
+}
+.detail-status-panel .detail-status-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.detail-status-panel.tone-danger  { background: var(--bad-soft); }
+.detail-status-panel.tone-warning { background: var(--warn-soft); }
+.detail-status-panel.tone-success { background: var(--ok-soft); }
+.detail-status-panel.tone-info    { background: var(--info-soft); }
+.detail-status-panel.tone-primary { background: var(--accent-soft); }
+.detail-status-panel.tone-muted   { background: var(--surface2); }
+.detail-status-panel.tone-danger  .detail-status-state { color: var(--bad); }
+.detail-status-panel.tone-warning .detail-status-state { color: var(--warn); }
+.detail-status-panel.tone-success .detail-status-state { color: var(--ok); }
+.detail-status-panel.tone-info    .detail-status-state { color: var(--info); }
+.detail-status-panel.tone-primary .detail-status-state { color: var(--accent); }
+.detail-status-panel.tone-muted   .detail-status-state { color: var(--mute); }
+
+/* ============================================================ FlowStrip */
+/* Borderless tinted surface, hairlines between steps. Column count rides
+   --flow-strip-cols (set inline from steps.length); container queries reflow
+   4 → 2 → 1 off the strip's own width. */
+.detail-flow-strip {
+    container-type: inline-size;
+    display: grid;
+    grid-template-columns: repeat(var(--flow-strip-cols, 4), 1fr);
+    background: var(--surface2);
+    border: 0; border-radius: 12px; overflow: hidden;
+}
+.detail-flow-strip .flow-strip-step { position: relative; padding: 14px 16px; min-width: 0; background: transparent; }
+.detail-flow-strip .flow-strip-step + .flow-strip-step { border-left: 1px solid var(--line-soft); }
+/* Per-step tone: a 2px cap over the step (muted = no cap). */
+.detail-flow-strip .flow-strip-step::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: transparent;
+}
+.detail-flow-strip .flow-strip-step.tone-danger::before  { background: var(--bad); }
+.detail-flow-strip .flow-strip-step.tone-warning::before { background: var(--warn); }
+.detail-flow-strip .flow-strip-step.tone-success::before { background: var(--ok); }
+.detail-flow-strip .flow-strip-step.tone-info::before    { background: var(--info); }
+.detail-flow-strip .flow-strip-step.tone-primary::before { background: var(--accent); }
+.detail-flow-strip .flow-strip-num {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.09em; color: var(--mute);
+}
+.detail-flow-strip .flow-strip-step.tone-danger  .flow-strip-num { color: var(--bad); }
+.detail-flow-strip .flow-strip-step.tone-warning .flow-strip-num { color: var(--warn); }
+.detail-flow-strip .flow-strip-step.tone-success .flow-strip-num { color: var(--ok); }
+.detail-flow-strip .flow-strip-step.tone-info    .flow-strip-num { color: var(--info); }
+.detail-flow-strip .flow-strip-step.tone-primary .flow-strip-num { color: var(--accent); }
+.detail-flow-strip .flow-strip-title {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 2px 0 5px; font-size: 13px; font-weight: 650; color: var(--ink-strong);
+}
+.detail-flow-strip .flow-strip-action { opacity: 0.5; }
+.detail-flow-strip .flow-strip-step:hover .flow-strip-action { opacity: 1; }
+.detail-flow-strip .flow-strip-value { font-size: 13px; font-weight: 550; line-height: 1.35; color: var(--ink); }
+.detail-flow-strip .flow-strip-value code {
+    font-size: 12px; background: var(--surface); border-radius: 5px; padding: 1px 5px;
+}
+.detail-flow-strip .flow-strip-empty { color: var(--mute); font-style: italic; font-weight: 400; }
+.detail-flow-strip .flow-strip-hint { font-size: 11.5px; color: var(--mute); margin-top: 4px; line-height: 1.4; }
+@container (max-width: 760px) { .detail-flow-strip { grid-template-columns: 1fr 1fr; } }
+@container (max-width: 460px) {
+    .detail-flow-strip { grid-template-columns: 1fr; }
+    .detail-flow-strip .flow-strip-step + .flow-strip-step { border-left: 0; border-top: 1px solid var(--line-soft); }
+}
+
+/* ============================================================ Timeline */
+.detail-timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; }
+.detail-timeline::before {
+    content: ''; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 1px;
+    background: linear-gradient(180deg, var(--line), transparent);
+}
+.detail-timeline-item {
+    position: relative; padding: 6px 0 13px;
+    display: grid; grid-template-columns: 1fr auto; gap: 8px;
+}
+.detail-timeline-item::before {
+    content: ''; position: absolute; left: -18px; top: 12px;
+    width: 9px; height: 9px; border-radius: 999px;
+    background: var(--surface); border: 1.5px solid var(--mute);
+}
+.detail-timeline-item.tone-danger::before  { border-color: var(--bad); }
+.detail-timeline-item.tone-warning::before { border-color: var(--warn); }
+.detail-timeline-item.tone-success::before { border-color: var(--ok); }
+.detail-timeline-item.tone-info::before    { border-color: var(--info); }
+.detail-timeline-item.tone-primary::before { border-color: var(--accent); }
+.detail-timeline-item.tone-muted::before   { border-color: var(--mute); }
+.detail-timeline-title { font-size: 13.5px; font-weight: 600; color: var(--ink-strong); }
+.detail-timeline-body { font-size: 12.5px; color: var(--mute); margin-top: 2px; }
+.detail-timeline-body code {
+    font-size: 12px; background: var(--surface2); border-radius: 5px; padding: 1px 5px; color: var(--ink);
+}
+.detail-timeline-meta {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; color: var(--mute); font-variant-numeric: tabular-nums;
+    white-space: nowrap; align-self: start; padding-top: 2px;
+}
+.detail-timeline-empty { list-style: none; padding: 8px 0; font-size: 13px; }
+
+/* ============================================================ KnownFieldsCard */
+.detail-known-fields-card { display: block; }
+.detail-known-fields-grid { margin-bottom: 4px; }
+/* Reuses .flat-row (theme.css) — the 3rd (action) grid column stays empty. */
+.detail-known-fields-card .flat-value code { font-size: 12px; }
+.detail-known-fields-empty { font-size: 13px; padding: 6px 0; }
+.detail-known-fields-raw {
+    margin-top: 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface2); overflow: hidden;
+}
+.detail-known-fields-raw-summary {
+    cursor: pointer; list-style: none; user-select: none;
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 13px; font-size: 12.5px; font-weight: 600; color: var(--mute);
+}
+.detail-known-fields-raw-summary::-webkit-details-marker { display: none; }
+.detail-known-fields-raw-summary::before {
+    content: '\25B6'; /* ▶ */
+    display: inline-block; font-size: 9px; color: var(--mute); transition: transform 0.15s ease;
+}
+.detail-known-fields-raw[open] > .detail-known-fields-raw-summary::before { transform: rotate(90deg); }
+.detail-known-fields-raw-summary:hover { color: var(--ink-strong); }
+.detail-known-fields-raw-body {
+    margin: 0; padding: 11px 13px 13px; border-top: 1px solid var(--line-soft);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; line-height: 1.5; color: var(--ink);
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 28rem; overflow: auto; background: var(--surface);
+}
+@media (prefers-reduced-motion: reduce) {
+    .detail-known-fields-raw-summary::before { transition: none; }
+}
+
+/* ============================================================ MetadataSection */
+.admin-metadata-section { display: block; }
+.amd-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.amd-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink-strong); }
+.amd-error {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    background: var(--bad-soft); color: var(--bad);
+    border: 1px solid var(--bad); border-radius: 9px;
+    padding: 8px 12px; font-size: 13px; font-weight: 550;
+}
+.amd-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.amd-item { display: flex; align-items: center; gap: 12px; padding: 9px 13px; border-bottom: 1px solid var(--line-soft); }
+.amd-item:last-child { border-bottom: none; }
+.amd-editor { background: var(--surface2); }
+.amd-key {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; font-weight: 650; color: var(--ink-strong);
+    min-width: 140px; flex-shrink: 0; word-break: break-all;
+}
+.amd-value { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); word-break: break-word; }
+.amd-blob { font-size: 12px; color: var(--mute); background: var(--surface2); border-radius: 5px; padding: 1px 6px; }
+.amd-actions { flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+.amd-remove:hover:not(:disabled) { color: var(--bad); }
+.amd-key-input { min-width: 140px; width: 140px; flex: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+.amd-value-input { flex: 1; min-width: 0; width: auto; }
+.amd-empty { padding: 26px 20px; text-align: center; color: var(--mute); font-size: 13px; }
+.amd-empty i { font-size: 22px; display: block; margin-bottom: 7px; }
+
+/* ============================================================ StackTraceView */
+.stack-trace-view {
+    background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.stack-trace-body { max-height: 600px; overflow: auto; padding: 8px 0; }
+.stack-trace-line {
+    font-family: ui-monospace, "SF Mono", Menlo, "Ubuntu Mono", Consolas, monospace;
+    font-size: 12.5px; line-height: 1.6; padding: 2px 12px; margin: 0;
+    border-left: 3px solid transparent; white-space: pre-wrap; word-break: break-word;
+}
+.stack-trace-line:hover { background: var(--line-soft); }
+.stack-trace-error {
+    color: var(--bad); font-weight: 650;
+    border-left-color: var(--bad); background: var(--bad-soft);
+}
+.stack-trace-error:hover { background: var(--bad-soft); filter: brightness(1.06); }
+.stack-trace-frame { border-left-color: var(--accent); }
+.stack-trace-fn { color: var(--accent); font-weight: 600; }
+.stack-trace-loc { color: var(--mute); font-size: 12px; }
+.stack-trace-lineno { color: var(--warn); font-weight: 650; }
+.stack-trace-context { color: var(--ink); }
+.stack-trace-empty { padding: 14px; font-size: 13px; }
+.stack-trace-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: 100%; padding: 8px 12px; border: 0; border-top: 1px solid var(--line);
+    background: var(--surface); color: var(--mute);
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.stack-trace-toggle:hover { color: var(--ink-strong); background: var(--surface2); }
+.stack-trace-toggle i { font-size: 11px; }

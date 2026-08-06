@@ -108,6 +108,22 @@ both a plain and a superuser session (sys-perm autosave re-badges the header
 live). `dev:live` @9009 pass is BLOCKED: the browser hits the mverify bouncer's
 "Are you human?" interstitial, which an agent must not click through.
 
+**2026-08-05, showcase split:** the component playground (`Develop → Components`,
+31 demo files / ~6.7k lines) came OUT of `apps/portal` — Ian: "DO NOT INCLUDE
+Components as part of Admin app. We want a simple demo app we can publish to
+maestro sites eventually." New workspace app `apps/showcase`: no sidebar/auth/
+admin chrome, mock-only (throws if `VITE_MOJO_API` is set), auto-signs in as
+the mock's fixed `ian@mojoverify.com` identity at boot (mock's `/api/login`
+looks callers up by EMAIL despite the `username` field name — a real trap,
+noted in-file) so a cold-localStorage visitor gets working data-backed demos
+with no login page. Also fixed in passing: `.app`'s CSS grid had no
+`grid-template-rows`, so the implicit row auto-sized to content and the
+sidebar grew past 100vh with the page instead of scrolling internally
+(`apps/portal/src/theme.css`) — same fix (`grid-template-rows: minmax(0, 1fr)`
++ `overflow: hidden`) kept `.showcase-shell` correct from the start. Publishing
+`apps/showcase` to maestro sites itself is NOT done — tracked as future work,
+not scaffolded this session.
+
 **Deep reference:** the full port manifest (tiers, contracts, trap list) is the
 artifact at https://claude.ai/code/artifact/99958e23-ce3d-4607-8848-14d6c26d7081.
 The web-mojo source of record is `/Users/ians/Projects/mojo/nativemojo/web-mojo`
@@ -124,10 +140,19 @@ portal-mojo/
   apps/portal            ← the base admin portal app: shell, auth, prebuilt pages,
                             page registry. First consumer + test bed of the package,
                             and the template `create-portal-mojo` clones per deployment.
+  apps/showcase           ← standalone component playground (mock-only, no admin/auth
+                            chrome) — every portal-mojo component, live, in one place.
+                            Not part of the admin app; meant to be published on its
+                            own (maestro sites) as a living reference. Split out of
+                            apps/portal 2026-08-05 (Ian: "DO NOT INCLUDE Components as
+                            part of Admin app"). theme.css + theme/ + models.ts are
+                            currently COPIED, not shared, between portal and showcase —
+                            a known duplication cost, acceptable while both are small;
+                            revisit (extract to the package) if they drift.
 ```
 
 Rules: the app imports the package, never the reverse. Every component is proven
-in `apps/portal` before it counts as done. When pages stabilize they migrate INTO
+in `apps/showcase` before it counts as done. When pages stabilize they migrate INTO
 the package (`portal-mojo/admin`) so deployed portals get admin updates via
 `npm update` — clone the shell, never the admin (see manifest §01).
 
@@ -346,9 +371,10 @@ autosave editing, permission-gated UI, live metrics dashboard.
   (paths above). The first baseline pass under-built charts/filters/pagination
   by working from summaries — that class of miss is the thing to prevent.
 - **Every component ships three-legged** (added 2026-08-05, per Ian): the
-  component, a demo section in the playground (`apps/portal` → Develop →
-  Components), and a reference page in `packages/portal-mojo/docs/` written
-  for AI context (import path, API, wire contract, invariants, pitfalls).
+  component, a demo section in the playground (`apps/showcase` — split out of
+  `apps/portal` 2026-08-05, see Repo shape), and a reference page in
+  `packages/portal-mojo/docs/` written for AI context (import path, API, wire
+  contract, invariants, pitfalls).
 - **Verify in the browser** — light AND dark, interactions clicked, console
   clean, `npm run typecheck` green — before calling an item done.
 - **Model split:** Fable drives contract-dense foundation work (Chunks A/B) and

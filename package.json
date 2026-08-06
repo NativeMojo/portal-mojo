@@ -10,7 +10,8 @@
     "scripts": {
         "dev": "npm run dev -w portal",
         "dev:live": "npm run dev:live -w portal",
+        "dev:showcase": "npm run dev -w showcase",
         "build": "npm run build -w portal",
-        "typecheck": "npm run typecheck -w portal-mojo && npm run typecheck -w portal"
+        "typecheck": "npm run typecheck -w portal-mojo && npm run typecheck -w portal && npm run typecheck -w showcase"
     }
 }

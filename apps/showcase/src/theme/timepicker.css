@@ -1,0 +1,282 @@
+/* ============================================================ TimePicker
+   Styles for portal-mojo <TimePicker> (packages/portal-mojo/src/ui/date/
+   TimePicker.tsx). Ported from the `.mojo-time-*` block of web-mojo
+   calendar.css; Bootstrap vars map onto theme.css tokens
+   --bs-body-color→--ink, --bs-emphasis-color→--ink-strong,
+   --bs-secondary-color→--mute, --bs-secondary-bg→--surface2,
+   --bs-tertiary-bg→--surface, --bs-border-color→--line,
+   --bs-primary→--accent, --bs-danger→--bad. The trigger wears the house
+   .input look (surface2 + line, accent ring) so it lines up in a form grid.
+
+   NOT imported by theme.css yet — the orchestrator adds the @import at
+   merge time. */
+
+.mojo-time-picker {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+/* ── Trigger ─────────────────────────────────────────────────── */
+
+.mojo-time-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 12px;
+    background: var(--field-bg);
+    color: var(--ink-strong);
+    border: 1px solid var(--field-line);
+    border-radius: 8px;
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+/* Room for the absolutely-positioned clear button. */
+.mojo-time-trigger.has-clear { padding-right: 30px; }
+
+.mojo-time-trigger:hover,
+.mojo-time-trigger:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    outline: none;
+}
+.mojo-time-trigger:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.mojo-time-trigger:disabled:hover {
+    border-color: var(--line);
+    box-shadow: none;
+}
+.mojo-time-trigger.is-invalid { border-color: var(--bad); }
+
+.mojo-time-trigger > i {
+    flex: none;
+    color: var(--mute);
+    font-size: 15px;
+}
+
+.mojo-time-trigger-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-feature-settings: "tnum" on;
+    font-variant-numeric: tabular-nums;
+}
+.mojo-time-trigger-text.is-empty { color: var(--mute); }
+
+/* The clear ✕ is a SIBLING of the trigger (nesting buttons is invalid HTML),
+   overlaid on its right edge. The wrapper — not the trigger — carries the
+   reveal state, so the pointer sitting on the ✕ keeps it visible. */
+.mojo-time-trigger-clear {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    color: var(--mute);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+.mojo-time-picker:hover .mojo-time-trigger-clear,
+.mojo-time-picker:focus-within .mojo-time-trigger-clear {
+    display: inline-flex;
+}
+.mojo-time-trigger-clear:hover {
+    background: var(--line-soft);
+    color: var(--ink-strong);
+}
+
+/* ── Panel shell ─────────────────────────────────────────────── */
+
+/* Inside the shared Popover the shell already supplies background / border /
+   shadow — the inner wrapper only brings padding and a minimum width. */
+.mojo-popover.mojo-time-popover .mojo-time-popover-inner {
+    padding: 14px 16px;
+    min-width: 220px;
+}
+/* A zone picker needs room for the IANA labels. */
+.mojo-popover.mojo-time-popover.has-tz .mojo-time-popover-inner { min-width: 300px; }
+
+.mojo-time-picker-inline {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 240px;
+    box-shadow: var(--shadow);
+}
+.mojo-time-picker-inline.is-invalid { border-color: var(--bad); }
+
+/* ── Stepper columns ─────────────────────────────────────────── */
+
+.mojo-time-stepper-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.mojo-time-stepper {
+    display: grid;
+    grid-template-rows: auto auto auto auto;
+    justify-items: center;
+    gap: 4px;
+}
+
+.mojo-time-stepper-btn {
+    width: 38px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.mojo-time-stepper-btn:hover {
+    background: var(--surface);
+    border-color: var(--mute);
+    color: var(--ink-strong);
+}
+.mojo-time-stepper-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.mojo-time-stepper-btn:disabled:hover {
+    background: var(--surface2);
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+.mojo-time-stepper-value {
+    width: 58px;
+    padding: 2px 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--ink-strong);
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    font-size: 25px;
+    font-weight: 600;
+    text-align: center;
+    font-feature-settings: "tnum" on;
+    font-variant-numeric: tabular-nums;
+}
+.mojo-time-stepper-value:focus {
+    outline: none;
+    border-bottom-color: var(--accent);
+}
+.mojo-time-stepper-value:disabled {
+    opacity: 0.55;
+    color: var(--mute);
+}
+
+.mojo-time-stepper-label {
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--mute);
+}
+
+.mojo-time-stepper-sep {
+    align-self: flex-start;
+    padding-top: 24px;
+    color: var(--mute);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 25px;
+    font-weight: 600;
+}
+
+/* ── AM/PM ───────────────────────────────────────────────────── */
+
+.mojo-time-ampm {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-left: 8px;
+    align-self: center;
+}
+.mojo-time-ampm-btn {
+    padding: 4px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.mojo-time-ampm-btn:hover { background: var(--surface); border-color: var(--mute); }
+.mojo-time-ampm-btn.is-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.mojo-time-ampm-btn.is-active:hover { background: var(--accent); border-color: var(--accent); }
+.mojo-time-ampm-btn:disabled { opacity: 0.45; cursor: default; }
+.mojo-time-ampm-btn:disabled:hover { background: var(--surface2); border-color: var(--line); }
+.mojo-time-ampm-btn.is-active:disabled:hover { background: var(--accent); border-color: var(--accent); }
+
+/* ── Timezone slot ───────────────────────────────────────────── */
+
+.mojo-time-tz-host {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+/* The fallback <select>: the injected TimezoneSelect brings its own look. */
+.mojo-time-tz-select {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+}
+.mojo-time-tz-offset {
+    margin-top: 5px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: var(--mute);
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+
+.mojo-time-foot {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+/* "Now" is the source's btn-link: quiet until hovered. */
+.mojo-time-now {
+    background: transparent;
+    border-color: transparent;
+    color: var(--accent);
+}
+.mojo-time-now:hover { background: var(--accent-soft); border-color: transparent; }
+.mojo-time-now:disabled:hover { background: transparent; }

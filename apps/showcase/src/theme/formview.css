@@ -1,0 +1,74 @@
+/* ============================================================
+   FormView — inline autosave (B3, board #1256).
+   Field status indicators (dirty dot → batch spinner → saved
+   flash → pinned error), the label row hosting them, and the
+   permission tabset nav. Tokens only — light AND dark resolve
+   through theme.css variables; no hardcoded colors.
+   NOTE: not imported yet — the orchestrator adds the @import
+   to theme.css at merge time.
+   ============================================================ */
+
+/* Label row: text left, status slot right (the FieldStatusManager
+   "label-inline" placement). */
+.fv-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fv-status { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 14px; height: 14px; flex: none; }
+
+/* Dirty: an edit exists that has not committed (blur/Enter) yet. */
+.fv-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); opacity: 0.7; }
+
+/* Pending (in the 300ms window / queued behind a flight) + saving. */
+.fv-spinner {
+    width: 12px; height: 12px; flex: none;
+    border-radius: 50%;
+    border: 2px solid var(--accent-soft);
+    border-top-color: var(--accent);
+    animation: fv-spin 0.6s linear infinite;
+}
+@keyframes fv-spin { to { transform: rotate(360deg); } }
+
+/* Saved flash: pop in, then the state machine removes it (~1.5s).
+   Visibility does NOT depend on the animation completing — under
+   prefers-reduced-motion the icon simply shows statically. */
+.fv-saved { color: var(--ok); font-size: 13px; line-height: 1; animation: fv-pop 0.18s ease; }
+@keyframes fv-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+
+/* Error: pinned until the field's next successful save. The message
+   itself renders in the .field-error slot under the input. */
+.fv-error-ico { color: var(--bad); font-size: 13px; line-height: 1; }
+
+/* Switch rows keep the theme's switch-row layout; the status slot rides
+   the label. The error line lands under the row. */
+/* The autosave switch row keeps the SETTINGS-LIST order (label left, control
+   right) because the label slot carries the saved/error indicator and a
+   column of these should scan down a common right edge. That order is only
+   legible while the pair stays visually bound — at col-12 on a wide dialog
+   the toggle ends up hundreds of px from its text. The cap is the rule:
+   label and switch are never further apart than a readable row. */
+.fv-switch-row { max-width: 460px; }
+.fv-switch-row .fv-label { flex: 1; margin-bottom: 0; }
+
+/* ── Permission tabset nav (one row of tabs over a form grid) ── */
+.fv-tabs {
+    display: flex; align-items: center; gap: 2px;
+    border-bottom: 1px solid var(--line);
+    margin: 10px 0 14px;
+}
+.fv-tab {
+    position: relative;
+    border: none; background: none; cursor: pointer;
+    padding: 7px 12px 8px;
+    font-size: 13px; font-weight: 600; color: var(--mute);
+    border-radius: 8px 8px 0 0;
+}
+.fv-tab:hover { color: var(--ink-strong); background: var(--surface2); }
+.fv-tab-active { color: var(--accent); }
+.fv-tab-active::after {
+    content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px;
+    height: 2px; border-radius: 2px; background: var(--accent);
+}
+
+/* A tab holding a field with a pinned error. */
+.fv-tab-err {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--bad); margin-left: 6px; vertical-align: middle;
+}

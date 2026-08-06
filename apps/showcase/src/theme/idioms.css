@@ -1,0 +1,84 @@
+/* ── UX idioms (board #1281): armed button · undo toast · progress toast ──
+   Ported look from maestro workspaces (dom.js + its css), restated in MOJO
+   tokens. Tokens only — both themes come from the token swap; the two
+   explicit dark-theme overrides below exist because an ARMED destructive
+   control must gain contrast in the dark palette, not lose it. */
+
+/* ── ArmedButton ─────────────────────────────────────────────────────── */
+/* Resting: a quiet danger-ghost. Armed: filled danger + warning icon —
+   the state must be unmissable, because the next click FIRES. */
+.armed-btn {
+    color: var(--bad);
+    border-color: var(--line);
+}
+.armed-btn i { color: var(--bad); }
+.armed-btn:hover { border-color: var(--bad); background: var(--bad-soft); }
+.armed-btn.is-armed {
+    background: var(--bad);
+    border-color: var(--bad);
+    color: #fff;
+    animation: armed-pulse 1.2s ease-in-out infinite;
+}
+.armed-btn.is-armed i { color: #fff; }
+:root[data-theme="dark"] .armed-btn.is-armed {
+    /* dark --bad is a light red; near-black text keeps AA contrast */
+    color: #160909;
+}
+:root[data-theme="dark"] .armed-btn.is-armed i { color: #160909; }
+@keyframes armed-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--bad-soft); }
+    50% { box-shadow: 0 0 0 5px var(--bad-soft); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .armed-btn.is-armed { animation: none; }
+}
+
+/* ── Undo toast ──────────────────────────────────────────────────────── */
+/* The action already happened — the card is calm (no level accent), the
+   Undo affordance is the loud part. */
+.toast-undo { border-left-color: var(--accent); justify-content: space-between; gap: 14px; }
+.toast-undo .undo-msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast-undo .undo-btn {
+    border: 0; background: none; cursor: pointer;
+    color: var(--accent); font-weight: 650; font-size: 13px;
+    padding: 2px 6px; border-radius: 6px; flex-shrink: 0;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.toast-undo .undo-btn:hover { background: var(--accent-soft); }
+
+/* ── Progress toast ──────────────────────────────────────────────────── */
+.toast-progress {
+    flex-direction: column; align-items: stretch; gap: 7px;
+    min-width: 240px; border-left-color: var(--accent);
+}
+.toast-progress .progress-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.toast-progress .progress-name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13px;
+}
+.toast-progress .progress-cancel {
+    border: 0; background: none; cursor: pointer; color: var(--mute);
+    padding: 1px 4px; border-radius: 5px; line-height: 1; flex-shrink: 0;
+}
+.toast-progress .progress-cancel:hover { color: var(--bad); background: var(--bad-soft); }
+.toast-progress .progress-cancel i { color: inherit; font-size: 11px; }
+.toast-progress .progress-row { display: flex; align-items: center; gap: 9px; }
+.toast-progress .progress-bar {
+    flex: 1; height: 5px; border-radius: 999px; background: var(--surface2);
+    overflow: hidden;
+}
+.toast-progress .progress-fill {
+    height: 100%; border-radius: 999px; background: var(--accent);
+    transition: width 0.18s ease-out;
+}
+.toast-progress .progress-pct {
+    flex-shrink: 0; min-width: 34px; text-align: right;
+    font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--mute);
+}
+.toast-progress.is-done { border-left-color: var(--ok); }
+.toast-progress.is-done .progress-fill { background: var(--ok); }
+.toast-progress.is-done .progress-pct { color: var(--ok); }
+.toast-progress.is-failed .progress-fill { background: var(--bad); }
+.toast-progress.is-failed .progress-pct { color: var(--bad); }

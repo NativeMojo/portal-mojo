@@ -1,0 +1,106 @@
+/* ============================================================ DatePicker
+   Trigger shell for portal-mojo <DatePicker>
+   (packages/portal-mojo/src/ui/date/DatePicker.tsx).
+
+   Deliberately small: theme/calendar.css already styles the whole grid, and
+   theme/popover.css styles the floating surface. What is left is the trigger
+   button, its clear affordance, and the popover CONTENT box — the shared
+   .mojo-popover shell is unpadded/unsized on purpose, so the picker carries
+   web-mojo's 20px padding + 260px min-width itself.
+
+   Trigger metrics follow the house control (.input in theme.css), not
+   web-mojo's Bootstrap ones: same surface2 fill, --line border, 8px radius,
+   7px/10px padding, 13.5px text. Tokens only, both themes.
+
+   NOT imported by theme.css yet — the orchestrator adds
+   `@import "./theme/datepicker.css";` at merge. */
+
+.mojo-date-picker {
+    position: relative;      /* the clear ✕ is absolutely placed over the trigger */
+    display: inline-block;
+    width: 100%;
+}
+
+/* ── Trigger ──────────────────────────────────────────────────── */
+
+.mojo-date-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--field-bg);
+    color: var(--ink-strong);
+    border: 1px solid var(--field-line);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mojo-date-trigger:hover:not(:disabled):not(.is-readonly) { border-color: var(--mute); }
+/* Focus-within on the WRAPPER so the ring also shows while the clear button
+   holds focus — the source got this free from nesting the two buttons. */
+.mojo-date-picker:focus-within .mojo-date-trigger {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.mojo-date-trigger:disabled { opacity: 0.55; cursor: default; }
+.mojo-date-trigger.is-readonly { cursor: default; }
+.mojo-date-trigger.is-invalid { border-color: var(--bad); }
+.mojo-date-trigger.has-clear { padding-right: 32px; }
+
+.mojo-date-trigger > i {
+    flex: none;
+    color: var(--mute);
+    font-size: 14.5px;
+}
+.mojo-date-trigger-text {
+    flex: 1;
+    min-width: 0;
+    font-feature-settings: "tnum" on;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mojo-date-trigger-text.is-empty { color: var(--mute); }
+
+.mojo-date-trigger-clear {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: none;
+    border-radius: 50%;
+    color: var(--mute);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+}
+.mojo-date-trigger-clear:hover { background: var(--line-soft); color: var(--ink-strong); }
+
+/* ── Popover content ──────────────────────────────────────────── */
+/* Day grids are naturally ~7 columns of whatever width they get; month/year
+   tile grids are 4-column and would collapse to the trigger width without a
+   floor (source's note, source's numbers). */
+.mojo-date-pop {
+    padding: 20px;
+    min-width: 260px;
+}
+
+/* ── Inline mode ──────────────────────────────────────────────── */
+.mojo-date-picker-inline.is-inert { pointer-events: none; }
+.mojo-date-picker-inline.is-disabled { opacity: 0.55; }
+.mojo-date-picker-inline.is-invalid {
+    border: 1px solid var(--bad);
+    border-radius: 10px;
+    padding: 10px;
+}

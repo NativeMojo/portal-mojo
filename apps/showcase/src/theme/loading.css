@@ -1,0 +1,200 @@
+/* ── Loaders: spinner · blocking overlay · view loader · inline · dim ─────
+   Styles for packages/portal-mojo/src/ui/loading.tsx.
+
+   MERGE-WIRE: theme.css — add `@import "./theme/loading.css";` to the import
+   block at the top.
+
+   Tokens only, both themes. The one thing that cannot come from the shared
+   palette is the overlay scrim (there is no scrim token), so this file
+   declares its own — light and dark, next to each other, like every other
+   token pair in theme.css.
+
+   web-mojo's BusyIndicator baked #fff / #e9ecef / #0d6efd / #495057 into a
+   <style> tag: correct in the light theme, illegible in the dark one. Every
+   one of those five values is a token here. */
+
+:root {
+    /* Scrim over the app while a blocking operation runs. Deliberately
+       LIGHTER than the modal backdrop (rgba(6,9,14,.55)): a modal is a
+       decision surface that must dominate, a busy overlay is a wait — the
+       page underneath should stay legible so the user keeps their context. */
+    --busy-scrim: rgba(6, 9, 14, 0.34);
+}
+:root[data-theme="dark"] {
+    /* Dark chrome is already near-black; the same alpha over it reads as
+       "nothing happened", so the dark scrim leans on blur + more alpha. */
+    --busy-scrim: rgba(0, 0, 0, 0.52);
+}
+
+/* ── Spinner atom ────────────────────────────────────────────────────────
+   currentColor by design: the ring inherits its context (white inside a
+   primary button, --accent inside a loader card, --mute in a table cell), so
+   one element is correct in both themes and in every container. */
+.mojo-spinner {
+    --spinner-size: 20px;
+    display: inline-block;
+    flex: none;
+    box-sizing: border-box;
+    width: var(--spinner-size);
+    height: var(--spinner-size);
+    border-radius: 50%;
+    /* Longhands, not the shorthand: the ring scales with the size custom
+       property, and a math function is unambiguous here. */
+    border-width: max(1.5px, calc(var(--spinner-size) / 8));
+    border-style: solid;
+    border-color: color-mix(in srgb, currentColor 22%, transparent);
+    border-top-color: currentColor;
+    animation: mojo-spin 0.75s linear infinite;
+    vertical-align: -0.15em;
+}
+.mojo-spinner-xs { --spinner-size: 12px; }
+.mojo-spinner-sm { --spinner-size: 15px; }
+.mojo-spinner-md { --spinner-size: 20px; }
+.mojo-spinner-lg { --spinner-size: 30px; }
+@keyframes mojo-spin { to { transform: rotate(360deg); } }
+
+/* ── Blocking full-screen overlay (native <dialog>, top layer) ───────────
+   Scoped to [open] on purpose: author rules beat the UA's
+   `dialog:not([open]) { display: none }` regardless of specificity, so an
+   unscoped `display: flex` would paint the element before showModal(). */
+.mojo-busy {
+    display: none;
+    /* z-index only matters on the non-top-layer fallback path (a browser
+       without showModal); a real modal dialog needs no number at all. */
+    z-index: 200;
+}
+.mojo-busy[open] {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: mojo-busy-in 0.14s ease-out;
+}
+.mojo-busy::backdrop {
+    background: var(--busy-scrim);
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+}
+.mojo-busy-card {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    max-width: min(420px, 88vw);
+    padding: 15px 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow-pop);
+    color: var(--accent);
+}
+.mojo-busy-label {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink-strong);
+    /* Long labels wrap rather than blow the card wide (source used nowrap). */
+    overflow-wrap: anywhere;
+}
+@keyframes mojo-busy-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── ViewLoader: the section / route loader ──────────────────────────────
+   Reserves its height BEFORE the anti-flash delay elapses (.is-waiting), so
+   a panel that resolves quickly never jumps and a slow one never shoves
+   content down when the loader appears. */
+.mojo-viewloader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    color: var(--accent);
+    padding: 12px;
+}
+.mojo-viewloader.is-waiting { gap: 0; }
+.mojo-viewloader-sm { min-height: 88px; }
+.mojo-viewloader-md { min-height: 168px; }
+.mojo-viewloader-lg { min-height: 280px; }
+.mojo-viewloader-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+}
+.mojo-viewloader-hint {
+    font-size: 12.5px;
+    color: var(--mute);
+    max-width: 42ch;
+}
+
+/* ── InlineLoader: one row, cell, or field ───────────────────────────────*/
+.mojo-inline-loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--mute);
+    font-size: 12.5px;
+}
+.mojo-inline-loader-label { color: inherit; }
+
+/* ── Busy: dim + inert a region while its mutation is in flight ──────────*/
+.mojo-dim { position: relative; }
+.mojo-dim-content { transition: opacity 0.16s ease-out, filter 0.16s ease-out; }
+.mojo-dim.is-busy > .mojo-dim-content {
+    opacity: 0.45;
+    filter: saturate(0.65);
+}
+.mojo-dim-veil {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    /* The content beneath is already `inert`; the veil must not eat the
+       clicks that inert has stopped anyway — and must never become a
+       focus target. */
+    pointer-events: none;
+    color: var(--accent);
+}
+.mojo-dim-veil-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-strong);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 11px;
+    box-shadow: var(--shadow);
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────
+   theme.css kills EVERY animation with a universal `!important` rule. For a
+   skeleton that is right (it just stops shimmering); for a spinner it is
+   wrong — the ring freezes mid-rotation with one colored quarter and reads
+   as a stuck, broken control. So the spin is SUBSTITUTED, not removed: a
+   uniform ring on a slow opacity pulse, which still says "working" without
+   spinning anything. It needs `!important` to out-rank that universal rule
+   (among important declarations the more specific selector wins, so
+   `.mojo-spinner` beats `*`). */
+@media (prefers-reduced-motion: reduce) {
+    .mojo-spinner {
+        border-color: color-mix(in srgb, currentColor 55%, transparent);
+        animation: mojo-loading-pulse 1.7s ease-in-out infinite !important;
+    }
+    .mojo-busy[open] { animation: none !important; }
+    .mojo-dim-content { transition: none !important; }
+}
+@keyframes mojo-loading-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.32; }
+}

@@ -14,6 +14,13 @@
       "runtimeArgs": ["run", "dev:live"],
       "port": 5199,
       "autoPort": true
+    },
+    {
+      "name": "showcase",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:showcase"],
+      "port": 5299,
+      "autoPort": true
     }
   ]
 }

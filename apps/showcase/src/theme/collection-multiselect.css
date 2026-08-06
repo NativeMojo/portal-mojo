@@ -1,0 +1,114 @@
+/* ============================================================
+   CollectionMultiSelect — the server-backed multi-pick
+   (packages/portal-mojo/src/ui/CollectionMultiSelect.tsx).
+   Tokens only — light AND dark ride the theme.css variables.
+   Reuses house primitives: .search-box, .tbl-check, .skel,
+   .field-label / .field-help / .field-error.
+   Row height is 42px BY CONTRACT: the component sizes the list
+   as `size × 42` visible rows before it scrolls.
+   The DROPDOWN variant borrows MultiSelectDropdown's shell
+   classes (.multiselect-trigger / -footer / -done) — one trigger
+   voice for both multi-picks; import multiselect-dropdown.css
+   alongside this file.
+   ============================================================ */
+.collection-multiselect { max-width: 460px; }
+.collection-multiselect-dropdown { max-width: 420px; }
+.collection-multiselect .field-label { margin-bottom: 5px; }
+
+.collection-multiselect-search { margin-bottom: 8px; }
+.collection-multiselect-search input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.collection-multiselect-search input:disabled { opacity: 0.55; cursor: default; }
+
+/* SELECT (n) / DESELECT (n) — the mono command voice (eyebrow family). */
+.collection-multiselect-actions {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 6px;
+}
+.collection-multiselect-action {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: none; background: none; cursor: pointer;
+    padding: 3px 5px; border-radius: 6px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+}
+.collection-multiselect-action i { font-size: 12px; }
+.collection-multiselect-action:hover { background: var(--accent-soft); }
+.collection-multiselect-action:disabled {
+    color: var(--mute); background: none; cursor: default; opacity: 0.6;
+}
+
+/* The list: a bordered scroll box of 42px checkbox rows. */
+.collection-multiselect-list {
+    border: 1px solid var(--line); border-radius: 9px;
+    background: var(--surface);
+    overflow-y: auto;
+}
+.collection-multiselect-item {
+    display: flex; align-items: center; gap: 10px;
+    box-sizing: border-box; min-height: 42px; padding: 4px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13.5px; color: var(--ink);
+    cursor: pointer; user-select: none;
+}
+.collection-multiselect-item:last-child { border-bottom: none; }
+.collection-multiselect-item:hover { background: var(--surface2); }
+.collection-multiselect-item.is-selected { background: var(--accent-soft); }
+.collection-multiselect-item.is-selected .collection-multiselect-item-label { color: var(--ink-strong); }
+.collection-multiselect-item.is-disabled { opacity: 0.55; cursor: default; }
+.collection-multiselect-item.is-disabled:hover { background: none; }
+.collection-multiselect-item.is-selected.is-disabled:hover { background: var(--accent-soft); }
+/* The checkbox is display-only — every click (and its shiftKey) must land
+   on the row, so display can never diverge from the controlled state. */
+.collection-multiselect-item .tbl-check { pointer-events: none; }
+.collection-multiselect-item-label {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.collection-multiselect-item-body {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 8px;
+}
+
+/* Loading silhouette: check square + one cycled-width bar per row. */
+.collection-multiselect-skel {
+    display: flex; align-items: center; gap: 10px;
+    box-sizing: border-box; min-height: 42px; padding: 4px 12px;
+    border-bottom: 1px solid var(--line-soft);
+}
+.collection-multiselect-skel:last-child { border-bottom: none; }
+.collection-multiselect-skel-check {
+    width: 15px; height: 15px; border-radius: 4px; flex: none;
+}
+
+/* Empty ("No items available") and error states share the framed box. */
+.collection-multiselect-empty {
+    border: 1px solid var(--line); border-radius: 9px;
+    padding: 26px 16px; text-align: center;
+    color: var(--mute); font-size: 13px;
+}
+.collection-multiselect-empty i {
+    display: block; font-size: 22px; margin-bottom: 6px; opacity: 0.6;
+}
+.collection-multiselect-error { color: var(--bad); }
+.collection-multiselect-error i { opacity: 1; }
+.collection-multiselect-error .btn { margin-top: 10px; }
+
+.collection-multiselect-disabled .field-label { opacity: 0.7; }
+
+/* ── Dropdown variant: the same head/list internals inside a Popover menu.
+   The popover IS the frame — the list drops its own border box and goes
+   full-bleed; a hairline separates it from the search/actions head. ── */
+.collection-multiselect-menu { border-radius: inherit; overflow: hidden; }
+.collection-multiselect-menu .collection-multiselect-head { padding: 10px 10px 0; }
+.collection-multiselect-menu .collection-multiselect-list,
+.collection-multiselect-menu .collection-multiselect-empty {
+    border: none; border-radius: 0; border-top: 1px solid var(--line);
+}
+.collection-multiselect-menu .collection-multiselect-body > .collection-multiselect-list:first-child,
+.collection-multiselect-menu .collection-multiselect-body > .collection-multiselect-empty:first-child {
+    border-top: none; /* no head above — the popover edge is the frame */
+}

@@ -1,0 +1,132 @@
+/* ============================================================ TagInput
+   Chips inside a field-shaped wrapper: the wrapper wears the .input look
+   (surface2 + line, accent ring on focus-within) so a TagInput lines up with
+   the rest of a form grid. Tokens only — light and dark both come from
+   theme.css. Bootstrap's badge/form-control classes are NOT used.
+   ------------------------------------------------------------ */
+.tag-input {
+    display: block;
+}
+
+.tag-input-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 36px;
+    padding: 5px 8px;
+    background: var(--field-bg);
+    color: var(--ink-strong);
+    border: 1px solid var(--field-line);
+    border-radius: 8px;
+    cursor: text;
+}
+/* The input inside carries no ring of its own — the wrapper is the field. */
+.tag-input-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ── chips ── */
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 2.5px 5px 2.5px 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: default;
+}
+.tag-chip-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Chips are only focusable to drive the arrow/Backspace flow, so the ring
+   shows for pointer focus too — otherwise Backspace would delete a chip with
+   no visible focus. */
+.tag-chip:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+.tag-chip-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.75;
+}
+.tag-chip-x:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.12);
+}
+:root[data-theme="dark"] .tag-chip-x:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+/* ── the text field ── */
+.tag-input-field {
+    flex: 1 1 120px;
+    min-width: 120px;
+    padding: 2px 0;
+    border: none;
+    outline: none;
+    background: none;
+    color: var(--ink-strong);
+    font: inherit;
+}
+.tag-input-field::placeholder {
+    color: var(--mute);
+}
+
+/* ── footer: counter + transient error ── */
+.tag-input-foot {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--mute);
+}
+.tag-input-count {
+    font-variant-numeric: tabular-nums;
+}
+.tag-input-error {
+    color: var(--bad);
+    font-weight: 600;
+    animation: tag-error-in 0.14s ease-out;
+}
+/* The live region stays mounted for AT; it only occupies space when it speaks. */
+.tag-input-error:empty {
+    display: none;
+}
+@keyframes tag-error-in {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ── states ── */
+.tag-input-disabled .tag-input-wrap {
+    opacity: 0.55;
+    cursor: default;
+}
+.tag-input-disabled .tag-chip,
+.tag-input-readonly .tag-chip {
+    cursor: default;
+}
+/* Readonly is a display of values, not a field: drop the field chrome. */
+.tag-input-readonly .tag-input-wrap {
+    background: transparent;
+    border-color: var(--line-soft);
+    cursor: default;
+}
