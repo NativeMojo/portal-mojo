@@ -105,7 +105,7 @@ export const isAcmeChallenge = (record: Pick<DnsRecordRow, 'type' | 'name'>): bo
 
 export function parseRecordValue(type: unknown, wire: unknown): StructuredRecordValue {
     const spec = specFor(type);
-    const raw = text(wire).trim();
+    const raw = text(type).toUpperCase() === 'TXT' ? text(wire) : text(wire).trim();
     if (!spec) return { text: raw };
     if (spec.fields.length === 1) return { [spec.fields[0]!.key]: spec.fields[0]!.kind === 'quoted' ? stripQuotes(raw) : raw };
     const parts = raw ? raw.split(/\s+/) : [];
@@ -117,6 +117,7 @@ export function parseRecordValue(type: unknown, wire: unknown): StructuredRecord
 export function formatRecordValue(type: unknown, value: StructuredRecordValue): string {
     const spec = specFor(type);
     if (!spec) return text(value.text).trim();
+    if (text(type).toUpperCase() === 'TXT') return text(value.text);
     return spec.fields.map((field) => {
         const raw = text(value[field.key]).trim();
         return field.kind === 'quoted' && raw ? `"${stripQuotes(raw)}"` : raw;
@@ -206,13 +207,14 @@ export function validateRecordSet(options: ValidateRecordSetOptions): { ok: bool
     if (spec && !spec.multi && values.length > 1) errors.push(validationError(null, 'values', `A ${type} record holds exactly one value.`));
     const seen = new Set<string>();
     values.forEach((wire, index) => {
-        if (!wire || wire.trim() !== wire) errors.push(validationError(index, 'value', 'Apply the visible correction before saving.'));
+        if (!wire || wire.trim() === '') errors.push(validationError(index, 'value', 'A record value is required.'));
+        else if (type !== 'TXT' && wire.trim() !== wire) errors.push(validationError(index, 'value', 'Apply the visible correction before saving.'));
         if (seen.has(wire)) errors.push(validationError(index, 'value', 'Duplicate values are not allowed.'));
         seen.add(wire);
         const parts = parseRecordValue(type, wire);
         for (const field of spec?.fields ?? []) {
             const value = parts[field.key] ?? '';
-            if (!value) { errors.push(validationError(index, field.key, `${field.label} is required.`)); continue; }
+            if (!value || (type === 'TXT' && value.trim() === '')) { errors.push(validationError(index, field.key, `${field.label} is required.`)); continue; }
             if (field.kind === 'ipv4' && !isIPv4(value)) errors.push(validationError(index, field.key, isIPv6(value) ? "That's IPv6 — use AAAA." : `"${value}" is not a valid IPv4 address.`, isIPv6(value) ? { action: 'change-type', type: 'AAAA', label: 'Change type to AAAA' } : undefined));
             if (field.kind === 'ipv6' && !isIPv6(value)) errors.push(validationError(index, field.key, isIPv4(value) ? "That's IPv4 — use A." : `"${value}" is not a valid IPv6 address.`, isIPv4(value) ? { action: 'change-type', type: 'A', label: 'Change type to A' } : undefined));
             if (field.kind === 'hostname' && !isHostname(value)) errors.push(validationError(index, field.key, isIP(value) ? `${field.label} must be a hostname, not an IP address.` : `"${value}" is not a valid hostname.`));

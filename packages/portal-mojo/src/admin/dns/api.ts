@@ -276,16 +276,27 @@ export function useDnsRecords(domain: number | null, enabled = true) {
     });
 }
 
-export interface DnsWriteResponse { status: true; provider: string; change_id?: string }
-export function upsertDnsRecord(domain: number, record: DnsRecordRow): Promise<DnsWriteResponse> {
-    return postData('/api/dnsman/dns', {
+export interface DnsWriteResponse { status: true; provider: string; change_id: string | null }
+export function parseDnsWriteResponse(value: unknown): DnsWriteResponse {
+    const response = object(value, 'record write response');
+    if (Object.keys(response).some((key) => !['status', 'provider', 'change_id'].includes(key))
+        || response.status !== true || typeof response.provider !== 'string' || !response.provider
+        || !(typeof response.change_id === 'string' || response.change_id === null)) {
+        throw new Error('DNS administration unavailable: malformed record write response');
+    }
+    return { status: true, provider: response.provider, change_id: response.change_id };
+}
+export async function upsertDnsRecord(domain: number, record: DnsRecordRow): Promise<DnsWriteResponse> {
+    const response = await mojoCall('/api/dnsman/dns', { method: 'POST', body: {
         domain, type: record.type, name: record.name,
         record_values: record.record_values, ttl: record.ttl,
-    });
+    } });
+    return parseDnsWriteResponse(response);
 }
 
-export function deleteDnsRecordSet(domain: number, record: Pick<DnsRecordRow, 'type' | 'name'>): Promise<DnsWriteResponse> {
-    return postData('/api/dnsman/dns/delete', { domain, type: record.type, name: record.name });
+export async function deleteDnsRecordSet(domain: number, record: Pick<DnsRecordRow, 'type' | 'name'>): Promise<DnsWriteResponse> {
+    const response = await mojoCall('/api/dnsman/dns/delete', { method: 'POST', body: { domain, type: record.type, name: record.name } });
+    return parseDnsWriteResponse(response);
 }
 export const deleteDnsRecord = deleteDnsRecordSet;
 
@@ -304,6 +315,8 @@ export interface CoordinateDnsOperationOptions<T> {
     write: () => Promise<T>;
     intended: DnsRecordRow | null;
     reconcile?: (live: DnsRecordSetResponse) => void | Promise<void>;
+    /** Required cache-safety boundary after every attempted write. */
+    invalidate: () => void | Promise<void>;
 }
 function intendedMatches(live: DnsRecordSetResponse, intended: DnsRecordRow | null, opening: RecordOwnerSnapshot): boolean {
     const exact = live.records.find((record) => recordKey(record) === opening.key) ?? null;
@@ -322,6 +335,8 @@ export async function coordinateDnsRecordOperation<T>(options: CoordinateDnsOper
     }
     let response: T | undefined;
     let requestError: unknown;
+    let reconciliationError: unknown;
+    let invalidationError: unknown;
     let live: DnsRecordSetResponse | null = null;
     try {
         response = await options.write();
@@ -331,8 +346,13 @@ export async function coordinateDnsRecordOperation<T>(options: CoordinateDnsOper
         try {
             live = await options.fetchFresh();
             await options.reconcile?.(live);
-        } catch (reconcileError) {
-            if (!requestError) throw reconcileError;
+        } catch (error) {
+            reconciliationError = error;
+        }
+        try {
+            await options.invalidate();
+        } catch (error) {
+            invalidationError = error;
         }
     }
     const applied = live != null && intendedMatches(live, options.intended, options.opening);
@@ -343,16 +363,20 @@ export async function coordinateDnsRecordOperation<T>(options: CoordinateDnsOper
         }
         throw requestError;
     }
+    if (reconciliationError) throw reconciliationError;
+    if (invalidationError) throw invalidationError;
     return { response, live, applied, ambiguousApplied: false };
 }
 
 export function useDnsRecordCoordinator(domain: number) {
     const queryClient = useQueryClient();
-    return async <T>(options: Omit<CoordinateDnsOperationOptions<T>, 'fetchFresh' | 'reconcile'>) => coordinateDnsRecordOperation({
+    return async <T>(options: Omit<CoordinateDnsOperationOptions<T>, 'fetchFresh' | 'reconcile' | 'invalidate'>) => coordinateDnsRecordOperation({
         ...options,
         fetchFresh: () => fetchDnsRecords(domain),
         reconcile: async (live) => {
             queryClient.setQueryData(dnsKeys.records(domain), live);
+        },
+        invalidate: async () => {
             await queryClient.invalidateQueries({ queryKey: dnsKeys.records(domain) });
         },
     });

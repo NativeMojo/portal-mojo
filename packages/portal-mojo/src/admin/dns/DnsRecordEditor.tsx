@@ -35,7 +35,7 @@ export function DnsRecordEditor({ domain, capabilities, records, record, onClose
     const desired: DnsRecordRow = { type, name: fqdn, record_values: values, ttl: Number(ttl) };
     const validation = validateRecordSet({ type, name, values, ttl, zone: domain.name, existingRecords: records, caps: capabilities, original: record ?? null });
     const pendingCorrection = autofixFieldValue('hostname', name).value !== name
-        || rows.some((row) => currentSpec?.fields.some((field) => autofixFieldValue(field.kind, row[field.key]).value !== (row[field.key] ?? '')));
+        || rows.some((row) => currentSpec?.fields.some((field) => field.kind !== 'text' && autofixFieldValue(field.kind, row[field.key]).value !== (row[field.key] ?? '')));
     const diff = diffRecordSet(record ?? null, desired);
     const unchanged = !!record && diff.added.length === 0 && diff.removed.length === 0 && diff.ttl.before === diff.ttl.after;
     const opening = useMemo(() => snapshotRecordOwner(records, record?.type ?? type, record?.name ?? fqdn), [records, record, type, fqdn]);

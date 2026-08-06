@@ -33,13 +33,17 @@ Upsert replaces the complete ordered set and sends exactly
 `{domain,type,name}`. Removing some values is an upsert of all survivors,
 never a partial delete.
 
+Both write endpoints answer at the top level as
+`{status:true,change_id:string|null,provider:string}`. Route 53 supplies a
+change id; GoDaddy may return `null`. There is no nested `data` write payload.
+
 ## Editor invariants
 
 A, AAAA, CNAME, TXT, MX, SRV, CAA, and delegated non-apex NS use controlled structured rows, intersected with `allowed_record_types`. Unknown types remain readable and have no editor. Existing type/name are immutable.
 
-Paste and blur may correct invisible characters, NBSP, curly quotes, URL/path/trailing dots, hostname case, bracketed IPs, and surrounding TXT/CAA quotes. Every correction records field, before, after, and message. Submit never trims, dequotes, lowercases, normalizes, or deduplicates unacknowledged state. Blank/duplicate values, incomplete structured rows, invalid IPv4/full IPv6, hostname/range/TTL errors, out-of-zone or malformed names, invalid wildcards, apex NS/SOA/CNAME, and CNAME coexistence fail before the request. Server refusal remains authoritative.
+Paste and blur may correct invisible characters, NBSP, curly quotes, URL/path/trailing dots, hostname case, bracketed IPs, and surrounding TXT/CAA quotes. Every correction records field, before, after, and message. Existing TXT values, including meaningful leading, trailing, and repeated whitespace, parse, format, edit, and submit losslessly unless the operator explicitly triggers and acknowledges a paste/blur correction. Submit never trims, dequotes, lowercases, normalizes, or deduplicates unacknowledged state. Blank/duplicate values, incomplete structured rows, invalid IPv4/full IPv6, hostname/range/TTL errors, out-of-zone or malformed names, invalid wildcards, apex NS/SOA/CNAME, and CNAME coexistence fail before the request. Server refusal remains authoritative.
 
-Confirmation shows identity, TTL, unchanged/removed/added values, and contextual warnings from the editor opening snapshot. After confirmation the coordinator performs an uncached read, compares the exact set and every same-owner record (including CNAME coexistence), and writes immediately only when unchanged. A `finally` read reconciles cache after success, rejection, or an ambiguous response. The draft and original error survive. This is best-effort preflight: no ETag/CAS exists, so a narrow GET-to-POST race remains.
+Confirmation shows identity, TTL, unchanged/removed/added values, and contextual warnings from the editor opening snapshot. After confirmation the coordinator performs an uncached read, compares the exact set and every same-owner record (including CNAME coexistence), and writes immediately only when unchanged. A `finally` read reconciles cache after success, rejection, or an ambiguous response, and the zone query is invalidated unconditionally even when that read fails so stale cache is never authoritative. The draft and original error survive. This is best-effort preflight: no ETag/CAS exists, so a narrow GET-to-POST race remains.
 
 ## Provider behavior
 

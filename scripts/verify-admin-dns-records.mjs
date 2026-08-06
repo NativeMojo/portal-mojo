@@ -34,6 +34,13 @@ try {
     ]) {
         assert.equal(data.formatRecordValue(type, data.parseRecordValue(type, wire)), wire, `${type} round trip`);
     }
+    for (const wire of ['  leading and trailing  ', 'multiple   inner spaces', '\tmeaningful TXT\t']) {
+        assert.equal(data.formatRecordValue('TXT', data.parseRecordValue('TXT', wire)), wire, 'TXT whitespace is lossless');
+        assert.equal(data.validateRecordSet({ type: 'TXT', name: 'txt', values: [wire], ttl: 300, zone: 'example.com', caps: { allowed_record_types: ['TXT'] } }).ok, true);
+    }
+    const explicitTxtCorrection = data.autofixFieldValue('text', '  pasted TXT  ');
+    assert.equal(explicitTxtCorrection.value, 'pasted TXT');
+    assert(explicitTxtCorrection.corrections.some((entry) => entry.message.includes('Trimmed')));
     for (const address of ['::', '::1', '2001:db8::1', '2001:db8:0:0:0:0:2:1', '::ffff:192.0.2.1']) assert.equal(data.isIPv6(address), true, address);
     for (const address of ['1:2:3:4:5:6:7', '1:2:3:4:5:6:7:8:9', '1::2::3', '12345::1', '::ffff:999.1.1.1']) assert.equal(data.isIPv6(address), false, address);
     assert.equal(data.toFqdn('@', 'Example.COM.'), 'example.com');
@@ -74,6 +81,10 @@ try {
     assert.equal('id' in parsed.records[0], false);
     assert.throws(() => api.parseDnsRecordSetResponse({ domain: 'example.com', provider: 'route53', records: [{ id: 'x', type: 'A', name: 'example.com', record_values: [], ttl: 300 }] }), /malformed/);
     assert.throws(() => api.parseDnsRecordSetResponse({ domain: 'example.com', provider: 'route53' }), /malformed/);
+    assert.deepEqual(api.parseDnsWriteResponse({ status: true, change_id: 'change-1', provider: 'route53' }), { status: true, change_id: 'change-1', provider: 'route53' });
+    assert.deepEqual(api.parseDnsWriteResponse({ status: true, change_id: null, provider: 'godaddy' }), { status: true, change_id: null, provider: 'godaddy' });
+    assert.throws(() => api.parseDnsWriteResponse({ status: true, data: { status: true, change_id: 'nested', provider: 'route53' } }), /malformed/);
+    assert.throws(() => api.parseDnsWriteResponse({ status: true, provider: 'godaddy' }), /malformed/);
     assert.notDeepEqual(api.dnsKeys.records(1), api.dnsKeys.records(2));
 
     const openingRecord = { type: 'A', name: 'example.com', record_values: ['192.0.2.1'], ttl: 300 };
@@ -84,12 +95,14 @@ try {
         fetchFresh: async () => { order.push('read'); return { domain: 'example.com', provider: 'route53', records: order.length < 3 ? [openingRecord] : [{ ...openingRecord, record_values: ['192.0.2.2'] }] }; },
         write: async () => { order.push('write'); return { ok: true }; },
         reconcile: async () => { order.push('reconcile'); },
+        invalidate: async () => { order.push('invalidate'); },
     });
-    assert.deepEqual(order, ['read', 'write', 'read', 'reconcile']);
+    assert.deepEqual(order, ['read', 'write', 'read', 'reconcile', 'invalidate']);
     await assert.rejects(api.coordinateDnsRecordOperation({
         opening, intended: openingRecord,
         fetchFresh: async () => ({ domain: 'example.com', provider: 'route53', records: [{ ...openingRecord, ttl: 301 }] }),
         write: async () => { throw new Error('must not write'); },
+        invalidate: async () => {},
     }), /changed/);
     let reconciled = false;
     await assert.rejects(api.coordinateDnsRecordOperation({
@@ -97,8 +110,27 @@ try {
         fetchFresh: async () => ({ domain: 'example.com', provider: 'route53', records: [openingRecord] }),
         write: async () => { throw new Error('ambiguous transport'); },
         reconcile: async () => { reconciled = true; },
+        invalidate: async () => {},
     }), /ambiguous transport/);
     assert.equal(reconciled, true);
+    let invalidatedAfterReadFailure = false;
+    let readCount = 0;
+    await assert.rejects(api.coordinateDnsRecordOperation({
+        opening, intended: openingRecord,
+        fetchFresh: async () => { readCount += 1; if (readCount === 1) return { domain: 'example.com', provider: 'route53', records: [openingRecord] }; throw new Error('reconciliation failed'); },
+        write: async () => ({ ok: true }),
+        invalidate: async () => { invalidatedAfterReadFailure = true; },
+    }), /reconciliation failed/);
+    assert.equal(invalidatedAfterReadFailure, true, 'write invalidates even when the reconciliation GET fails');
+    let invalidatedAfterPrimaryFailure = false;
+    readCount = 0;
+    await assert.rejects(api.coordinateDnsRecordOperation({
+        opening, intended: openingRecord,
+        fetchFresh: async () => { readCount += 1; if (readCount === 1) return { domain: 'example.com', provider: 'route53', records: [openingRecord] }; throw new Error('secondary reconciliation failure'); },
+        write: async () => { throw new Error('primary write failure'); },
+        invalidate: async () => { invalidatedAfterPrimaryFailure = true; },
+    }), /primary write failure/);
+    assert.equal(invalidatedAfterPrimaryFailure, true, 'primary write errors survive unconditional invalidation');
 
     const a = async () => 1;
     const disposeA = forward.registerDnsAdminIntegration({ resolveDomainByName: a });
@@ -125,6 +157,9 @@ try {
     assert.equal(denied.error_code, 403);
     const written = await mock.mockFetch('/api/dnsman/dns', { method: 'POST', headers: manager, body: { domain: 8201, type: 'TXT', name: '_verify.acme.example', record_values: ['one', 'two'], ttl: 300 } });
     assert.equal(written.status, true);
+    assert.deepEqual(Object.keys(written).sort(), ['change_id', 'provider', 'status']);
+    assert.equal(typeof written.change_id, 'string');
+    assert.equal(written.provider, 'route53');
     const refreshed = await mock.mockFetch('/api/dnsman/dns', { headers: manager, params: { domain: 8201 } });
     assert.deepEqual(refreshed.data.records.find((record) => data.recordKey(record) === 'TXT|_verify.acme.example').record_values, ['one', 'two']);
     mock.armMockDnsWriteFault('reject');
@@ -146,12 +181,18 @@ try {
     assert.equal(partial.error_code, 400);
     const deleted = await mock.mockFetch('/api/dnsman/dns/delete', { method: 'POST', headers: manager, body: { domain: 8201, type: 'TXT', name: '_verify.acme.example' } });
     assert.equal(deleted.status, true);
+    assert.deepEqual(Object.keys(deleted).sort(), ['change_id', 'provider', 'status']);
     const godaddy = await mock.mockFetch('/api/dnsman/dns', { method: 'POST', headers: manager, body: { domain: 8202, type: 'TXT', name: 'floor.acme-byo.example', record_values: ['floor'], ttl: 60 } });
     assert.equal(godaddy.status, true);
+    assert.deepEqual(godaddy, { status: true, change_id: null, provider: 'godaddy' });
     const godaddyLive = await mock.mockFetch('/api/dnsman/dns', { headers: manager, params: { domain: 8202 } });
     assert.equal(godaddyLive.data.records.find((record) => record.name === 'floor.acme-byo.example').ttl, 600);
     const godaddyDelete = await mock.mockFetch('/api/dnsman/dns/delete', { method: 'POST', headers: manager, body: { domain: 8202, type: 'TXT', name: 'floor.acme-byo.example' } });
     assert.equal(godaddyDelete.error_code, 400);
+    const whitespaceWrite = await mock.mockFetch('/api/dnsman/dns', { method: 'POST', headers: manager, body: { domain: 8201, type: 'TXT', name: '_whitespace.acme.example', record_values: ['  preserve me  ', 'inner   spacing'], ttl: 300 } });
+    assert.equal(whitespaceWrite.status, true);
+    const whitespaceLive = await mock.mockFetch('/api/dnsman/dns', { headers: manager, params: { domain: 8201 } });
+    assert.deepEqual(whitespaceLive.data.records.find((record) => record.name === '_whitespace.acme.example').record_values, ['  preserve me  ', 'inner   spacing']);
     for (const id of [8203, 8204, 8205, 8207]) {
         const response = await mock.mockFetch('/api/dnsman/dns', { headers: manager, params: { domain: id } });
         assert.equal(response.status, false, `fixture ${id} blocks`);

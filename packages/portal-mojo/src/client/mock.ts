@@ -6944,7 +6944,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         db.dnsRecords.set(domain.id, records);
         if (dnsWriteFault === 'ambiguous') { dnsWriteFault = null; return { status: false, error: 'Mock transport lost the applied response', error_code: 503 }; }
         if (dnsWriteFault === 'reconcile') { dnsWriteFault = null; dnsFailNextRead = true; }
-        return { status: true, data: { status: true, ...(domain.provider === 'route53' ? { change_id: `mock-change-${Date.now()}` } : {}), provider: domain.provider } };
+        return { status: true, change_id: domain.provider === 'route53' ? `mock-change-${Date.now()}` : null, provider: domain.provider };
     }
 
     if (path === '/api/dnsman/certificate/request' || path === '/api/dnsman/certificate/revoke') {
