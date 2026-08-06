@@ -12,6 +12,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [params.md](params.md) | `useTableParams` — the single source of truth for table state; persistence blob |
 | [auth.md](auth.md) | Login flows, token upkeep, hosted-auth (bouncer page) bridge, auth events |
 | [auth-pages.md](auth-pages.md) | The in-app auth pages: routes + guard, `VITE_MOJO_AUTH` switch, fresh-auth (440 step-up) modal, MFA panel, password tools |
+| [admin-credentials.md](admin-credentials.md) | Group API keys and webhook subscriptions — dual-mount pages, permission registry, secret-safe create/reveal/rotation |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
@@ -33,6 +34,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [detail-primitives.md](detail-primitives.md) | StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — the detail-page pack |
 | [dataview.md](dataview.md) | Auto-inferring key/value grid + safe JSON viewer — schema or inference, nested records |
 | [markdown.md](markdown.md) | MarkdownView — server render via docit, allowlist sanitizer trust model, client fallback |
+| [record-feed.md](record-feed.md) | RecordFeed — ticket/incident adapters, chronological latest-window normalization, optimistic sends, controlled mode |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart` (+stats/data dialogs, custom `dt_*` range), `MetricsMiniWidget`, `KPITile/KPIStrip`, `CircularProgress`, `PieChart`, `exportChartPng`, the metrics wire shape |
 | [menus-and-access.md](menus-and-access.md) | Menu registry + SidebarNav; `useMe`/`useCan`/`Guarded`; group context |
 | [grouping-and-fmt.md](grouping-and-fmt.md) | `groupBy*` helpers, `fmt.*` formatters |

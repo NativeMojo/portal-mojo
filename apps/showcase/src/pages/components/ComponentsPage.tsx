@@ -38,6 +38,8 @@ import { CollectionSelectDemo } from './demos-collection-select';
 import { PasswordDemo } from './demos-password';
 import { IdiomsDemo } from './demos-idioms';
 import { LoadingDemo } from './demos-loading';
+import { RecordFeedDemo } from './demos-record-feed';
+import { AdminCredentialsDemo } from './demos-admin-credentials';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
@@ -71,6 +73,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'search', title: 'Expanding search', icon: 'bi-search',
                 blurb: 'maestro fsearch: a 30px ICON at rest — all three states shown side by side, the 300ms debounce logged keystroke-by-keystroke, and the committed term driving a real server query.',
                 render: () => <SearchDemo />,
+            },
+            {
+                key: 'record-feed', title: 'RecordFeed', icon: 'bi-chat-left-text',
+                blurb: 'Record-scoped notes and events: typed ticket/incident adapters, optimistic sends, status and assistant rows, plus controlled streaming mode.',
+                render: () => <RecordFeedDemo />,
             },
         ],
     },
@@ -266,6 +273,16 @@ const GROUPS: DemoGroup[] = [
                 key: 'skeleton', title: 'Skeletons', icon: 'bi-body-text',
                 blurb: 'The loading silhouette: avatar + stacked lines, cycled widths, pills.',
                 render: () => <SkeletonDemo />,
+            },
+        ],
+    },
+    {
+        title: 'Admin',
+        sections: [
+            {
+                key: 'admin-credentials', title: 'Credentials', icon: 'bi-key',
+                blurb: 'Reusable group API-key and webhook administration, including one-shot token handling, explicit audited reveals, and permission-aware controls.',
+                render: () => <AdminCredentialsDemo />,
             },
         ],
     },
