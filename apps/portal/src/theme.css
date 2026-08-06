@@ -18,6 +18,7 @@
 @import "./theme/admin-jobs.css";
 @import "./theme/admin-network.css";
 @import "./theme/admin-dns.css";
+@import "./theme/admin-storage.css";
 @import "./theme/multiselect-dropdown.css";
 @import "./theme/datepicker.css";
 @import "./theme/formview.css";

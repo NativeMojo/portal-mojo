@@ -36,6 +36,7 @@ import { MEMBERS_ADMIN_SECTION, USERS_ADMIN_SECTION } from './identity';
 import { JOBS_ADMIN_SECTION } from './jobs';
 import { NETWORK_SECURITY_ADMIN_SECTION } from './network';
 import { DNS_ADMIN_SECTION } from './dns';
+import { STORAGE_ADMIN_SECTION } from './storage';
 
 export * from './credentials';
 export * from './monitoring';
@@ -49,6 +50,7 @@ export * from './identity';
 export * from './jobs';
 export * from './network';
 export * from './dns';
+export * from './storage';
 
 export type AdminNavigationGroup =
     | 'identity-access'
@@ -140,6 +142,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     JOBS_ADMIN_SECTION,
     NETWORK_SECURITY_ADMIN_SECTION,
     DNS_ADMIN_SECTION,
+    STORAGE_ADMIN_SECTION,
 ];
 
 function relativePath(...parts: Array<string | undefined>): string {

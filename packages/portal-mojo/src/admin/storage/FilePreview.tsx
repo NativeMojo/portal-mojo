@@ -37,7 +37,7 @@ export function FilePreview({ file }: { file: FileRow }) {
     const category = filePreviewCategory(file);
     const warned = useRef(false);
     useEffect(() => {
-        if (!KNOWN.has(category) && category !== 'unknown' && !warned.current) {
+        if (!KNOWN.has(category) && !warned.current) {
             warned.current = true;
             console.warn(`FilePreview: unknown category "${category}" — using safe generic actions`);
         }

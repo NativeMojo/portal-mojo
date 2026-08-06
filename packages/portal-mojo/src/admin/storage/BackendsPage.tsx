@@ -3,7 +3,7 @@ import { Badge, ModelTable, fmt, modal, toast, type BatchAction, type Column, ty
 import { useCan } from '../../client';
 import { FileManagerDetail } from './FileManagerDetail';
 import { openFileManagerEditor } from './storage-dialogs';
-import { FileManagerModel, STORAGE_MANAGE_PERMS, exportFileManagers, relationId, saveFileManagerAtomic, type FileManagerRow } from './models';
+import { FileManagerModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, USER_DIRECTORY_PERMS, exportFileManagers, relationId, saveFileManagerAtomic, type FileManagerRow } from './models';
 
 function scope(row: FileManagerRow): string { return relationId(row.group) != null ? `Group · ${(typeof row.group === 'object' && row.group?.name) || `#${relationId(row.group)}`}` : relationId(row.user) != null ? `User · ${(typeof row.user === 'object' && (row.user.display_name || row.user.name)) || `#${relationId(row.user)}`}` : 'System'; }
 const COLUMNS: Column<FileManagerRow>[] = [
@@ -28,12 +28,16 @@ export function showFileManagerDetail(id: number): void { void modal.detail((clo
 
 export function BackendsPage() {
     const queryClient = useQueryClient();
-    const canManage = useCan(STORAGE_MANAGE_PERMS).can;
+    const manage = useCan(STORAGE_MANAGE_PERMS);
+    const canManage = manage.can;
+    const canViewGroups = useCan(GROUP_DIRECTORY_PERMS).can;
+    const canViewUsers = useCan(USER_DIRECTORY_PERMS).can;
+    const canCreate = canManage && (Boolean(manage.me?.is_superuser) || canViewGroups || canViewUsers);
     const saveState = (row: FileManagerRow, active: boolean) => saveFileManagerAtomic({ queryClient, id: row.id, changes: { is_active: active } });
     const batchActions: BatchAction<FileManagerRow>[] = [
         { key: 'activate', label: 'Activate', eligible: (row) => !row.is_active, run: (row) => saveState(row, true) },
         { key: 'deactivate', label: 'Deactivate', eligible: (row) => row.is_active, run: (row) => saveState(row, false) },
     ];
     const add = async () => { const row = await openFileManagerEditor('create'); if (row) toast.success(`${row.name} created private`); };
-    return <ModelTable model={FileManagerModel} eyebrow="Infrastructure · Storage" title="Storage Backends" columns={COLUMNS} filters={FILTERS} defaultSort="-created" searchable searchPlaceholder="Search name, backend, description" selectable={canManage} batchActions={canManage ? batchActions : []} columnChooser persistState persistKey="admin:storage:backends" exportFormats={['csv', 'json']} exporter={exportFileManagers} onRowClick={(row) => showFileManagerDetail(row.id)} {...(canManage ? { addLabel: 'Create backend', onAdd: () => void add() } : {})} />;
+    return <ModelTable model={FileManagerModel} eyebrow="Infrastructure · Storage" title="Storage Backends" columns={COLUMNS} filters={FILTERS} defaultSort="-created" searchable searchPlaceholder="Search name, backend, description" selectable={canManage} batchActions={canManage ? batchActions : []} columnChooser persistState persistKey="admin:storage:backends" exportFormats={['csv', 'json']} exporter={exportFileManagers} onRowClick={(row) => showFileManagerDetail(row.id)} {...(canCreate ? { addLabel: 'Create backend', onAdd: () => void add() } : {})} />;
 }
