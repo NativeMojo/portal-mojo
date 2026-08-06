@@ -32,7 +32,8 @@ import {
     GROUP_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
     WebhookSubscriptionModel, WebhookSubscriptionsSection,
 } from 'portal-mojo/admin';
-import { GroupModel, LogModel, MemberModel, type GroupRow } from '../models';
+import { LogModel } from '../../../../packages/portal-mojo/src/admin/monitoring';
+import { GroupModel, MemberModel, type GroupRow } from '../models';
 import {
     GROUP_ADMIN_PERMS, GROUP_AUTH_PERMS, GROUP_DESTRUCTIVE_PERMS,
     iconForKind, kindLabel,

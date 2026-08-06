@@ -9,6 +9,15 @@
 // endpoint + graph facts.
 import { defineModel, type Group, type Params, type User } from 'portal-mojo/client';
 
+// Canonical monitoring models live with their reusable admin package.
+// MERGE-WIRE: switch this compatibility re-export to `portal-mojo/admin` once
+// the orchestrator adds the monitoring barrel to the shared admin entry point.
+export {
+    LogModel,
+    LOG_LEVEL_OPTIONS,
+    type LogRow,
+} from '../../../packages/portal-mojo/src/admin/monitoring';
+
 /**
  * The user row as the DEFAULT (one-record) graph serializes it — measured in
  * django-mojo account/models/user.py GRAPHS 2026-08-05: `requires_mfa` and
@@ -237,48 +246,6 @@ export const ApiKeyModel = defineModel<ApiKeyRow>({
         revoke: { response: 'payload' },
     },
 });
-
-/**
- * /api/logs row — the live logit.Log default graph, measured 2026-08-05.
- * `graph=basic` narrows to the id/created/level/kind/method/path/ip/uid/gid/
- * username/model_name/model_id subset; default sort is `-id` (rest.py).
- */
-export interface LogRow {
-    id: number;
-    created: number;
-    level: string;
-    kind: string | null;
-    method: string | null;
-    path: string | null;
-    payload: string | null;
-    ip: string | null;
-    duid: string | null;
-    uid: number;
-    gid: number;
-    username: string | null;
-    user_agent: string | null;
-    log: string | null;
-    model_name: string | null;
-    model_id: number;
-}
-
-export const LogModel = defineModel<LogRow>({
-    name: 'log',
-    endpoint: '/api/logs',
-    // logit rest.py VIEW_PERMS: manage_logs | view_logs | security | admin.
-    permissions: {
-        view: ['view_logs', 'manage_logs', 'security'],
-        manage: ['manage_logs'],
-    },
-});
-
-/** Log levels as the backend writes them — filter options + tone map input. */
-export const LOG_LEVEL_OPTIONS = [
-    { value: 'info', label: 'Info' },
-    { value: 'warning', label: 'Warning' },
-    { value: 'error', label: 'Error' },
-    { value: 'critical', label: 'Critical' },
-];
 
 /** Query params helper: the member list for one group (GroupDetail). */
 export function memberParamsFor(groupId: number, search: string): Params {
