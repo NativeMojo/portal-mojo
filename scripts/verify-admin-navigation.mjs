@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
@@ -25,6 +26,16 @@ const server = await createServer({
 });
 
 try {
+    const [appShell, settingsRoutes, settingDetail] = await Promise.all([
+        readFile(new URL('../apps/portal/src/App.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/settings/index.ts', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/settings/SettingDetail.tsx', import.meta.url), 'utf8'),
+    ]);
+    assert.doesNotMatch(appShell, /RightPanelProvider|RightPanelSlot|useRightPanel|app-right-panel-open/,
+        'the global Admin shell must not reserve a persistent record-detail panel');
+    assert.doesNotMatch(`${settingsRoutes}\n${settingDetail}`, /SettingDetailPage|useNavigate|useParams|path:\s*['"]:id/,
+        'Settings detail must be modal-owned, not route-owned');
+
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const menus = await server.ssrLoadModule('/packages/portal-mojo/src/ui/menu-registry.ts');
     const EmptyPage = () => null;
@@ -46,6 +57,9 @@ try {
         'root AdminSections must emit one shared embedded mount landing');
     assert(routeObjects.some((route) => route.path === 'system/alpha'));
     assert(routeObjects.some((route) => route.path === 'system/beta'));
+    assert.deepEqual(admin.SETTINGS_ADMIN_SECTION.routes.map((route) => route.path), ['']);
+    assert(admin.ADMIN_SECTIONS.flatMap((section) => section.routes).every((route) => !route.path.includes(':')),
+        'shipped Admin record details must not register child routes');
 
     const menu = admin.adminSectionsMenu(sections, { mount: '/system', grouped: true });
     const category = menu.items.find((item) => item.id === 'admin:other');

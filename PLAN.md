@@ -178,6 +178,15 @@ warnings remain for large bundles and Incident/Event static/dynamic import
 overlap; code splitting is a later optimization, not a Wave 7A correctness
 blocker.
 
+**2026-08-06, Admin detail presentation correction:** after browser review,
+Ian established the product rule that Admin record inspection uses the standard
+KISS detail modal unless another presentation is explicitly requested. Board
+item **#1425** converted Tickets, Incidents, Events, RuleSets, and the remaining
+Settings child route to `modal.detail`, removed production RightPanel shell
+wiring and record-detail routes, and retained RightPanel only as an explicit
+opt-in primitive. Top-level Admin resources remain global no-group pages in the
+single Admin sidenav; focused editors and confirmations stack as native dialogs.
+
 **2026-08-05, wave 7a residual (Groups Admin #1410):** the app-local Groups
 surface now carries system-pinned route, menu, section, and action gates;
 restores the useful legacy column inventory; and offers real, reason-aware

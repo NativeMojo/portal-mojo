@@ -3,11 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { mojoSave, useCan } from '../../client';
 import type { RecordFeedItem } from '../../client/record-feed';
 import {
-    Badge, CollectionSelect, MarkdownView, ModelTable, RecordFeed, SchemaForm, fmt, modal, toast,
+    Badge, CollectionSelect, DetailView, MarkdownView, ModelTable, RecordFeed, SchemaForm, fmt, modal, toast,
     type Column, type Field, type FilterDef, type FormData, type Tone,
 } from '../../ui';
 import { createTicketNoteAdapter } from '../../client/record-feed';
-import { useRightPanel } from '../../ui/RightPanel';
 import {
     MaestroItemLinkModel, TICKET_MANAGE_PERMS, TICKET_USER_LOOKUP_PERMS,
     TicketModel, buildTicketActionResponseBody, invalidateTicketDependents,
@@ -285,7 +284,7 @@ function safeRemoteUrl(value: unknown): string | null {
     }
 }
 
-function TicketPanel({ ticketId, close }: { ticketId: number; close(): void }) {
+function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) {
     const queryClient = useQueryClient();
     const ticketQuery = TicketModel.useOne(ticketId);
     const linkQuery = MaestroItemLinkModel.useList({ ticket: ticketId, size: 1, graph: 'default' });
@@ -326,15 +325,15 @@ function TicketPanel({ ticketId, close }: { ticketId: number; close(): void }) {
         return () => window.clearInterval(timer);
     }, [polling, link, linkQuery.refetch]);
 
-    if (ticketQuery.isLoading) return <div className="ticket-panel-state"><span className="spinner" /> Loading ticket…</div>;
+    if (ticketQuery.isLoading) return <div className="ticket-detail-state"><span className="spinner" /> Loading ticket… <button type="button" className="btn" onClick={close}>Close</button></div>;
     if (ticketQuery.error || !ticketQuery.data) {
         return (
-            <div className="ticket-panel-state">
+            <div className="ticket-detail-state">
                 <h3>Ticket unavailable</h3>
                 <p className="form-alert">{ticketQuery.error?.message ?? 'The ticket could not be loaded.'}</p>
                 <div className="demo-row">
                     <button type="button" className="btn" onClick={() => void ticketQuery.refetch()}>Retry</button>
-                    <button type="button" className="btn" onClick={close}>Close panel</button>
+                    <button type="button" className="btn" onClick={close}>Close</button>
                 </div>
             </div>
         );
@@ -392,42 +391,50 @@ function TicketPanel({ ticketId, close }: { ticketId: number; close(): void }) {
     const remoteUrl = safeRemoteUrl(link?.remote_url);
 
     return (
-        <div className="ticket-panel-content">
-            <div className="ticket-panel-summary">
-                <div className="ticket-panel-badges">
-                    <Badge tone={statusTone(ticket.status)}>{label(ticket.status)}</Badge>
-                    <Badge tone={priorityTone(ticket.priority)}>P{ticket.priority}</Badge>
-                    <Badge tone="muted">{label(ticket.category)}</Badge>
-                </div>
-                <h3>{ticket.title}</h3>
-                <p className="dim">Ticket #{ticket.id} · created {fmt.datetime(ticket.created)} · updated {fmt.relative(ticket.modified)}</p>
-                <dl className="ticket-facts">
-                    <div><dt>Assignee</dt><dd>{relationLabel(ticket.assignee, 'Unassigned')}</dd></div>
-                    <div><dt>Group</dt><dd>{relationLabel(ticket.group, 'Global')}</dd></div>
-                    <div><dt>Incident</dt><dd>{relationLabel(ticket.incident, 'None')}</dd></div>
-                    <div><dt>LLM assistance</dt><dd>{llmEnabled ? 'Enabled' : 'Disabled'}</dd></div>
-                </dl>
-                <div className="ticket-description">
-                    <h4>Description</h4>
-                    {ticket.description ? <MarkdownView source={ticket.description} /> : <p className="dim">No description.</p>}
-                </div>
-                <div className="ticket-maestro-link">
-                    <h4>Maestro</h4>
-                    {link ? (
-                        <p>{remoteUrl
-                            ? <a href={remoteUrl} target="_blank" rel="noreferrer">Item #{link.remote_item_id}</a>
-                            : <>Item #{link.remote_item_id}</>}</p>
-                    ) : (
-                        <p className="dim">{polling ? 'Waiting for the queued link…' : 'Not linked.'}</p>
-                    )}
-                    <button type="button" className="btn btn-sm" disabled={linkQuery.isFetching} onClick={() => void linkQuery.refetch()}>
-                        {linkQuery.isFetching ? 'Checking…' : 'Check link'}
-                    </button>
-                </div>
-            </div>
-
-            {canManage && (
-                <section className="ticket-panel-controls" aria-label="Ticket controls">
+        <DetailView
+            icon="bi-ticket-detailed"
+            title={ticket.title}
+            subtitle={`Ticket #${ticket.id} · created ${fmt.datetime(ticket.created)} · updated ${fmt.relative(ticket.modified)}`}
+            chips={[
+                { text: label(ticket.status), tone: statusTone(ticket.status) },
+                { text: `P${ticket.priority}`, tone: priorityTone(ticket.priority) },
+                { text: label(ticket.category), tone: 'muted' },
+            ]}
+            onClose={close}
+            menuContext={ticket}
+            sections={[
+                {
+                    key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => (
+                        <div className="ticket-detail-summary">
+                            <dl className="ticket-facts">
+                                <div><dt>Assignee</dt><dd>{relationLabel(ticket.assignee, 'Unassigned')}</dd></div>
+                                <div><dt>Group</dt><dd>{relationLabel(ticket.group, 'Global')}</dd></div>
+                                <div><dt>Incident</dt><dd>{relationLabel(ticket.incident, 'None')}</dd></div>
+                                <div><dt>LLM assistance</dt><dd>{llmEnabled ? 'Enabled' : 'Disabled'}</dd></div>
+                            </dl>
+                            <div className="ticket-description">
+                                <h4>Description</h4>
+                                {ticket.description ? <MarkdownView source={ticket.description} /> : <p className="dim">No description.</p>}
+                            </div>
+                            <div className="ticket-maestro-link">
+                                <h4>Maestro</h4>
+                                {link ? (
+                                    <p>{remoteUrl
+                                        ? <a href={remoteUrl} target="_blank" rel="noreferrer">Item #{link.remote_item_id}</a>
+                                        : <>Item #{link.remote_item_id}</>}</p>
+                                ) : (
+                                    <p className="dim">{polling ? 'Waiting for the queued link…' : 'Not linked.'}</p>
+                                )}
+                                <button type="button" className="btn btn-sm" disabled={linkQuery.isFetching} onClick={() => void linkQuery.refetch()}>
+                                    {linkQuery.isFetching ? 'Checking…' : 'Check link'}
+                                </button>
+                            </div>
+                        </div>
+                    ),
+                },
+                ...(canManage ? [{
+                    key: 'manage', label: 'Manage', icon: 'bi-sliders', render: () => (
+                <section className="ticket-detail-controls" aria-label="Ticket controls">
                     <h4>Manage ticket</h4>
                     {error && <div className="form-alert" role="alert">{error}</div>}
                     <div className="ticket-control-grid">
@@ -475,19 +482,23 @@ function TicketPanel({ ticketId, close }: { ticketId: number; close(): void }) {
                         <button type="button" className="btn" disabled={busy} onClick={() => void openTicketEditor(ticket)}>Edit all fields</button>
                     </div>
                 </section>
-            )}
-
-            <section className="ticket-panel-feed">
-                <h4>Activity</h4>
-                <RecordFeed
-                    adapter={adapter}
-                    variant="compact"
-                    showInput={canManage}
-                    currentUserId={me?.id ?? null}
-                    renderAddon={(item) => <TicketActionCard item={item} ticket={ticket} canManage={canManage} />}
-                />
-            </section>
-        </div>
+                    ),
+                }] : []),
+                {
+                    key: 'activity', label: 'Activity', icon: 'bi-clock-history', render: () => (
+                        <section className="ticket-detail-feed">
+                            <RecordFeed
+                                adapter={adapter}
+                                variant="compact"
+                                showInput={canManage}
+                                currentUserId={me?.id ?? null}
+                                renderAddon={(item) => <TicketActionCard item={item} ticket={ticket} canManage={canManage} />}
+                            />
+                        </section>
+                    ),
+                },
+            ]}
+        />
     );
 }
 
@@ -500,19 +511,16 @@ const TICKET_FILTERS: FilterDef[] = [
 
 export function TicketsPage() {
     const { can: canManage } = useCan(TICKET_MANAGE_PERMS);
-    const panel = useRightPanel();
-    const openTicket = (row: TicketRow, launcher?: HTMLElement | null) => panel.open({
-        key: `ticket:${row.id}`,
-        title: `Ticket #${row.id}`,
-        render: ({ close }) => <TicketPanel ticketId={row.id} close={close} />,
-    }, launcher);
+    const openTicket = (row: TicketRow) => void modal.detail((close) => (
+        <TicketDetail ticketId={row.id} close={() => close(null)} />
+    ));
     const columns: Column<TicketRow>[] = [
         { key: 'id', label: 'ID', sortable: true, align: 'end', render: (row) => `#${row.id}` },
         {
             key: 'title', label: 'Title', sortable: true, hideable: false,
             render: (row) => <button type="button" className="ticket-title-button" onClick={(event: MouseEvent<HTMLButtonElement>) => {
                 event.stopPropagation();
-                openTicket(row, event.currentTarget);
+                openTicket(row);
             }}>{row.title}</button>,
         },
         { key: 'status', label: 'Status', sortable: true, render: (row) => canManage ? <InlineTicketSelect row={row} field="status" values={TICKET_STATUSES} /> : <Badge tone={statusTone(row.status)}>{label(row.status)}</Badge> },

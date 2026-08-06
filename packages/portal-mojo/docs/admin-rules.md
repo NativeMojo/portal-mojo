@@ -9,10 +9,12 @@ import {
 } from 'portal-mojo/admin';
 ```
 
-The shared Security Operations section mounts `rules` and `rules/:id` after
-Tickets, Incidents, and Events. Routes are mount-relative, so the same bundle
-works at `#/security/rules` in the standalone Admin and
-`#/system/security/rules` when embedded. Reads require
+The shared Security Operations section mounts the `rules` table after Tickets,
+Incidents, and Events. Selecting a RuleSet opens its DetailView through the
+shared KISS `modal.detail` surface; there is no `rules/:id` child route, so the
+table URL and query state remain unchanged. The mount-relative table works at
+`#/security/rules` in the standalone Admin and `#/system/security/rules` when
+embedded. Reads require
 `sys.view_security|sys.security`; mutations require
 `sys.manage_security|sys.security`. These are system-pinned clauses: active
 group grants do not satisfy them, and the server remains authoritative.

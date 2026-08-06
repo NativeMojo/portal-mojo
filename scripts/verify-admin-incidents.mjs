@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
@@ -7,6 +8,14 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 
 try {
+    const [incidentPage, eventPage] = await Promise.all([
+        readFile(new URL('../packages/portal-mojo/src/admin/incidents/IncidentsPage.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/incidents/EventsPage.tsx', import.meta.url), 'utf8'),
+    ]);
+    assert.match(incidentPage, /showIncidentDetail\(row\.id\)/);
+    assert.match(eventPage, /showEventDetail\(row\.id\)/);
+    assert.doesNotMatch(`${incidentPage}\n${eventPage}`, /useRightPanel|RightPanelSlot|RightPanelProvider/);
+
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const incidents = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/models.ts');
     const sanitize = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/sanitize.ts');
@@ -15,7 +24,7 @@ try {
     assert.deepEqual(admin.SECURITY_VIEW_PERMS, ['sys.view_security', 'sys.security']);
     assert.deepEqual(admin.SECURITY_MANAGE_PERMS, ['sys.manage_security', 'sys.security']);
     assert.deepEqual(admin.SECURITY_DELETE_PERMS, ['sys.manage_security']);
-    assert.deepEqual(admin.SECURITY_OPERATIONS_ADMIN_SECTION.routes.map((route) => route.path), ['tickets', 'incidents', 'events', 'rules', 'rules/:id']);
+    assert.deepEqual(admin.SECURITY_OPERATIONS_ADMIN_SECTION.routes.map((route) => route.path), ['tickets', 'incidents', 'events', 'rules']);
     assert(admin.adminSectionRoutes([admin.SECURITY_OPERATIONS_ADMIN_SECTION], { mount: '/system' }).some((route) => route.path === 'system/security/incidents'));
 
     const normalized = incidents.normalizeIncidentListParams({ graph: 'detailed', download_format: 'json', filename: 'leak', mode: 'raw', status: 'new', priority__gte: 5, start: 0, size: 25 });

@@ -1,8 +1,6 @@
 import { createSafeExporter } from '../../client';
 import { Badge, ModelTable, fmt, groupByDay, type Column, type FilterDef, type Tone } from '../../ui';
-import { useRightPanel } from '../../ui/RightPanel';
-import { EventDetail } from './EventDetail';
-import { EventModel, type EventRow } from './models';
+import { EventModel, showEventDetail, type EventRow } from './models';
 import { sanitizeEventRow } from './sanitize';
 
 function levelTone(level: number): Tone { return level >= 8 ? 'danger' : level >= 4 ? 'warning' : 'muted'; }
@@ -32,7 +30,6 @@ const FILTERS: FilterDef[] = [
 ];
 
 export function EventsPage() {
-    const panel = useRightPanel();
     const grouping = groupByDay<EventRow>('created');
     const columns: Column<EventRow>[] = [
         { key: 'created', label: 'Created', sortable: true, render: (row) => fmt.datetime(row.created) },
@@ -50,6 +47,6 @@ export function EventsPage() {
         {...grouping} groupHeaderStyle="band"
         exporter={EVENT_EXPORTER} exportFormats={['csv', 'json']}
         columnChooser persistState persistKey="admin-security-events" autoRefresh={30}
-        onRowClick={(row) => panel.open({ key: `event:${row.id}`, title: `Event #${row.id}`, render: ({ close }) => <EventDetail id={row.id} onClose={close} /> })}
+        onRowClick={(row) => showEventDetail(row.id)}
     />;
 }

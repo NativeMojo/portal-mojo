@@ -6,8 +6,9 @@ the `/api/settings` model while keeping write-only values out of client caches.
 
 ## Routes and access
 
-Register `SettingsPage` at the section index and `SettingDetailPage` at `:id`.
-Both routes and the sidebar contribution require either `sys.manage_settings`
+Register `SettingsPage` at the section index. Selecting a row opens
+`SettingDetail` through the shared KISS modal; there is no `:id` child route.
+The route and sidebar contribution require either `sys.manage_settings`
 or `sys.groups`, mirroring `Setting.RestMeta` while ensuring active-group member
 permissions cannot open a fleet-wide settings surface.
 
@@ -19,7 +20,6 @@ permissions cannot open a fleet-wide settings surface.
   permissions: SETTINGS_PERMISSIONS,
   routes: [
     { path: '', component: SettingsPage, permissions: SETTINGS_PERMISSIONS },
-    { path: ':id', component: SettingDetailPage, permissions: SETTINGS_PERMISSIONS },
   ],
 }
 ```
@@ -70,7 +70,6 @@ import {
   SettingModel,
   SettingsPage,
   SettingDetail,
-  SettingDetailPage,
   SETTINGS_PERMISSIONS,
   SETTINGS_ADMIN_SECTION,
   buildSettingPayload,

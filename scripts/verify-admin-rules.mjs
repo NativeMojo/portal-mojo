@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
@@ -7,6 +8,15 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 
 try {
+    const [ruleSetsPage, ruleSetDetail, ruleRoutes] = await Promise.all([
+        readFile(new URL('../packages/portal-mojo/src/admin/rules/RuleSetsPage.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/rules/RuleSetDetailPage.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/rules/index.ts', import.meta.url), 'utf8'),
+    ]);
+    assert.match(ruleSetsPage, /modal\.detail\([\s\S]*<RuleSetDetail/);
+    assert.doesNotMatch(`${ruleSetsPage}\n${ruleSetDetail}`, /useNavigate|useParams/);
+    assert.doesNotMatch(ruleRoutes, /rules\/:id|RuleSetDetailPage/);
+
     const dsl = await server.ssrLoadModule('/packages/portal-mojo/src/admin/rules/handler-dsl.ts');
     const models = await server.ssrLoadModule('/packages/portal-mojo/src/admin/rules/models.ts');
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
@@ -42,7 +52,7 @@ try {
     assert.throws(() => models.ruleChanges({ parent: 1, name: 'bool', index: 0, field_name: 'active', value: 'false', value_type: 'bool', comparator: '==' }, true));
     assert.equal(models.ruleChanges({ parent: 1, name: 'legacy bool renamed', index: 0, field_name: 'active', value: 'false', value_type: 'bool', comparator: '==' }, false, { parent: 1, name: 'legacy bool', index: 0, field_name: 'active', value: 'false', value_type: 'bool', comparator: '==' }).value, 'false');
     assert.throws(() => models.ruleChanges({ parent: 1, name: 'int', index: 0, field_name: 'level', value: 'x', value_type: 'int', comparator: '==' }, true));
-    assert.deepEqual(admin.SECURITY_OPERATIONS_ADMIN_SECTION.routes.map((route) => route.path), ['tickets', 'incidents', 'events', 'rules', 'rules/:id']);
+    assert.deepEqual(admin.SECURITY_OPERATIONS_ADMIN_SECTION.routes.map((route) => route.path), ['tickets', 'incidents', 'events', 'rules']);
 
     const login = async (email) => { const response = await mock.mockFetch('/api/login', { method: 'POST', body: { username: email, password: 'mojo' } }); return { Authorization: `Bearer ${response.data.access_token}` }; };
     const manager = await login('security.manager@nativemojo.com'); const viewer = await login('security.viewer@nativemojo.com'); const unrelated = await login('groups.manager@nativemojo.com'); const manageOnly = await login('security.manage-only@nativemojo.com');

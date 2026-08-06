@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useCan } from '../../client';
-import { Badge, ModelTable, fmt, type Column, type FilterDef } from '../../ui';
+import { Badge, ModelTable, fmt, modal, type Column, type FilterDef } from '../../ui';
 import { parseHandlerChain } from './handler-dsl';
 import { openRuleSetEditor } from './editors';
 import { BUNDLE_BY_OPTIONS, RULESET_MANAGE_PERMS, RuleSetModel, type RuleSetRow } from './models';
+import { RuleSetDetail } from './RuleSetDetailPage';
 
 function handlerSummary(value: string | null) {
     const chain = parseHandlerChain(value);
@@ -13,7 +13,7 @@ function handlerSummary(value: string | null) {
 }
 
 export function RuleSetsPage() {
-    const navigate = useNavigate(); const { can: canManage } = useCan(RULESET_MANAGE_PERMS);
+    const { can: canManage } = useCan(RULESET_MANAGE_PERMS);
     const inventory = RuleSetModel.useList({ size: 500, sort: 'priority' });
     const ties = useMemo(() => {
         const counts = new Map<string, number>();
@@ -29,5 +29,5 @@ export function RuleSetsPage() {
         { key: 'modified', label: 'Modified', sortable: true, render: (row) => fmt.datetime(row.modified) },
     ];
     const filters: FilterDef[] = [{ key: 'is_active', label: 'Active', type: 'boolean' }, { key: 'category', label: 'Category', type: 'text' }, { key: 'priority', label: 'Priority', type: 'number' }, { key: 'bundle_by', label: 'Bundle mode', type: 'select', options: BUNDLE_BY_OPTIONS.map((option) => ({ value: String(option.value), label: option.label })) }];
-    return <div className="admin-rules-page">{ties.length > 0 && <div className="rule-priority-warning"><strong>Undefined tie order:</strong> {ties.join(', ')}. Edit one priority; multi-row reorder is intentionally unavailable.</div>}<ModelTable model={RuleSetModel} title="Rule Engine" eyebrow="Security operations" columns={columns} filters={filters} searchable searchPlaceholder="Search rule-set names" defaultParams={{ sort: 'priority' }} presets={[{ key: 'all', label: 'All', params: {} }, { key: 'active', label: 'Active', params: { is_active: 'true' } }, { key: 'inactive', label: 'Inactive', params: { is_active: 'false' } }]} columnChooser persistState persistKey="admin-security-rules" onRowClick={(row) => navigate(String(row.id))} {...(canManage ? { addLabel: 'New inactive rule set', onAdd: () => void openRuleSetEditor() } : {})} /></div>;
+    return <div className="admin-rules-page">{ties.length > 0 && <div className="rule-priority-warning"><strong>Undefined tie order:</strong> {ties.join(', ')}. Edit one priority; multi-row reorder is intentionally unavailable.</div>}<ModelTable model={RuleSetModel} title="Rule Engine" eyebrow="Security operations" columns={columns} filters={filters} searchable searchPlaceholder="Search rule-set names" defaultParams={{ sort: 'priority' }} presets={[{ key: 'all', label: 'All', params: {} }, { key: 'active', label: 'Active', params: { is_active: 'true' } }, { key: 'inactive', label: 'Inactive', params: { is_active: 'false' } }]} columnChooser persistState persistKey="admin-security-rules" onRowClick={(row) => void modal.detail((close) => <RuleSetDetail id={row.id} onClose={() => close(null)} />)} {...(canManage ? { addLabel: 'New inactive rule set', onAdd: () => void openRuleSetEditor() } : {})} /></div>;
 }

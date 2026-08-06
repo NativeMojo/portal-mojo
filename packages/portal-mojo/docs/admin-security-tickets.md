@@ -11,7 +11,7 @@ The section and route use `sys.view_security` or `sys.security`. Mutating contro
 - Ticket collection/detail: `/api/incident/ticket`. List state uses the standard Django lookups, graph relations, paging, sorting, search, and `download_format=csv|json`. Saves accept title, description, arbitrary status/category strings, integer priority 1–10, and a nullable assignee ID.
 - Notes: `/api/incident/ticket/note`, always scoped with the ticket `parent` and, for grouped tickets, the ticket's own `group`. A status save creates a structured note with `metadata.type=status_change`, `old_status`, and `new_status`.
 - Ticket actions: detail POST bodies use `enable_llm`, `disable_llm`, or `push_to_maestro`. Push success means queued, not linked.
-- Maestro links: `/api/incident/maestro/item-link?ticket=<id>`. The panel polls for at most 30 seconds after a queued push and always offers a manual check.
+- Maestro links: `/api/incident/maestro/item-link?ticket=<id>`. The detail modal polls for at most 30 seconds after a queued push and always offers a manual check.
 
 Unknown status/category values are appended to the known UI options and are never coerced away. Relation values may be a graph object, a bare ID, or null.
 
@@ -21,8 +21,14 @@ Every ticket mutation invalidates the Ticket model root, the record-scoped Ticke
 
 Resolved actions, terminal tickets, missing manage permission, and in-flight responses disable approval controls. The server still owns replay protection and handler authorization.
 
-## Panel behavior
+## Detail modal behavior
 
-Ticket titles are real buttons and open the shared non-modal `RightPanel` without changing the current route or table params. The panel fetches the authoritative detail row, restores focus on close, and remains mounted during route-like shell rerenders. `RecordFeed` uses compact mode and receives `showInput={canManage}`.
+Ticket titles are real buttons and both title clicks and row clicks open the
+shared KISS `modal.detail` surface without changing the current route or table
+params. The modal fetches the authoritative detail row and uses `DetailView`
+sections for Overview, permission-gated Manage controls, and Activity.
+Nested edit and confirmation modals use the native dialog stack, and closing
+the detail returns to the unchanged queue. `RecordFeed` uses compact mode and
+receives `showInput={canManage}`.
 
 Attachments/media, Assistant chat, and incident-detail navigation remain deferred. Raw feed media is not rendered, and a remote Maestro URL becomes a link only when it parses as HTTP or HTTPS.

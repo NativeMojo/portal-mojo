@@ -12,11 +12,9 @@
 .ticket-inline-select:disabled { opacity: 0.65; }
 .ticket-inline-error { max-width: 180px; color: var(--bad); font-size: 11px; line-height: 1.25; }
 .ticket-editor-priority { margin-bottom: 16px; max-width: 220px; }
-.ticket-panel-content { display: grid; gap: 0; }
-.ticket-panel-summary, .ticket-panel-controls, .ticket-panel-feed { padding: 18px; border-bottom: 1px solid var(--line); }
-.ticket-panel-content h3 { margin: 10px 0 4px; color: var(--ink-strong); font-size: 20px; line-height: 1.25; }
-.ticket-panel-content h4 { margin: 0 0 10px; color: var(--ink-strong); font-size: 13px; }
-.ticket-panel-badges, .ticket-control-actions, .ticket-action-card-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.ticket-detail-summary, .ticket-detail-controls, .ticket-detail-feed { display: grid; gap: 14px; }
+.ticket-detail-summary h4, .ticket-detail-controls h4 { margin: 0 0 10px; color: var(--ink-strong); font-size: 13px; }
+.ticket-control-actions, .ticket-action-card-actions { display: flex; gap: 7px; flex-wrap: wrap; }
 .ticket-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin: 18px 0; }
 .ticket-facts div { min-width: 0; }
 .ticket-facts dt { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
@@ -24,7 +22,7 @@
 .ticket-description, .ticket-maestro-link { margin-top: 18px; }
 .ticket-control-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ticket-control-actions { margin-top: 12px; }
-.ticket-panel-state { padding: 24px; }
+.ticket-detail-state { display: flex; align-items: center; gap: 10px; padding: 24px; }
 .ticket-action-card {
     margin-top: 10px; padding: 12px; border: 1px solid var(--warn);
     border-radius: 9px; background: var(--warn-soft); color: var(--ink);
@@ -36,5 +34,4 @@
 .ticket-action-card-actions { margin-top: 10px; }
 @media (max-width: 520px) {
     .ticket-facts, .ticket-control-grid { grid-template-columns: 1fr; }
-    .ticket-panel-summary, .ticket-panel-controls, .ticket-panel-feed { padding: 14px; }
 }

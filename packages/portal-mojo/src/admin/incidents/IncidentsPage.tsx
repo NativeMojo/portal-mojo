@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createSafeExporter, useCan } from '../../client';
 import { Badge, ModelTable, fmt, modal, type BatchAction, type Column, type FilterDef, type Tone } from '../../ui';
-import { useRightPanel } from '../../ui/RightPanel';
 import { SECURITY_MANAGE_PERMS } from '../security-permissions';
-import { IncidentDetail } from './IncidentDetail';
-import { INCIDENT_LIFECYCLE, IncidentModel, buildIncidentMerge, type IncidentRow } from './models';
+import { INCIDENT_LIFECYCLE, IncidentModel, buildIncidentMerge, showIncidentDetail, type IncidentRow } from './models';
 import { sanitizeIncidentRow } from './sanitize';
 
 function priorityTone(priority: number): Tone { return priority >= 8 ? 'danger' : priority >= 5 ? 'warning' : 'info'; }
@@ -36,13 +34,8 @@ function MergeTargetForm({ rows, done }: { rows: IncidentRow[]; done: (value: nu
 export function IncidentsPage() {
     const { can: canManage } = useCan(SECURITY_MANAGE_PERMS);
     const queryClient = useQueryClient();
-    const panel = useRightPanel();
     const save = IncidentModel.useSave();
     const merge = IncidentModel.useAction('merge');
-    const openIncident = (row: IncidentRow, launcher?: HTMLElement | null) => panel.open({
-        key: `incident:${row.id}`, title: `Incident #${row.id}`,
-        render: ({ close }) => <IncidentDetail id={row.id} onClose={close} />,
-    }, launcher);
     const lifecycle = (status: string): BatchAction<IncidentRow> => ({
         key: status, label: `Set ${status}`, icon: 'bi-arrow-left-right',
         run: (row) => save.mutateAsync({ id: row.id, changes: { status } }),
@@ -103,7 +96,7 @@ export function IncidentsPage() {
         rowTone={(row) => row.priority >= 8 ? 'danger' : row.priority >= 5 ? 'warning' : null}
         exporter={INCIDENT_EXPORTER} exportFormats={['csv', 'json']}
         columnChooser persistState persistKey="admin-security-incidents" autoRefresh={30}
-        onRowClick={(row) => openIncident(row)}
+        onRowClick={(row) => showIncidentDetail(row.id)}
         {...(canManage ? { selectable: true, batchActions: actions } : {})}
     />;
 }

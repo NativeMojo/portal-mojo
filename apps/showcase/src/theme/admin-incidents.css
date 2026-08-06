@@ -11,7 +11,4 @@
 .incident-event-row > span { min-width: 0; display: grid; gap: 3px; }
 .incident-event-row small { color: var(--mute); overflow-wrap: anywhere; }
 .admin-incidents-demo-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
-.admin-incidents-demo-shell { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 38%); min-height: 620px; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.admin-incidents-demo-main { min-width: 0; padding: 12px; background: var(--bg); }
-.admin-incidents-demo-shell > .right-panel { min-width: 0; background: var(--surface); }
-@media (max-width: 850px) { .admin-incidents-demo-shell { display: block; } .admin-incidents-demo-shell > .right-panel { position: fixed; inset: 56px 0 0 10%; z-index: 20; box-shadow: var(--shadow-pop); } }
+.admin-incidents-demo-main { min-width: 0; min-height: 620px; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }

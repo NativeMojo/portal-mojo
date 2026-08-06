@@ -13,6 +13,13 @@ sections with side-label dividers. Open it inside `modal.detail(...)` for
 the standard row-click experience. Ported from web-mojo `SideNavView.js`
 (sections, gating, badges) + `ContextMenu.js` (the kebab).
 
+**Admin convention:** every record inspection launched from an Admin table
+uses this KISS detail-modal pattern unless the product explicitly specifies a
+different presentation. Top-level Admin resources remain pages in the global
+Admin sidenav; the selected record does not become a child route, drawer, or
+persistent right panel by default. Focused edit/action dialogs may stack above
+the detail through `modal.open` or `modal.confirm`.
+
 Because sections and menu entries can carry permissions, DetailView
 resolves the live session (`useMe` + active-group member) — like the rest
 of the toolkit it must render inside the app's `QueryClientProvider`

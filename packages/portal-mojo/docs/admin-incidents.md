@@ -34,10 +34,12 @@ cannot guarantee arbitrary opaque prose, so raw JSON is not rendered or
 exported. `createSafeExporter` sanitizes before accumulation and projects only
 declared fields.
 
-Details compose the shipped RightPanel, StatusPanel, KnownFieldsCard,
-StackTraceView, and RecordFeed. Ticket/rule/AI/network-response/dashboard
-controls remain excluded. Bouncer discovery stays category-prefix plus MUID
-search because its reporter writes MUID into incident details.
+Incident and event rows open the shared KISS `modal.detail` surface, composing
+DetailView, StatusPanel, KnownFieldsCard, StackTraceView, and RecordFeed.
+Incident→event and event→incident drill-ins stack a child detail modal; closing
+the child reveals the parent. Ticket/rule/AI/network-response/dashboard controls
+remain excluded. Bouncer discovery stays category-prefix plus MUID search
+because its reporter writes MUID into incident details.
 
 ## Backend evidence
 

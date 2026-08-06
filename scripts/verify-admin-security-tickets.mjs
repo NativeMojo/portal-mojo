@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
@@ -12,6 +13,11 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 
 try {
+    const ticketPage = await readFile(new URL('../packages/portal-mojo/src/admin/security/tickets.tsx', import.meta.url), 'utf8');
+    assert.match(ticketPage, /modal\.detail\([\s\S]*<TicketDetail/, 'ticket rows must open the KISS detail modal');
+    assert.match(ticketPage, /<DetailView/, 'ticket detail must use the standard DetailView chrome');
+    assert.doesNotMatch(ticketPage, /useRightPanel|TicketPanel|ticket-panel-/, 'ticket detail must not retain RightPanel wiring');
+
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const menus = await server.ssrLoadModule('/packages/portal-mojo/src/ui/menu-registry.ts');
     const models = await server.ssrLoadModule('/packages/portal-mojo/src/admin/security/models.ts');

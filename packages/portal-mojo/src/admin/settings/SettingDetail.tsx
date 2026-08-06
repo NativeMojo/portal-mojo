@@ -1,4 +1,3 @@
-import { useNavigate, useParams } from 'react-router-dom';
 import { Badge, DetailView, Eyebrow, FlatRow, fmt } from '../../ui';
 import { useCan } from '../../client';
 import {
@@ -55,13 +54,4 @@ export function SettingDetail({ id, onClose }: { id: number; onClose: () => void
             onClose={onClose}
         />
     );
-}
-
-/** Mount-point-relative detail page for AdminSection route `:id`. */
-export function SettingDetailPage() {
-    const params = useParams();
-    const navigate = useNavigate();
-    const id = Number(params.id);
-    if (!Number.isInteger(id) || id <= 0) return <div className="panel panel-pad text-bad">Invalid setting id</div>;
-    return <SettingDetail id={id} onClose={() => navigate('..', { relative: 'path' })} />;
 }
