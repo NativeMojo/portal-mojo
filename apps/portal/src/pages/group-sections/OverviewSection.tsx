@@ -8,19 +8,32 @@ import {
     Badge, Eyebrow, FlatRow, MetricCard, Timeline,
     fmt, type TimelineItem,
 } from 'portal-mojo/ui';
-import { GroupApiKeyModel, LogModel } from 'portal-mojo/admin';
+import {
+    GroupApiKeyModel, LogModel, type GroupApiKeyRow, type LogRow,
+} from 'portal-mojo/admin';
+import { useModelList } from 'portal-mojo/client';
 import { GroupModel, MemberModel, type GroupRow } from '../../models';
 import { kindLabel } from './models';
 import { LOG_TONE, groupAuditParams } from './shared';
 
-export function OverviewSection({ group, openGroup }: {
+export function OverviewSection({ group, openGroup, canViewCredentials, canViewAudit }: {
     group: GroupRow;
     openGroup: (id: number) => void;
+    canViewCredentials: boolean;
+    canViewAudit: boolean;
 }) {
     const { data: subs } = GroupModel.useList({ parent: group.id, size: 25, sort: 'name' });
     const { data: memberPeek } = MemberModel.useList({ group: group.id, size: 1, is_active: true });
-    const { data: keyPeek } = GroupApiKeyModel.useList({ group: group.id, size: 1 });
-    const { data: logs } = LogModel.useList({ ...groupAuditParams(group.id), size: 5 });
+    const { data: keyPeek } = useModelList<GroupApiKeyRow>(
+        GroupApiKeyModel.endpoint,
+        { group: group.id, size: 1, graph: 'default' },
+        { enabled: canViewCredentials },
+    );
+    const { data: logs } = useModelList<LogRow>(
+        LogModel.endpoint,
+        { ...groupAuditParams(group.id), size: 5 },
+        { enabled: canViewAudit },
+    );
 
     const subGroups = subs?.rows ?? [];
     const subCount = subs?.count ?? subGroups.length;
@@ -43,7 +56,7 @@ export function OverviewSection({ group, openGroup }: {
             <div className="grid gap-3 grid-cols-2 xl:grid-cols-4" style={{ marginBottom: 14 }}>
                 <MetricCard label="Members" value={memberCount} />
                 <MetricCard label="Sub-groups" value={subs ? subCount : '—'} />
-                <MetricCard label="API keys" value={keyPeek?.count ?? '—'} />
+                <MetricCard label="API keys" value={canViewCredentials ? (keyPeek?.count ?? '—') : 'Unavailable'} />
                 <MetricCard label="Last activity" value={fmt.relative(group.last_activity, '—')} />
             </div>
 
@@ -90,7 +103,11 @@ export function OverviewSection({ group, openGroup }: {
             </div>
 
             <Eyebrow>Recent activity</Eyebrow>
-            <Timeline items={items} emptyText="No recorded activity for this group yet." />
+            {canViewAudit ? (
+                <Timeline items={items} emptyText="No recorded activity for this group yet." />
+            ) : (
+                <p className="dim-italic">Recent activity requires global log or security access.</p>
+            )}
         </>
     );
 }

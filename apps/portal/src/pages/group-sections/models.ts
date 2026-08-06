@@ -26,14 +26,6 @@
 //     django model: created/category/title (+ level/details/model_*).
 import { defineModel } from 'portal-mojo/client';
 
-// ── Permission tiers (GroupView.js:1357-1359) ─────────────────────────
-/** Admin tier — offer group-management flows. */
-export const GROUP_ADMIN_PERMS = ['groups', 'manage_groups'];
-/** Strict tier — disable/reactivate (backend tightening, spec line 214). */
-export const GROUP_DESTRUCTIVE_PERMS = 'manage_groups';
-/** Configure Auth — system-level only (sys. pins to the global dict). */
-export const GROUP_AUTH_PERMS = ['sys.groups', 'sys.manage_groups'];
-
 // ── Group kinds (Group.js GroupKinds — the FULL known-kind catalog) ───
 export const GROUP_KINDS: Record<string, string> = {
     org: 'Organization',

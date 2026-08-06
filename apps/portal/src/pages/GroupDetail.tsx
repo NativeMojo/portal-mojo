@@ -29,14 +29,16 @@ import {
 } from 'portal-mojo/ui';
 import { mojoList, useCan, type Params } from 'portal-mojo/client';
 import {
-    GROUP_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
+    GLOBAL_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
     LogModel, WebhookSubscriptionModel, WebhookSubscriptionsSection,
     MEMBER_INVITE_PERMISSIONS, MEMBER_SAVE_PERMISSIONS, MEMBER_USER_DIRECTORY_PERMISSIONS,
     openMemberAdmissionDialog,
 } from 'portal-mojo/admin';
-import { GroupModel, MemberModel, type GroupRow } from '../models';
 import {
-    GROUP_ADMIN_PERMS, GROUP_AUTH_PERMS, GROUP_DESTRUCTIVE_PERMS,
+    GROUP_DESTRUCTIVE_PERMS, GROUP_MANAGE_PERMS,
+    GroupModel, MemberModel, type GroupRow,
+} from '../models';
+import {
     iconForKind, kindLabel,
 } from './group-sections/models';
 import { GEOFENCE_VIEW_PERMS } from './group-sections/geofence-data';
@@ -51,6 +53,9 @@ import { EventsSection } from './group-sections/EventsSection';
 import { AuditSection } from './group-sections/AuditSection';
 
 export { iconForKind } from './group-sections/models';
+
+const GLOBAL_SECURITY_PERMS = ['sys.view_security', 'sys.security'];
+const GLOBAL_LOG_PERMS = ['sys.view_logs', 'sys.manage_logs', 'sys.security'];
 
 /** Open another group's detail as a stacked modal (source _openGroupById). */
 function openGroupById(id: number) {
@@ -78,9 +83,9 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
     const groupSave = GroupModel.useSave();
     const disable = GroupModel.useAction('disable');
     const reactivate = GroupModel.useAction('reactivate');
-    const { can: canDestroy } = useCan(GROUP_DESTRUCTIVE_PERMS);
-    const { can: canAccessManage } = useCan(GROUP_CREDENTIAL_PERMS);
-    const { can: canViewAudit } = useCan(['view_logs', 'manage_logs', 'security']);
+    const { can: canManage } = useCan(GROUP_MANAGE_PERMS);
+    const { can: canAccessCredentials } = useCan(GLOBAL_CREDENTIAL_PERMS);
+    const { can: canViewAudit } = useCan(GLOBAL_LOG_PERMS);
     const { can: canInviteMember } = useCan(MEMBER_INVITE_PERMISSIONS);
     const { can: canCreateMember } = useCan(MEMBER_SAVE_PERMISSIONS);
     const { can: canReadUsers } = useCan(MEMBER_USER_DIRECTORY_PERMISSIONS);
@@ -90,8 +95,8 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
     // hold off until the caller could actually open the section.
     const memberCount = useCountPeek(MemberModel.endpoint, { group: id, size: 1, is_active: true });
     const subCount = useCountPeek(GroupModel.endpoint, { parent: id, size: 1 });
-    const keyCount = useCountPeek(GroupApiKeyModel.endpoint, { group: id, size: 1 }, canAccessManage);
-    const hookCount = useCountPeek(WebhookSubscriptionModel.endpoint, { group: id, size: 1 }, canAccessManage);
+    const keyCount = useCountPeek(GroupApiKeyModel.endpoint, { group: id, size: 1 }, canAccessCredentials);
+    const hookCount = useCountPeek(WebhookSubscriptionModel.endpoint, { group: id, size: 1 }, canAccessCredentials);
     const auditCount = useCountPeek(LogModel.endpoint, { ...groupAuditParams(id), size: 1 }, canViewAudit);
 
     if (isPending || !group) {
@@ -145,12 +150,12 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
         },
         {
             label: `Add Sub-${noun}`, icon: 'bi-diagram-3',
-            permissions: GROUP_ADMIN_PERMS,
+            permissions: GROUP_MANAGE_PERMS,
             onSelect: () => { void runAddSubGroupFlow(group, groupSave.mutateAsync); },
         },
         {
             label: 'Configure Auth', icon: 'bi-box-arrow-in-right',
-            permissions: GROUP_AUTH_PERMS,
+            permissions: GROUP_MANAGE_PERMS,
             onSelect: () => { openAuthConfigDialog(group); },
         },
         {
@@ -189,7 +194,7 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
             ]}
             // Toggle hidden below manage_groups (source _buildHeaderAux gate).
             // Off → deactivate flow (cancel leaves it on); on → reactivate.
-            active={canDestroy
+            active={canManage
                 ? { value: group.is_active, onChange: (next) => { void (next ? activate() : deactivate()); } }
                 : undefined}
             contextMenu={MENU}
@@ -203,21 +208,31 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
             }}
             onClose={onClose}
             sections={[
-                { key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <OverviewSection group={group} openGroup={openGroupById} /> },
-                { key: 'Identity', label: 'Identity', icon: 'bi-card-text', render: () => <IdentitySection group={group} /> },
+                {
+                    key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2',
+                    render: () => (
+                        <OverviewSection
+                            group={group}
+                            openGroup={openGroupById}
+                            canViewCredentials={canAccessCredentials}
+                            canViewAudit={canViewAudit}
+                        />
+                    ),
+                },
+                { key: 'Identity', label: 'Identity', icon: 'bi-card-text', render: () => <IdentitySection group={group} editable={canManage} /> },
                 { divider: 'Membership' },
                 { key: 'Members', label: 'Members', icon: 'bi-people', render: () => <MembersSection group={group} openGroup={openGroupById} /> },
                 { key: 'SubGroups', label: 'Sub-Groups', icon: 'bi-diagram-3', render: () => <SubGroupsSection group={group} openGroup={openGroupById} /> },
                 { divider: 'Access' },
                 {
                     key: 'ApiKeys', label: 'API Keys', icon: 'bi-key',
-                    permissions: GROUP_CREDENTIAL_PERMS,
-                    render: () => <GroupApiKeysSection group={group} />,
+                    permissions: GLOBAL_CREDENTIAL_PERMS,
+                    render: () => <GroupApiKeysSection group={group} permission={GLOBAL_CREDENTIAL_PERMS} />,
                 },
                 {
                     key: 'Webhooks', label: 'Webhooks', icon: 'bi-broadcast',
-                    permissions: GROUP_CREDENTIAL_PERMS,
-                    render: () => <WebhookSubscriptionsSection group={group} />,
+                    permissions: GLOBAL_CREDENTIAL_PERMS,
+                    render: () => <WebhookSubscriptionsSection group={group} permission={GLOBAL_CREDENTIAL_PERMS} />,
                 },
                 {
                     key: 'Geofencing', label: 'Geofencing', icon: 'bi-globe-americas',
@@ -225,13 +240,17 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
                     render: () => <GeofenceSection group={group} />,
                 },
                 { divider: 'Activity' },
-                { key: 'Events', label: 'Events', icon: 'bi-calendar-event', render: () => <EventsSection group={group} /> },
+                {
+                    key: 'Events', label: 'Events', icon: 'bi-calendar-event',
+                    permissions: GLOBAL_SECURITY_PERMS,
+                    render: () => <EventsSection group={group} />,
+                },
                 {
                     key: 'Audit', label: 'Audit', icon: 'bi-clock-history',
                     // Wider than the source's bare 'view_logs': the fetch
                     // itself needs logit's VIEW_PERMS, so the gate matches
                     // what can actually load (fail-closed alignment).
-                    permissions: ['view_logs', 'manage_logs', 'security'],
+                    permissions: GLOBAL_LOG_PERMS,
                     render: () => <AuditSection group={group} />,
                 },
                 { divider: 'Detail' },
@@ -239,17 +258,19 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
                     key: 'Metadata', label: 'Metadata', icon: 'bi-braces',
                     render: () => (
                         <>
-                            <MetadataSection
-                                endpoint={GroupModel.endpoint}
-                                id={group.id}
-                                metadata={group.metadata ?? {}}
-                                onSaved={(next) => {
-                                    // Owner write-through + refetch (the primitive is
-                                    // controlled — it never mirrors server state).
-                                    qc.setQueryData(GroupModel.keys.one(group.id), { ...group, metadata: next });
-                                    void GroupModel.invalidate(qc);
-                                }}
-                            />
+                            {canManage && (
+                                <MetadataSection
+                                    endpoint={GroupModel.endpoint}
+                                    id={group.id}
+                                    metadata={group.metadata ?? {}}
+                                    onSaved={(next) => {
+                                        // Owner write-through + refetch (the primitive is
+                                        // controlled — it never mirrors server state).
+                                        qc.setQueryData(GroupModel.keys.one(group.id), { ...group, metadata: next });
+                                        void GroupModel.invalidate(qc);
+                                    }}
+                                />
+                            )}
                             <div style={{ marginTop: 16 }}>
                                 <JsonBlock value={group.metadata ?? {}} label="Raw metadata (JSON)" collapsible defaultOpen={false} />
                             </div>

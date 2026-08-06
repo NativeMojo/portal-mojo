@@ -280,9 +280,9 @@ function ApiKeyCard({ row, actions }: {
     );
 }
 
-export function GroupApiKeysSection({ group }: { group: CredentialGroup }) {
+function GroupApiKeysContent({ group, permission }: { group: CredentialGroup; permission: PermSpec }) {
     const { data, isPending } = GroupApiKeyModel.useList({ group: group.id, size: 10, sort: '-created' });
-    const actions = useGroupApiKeyActions(GROUP_CREDENTIAL_PERMS);
+    const actions = useGroupApiKeyActions(permission);
     const rows = data?.rows ?? [];
     return (
         <>
@@ -304,6 +304,15 @@ export function GroupApiKeysSection({ group }: { group: CredentialGroup }) {
             )}
         </>
     );
+}
+
+export function GroupApiKeysSection({ group, permission = GROUP_CREDENTIAL_PERMS }: {
+    group: CredentialGroup;
+    permission?: PermSpec;
+}) {
+    const { can } = useCan(permission);
+    if (!can) return <p className="dim-italic">API keys are unavailable for this account.</p>;
+    return <GroupApiKeysContent group={group} permission={permission} />;
 }
 
 export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => void }) {

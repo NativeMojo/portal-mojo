@@ -108,12 +108,17 @@ export type GroupRow = Group & {
     member_count: number;
 };
 
+/** Global Admin gates. `sys.` forbids active-member authority from leaking in. */
+export const GROUP_VIEW_PERMS = ['sys.groups', 'sys.view_groups'];
+export const GROUP_MANAGE_PERMS = ['sys.groups', 'sys.manage_groups'];
+export const GROUP_DESTRUCTIVE_PERMS = ['sys.groups', 'sys.manage_groups'];
+
 export const GroupModel = defineModel<GroupRow>({
     name: 'group',
     endpoint: '/api/group',
     permissions: {
-        view: ['groups', 'view_groups'],
-        manage: ['groups', 'manage_groups'],
+        view: GROUP_VIEW_PERMS,
+        manage: GROUP_MANAGE_PERMS,
     },
     forms: {
         create: {
@@ -154,8 +159,8 @@ export const GroupModel = defineModel<GroupRow>({
     // manage_groups tier server-side; realtime_message/revoke_group_tokens
     // join when their screens land).
     actions: {
-        disable: { permissions: 'manage_groups' },
-        reactivate: { permissions: 'manage_groups' },
+        disable: { permissions: GROUP_DESTRUCTIVE_PERMS },
+        reactivate: { permissions: GROUP_DESTRUCTIVE_PERMS },
     },
 });
 

@@ -19,7 +19,7 @@
 // mints backend-shaped `uuid4().hex` (32 lowercase hex chars, no hyphens)
 // after a confirm.
 import {
-    Badge, CollectionSelect, Eyebrow, FlatRow, FormView,
+    Badge, Eyebrow, FlatRow, FormView,
     fmt, modal, toast, type Field,
 } from 'portal-mojo/ui';
 import { GroupModel, type GroupRow } from '../../models';
@@ -70,7 +70,11 @@ function generateUuidHex(): string | null {
     return null;
 }
 
-export function IdentitySection({ group }: { group: GroupRow }) {
+function shown(value: unknown): string {
+    return value == null || value === '' ? 'Not set' : String(value);
+}
+
+export function IdentitySection({ group, editable }: { group: GroupRow; editable: boolean }) {
     const save = GroupModel.useSave();
 
     const eodRaw = group.metadata?.eod_hour;
@@ -94,16 +98,10 @@ export function IdentitySection({ group }: { group: GroupRow }) {
         }
     };
 
-    const saveParent = async (id: string | number | null) => {
-        // Client-side sanity only (server stays authoritative): a group can
-        // never be its own parent.
-        if (id != null && Number(id) === group.id) {
-            toast.error('A group cannot be its own parent');
-            return;
-        }
+    const clearParent = async () => {
         try {
-            await save.mutateAsync({ id: group.id, changes: { parent: id == null ? null : Number(id) } });
-            toast.success(id == null ? 'Parent cleared — now a top-level group' : 'Parent updated');
+            await save.mutateAsync({ id: group.id, changes: { parent: null } });
+            toast.success('Parent cleared — now a top-level group');
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update parent');
         }
@@ -132,48 +130,71 @@ export function IdentitySection({ group }: { group: GroupRow }) {
     return (
         <>
             <Eyebrow>Profile</Eyebrow>
-            <p className="dim" style={{ margin: '0 0 12px' }}>Edits save on commit — no save button.</p>
-            <FormView model={GroupModel} row={group} fields={IDENTITY_FIELDS} />
-            {!group.uuid && (
+            {editable ? (
+                <>
+                    <p className="dim" style={{ margin: '0 0 12px' }}>Edits save on commit — no save button.</p>
+                    <FormView model={GroupModel} row={group} fields={IDENTITY_FIELDS} />
+                </>
+            ) : (
+                <>
+                    <FlatRow label="Name">{group.name}</FlatRow>
+                    <FlatRow label="Kind">{shown(group.kind)}</FlatRow>
+                    <FlatRow label="UUID"><code>{shown(group.uuid)}</code></FlatRow>
+                </>
+            )}
+            {editable && !group.uuid && (
                 <button className="btn btn-compact" style={{ marginTop: 4 }} onClick={() => void generateUuid()}>
                     <i className="bi bi-shuffle" /> Generate UUID
                 </button>
             )}
             <div className="ga-parent-row">
-                <CollectionSelect
-                    endpoint="/api/group"
-                    label="Parent group"
-                    value={group.parent ?? null}
-                    onChange={(id) => void saveParent(id)}
-                    labelField="name"
-                    valueField="id"
-                    maxItems={10}
-                    emptyFetch={false}
-                    debounceMs={300}
-                    placeholder="Search groups…"
-                    help="Clear to make this a top-level group. Saves immediately."
-                />
+                <FlatRow label="Parent group">
+                    <span>{group.parent?.name ?? 'None — top-level group'}</span>
+                    {editable && group.parent?.id && (
+                        <button className="btn btn-compact" style={{ marginLeft: 10 }} onClick={() => void clearParent()}>
+                            <i className="bi bi-x-circle" /> Clear to top-level
+                        </button>
+                    )}
+                </FlatRow>
+                {editable && group.parent?.id && (
+                    <p className="field-help">Assigning or changing a parent is unavailable until the server validates hierarchy cycles.</p>
+                )}
             </div>
 
             <Eyebrow>Settings</Eyebrow>
-            <FormView model={GroupModel} row={group} fields={SETTINGS_FIELDS} />
+            {editable ? (
+                <FormView model={GroupModel} row={group} fields={SETTINGS_FIELDS} />
+            ) : (
+                <>
+                    <FlatRow label="Timezone">{shown(group.metadata?.timezone)}</FlatRow>
+                    <FlatRow label="Short name">{shown(group.metadata?.short_name)}</FlatRow>
+                    <FlatRow label="Domain">{shown(group.metadata?.domain)}</FlatRow>
+                    <FlatRow label="Auth domain">{shown(group.metadata?.auth_domain)}</FlatRow>
+                    <FlatRow label="Portal URL">{shown(group.metadata?.portal)}</FlatRow>
+                    <FlatRow label="Email template">{shown(group.metadata?.email_template)}</FlatRow>
+                </>
+            )}
             <div className="ga-eod-row">
-                <label className="field">
-                    <span className="field-label">EOD hour</span>
-                    <select
-                        className="input"
-                        value={eodValid ? String(eodHour) : ''}
-                        onChange={(e) => void saveEod(e.target.value)}
-                    >
-                        <option value="">Not set</option>
-                        {EOD_HOUR_OPTIONS.map((o) => (
-                            <option key={o.value} value={String(o.value)}>
-                                {String(o.value).padStart(2, '0')}:00 — {o.label}
-                            </option>
-                        ))}
-                    </select>
-                    <span className="field-help">Hour of the day (24h) when this group rolls over.</span>
-                </label>
+                {editable ? (
+                    <label className="field">
+                        <span className="field-label">EOD hour</span>
+                        <select
+                            className="input"
+                            value={eodValid ? String(eodHour) : ''}
+                            onChange={(e) => void saveEod(e.target.value)}
+                        >
+                            <option value="">Not set</option>
+                            {EOD_HOUR_OPTIONS.map((o) => (
+                                <option key={o.value} value={String(o.value)}>
+                                    {String(o.value).padStart(2, '0')}:00 — {o.label}
+                                </option>
+                            ))}
+                        </select>
+                        <span className="field-help">Hour of the day (24h) when this group rolls over.</span>
+                    </label>
+                ) : (
+                    <FlatRow label="EOD hour">{eodValid ? `${String(eodHour).padStart(2, '0')}:00` : 'Not set'}</FlatRow>
+                )}
             </div>
 
             <Eyebrow>Record</Eyebrow>

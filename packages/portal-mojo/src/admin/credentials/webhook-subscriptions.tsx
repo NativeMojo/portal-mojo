@@ -284,14 +284,14 @@ function WebhookCard({ row, actions }: {
     );
 }
 
-export function WebhookSubscriptionsSection({ group }: { group: CredentialGroup }) {
+function WebhookSubscriptionsContent({ group, permission }: { group: CredentialGroup; permission: PermSpec }) {
     const { data, isPending } = WebhookSubscriptionModel.useList({ group: group.id, size: 25, sort: '-created' });
-    const actions = useWebhookActions(GROUP_CREDENTIAL_PERMS);
+    const actions = useWebhookActions(permission);
     const rows = data?.rows ?? [];
     return (
         <>
             <Eyebrow>Webhooks</Eyebrow>
-            <WebhookSecretPanel group={group} />
+            <WebhookSecretPanel group={group} permission={permission} />
             <div className="ga-section-gap" />
             <Eyebrow>Subscriptions</Eyebrow>
             {actions.canManage && (
@@ -305,6 +305,15 @@ export function WebhookSubscriptionsSection({ group }: { group: CredentialGroup 
             {rows.map((row) => <WebhookCard key={row.id} row={row} actions={actions} />)}
         </>
     );
+}
+
+export function WebhookSubscriptionsSection({ group, permission = GROUP_CREDENTIAL_PERMS }: {
+    group: CredentialGroup;
+    permission?: PermSpec;
+}) {
+    const { can } = useCan(permission);
+    if (!can) return <p className="dim-italic">Webhooks are unavailable for this account.</p>;
+    return <WebhookSubscriptionsContent group={group} permission={permission} />;
 }
 
 export function WebhookSubscriptionDetail({ id, onClose }: { id: number; onClose: () => void }) {

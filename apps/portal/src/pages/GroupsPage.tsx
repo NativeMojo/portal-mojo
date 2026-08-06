@@ -6,12 +6,16 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
     Badge, fmt, formModal, modal, toast, ModelTable,
-    type Column, type FilterDef,
+    type BatchAction, type Column, type FilterDef,
 } from 'portal-mojo/ui';
-import { GroupModel, GROUP_KIND_OPTIONS, type GroupRow } from '../models';
+import { useCan } from 'portal-mojo/client';
+import {
+    GROUP_KIND_OPTIONS, GROUP_MANAGE_PERMS, GroupModel, type GroupRow,
+} from '../models';
 import { GroupDetail, iconForKind } from './GroupDetail';
 
 const COLUMNS: Column<GroupRow>[] = [
+    { key: 'id', label: 'ID', sortable: true, render: (g) => <span className="dim">{g.id}</span> },
     {
         key: 'name', label: 'Group', sortable: true, hideable: false, render: (g) => (
             <div className="cell-user">
@@ -32,8 +36,10 @@ const COLUMNS: Column<GroupRow>[] = [
             g.member_count > 0 ? String(g.member_count) : <span className="dim">—</span>,
     },
     { key: 'is_active', label: 'Status', render: (g) => <Badge>{g.is_active ? 'Active' : 'Inactive'}</Badge> },
-    { key: 'last_activity', label: 'Last Activity', sortable: true, render: (g) => fmt.relative(g.last_activity, '—') },
+    { key: 'parent', label: 'Parent', render: (g) => g.parent?.name ?? <span className="dim">—</span> },
+    { key: 'uuid', label: 'UUID', render: (g) => g.uuid ? <code>{g.uuid}</code> : <span className="dim">—</span> },
     { key: 'created', label: 'Created', sortable: true, render: (g) => fmt.date(g.created) },
+    { key: 'last_activity', label: 'Last Activity', sortable: true, render: (g) => fmt.relative(g.last_activity, '—') },
 ];
 
 const FILTERS: FilterDef[] = [
@@ -50,6 +56,9 @@ const FILTERS: FilterDef[] = [
 export function GroupsPage() {
     const qc = useQueryClient();
     const save = GroupModel.useSave();
+    const disable = GroupModel.useAction('disable');
+    const reactivate = GroupModel.useAction('reactivate');
+    const { can: canManage } = useCan(GROUP_MANAGE_PERMS);
 
     const addGroup = async () => {
         const form = GroupModel.forms.create!;
@@ -71,6 +80,24 @@ export function GroupsPage() {
         void modal.detail((close) => <GroupDetail id={g.id} onClose={() => close(null)} />);
     };
 
+    const batchActions: BatchAction<GroupRow>[] = canManage ? [
+        {
+            key: 'deactivate', label: 'Deactivate', icon: 'bi-x-circle', danger: true, confirm: false,
+            prepare: async () => {
+                const data = await formModal(GroupModel.forms.disable!);
+                if (!data) return null;
+                const payload: Record<string, unknown> = { reason: data.reason };
+                if (data.note) payload.note = data.note;
+                return payload;
+            },
+            run: (row, payload) => disable.mutateAsync({ id: row.id, payload }),
+        },
+        {
+            key: 'reactivate', label: 'Reactivate', icon: 'bi-arrow-counterclockwise',
+            run: (row) => reactivate.mutateAsync({ id: row.id }),
+        },
+    ] : [];
+
     return (
         <ModelTable<GroupRow>
             model={GroupModel}
@@ -86,12 +113,13 @@ export function GroupsPage() {
                 { key: 'orgs', label: 'Orgs', params: { kind: 'org' } },
             ]}
             defaultSort="-created"
+            selectable={canManage}
+            batchActions={batchActions}
             columnChooser
             persistState
             exportFormats={['csv', 'json']}
             onRowClick={openGroup}
-            addLabel="Add Group"
-            onAdd={addGroup}
+            {...(canManage ? { addLabel: 'Add Group', onAdd: addGroup } : {})}
         />
     );
 }

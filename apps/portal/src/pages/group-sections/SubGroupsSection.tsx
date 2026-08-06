@@ -9,8 +9,8 @@ import {
     fmt, formModal, toast,
 } from 'portal-mojo/ui';
 import { useCan } from 'portal-mojo/client';
-import { GroupModel, type GroupRow } from '../../models';
-import { GROUP_ADMIN_PERMS, GROUP_KIND_COMBO_OPTIONS, kindLabel } from './models';
+import { GROUP_MANAGE_PERMS, GroupModel, type GroupRow } from '../../models';
+import { GROUP_KIND_COMBO_OPTIONS, kindLabel } from './models';
 
 /** GroupModel.useSave().mutateAsync — what the add-sub-group flow needs. */
 type GroupSaveFn = (vars: { id: number | string | null; changes: Record<string, unknown> }) => Promise<GroupRow>;
@@ -48,7 +48,7 @@ export function SubGroupsSection({ group, openGroup }: {
 }) {
     const { data, isPending } = GroupModel.useList({ parent: group.id, size: 25, sort: 'name' });
     const save = GroupModel.useSave();
-    const { can: canManage } = useCan(GROUP_ADMIN_PERMS);
+    const { can: canManage } = useCan(GROUP_MANAGE_PERMS);
     const subs = data?.rows ?? [];
 
     return (
