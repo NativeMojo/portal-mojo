@@ -22,4 +22,7 @@ export * from './record-feed';
 export * from './safe-export';
 export * from './types';
 // Dev affordance: per-endpoint call counts from the mock (single-flight proof).
-export { armMockReauth, getMockCallCounts } from './mock';
+export {
+    armMockReauth, clearMockRequestHistory, getMockCallCounts,
+    getMockRequestHistory, setMockDnsConfigMalformed,
+} from './mock';

@@ -3,7 +3,7 @@
 Reference docs for every export, written to be loaded into an AI coding
 context. Each page states the import path, the API surface, the wire
 contract it speaks, and the invariants that must hold. Live demos for
-everything: run the portal (`npm run dev`) → **Develop → Components**.
+everything: run the showcase (`npm run dev:showcase`) → **Develop → Components**.
 
 | Page | Covers |
 |---|---|
@@ -24,6 +24,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [admin-devices-geoip.md](admin-devices-geoip.md) | Fleet device triage, the login-location world map with country drill-down, and the GeoIP dossier — expiry-aware enforcement, the never-cached raw provider record, and the backend traps the port encodes |
 | [admin-jobs.md](admin-jobs.md) | Jobs engine — runner fleet, per-channel queue depth, the segmented job table with armed cancel and republishing retry, the dry-run-first control plane, scheduled tasks with a global-only gate, and the thirteen backend corrections the port encodes |
 | [admin-network-security.md](admin-network-security.md) | Perimeter control — blocked IPs, the firewall log, kernel IP sets and the geofencing page (posture, rules, simulator, evidence, exemptions), with the DSL projection and every backend correction the port encodes |
+| [admin-dns.md](admin-dns.md) | Global DNS foundation — capability gates, safe typed resources, provider credential lifecycle, and secret/PII/material boundaries |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |
@@ -77,5 +78,5 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 ## Working agreement
 
 Every new component ships with: a page here, a demo section in the
-playground (`apps/portal/src/pages/components/`), and a browser
+playground (`apps/showcase/src/pages/components/`), and a browser
 verification in both themes.
