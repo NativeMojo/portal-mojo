@@ -243,6 +243,11 @@ try {
         'one selected URL-owning surface mounts across manager, viewer and unavailable legs');
     assert.match(showcaseSource, /surface === 'credentials'/);
     assert.match(showcaseSource, /setSearchParams\(isolated/);
+    assert.match(showcaseSource, /useState<Surface \| null>\(null\)/);
+    assert.match(showcaseSource, /setSurface\(null\)/);
+    assert.match(showcaseSource, /if \(surface !== null \|\| pendingSurface == null\) return/);
+    assert.match(showcaseSource, /return; \/\/ wait for the router to publish the clean params/);
+    assert.match(showcaseSource, /!switching && surface !== null/);
     assert.match(showcaseSource, /dns\.viewer@nativemojo\.com/);
     assert.match(showcaseSource, /setMockDnsConfigMalformed\(leg === 'unavailable'\)/);
     assert.match(await read('packages/portal-mojo/docs/admin-dns.md'), /Both themes|Themes and showcase/i);

@@ -28,32 +28,32 @@ const SURFACES: Array<{ key: Surface; label: string }> = [
 
 export function AdminDnsDemo() {
     const [leg, setLeg] = useState<Leg>('manager');
-    const [surface, setSurface] = useState<Surface>('credentials');
+    const [surface, setSurface] = useState<Surface | null>(null);
+    const [pendingSurface, setPendingSurface] = useState<Surface | null>('credentials');
     const [switching, setSwitching] = useState(true);
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const selectSurface = (nextSurface: Surface) => {
-        // Every shipped page owns URL state. The showcase intentionally keeps
-        // only its demo selector while crossing surfaces so a Records domain
-        // cannot masquerade as a ModelTable filter on Domains/Credentials.
-        const isolated = new URLSearchParams();
-        const demo = searchParams.get('demo');
-        if (demo) isolated.set('demo', demo);
-        setSearchParams(isolated, { replace: true });
-        setSurface(nextSurface);
+        if (surface === nextSurface && pendingSurface == null) return;
+        setPendingSurface(nextSurface);
+        // Commit an empty slot first. This unmounts DnsRecordsPage before its
+        // absent-domain effect can race the URL reset and restore `domain`.
+        setSurface(null);
     };
 
     useEffect(() => {
+        if (surface !== null || pendingSurface == null) return;
         const isolated = new URLSearchParams();
         const demo = searchParams.get('demo');
         if (demo) isolated.set('demo', demo);
-        if (isolated.toString() === searchParams.toString()) return;
-        setSearchParams(isolated, { replace: true });
-        // One-time showcase mount isolation; production pages retain their
-        // complete URL-backed contracts.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        if (isolated.toString() !== searchParams.toString()) {
+            setSearchParams(isolated, { replace: true });
+            return; // wait for the router to publish the clean params
+        }
+        setSurface(pendingSurface);
+        setPendingSurface(null);
+    }, [surface, pendingSurface, searchParams, setSearchParams]);
 
     useEffect(() => {
         let active = true;
@@ -90,14 +90,14 @@ export function AdminDnsDemo() {
     return (
         <div style={{ display: 'grid', gap: 14 }}>
             <div className="seg" style={{ flexWrap: 'wrap' }} aria-label="DNS showcase surface">
-                {SURFACES.map((entry) => <button key={entry.key} type="button" disabled={switching} className={`seg-btn${surface === entry.key ? ' seg-active' : ''}`} onClick={() => selectSurface(entry.key)}>{entry.label}</button>)}
+                {SURFACES.map((entry) => <button key={entry.key} type="button" disabled={switching || surface === null} className={`seg-btn${(surface ?? pendingSurface) === entry.key ? ' seg-active' : ''}`} onClick={() => selectSurface(entry.key)}>{entry.label}</button>)}
             </div>
             <div className="seg" style={{ flexWrap: 'wrap' }}>
                 {LEGS.map((entry) => (
                     <button
                         key={entry.key}
                         type="button"
-                        disabled={switching}
+                        disabled={switching || surface === null}
                         className={`seg-btn${leg === entry.key ? ' seg-active' : ''}`}
                         onClick={() => setLeg(entry.key)}
                     >
@@ -107,8 +107,9 @@ export function AdminDnsDemo() {
             </div>
 
             {switching && <div className="panel panel-pad dim">Switching controlled DNS identity…</div>}
+            {!switching && surface === null && <div className="panel panel-pad dim">Switching DNS showcase surface…</div>}
 
-            {!switching && <>
+            {!switching && surface !== null && <>
                 <div className="panel panel-pad">
                     <div className="eyebrow">{leg === 'manager' ? 'Executable manager leg' : leg === 'viewer' ? 'Executable viewer leg' : 'Executable fail-closed leg'}</div>
                     <p className="dim" style={{ marginBottom: 0 }}>{leg === 'manager' ? 'The real selected surface runs with manager controls against the central mock.' : leg === 'viewer' ? 'The stable DNS viewer can inspect safe state while every mutation control remains absent.' : 'The manager receives a deliberately malformed capability response, so dependent controls fail closed.'}</p>
