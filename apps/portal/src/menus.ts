@@ -3,6 +3,7 @@
 // carry their own permission gates. Admin sections will contribute a menu
 // here via adminSectionsMenu() as Phase 2 pages stabilize.
 import { registerMenus, setDefaultMenu } from 'portal-mojo/ui';
+import { ADMIN_SECTIONS, adminSectionsMenu } from 'portal-mojo/admin';
 
 registerMenus([
     {
@@ -33,5 +34,6 @@ registerMenus([
             { label: 'Back to main', icon: 'bi-arrow-left-short', route: '/' },
         ],
     },
+    adminSectionsMenu(ADMIN_SECTIONS, { name: 'admin-credentials', divider: 'System' }),
 ]);
 setDefaultMenu('main');

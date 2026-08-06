@@ -28,10 +28,13 @@ import {
     type DetailMenuEntry,
 } from 'portal-mojo/ui';
 import { mojoList, useCan, type Params } from 'portal-mojo/client';
+import {
+    GROUP_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
+    WebhookSubscriptionModel, WebhookSubscriptionsSection,
+} from 'portal-mojo/admin';
 import { GroupModel, LogModel, MemberModel, type GroupRow } from '../models';
 import {
-    GROUP_ACCESS_MANAGE_PERMS, GROUP_ADMIN_PERMS, GROUP_AUTH_PERMS,
-    GROUP_DESTRUCTIVE_PERMS, GroupApiKeyModel, WebhookSubscriptionModel,
+    GROUP_ADMIN_PERMS, GROUP_AUTH_PERMS, GROUP_DESTRUCTIVE_PERMS,
     iconForKind, kindLabel,
 } from './group-sections/models';
 import { GEOFENCE_VIEW_PERMS } from './group-sections/geofence-data';
@@ -41,8 +44,6 @@ import { OverviewSection } from './group-sections/OverviewSection';
 import { IdentitySection } from './group-sections/IdentitySection';
 import { MembersSection, runInviteMemberFlow } from './group-sections/MembersSection';
 import { SubGroupsSection, runAddSubGroupFlow } from './group-sections/SubGroupsSection';
-import { ApiKeysSection } from './group-sections/ApiKeysSection';
-import { WebhooksSection } from './group-sections/WebhooksSection';
 import { GeofenceSection } from './group-sections/GeofenceSection';
 import { EventsSection } from './group-sections/EventsSection';
 import { AuditSection } from './group-sections/AuditSection';
@@ -76,7 +77,7 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
     const disable = GroupModel.useAction('disable');
     const reactivate = GroupModel.useAction('reactivate');
     const { can: canDestroy } = useCan(GROUP_DESTRUCTIVE_PERMS);
-    const { can: canAccessManage } = useCan(GROUP_ACCESS_MANAGE_PERMS);
+    const { can: canAccessManage } = useCan(GROUP_CREDENTIAL_PERMS);
     const { can: canViewAudit } = useCan(['view_logs', 'manage_logs', 'security']);
 
     // Rail count badges (source setBadge wiring, as controlled props). The
@@ -195,11 +196,11 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
                 { key: 'Members', label: 'Members', icon: 'bi-people', render: () => <MembersSection group={group} /> },
                 { key: 'SubGroups', label: 'Sub-Groups', icon: 'bi-diagram-3', render: () => <SubGroupsSection group={group} openGroup={openGroupById} /> },
                 { divider: 'Access' },
-                { key: 'ApiKeys', label: 'API Keys', icon: 'bi-key', render: () => <ApiKeysSection group={group} /> },
+                { key: 'ApiKeys', label: 'API Keys', icon: 'bi-key', render: () => <GroupApiKeysSection group={group} /> },
                 {
                     key: 'Webhooks', label: 'Webhooks', icon: 'bi-broadcast',
                     permissions: 'manage_group',
-                    render: () => <WebhooksSection group={group} />,
+                    render: () => <WebhookSubscriptionsSection group={group} />,
                 },
                 {
                     key: 'Geofencing', label: 'Geofencing', icon: 'bi-globe-americas',

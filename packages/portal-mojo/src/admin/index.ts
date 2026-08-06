@@ -14,13 +14,28 @@
 // Sections land here as Phase 2 admin pages stabilize; deployed portals then
 // pick up admin updates via `npm update portal-mojo` — clone the shell,
 // never the admin.
-import type { ComponentType } from 'react';
+import { createElement, useContext, type ComponentType, type ReactNode } from 'react';
+import { Navigate, type RouteObject } from 'react-router-dom';
+import { GroupContext, hasPermission, useMe, type PermSpec } from '../client';
+import { Guarded } from '../ui/Guarded';
 import type { MenuConfig, MenuItem } from '../ui/menu-registry';
+import {
+    GLOBAL_CREDENTIAL_PERMS,
+    GroupApiKeysPage,
+    WebhookSubscriptionsPage,
+} from './credentials';
+
+export * from './credentials';
 
 /** One mountable admin area: pages + routes + sidebar contribution + gates. */
 export interface AdminSection {
     /** Stable id; the default route segment (`'users'` → `#/users` standalone, `#/system/users` embedded). */
     id: string;
+    /**
+     * Route prefix relative to the admin mount. Defaults to `id`. Use `''`
+     * when sibling routes should mount directly at the admin root.
+     */
+    basePath?: string;
     /** Sidebar entry label. */
     title: string;
     /** bootstrap-icons class for the sidebar entry (e.g. `'bi-people'`). */
@@ -37,12 +52,114 @@ export interface AdminRoute {
     /** Path relative to the section mount (`''` for the index, `':id'` for details). */
     path: string;
     component: ComponentType;
+    /** Additional route gate (ANY-of). It is ANDed with section permissions. */
+    permissions?: PermSpec;
     /** Present → the route appears as a sidebar item under the section. */
     label?: string;
 }
 
-/** Registry of every shipped admin section. Empty until Phase 2 pages stabilize. */
-export const ADMIN_SECTIONS: readonly AdminSection[] = [];
+/** Registry of every shipped admin section. */
+export const ADMIN_SECTIONS: readonly AdminSection[] = [
+    {
+        id: 'credentials',
+        basePath: '',
+        title: 'Credentials',
+        icon: 'bi-key',
+        permissions: GLOBAL_CREDENTIAL_PERMS,
+        routes: [
+            {
+                path: 'api-keys', label: 'Group API Keys',
+                component: GroupApiKeysPage, permissions: GLOBAL_CREDENTIAL_PERMS,
+            },
+            {
+                path: 'webhook-subscriptions', label: 'Webhooks',
+                component: WebhookSubscriptionsPage, permissions: GLOBAL_CREDENTIAL_PERMS,
+            },
+        ],
+    },
+];
+
+function relativePath(...parts: Array<string | undefined>): string {
+    return parts.filter((part) => part != null && part !== '')
+        .join('/')
+        .replace(/^\/+|\/+$/g, '')
+        .replace(/\/+/g, '/');
+}
+
+function absolutePath(...parts: Array<string | undefined>): string {
+    const relative = relativePath(...parts);
+    return relative ? `/${relative}` : '/';
+}
+
+function AdminDenied() {
+    return createElement('div', { className: 'panel' },
+        createElement('div', { className: 'empty' },
+            createElement('i', { className: 'bi bi-shield-lock' }),
+            createElement('h2', null, 'Access denied'),
+            createElement('p', { className: 'dim' }, 'Your account does not have permission to open this admin page.'),
+        ));
+}
+
+function guardedElement(section: AdminSection, route: AdminRoute): ReactNode {
+    const page = createElement(route.component);
+    const routeGuarded = route.permissions
+        ? createElement(Guarded, {
+            permission: route.permissions,
+            fallback: createElement(AdminDenied),
+            children: page,
+        })
+        : page;
+    return createElement(Guarded, {
+        permission: section.permissions,
+        fallback: createElement(AdminDenied),
+        children: routeGuarded,
+    });
+}
+
+function AdminLanding({ section, mount }: { section: AdminSection; mount: string }) {
+    const { data: me } = useMe();
+    const member = useContext(GroupContext)?.member ?? null;
+    const first = section.routes.find((route) =>
+        hasPermission(me ?? null, section.permissions, member)
+        && (!route.permissions || hasPermission(me ?? null, route.permissions, member)));
+    if (!first) return createElement(AdminDenied);
+    const base = section.basePath ?? section.id;
+    return createElement(Navigate, {
+        replace: true,
+        to: absolutePath(mount, base, first.path),
+    });
+}
+
+/**
+ * Generate mount-relative React Router entries with section AND route gates.
+ * A non-root section receives a dynamic index redirect to its first visible
+ * route, so direct navigation never lands on a route the operator cannot see.
+ */
+export function adminSectionRoutes(
+    sections: readonly AdminSection[],
+    opts: { mount?: string } = {},
+): RouteObject[] {
+    const mount = relativePath(opts.mount ?? '');
+    const routes: RouteObject[] = [];
+    for (const section of sections) {
+        const base = relativePath(section.basePath ?? section.id);
+        const landing = relativePath(mount, base);
+        const hasIndex = section.routes.some((route) => relativePath(route.path) === '');
+        if (landing && !hasIndex) {
+            routes.push({
+                path: landing,
+                element: createElement(AdminLanding, { section, mount }),
+            });
+        }
+        for (const route of section.routes) {
+            routes.push({
+                path: relativePath(mount, base, route.path),
+                element: guardedElement(section, route),
+            });
+        }
+    }
+    return routes;
+}
 
 /**
  * Bridge admin sections into the A4 sidebar registry — sections CONTRIBUTE
@@ -55,20 +172,26 @@ export function adminSectionsMenu(
     sections: readonly AdminSection[],
     opts: { name?: string; mount?: string; divider?: string } = {},
 ): MenuConfig {
-    const mount = (opts.mount ?? '').replace(/\/$/, '');
+    const mount = relativePath(opts.mount ?? '');
     const items: MenuItem[] = [];
     if (opts.divider) items.push({ divider: opts.divider });
     for (const section of sections) {
         const labeled = section.routes.filter((r) => r.label);
-        const base = `${mount}/${section.id}`.replace(/\/+/g, '/');
+        const base = relativePath(mount, section.basePath ?? section.id);
+        const children = labeled.map((route) => ({
+            label: route.label!,
+            route: absolutePath(base, route.path),
+            permissions: route.permissions,
+        }));
         items.push({
             label: section.title,
             icon: section.icon,
             permissions: section.permissions,
-            route: base,
-            children: labeled
-                .filter((r) => r.path !== '')
-                .map((r) => ({ label: r.label!, route: `${base}/${r.path}`.replace(/\/+/g, '/') })),
+            // Root-mounted sections cannot own `/`; render a pure parent and
+            // let the first visible child be the landing. Prefixed sections
+            // use the generated dynamic index redirect above.
+            ...(base ? { route: absolutePath(base) } : {}),
+            children,
         });
     }
     return { name: opts.name ?? 'admin', items };

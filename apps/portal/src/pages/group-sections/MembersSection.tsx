@@ -17,9 +17,10 @@ import {
     fmt, formModal, modal, toast,
 } from 'portal-mojo/ui';
 import { useCan, type Params } from 'portal-mojo/client';
+import { grantedPermissions } from 'portal-mojo/admin';
 import { MemberModel, type GroupRow, type MemberRow } from '../../models';
 import { UserDetail } from '../UserDetail';
-import { MEMBER_MANAGE_PERMS, grantedPerms, inviteMemberByEmail } from './models';
+import { MEMBER_MANAGE_PERMS, inviteMemberByEmail } from './models';
 
 /**
  * The "Invite by Email" flow — shared by the Members toolbar and the header
@@ -56,7 +57,7 @@ function memberParams(groupId: number, search: string, status: StatusFilter): Pa
 
 function MemberRowItem({ member, onOpen }: { member: MemberRow; onOpen: () => void }) {
     const u = member.user;
-    const grants = grantedPerms(member.permissions);
+    const grants = grantedPermissions(member.permissions);
     const role = typeof member.metadata?.role === 'string' && member.metadata.role !== ''
         ? member.metadata.role : null;
     const shown = grants.slice(0, 6);

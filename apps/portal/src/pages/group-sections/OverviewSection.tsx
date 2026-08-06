@@ -9,7 +9,8 @@ import {
     fmt, type TimelineItem,
 } from 'portal-mojo/ui';
 import { GroupModel, LogModel, MemberModel, type GroupRow } from '../../models';
-import { GroupApiKeyModel, kindLabel } from './models';
+import { GroupApiKeyModel } from 'portal-mojo/admin';
+import { kindLabel } from './models';
 import { LOG_TONE, groupAuditParams } from './shared';
 
 export function OverviewSection({ group, openGroup }: {
