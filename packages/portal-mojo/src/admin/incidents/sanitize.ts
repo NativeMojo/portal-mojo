@@ -48,7 +48,7 @@ export function sanitizeSecurityValue<T>(value: T, seen = new WeakMap<object, un
 }
 
 function sanitizedRow<T extends Record<string, unknown>>(row: T): T {
-    const safe = sanitizeSecurityValue(row);
+    const safe = sanitizeSecurityValue(row) as Record<string, unknown>;
     for (const key of ['details', 'stack_trace', 'traceback']) {
         if (key in safe && safe[key] != null) safe[key] = boundedSecurityText(safe[key]);
     }
@@ -58,7 +58,7 @@ function sanitizedRow<T extends Record<string, unknown>>(row: T): T {
             if (key in metadata && metadata[key] != null) metadata[key] = boundedSecurityText(metadata[key]);
         }
     }
-    return safe;
+    return safe as T;
 }
 
 export const sanitizeIncidentRow = <T,>(row: T): T => sanitizedRow(row as unknown as Record<string, unknown>) as T;

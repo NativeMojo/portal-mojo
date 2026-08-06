@@ -3750,7 +3750,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const canManageOthers = hasGlobalPermission(caller, ['users', 'manage_users']);
         const requestedUser = opts.params?.user == null ? null : Number(opts.params.user);
         if (requestedUser != null && requestedUser !== caller.id && !canManageOthers) return permissionDenied();
-        const params = { ...(opts.params ?? {}), user: requestedUser ?? caller.id };
+        const params: Params = { ...(opts.params ?? {}), user: requestedUser ?? caller.id };
         const search = (k: Record<string, unknown>) => String(k.label ?? '');
         if (params.download_format) {
             const full = listRows(db.apiKeys as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.apiKeys.length }, search, '-id');

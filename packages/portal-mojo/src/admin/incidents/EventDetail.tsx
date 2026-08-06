@@ -1,4 +1,4 @@
-import { Badge, DetailView, Eyebrow, FlatRow, KnownFieldsCard, StatusPanel, fmt } from '../../ui';
+import { DetailView, Eyebrow, FlatRow, KnownFieldsCard, StatusPanel, fmt } from '../../ui';
 import { EvidenceCard, INCIDENT_METADATA_FIELDS, RequestResponseForensics, TraceForensics, first, metadataOf } from './forensics';
 import { showIncidentDetail, useEventDetail } from './models';
 

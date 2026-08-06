@@ -14,7 +14,7 @@ export function first(metadata: Record<string, unknown>, ...keys: string[]): unk
 function text(value: unknown): string { return value == null || value === '' ? '—' : boundedSecurityText(value, 8_000); }
 
 export function RequestResponseForensics({ metadata }: { metadata: Record<string, unknown> }) {
-    const fields: Array<[string, unknown]> = [
+    const candidates: Array<[string, unknown]> = [
         ['Method', first(metadata, 'http_method', 'request_method', 'method')],
         ['Status', first(metadata, 'http_status', 'response_status', 'status_code')],
         ['Host', first(metadata, 'http_host', 'request_host', 'host')],
@@ -26,7 +26,8 @@ export function RequestResponseForensics({ metadata }: { metadata: Record<string
         ['Request body', first(metadata, 'request_body', 'request_data', 'body')],
         ['Response headers', first(metadata, 'response_headers')],
         ['Response body', first(metadata, 'response_body', 'response_data')],
-    ].filter(([, value]) => value != null && value !== '');
+    ];
+    const fields = candidates.filter(([, value]) => value != null && value !== '');
     if (!fields.length) return <p className="dim-italic">No request or response context was recorded.</p>;
     return <div className="incident-forensic-list">{fields.map(([label, value]) => (
         <FlatRow key={label} label={label}><pre className="incident-forensic-value">{text(value)}</pre></FlatRow>

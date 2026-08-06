@@ -258,7 +258,7 @@ function TicketActionCard({ item, ticket, canManage }: {
         <section className={`ticket-action-card${action.resolved ? ' is-resolved' : ''}`} aria-label={cardLabel}>
             <div className="ticket-action-card-head">
                 <strong>{cardLabel}</strong>
-                {action.resolved && <Badge tone="success">Resolved</Badge>}
+                {Boolean(action.resolved) && <Badge tone="success">Resolved</Badge>}
             </div>
             {detail && <p>{detail}</p>}
             {target && <p className="dim">Target: {target}</p>}
