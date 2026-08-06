@@ -54,6 +54,41 @@ Mock-only contract controls are exported in development: call
 `armMockReauth(method, path)` to make one authenticated method+path match
 answer 440. Ordinary requests and real transports are unaffected.
 
+## Mock admin contracts
+
+The mock carries measured GroupView/admin transports, not UI-shaped
+shortcuts:
+
+- group API keys use `/api/group/apikey`; ordinary/default rows omit the raw
+  token, create returns it, and only explicit `graph=token` reads it later;
+- webhook subscriptions validate HTTPS URLs, reject URL credentials, and
+  keep metadata detail-only; `/api/group/webhook_secret` is the deliberate
+  read/rotate secret endpoint;
+- member invites stamp the requested group and member edits preserve the
+  backend permission-dict behavior; group incident rows filter through
+  `/api/incident/event?group_id=`;
+- `/api/auth/config` resolves defaults → deployment → root → child, replaces
+  lists, preserves nested dict keys, ignores unknown/inactive UUIDs, and
+  returns only the public whitelist;
+- settings keep plaintext for secret rows in a private mock slot, while every
+  wire response carries `value:''` + `display_value:'******'`. Payload order
+  deliberately mirrors live `set_value`: serialize `is_secret` before
+  `value`. Non-null group scopes enforce `(key, group)` uniqueness; repeated
+  global `(key, null)` rows remain possible because PostgreSQL NULL uniqueness
+  does. REST delete is denied;
+- metrics permissions are top-level `/api/metrics/permissions` responses, not
+  model envelopes. Single permission reads may be strings, multiple are
+  lists, and cleared values read as null. Clearing/deleting retains the
+  account row in the list, matching the separate Redis account index.
+
+Stable mock permission identities (password `mojo`) make gates reproducible:
+`ian@mojoverify.com` is only an odd-group admin;
+`security.viewer@nativemojo.com` has global security/geofence view;
+`security.manager@nativemojo.com` has security/geofence/settings/metrics
+management; `groups.manager@nativemojo.com` has global groups/users
+management. `/api/geo/check?__mock_country=CN` is the deterministic public
+deny case; the default US case allows.
+
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx

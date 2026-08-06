@@ -332,6 +332,116 @@ function buildApiKeys(): MockApiKey[] {
     });
 }
 
+// ── Group API keys + webhooks ─────────────────────────────────────────
+
+interface MockGroupApiKey {
+    id: number;
+    group: number;
+    user: number | null;
+    created: number;
+    modified: number;
+    name: string;
+    is_active: boolean;
+    permissions: Record<string, unknown>;
+    limits: Record<string, unknown>;
+    last_used: number | null;
+    expires_at: number | null;
+    metadata: Record<string, unknown>;
+    override_user: boolean;
+    token: string; // mock-private; only graph=token or create may expose it
+    [field: string]: unknown;
+}
+
+interface MockWebhookSubscription {
+    id: number;
+    group: number;
+    created: number;
+    modified: number;
+    url: string;
+    events: string[];
+    is_active: boolean;
+    metadata: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockSetting {
+    id: number;
+    created: number;
+    modified: number;
+    key: string;
+    value: string;
+    is_secret: boolean;
+    group: number | null;
+    secretValue: unknown; // mock-private plaintext; never serialized
+    [field: string]: unknown;
+}
+
+function buildGroupApiKeys(): MockGroupApiKey[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 201, group: 1, user: 1, created: now - 80 * 86400, modified: now - 2 * 86400, name: 'Acme deploy', is_active: true, permissions: { member: true, view_metrics: true }, limits: { assess: { limit: 500, window: 60 } }, last_used: now - 1800, expires_at: null, metadata: { owner: 'platform' }, override_user: false, token: 'mock_gk_acme_deploy' },
+        { id: 202, group: 1, user: null, created: now - 30 * 86400, modified: now - 4 * 86400, name: 'Webhook worker', is_active: true, permissions: { manage_webhooks: true }, limits: {}, last_used: now - 86400, expires_at: now + 180 * 86400, metadata: {}, override_user: false, token: 'mock_gk_webhook_worker' },
+        { id: 203, group: 2, user: null, created: now - 120 * 86400, modified: now - 20 * 86400, name: 'Legacy importer', is_active: false, permissions: { member: true }, limits: {}, last_used: now - 40 * 86400, expires_at: now + 10 * 86400, metadata: {}, override_user: false, token: 'mock_gk_legacy_importer' },
+    ];
+}
+
+function buildWebhookSubscriptions(): MockWebhookSubscription[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 301, group: 1, created: now - 60 * 86400, modified: now - 3 * 86400, url: 'https://hooks.example.com/mojo/accounts', events: ['user.created', 'user.updated'], is_active: true, metadata: { environment: 'production' } },
+        { id: 302, group: 1, created: now - 20 * 86400, modified: now - 10 * 86400, url: 'https://audit.example.com/group-events', events: ['member.invited'], is_active: false, metadata: {} },
+        { id: 303, group: 2, created: now - 7 * 86400, modified: now - 86400, url: 'https://dev.example.com/webhooks', events: [], is_active: true, metadata: {} },
+    ];
+}
+
+function buildSettings(): MockSetting[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 401, created: now - 200 * 86400, modified: now - 2 * 86400, key: 'SITE_NAME', value: 'NativeMojo', is_secret: false, group: null, secretValue: null },
+        { id: 402, created: now - 120 * 86400, modified: now - 6 * 86400, key: 'MAIL_API_TOKEN', value: '', is_secret: true, group: null, secretValue: 'mock-private-mail-token' },
+        { id: 403, created: now - 30 * 86400, modified: now - 86400, key: 'WELCOME_MESSAGE', value: 'Welcome, Acme', is_secret: false, group: 1, secretValue: null },
+        // PostgreSQL unique_together permits repeated NULL group values. Keep
+        // that live quirk executable instead of enforcing a stricter mock.
+        { id: 404, created: now - 5 * 86400, modified: now - 5 * 86400, key: 'SITE_NAME', value: 'NativeMojo fallback', is_secret: false, group: null, secretValue: null },
+    ];
+}
+
+function serializeGroupApiKey(key: MockGroupApiKey, graph = 'default', includeCreateToken = false): Record<string, unknown> {
+    const group = db.groups.find((candidate) => candidate.id === key.group);
+    const user = key.user == null ? null : db.users.find((candidate) => candidate.id === key.user);
+    const row: Record<string, unknown> = {
+        id: key.id, created: key.created, modified: key.modified, name: key.name,
+        is_active: key.is_active, permissions: key.permissions, limits: key.limits,
+        last_used: key.last_used, expires_at: key.expires_at, metadata: key.metadata,
+        override_user: key.override_user,
+        group: group ? groupBasic(group) : null,
+        user: user ? userBasic(user) : null,
+    };
+    if (graph === 'token' || includeCreateToken) row.token = key.token;
+    return row;
+}
+
+function serializeWebhook(row: MockWebhookSubscription, graph = 'default'): Record<string, unknown> {
+    const group = db.groups.find((candidate) => candidate.id === row.group);
+    return {
+        id: row.id, created: row.created, modified: row.modified, url: row.url,
+        events: row.events, is_active: row.is_active,
+        ...(graph === 'detail' ? { metadata: row.metadata } : {}),
+        group: group ? groupBasic(group) : null,
+    };
+}
+
+function serializeSetting(row: MockSetting): Record<string, unknown> {
+    const group = row.group == null ? null : db.groups.find((candidate) => candidate.id === row.group);
+    return {
+        id: row.id, created: row.created, modified: row.modified, key: row.key,
+        value: row.is_secret ? '' : row.value,
+        is_secret: row.is_secret,
+        group: group ? groupBasic(group) : null,
+        display_value: row.is_secret ? '******' : row.value,
+    };
+}
+
 // ── Logs ──────────────────────────────────────────────────────────────
 // /api/logs rows — live default graph (measured): {id, created, level, kind,
 // method, path, payload, ip, duid, uid, gid, username, user_agent, log,
@@ -667,7 +777,7 @@ function buildIncidentEvents(): MockIncidentEvent[] {
         { uid: 4, cat: 'account.user_disabled', title: 'User disabled (reason=admin)', details: 'Disabled by ian: repeated ToS violations', level: 6, days: 12 },
         { uid: 5, cat: 'account.user_disabled', title: 'User disabled (reason=abuse)', details: 'Banned by automated abuse sweep', level: 8, days: 30 },
     ];
-    return seeds.map((s, i) => ({
+    const rows: MockIncidentEvent[] = seeds.map((s, i) => ({
         id: 9000 - i,
         created: nowSec - s.days * DAY - 3600,
         level: s.level,
@@ -684,6 +794,23 @@ function buildIncidentEvents(): MockIncidentEvent[] {
         metadata: {},
         group_id: null,
     }));
+    rows.push(
+        {
+            id: 8990, created: nowSec - 7200, level: 7, scope: 'group',
+            category: 'security:webhook_delivery', source_ip: '203.0.113.44',
+            hostname: 'worker-2', uid: 1, country_code: 'US',
+            title: 'Repeated webhook delivery failures', details: 'Endpoint returned 503 for five attempts',
+            model_name: 'account.Group', model_id: 1, metadata: { webhook_subscription_id: 301 }, group_id: 1,
+        },
+        {
+            id: 8989, created: nowSec - 3 * DAY, level: 5, scope: 'group',
+            category: 'security:member_invite', source_ip: '198.51.100.18',
+            hostname: 'portal-1', uid: 1, country_code: 'US',
+            title: 'Member invite retried', details: 'Invite resent after the original link expired',
+            model_name: 'account.Group', model_id: 1, metadata: {}, group_id: 1,
+        },
+    );
+    return rows;
 }
 
 function buildPasskeys(): MockPasskey[] {
@@ -855,6 +982,44 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     invited.last_activity = null;
     invited.is_email_verified = false;
 
+    // Stable permission identities for global-vs-group admin contract demos.
+    // Ian remains group-admin-only on odd group ids; these two users prove
+    // global view and global manage gates independently.
+    const securityViewer = at(11);
+    securityViewer.is_active = true;
+    securityViewer.username = 'security.viewer';
+    securityViewer.email = 'security.viewer@nativemojo.com';
+    securityViewer.display_name = 'Security Viewer';
+    securityViewer.permissions = { view_security: true, view_geofence: true };
+    const securityManager = at(12);
+    securityManager.is_active = true;
+    securityManager.username = 'security.manager';
+    securityManager.email = 'security.manager@nativemojo.com';
+    securityManager.display_name = 'Security Manager';
+    securityManager.permissions = { manage_security: true, manage_geofence: true, manage_settings: true, manage_metrics: true };
+    const groupsManager = at(13);
+    groupsManager.is_active = true;
+    groupsManager.username = 'groups.manager';
+    groupsManager.email = 'groups.manager@nativemojo.com';
+    groupsManager.display_name = 'Groups Manager';
+    groupsManager.permissions = { manage_groups: true, groups: true, manage_users: true, users: true };
+
+    // Auth-config inheritance fixtures: defaults -> deployment -> root -> child.
+    groups[0]!.metadata = mergeDicts(groups[0]!.metadata, {
+        auth_config: {
+            theme: { app_title: 'ACME ACCESS', hero_headline: 'Welcome to Acme' },
+            login: { methods: ['password', 'passkey'] },
+            private_operator_note: 'must never reach the public auth config',
+        },
+        geofence: { countries: { deny: ['CN'] } },
+    });
+    groups[1]!.metadata = mergeDicts(groups[1]!.metadata, {
+        auth_config: {
+            theme: { hero_subheadline: 'Engineering workspace' },
+            registration: { extra_fields: [{ name: 'team_code', label: 'Team code' }] },
+        },
+    });
+
     // Seed-consistency sweep: a disabled (or long-idle) account is never
     // "online" regardless of what the random spread rolled.
     for (const u of users) {
@@ -878,6 +1043,17 @@ const db = {
     passkeys: buildPasskeys(),
     oauthConnections: buildOAuthConnections(),
     notificationPrefs: buildNotificationPrefs(),
+    groupApiKeys: buildGroupApiKeys(),
+    webhooks: buildWebhookSubscriptions(),
+    webhookSecrets: new Map<number, { value: string; created_at: string; last_rotated_at: string }>(),
+    settings: buildSettings(),
+    metricPermissions: new Map<string, { view_permissions: string | string[] | null; write_permissions: string | string[] | null }>([
+        ['global', { view_permissions: 'view_metrics', write_permissions: ['write_metrics', 'metrics'] }],
+        ['group-1', { view_permissions: ['view_metrics', 'metrics'], write_permissions: null }],
+        ['user-1', { view_permissions: null, write_permissions: 'metrics' }],
+    ]),
+    geoRules: { countries: { deny: ['CN'] } } as Record<string, unknown>,
+    geoAllowlist: [{ cidr: '203.0.113.0/24', reason: 'Office egress', until: null }] as unknown[],
     // Per-user login throttle counters (auth/manage/throttle shape). u3 is
     // mid-lockout so the header badge + Clear Rate Limit are demoable.
     throttle: new Map<number, { count: number; limit: number; window: number; retry_after_seconds: number }>([
@@ -1176,6 +1352,110 @@ function mergeDicts(existing: Record<string, unknown>, incoming: Record<string, 
     return out;
 }
 
+const LOGIN_METHODS = new Set(['password', 'sms', 'passkey', 'magic', 'google', 'apple', 'github']);
+const REGISTRATION_METHODS = new Set(['password', 'google', 'apple', 'github']);
+const DEFAULT_AUTH_CONFIG: Record<string, unknown> = {
+    theme: {
+        app_title: 'DJANGO MOJO', logo_url: '', favicon_url: '', hero_image_url: '',
+        hero_headline: 'Welcome back', hero_subheadline: 'Admin Portal',
+        back_to_website_url: '', terms_url: '', layout: 'card', api_base: '',
+        success_redirect: '/', custom_css: '', custom_css_url: '',
+    },
+    registration: {
+        enabled: true, fields: null, extra_fields: [], identity_field: '', min_age: null,
+        methods: ['password', 'google', 'apple', 'github'], passkey_prompt: 'off',
+    },
+    login: { methods: ['password', 'sms', 'passkey', 'magic', 'google', 'apple', 'github'] },
+};
+const DEPLOYMENT_AUTH_CONFIG: Record<string, unknown> = {
+    theme: { hero_subheadline: 'NativeMojo identity', terms_url: 'https://example.com/terms' },
+    registration: { min_age: 16 },
+    deployment_private_key: 'never-public',
+};
+
+function validateAuthConfig(value: unknown): string | null {
+    if (!isPlainObject(value)) return 'auth config must be an object';
+    if (value.theme != null) {
+        if (!isPlainObject(value.theme)) return 'auth_config.theme must be an object';
+        const layout = value.theme.layout;
+        if (layout != null && !['card', 'fullscreen'].includes(String(layout))) return 'auth_config.theme.layout must be one of: card, fullscreen';
+        const css = value.theme.custom_css;
+        if (css != null && typeof css !== 'string') return 'auth_config.theme.custom_css must be a string';
+        if (typeof css === 'string' && (css.includes('<') || css.toLowerCase().includes('@import') || css.includes('://'))) return 'auth_config.theme.custom_css cannot reference external content';
+        const cssUrl = value.theme.custom_css_url;
+        if (cssUrl && (typeof cssUrl !== 'string' || !cssUrl.startsWith('https://'))) return 'auth_config.theme.custom_css_url must be an https:// URL';
+    }
+    const validateMethods = (section: unknown, allowed: Set<string>, label: string, nonEmpty: boolean): string | null => {
+        if (section == null) return null;
+        if (!isPlainObject(section)) return `auth_config.${label.split('.')[0]} must be an object`;
+        if (section.methods == null) return null;
+        if (!Array.isArray(section.methods)) return `${label} must be a list`;
+        if (nonEmpty && section.methods.length === 0) return `${label} cannot be empty — no way to log in`;
+        const unknown = section.methods.find((method) => typeof method !== 'string' || !allowed.has(method));
+        return unknown == null ? null : `${label} has an unknown method '${String(unknown)}'`;
+    };
+    const loginError = validateMethods(value.login, LOGIN_METHODS, 'login.methods', true);
+    if (loginError) return loginError;
+    const registrationError = validateMethods(value.registration, REGISTRATION_METHODS, 'registration.methods', false);
+    if (registrationError) return registrationError;
+    if (isPlainObject(value.registration)) {
+        const prompt = value.registration.passkey_prompt;
+        if (prompt != null && !['off', 'optional', 'required'].includes(String(prompt))) return 'auth_config.registration.passkey_prompt must be one of: off, optional, required';
+    }
+    return null;
+}
+
+function isEffectivelyActive(group: MockGroup): boolean {
+    let current: MockGroup | undefined = group;
+    const seen = new Set<number>();
+    while (current && !seen.has(current.id)) {
+        if (!current.is_active) return false;
+        seen.add(current.id);
+        const parentId: number | null = current.parent ? Number(current.parent.id) : null;
+        current = parentId ? db.groups.find((candidate) => candidate.id === parentId) : undefined;
+    }
+    return true;
+}
+
+function resolveAuthConfig(group?: MockGroup): Record<string, unknown> {
+    let config = mergeDicts(DEFAULT_AUTH_CONFIG, DEPLOYMENT_AUTH_CONFIG);
+    if (group) {
+        const chain: MockGroup[] = [];
+        let current: MockGroup | undefined = group;
+        const seen = new Set<number>();
+        while (current && !seen.has(current.id)) {
+            chain.unshift(current);
+            seen.add(current.id);
+            const parentId: number | null = current.parent ? Number(current.parent.id) : null;
+            current = parentId ? db.groups.find((candidate) => candidate.id === parentId) : undefined;
+        }
+        for (const entry of chain) {
+            const override = isPlainObject(entry.metadata.auth_config) ? entry.metadata.auth_config : {};
+            config = mergeDicts(config, override);
+        }
+    }
+    return config;
+}
+
+function publicAuthConfig(config: Record<string, unknown>): Record<string, unknown> {
+    const theme = isPlainObject(config.theme) ? config.theme : {};
+    const registration = isPlainObject(config.registration) ? config.registration : {};
+    const login = isPlainObject(config.login) ? config.login : {};
+    return {
+        theme: { ...theme },
+        registration: {
+            enabled: registration.enabled ?? true,
+            fields: registration.fields ?? null,
+            extra_fields: Array.isArray(registration.extra_fields) ? registration.extra_fields : [],
+            identity_field: registration.identity_field ?? '',
+            min_age: registration.min_age ?? null,
+            methods: Array.isArray(registration.methods) ? registration.methods : [],
+            passkey_prompt: registration.passkey_prompt ?? 'off',
+        },
+        login: { methods: Array.isArray(login.methods) ? login.methods : [] },
+    };
+}
+
 // NO_SAVE_FIELDS parity (account/models/user.py RestMeta): silently dropped,
 // never an error — matching rest.py's strip. NOTE is_dob_verified IS in this
 // set live, which is why the portal ships no DOB force-verify affordance.
@@ -1263,6 +1543,10 @@ function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
     for (const [key, value] of Object.entries(body)) {
         if (GROUP_ACTIONS.has(key)) actionEntries.push([key, value]);
         else if (!GROUP_NO_SAVE.has(key)) fields[key] = value;
+    }
+    if (isPlainObject(fields.metadata) && 'auth_config' in fields.metadata) {
+        const error = validateAuthConfig(fields.metadata.auth_config);
+        if (error) return { status: false, error, error_code: 400 };
     }
     const target = group as unknown as Record<string, unknown>;
     for (const [key, value] of Object.entries(fields)) {
@@ -1562,13 +1846,21 @@ function mfaGrant(challenge: PendingMfa, source: 'totp' | 'recovery' | 'sms', ac
     return { status: true, data: { ...tokenPair(user, accessTtl), user: serializeUser(user), source } };
 }
 
-function authFetch(path: string, body: Record<string, unknown>): unknown {
+function authFetch(path: string, body: Record<string, unknown>, params: Params = {}): unknown {
     // Dev knob: __mock_access_ttl mints a short-lived access token so refresh
     // paths are testable without waiting 6 hours. Mock-only; ignored by the
     // real backend (unknown params are dropped server-side).
     const accessTtl = typeof body.__mock_access_ttl === 'number' ? body.__mock_access_ttl : ACCESS_TTL;
 
     switch (path) {
+        case '/api/auth/config': {
+            const uuid = String(params.group_uuid ?? body.group_uuid ?? '').trim();
+            const group = uuid ? db.groups.find((candidate) => candidate.uuid === uuid) : undefined;
+            // Live semantics: absent, unknown, or effectively inactive UUIDs
+            // resolve no group and therefore fall back to deployment config.
+            const activeGroup = group && isEffectivelyActive(group) ? group : undefined;
+            return { status: true, data: publicAuthConfig(resolveAuthConfig(activeGroup)) };
+        }
         case '/api/login': {
             const user = findByEmail(body.username);
             if (!user || !user.is_active || body.password !== MOCK_PASSWORD) return invalidCreds();
@@ -1763,6 +2055,29 @@ function userFromBearer(headers: Record<string, string> | undefined): MockUser |
     return db.users.find((u) => u.id === Number(payload.uid));
 }
 
+function hasGlobalPermission(user: MockUser | undefined, permissions: string[]): boolean {
+    if (!user) return false;
+    if (user.is_superuser) return true;
+    return permissions.some((permission) => Boolean(user.permissions[permission]));
+}
+
+function groupCanManage(user: MockUser | undefined, groupId: number): boolean {
+    if (!user) return false;
+    if (user.is_superuser || hasGlobalPermission(user, ['manage_groups', 'groups'])) return true;
+    const member = db.members.find((row) => row.group === groupId && row.user === user.id && row.is_active);
+    if (member && ['admin', 'manage_group', 'manage_members'].some((permission) => Boolean(member.permissions[permission]))) return true;
+    // Same deterministic group-context identity as /api/group/<id>/member.
+    return user.id === 1 && groupId % 2 === 1;
+}
+
+function requestGroupId(opts: MockFetchOpts): number {
+    return Number(opts.body?.group ?? opts.params?.group ?? 0);
+}
+
+function permissionDenied(code = 403): Record<string, unknown> {
+    return { status: false, error: 'permission denied', error_code: code };
+}
+
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
     const method = (opts.method ?? 'GET').toUpperCase();
@@ -1867,7 +2182,147 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: { deleted: had ? 1 : 0 } };
     }
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
-        return authFetch(path, opts.body ?? {});
+        return authFetch(path, opts.body ?? {}, opts.params ?? {});
+    }
+    // ── Geofence public/member/config planes ──────────────────────────
+    if (path === '/api/geo/check') {
+        const uuid = String(opts.params?.group_uuid ?? '').trim();
+        const group = uuid ? db.groups.find((candidate) => candidate.uuid === uuid) : undefined;
+        if (uuid && !group) return { status: false, error: 'Unknown group', error_code: 400 };
+        const country = String(opts.params?.__mock_country ?? 'US').toUpperCase();
+        const inactive = group != null && !isEffectivelyActive(group);
+        const denied = country === 'CN';
+        return {
+            status: true,
+            data: {
+                allowed: inactive ? !denied : !denied,
+                reason: inactive ? 'group_inactive' : denied ? 'country_not_allowed' : 'passed',
+                detail: inactive ? 'Group is inactive; evaluated against system rules only.' : denied ? 'Country CN is denied by the system rule.' : 'Allowed.',
+                ip: country === 'CN' ? '198.51.100.66' : '203.0.113.42',
+                country, country_code: country,
+                region: country === 'US' ? 'US-CA' : null,
+                region_code: country === 'US' ? 'US-CA' : null,
+                abuse: { tor: false, vpn: false, datacenter: false, proxy: false },
+                checked_at: new Date().toISOString(),
+                rule_level: denied ? 'system' : null,
+                strict_posture: false,
+                ...(inactive ? { group_inactive: true } : {}),
+            },
+        };
+    }
+    if (path === '/api/geo/policy') {
+        const caller = userFromBearer(opts.headers);
+        const groupId = requestGroupId(opts);
+        const group = db.groups.find((candidate) => candidate.id === groupId);
+        if (!caller) return permissionDenied(401);
+        const member = db.members.find((row) => row.group === groupId && row.user === caller.id && row.is_active);
+        if (!group || (!hasGlobalPermission(caller, ['view_security', 'security']) && !member && !(caller.id === 1 && groupId % 2 === 1))) return permissionDenied();
+        const strict = group.metadata.geofence_strict;
+        return { status: true, data: { group: { id: group.id, uuid: group.uuid, name: group.name, is_active: group.is_active }, enabled: true, evaluation_order: ['system', 'group'], system_rule: db.geoRules, group_rule: group.metadata.geofence ?? {}, strict_posture: strict ?? null, strict_posture_effective: Boolean(strict) } };
+    }
+    if (path === '/api/geo/rules') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canView = hasGlobalPermission(caller, ['view_geofence', 'manage_geofence', 'security']);
+        const canManage = hasGlobalPermission(caller, ['manage_geofence', 'security']);
+        if (opts.method === 'POST') {
+            if (!canManage) return permissionDenied();
+            if (!isPlainObject(opts.body?.rule)) return { status: false, error: "'rule' must be a dict", error_code: 400 };
+            db.geoRules = { ...opts.body.rule };
+            return { status: true, data: { rule: db.geoRules, source: 'setting', modified: new Date().toISOString() } };
+        }
+        if (opts.method === 'DELETE') {
+            if (!canManage) return permissionDenied();
+            const removed = Object.keys(db.geoRules).length > 0;
+            db.geoRules = {};
+            return { status: true, data: { removed } };
+        }
+        if (!canView) return permissionDenied();
+        return { status: true, data: { system: { rule: db.geoRules, source: 'setting', modified: new Date().toISOString() }, posture: { enabled: true, fail_closed: false, fail_closed_scopes: [], allow_private_ips: true, strict_posture: false, cache_ttl: 300 }, allowlist_summary: { setting_entries: db.geoAllowlist.length, geoip_active: 0 }, evaluation_order: ['system', 'group'], enforced_endpoints: [{ endpoint: 'POST /api/login', scope: 'auth', after_auth: true }] } };
+    }
+    if (path === '/api/geo/allowlist') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canManage = hasGlobalPermission(caller, ['manage_geofence', 'security']);
+        if (opts.method === 'POST') {
+            if (!canManage) return permissionDenied();
+            if (!Array.isArray(opts.body?.entries)) return { status: false, error: "'entries' is required (a list; may be empty)", error_code: 400 };
+            db.geoAllowlist = [...opts.body.entries];
+            return { status: true, data: { entries: db.geoAllowlist } };
+        }
+        if (!hasGlobalPermission(caller, ['view_geofence', 'manage_geofence', 'security'])) return permissionDenied();
+        return { status: true, data: { setting: db.geoAllowlist.map((entry) => isPlainObject(entry) ? { cidr: entry.cidr ?? entry.ip, reason: entry.reason ?? null, until: entry.until ?? null, active: true } : { cidr: entry, reason: null, until: null, active: true }), geoip: [] } };
+    }
+    // ── Settings — plaintext stays private; secrets serialize masked ─────
+    const oneSetting = path.match(/^\/api\/settings\/(\d+)$/);
+    if (oneSetting || path === '/api/settings') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['manage_settings', 'groups'])) return permissionDenied();
+        if (oneSetting) {
+            const row = db.settings.find((candidate) => candidate.id === Number(oneSetting[1]));
+            if (!row) return { status: false, error: 'Setting not found', error_code: 404 };
+            if (opts.method === 'DELETE') return { status: false, error: 'DELETE not allowed: Setting', error_code: 403 };
+            if (opts.method === 'POST' && opts.body) {
+                for (const [field, value] of Object.entries(opts.body)) {
+                    if (field === 'is_secret') row.is_secret = Boolean(value);
+                    else if (field === 'value') {
+                        if (row.is_secret) { row.value = ''; row.secretValue = value; }
+                        else { row.value = typeof value === 'string' ? value : JSON.stringify(value); row.secretValue = null; }
+                    } else if (field === 'key') row.key = String(value);
+                    else if (field === 'group') row.group = value == null || value === '' ? null : Number(value);
+                }
+                row.modified = Math.floor(Date.now() / 1000);
+            }
+            return { status: true, data: serializeSetting(row), graph: 'default' };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockSetting = { id: Math.max(0, ...db.settings.map((candidate) => candidate.id)) + 1, created: now, modified: now, key: '', value: '', is_secret: false, group: null, secretValue: null };
+            for (const [field, value] of Object.entries(opts.body)) {
+                if (field === 'is_secret') row.is_secret = Boolean(value);
+                else if (field === 'value') {
+                    if (row.is_secret) row.secretValue = value;
+                    else row.value = typeof value === 'string' ? value : JSON.stringify(value);
+                } else if (field === 'key') row.key = String(value);
+                else if (field === 'group') row.group = value == null || value === '' ? null : Number(value);
+            }
+            if (!row.key) return { status: false, error: 'key is required', error_code: 400 };
+            if (row.group != null && db.settings.some((candidate) => candidate.group === row.group && candidate.key === row.key)) return { status: false, error: 'Setting with this Key and Group already exists.', error_code: 400 };
+            db.settings.push(row);
+            return { status: true, data: serializeSetting(row), graph: 'default' };
+        }
+        const result = listRows(db.settings as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => String(row.key), 'key');
+        return { ...result, data: (result.data as unknown as MockSetting[]).map(serializeSetting) };
+    }
+    // ── Metrics permission plane (top-level response, not model envelopes) ──
+    const metricsPermMatch = path.match(/^\/api\/metrics\/permissions(?:\/(.+))?$/);
+    if (metricsPermMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['manage_incidents', 'metrics', 'manage_metrics'])) return permissionDenied();
+        let account = metricsPermMatch[1] ? decodeURIComponent(metricsPermMatch[1]) : null;
+        if (opts.method === 'POST' || opts.method === 'PUT') account = account || (opts.body?.account ? String(opts.body.account) : null);
+        if (opts.method === 'DELETE' && account) {
+            db.metricPermissions.set(account, { view_permissions: null, write_permissions: null });
+            return { status: true, account, action: 'deleted' };
+        }
+        if ((opts.method === 'POST' || opts.method === 'PUT') && account) {
+            const split = (value: unknown) => String(value ?? '').split(',');
+            const view = split(opts.body?.view_permissions);
+            const write = split(opts.body?.write_permissions);
+            db.metricPermissions.set(account, {
+                view_permissions: view.length === 1 && view[0] === '' ? null : view.length === 1 ? view[0]! : view,
+                write_permissions: write.length === 1 && write[0] === '' ? null : write.length === 1 ? write[0]! : write,
+            });
+            return { status: true, id: account, account, view_permissions: view, write_permissions: write, action: 'set' };
+        }
+        if (account) {
+            const row = db.metricPermissions.get(account) ?? { view_permissions: null, write_permissions: null };
+            return { status: true, id: account, account, ...row };
+        }
+        const data = [...db.metricPermissions.entries()].map(([id, row]) => ({ id, account: id, ...row }));
+        return { status: true, data, size: 10, start: 0, count: data.length };
     }
     // ── Browser devices — /api/user/device (account/models/device.py) ──
     if (path === '/api/user/device') {
@@ -2051,6 +2506,138 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             },
         };
     }
+    // Group-scoped key inventory. Raw tokens are absent from ordinary reads;
+    // create and explicit graph=token are the only disclosure paths.
+    const oneGroupKey = path.match(/^\/api\/group\/apikey\/(\d+)$/);
+    if (oneGroupKey || path === '/api/group/apikey') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (oneGroupKey) {
+            const row = db.groupApiKeys.find((candidate) => candidate.id === Number(oneGroupKey[1]));
+            if (!row) return { status: false, error: 'ApiKey not found', error_code: 404 };
+            if (!groupCanManage(caller, row.group)) return permissionDenied();
+            if (opts.method === 'DELETE') {
+                db.groupApiKeys = db.groupApiKeys.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (opts.method === 'POST' && opts.body) {
+                if ('name' in opts.body) row.name = String(opts.body.name ?? '');
+                if ('is_active' in opts.body) row.is_active = Boolean(opts.body.is_active);
+                if (isPlainObject(opts.body.permissions)) row.permissions = mergeDicts(row.permissions, opts.body.permissions);
+                if (isPlainObject(opts.body.limits)) row.limits = mergeDicts(row.limits, opts.body.limits);
+                if (isPlainObject(opts.body.metadata)) row.metadata = mergeDicts(row.metadata, opts.body.metadata);
+                row.modified = Math.floor(Date.now() / 1000);
+            }
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: serializeGroupApiKey(row, graph), graph };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            const groupId = requestGroupId(opts);
+            if (!db.groups.some((candidate) => candidate.id === groupId)) return { status: false, error: 'Group not found', error_code: 404 };
+            if (!groupCanManage(caller, groupId)) return permissionDenied();
+            const now = Math.floor(Date.now() / 1000);
+            const id = Math.max(0, ...db.groupApiKeys.map((candidate) => candidate.id)) + 1;
+            const row: MockGroupApiKey = {
+                id, group: groupId, user: opts.body.user == null ? null : Number(opts.body.user),
+                created: now, modified: now, name: String(opts.body.name ?? ''),
+                is_active: opts.body.is_active == null ? true : Boolean(opts.body.is_active),
+                permissions: isPlainObject(opts.body.permissions) ? opts.body.permissions : {},
+                limits: isPlainObject(opts.body.limits) ? opts.body.limits : {},
+                last_used: null, expires_at: opts.body.expires_at == null ? null : Number(opts.body.expires_at),
+                metadata: isPlainObject(opts.body.metadata) ? opts.body.metadata : {},
+                override_user: Boolean(opts.body.override_user), token: `mock_gk_${mockHex32(mulberry32(id))}`,
+            };
+            db.groupApiKeys.unshift(row);
+            return { status: true, data: serializeGroupApiKey(row, 'default', true), graph: 'default' };
+        }
+        const groupId = requestGroupId(opts);
+        if (groupId ? !groupCanManage(caller, groupId) : !hasGlobalPermission(caller, ['manage_groups', 'groups'])) return permissionDenied();
+        const params = { ...(opts.params ?? {}), ...(groupId ? { group: groupId } : {}) };
+        const result = listRows(db.groupApiKeys as unknown as Record<string, unknown>[], params, (row) => String(row.name), '-created');
+        const graph = String(opts.params?.graph ?? 'default');
+        return { ...result, graph: opts.params?.graph ? graph : 'list', data: (result.data as unknown as MockGroupApiKey[]).map((row) => serializeGroupApiKey(row, graph)) };
+    }
+    if (path === '/api/group/webhook_secret') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const groupId = requestGroupId(opts);
+        if (!groupCanManage(caller, groupId)) return permissionDenied();
+        const now = new Date().toISOString();
+        const existing = db.webhookSecrets.get(groupId);
+        const record = !existing || opts.body?.rotate === true
+            ? { value: `wsec_${mockHex32(mulberry32(groupId + Date.now()))}`, created_at: existing?.created_at ?? now, last_rotated_at: now }
+            : existing;
+        db.webhookSecrets.set(groupId, record);
+        return { status: true, data: { secret: record.value, created_at: record.created_at, last_rotated_at: record.last_rotated_at } };
+    }
+    const oneWebhook = path.match(/^\/api\/group\/webhook_subscriptions\/(\d+)$/);
+    if (oneWebhook || path === '/api/group/webhook_subscriptions') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (oneWebhook) {
+            const row = db.webhooks.find((candidate) => candidate.id === Number(oneWebhook[1]));
+            if (!row) return { status: false, error: 'WebhookSubscription not found', error_code: 404 };
+            if (!groupCanManage(caller, row.group)) return permissionDenied();
+            if (opts.method === 'DELETE') {
+                db.webhooks = db.webhooks.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (opts.method === 'POST' && opts.body) {
+                const url = 'url' in opts.body ? String(opts.body.url ?? '') : row.url;
+                if (!url.startsWith('https://')) return { status: false, error: 'url must start with https:// (http and other schemes are not allowed)', error_code: 400 };
+                try { if (new URL(url).username || new URL(url).password) return { status: false, error: 'url must not include credentials (user:pass@) — strip the userinfo component', error_code: 400 }; } catch { return { status: false, error: 'url is not a valid URL', error_code: 400 }; }
+                const events = opts.body.events ?? row.events;
+                if (!Array.isArray(events) || events.some((entry) => typeof entry !== 'string' || !entry)) return { status: false, error: 'events must be a list of strings', error_code: 400 };
+                row.url = url; row.events = [...events] as string[];
+                if ('is_active' in opts.body) row.is_active = Boolean(opts.body.is_active);
+                if (isPlainObject(opts.body.metadata)) row.metadata = mergeDicts(row.metadata, opts.body.metadata);
+                row.modified = Math.floor(Date.now() / 1000);
+            }
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: serializeWebhook(row, graph), graph };
+        }
+        if (opts.method === 'POST' && opts.body) {
+            const groupId = requestGroupId(opts);
+            if (!groupCanManage(caller, groupId)) return permissionDenied();
+            const url = String(opts.body.url ?? '');
+            if (!url.startsWith('https://')) return { status: false, error: 'url must start with https:// (http and other schemes are not allowed)', error_code: 400 };
+            try { if (new URL(url).username || new URL(url).password) return { status: false, error: 'url must not include credentials (user:pass@) — strip the userinfo component', error_code: 400 }; } catch { return { status: false, error: 'url is not a valid URL', error_code: 400 }; }
+            const events = opts.body.events ?? [];
+            if (!Array.isArray(events) || events.some((entry) => typeof entry !== 'string' || !entry)) return { status: false, error: 'events must be a list of strings', error_code: 400 };
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockWebhookSubscription = { id: Math.max(0, ...db.webhooks.map((candidate) => candidate.id)) + 1, group: groupId, created: now, modified: now, url, events: [...events] as string[], is_active: opts.body.is_active == null ? true : Boolean(opts.body.is_active), metadata: isPlainObject(opts.body.metadata) ? opts.body.metadata : {} };
+            if (db.webhooks.some((candidate) => candidate.group === groupId && candidate.url === url)) return { status: false, error: 'Webhook subscription already exists', error_code: 400 };
+            db.webhooks.unshift(row);
+            return { status: true, data: serializeWebhook(row), graph: 'default' };
+        }
+        const groupId = requestGroupId(opts);
+        if (groupId ? !groupCanManage(caller, groupId) : !hasGlobalPermission(caller, ['manage_groups', 'groups'])) return permissionDenied();
+        const params = { ...(opts.params ?? {}), ...(groupId ? { group: groupId } : {}) };
+        const result = listRows(db.webhooks as unknown as Record<string, unknown>[], params, (row) => `${row.url}`, '-created');
+        const graph = String(opts.params?.graph ?? 'default');
+        return { ...result, data: (result.data as unknown as MockWebhookSubscription[]).map((row) => serializeWebhook(row, graph)) };
+    }
+    if (path === '/api/group/member/invite') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const groupId = requestGroupId(opts);
+        if (!groupCanManage(caller, groupId)) return permissionDenied();
+        const email = String(opts.body?.email ?? '').trim().toLowerCase();
+        if (!email) return { status: false, error: 'email is required', error_code: 400 };
+        let user = findByEmail(email);
+        if (!user) {
+            const id = Math.max(...db.users.map((candidate) => candidate.id)) + 1;
+            const username = email.split('@')[0] || `user${id}`;
+            user = { id, first_name: '', last_name: '', display_name: email, username, email, phone_number: null, is_active: true, is_superuser: false, is_email_verified: false, is_phone_verified: false, is_dob_verified: false, is_online: false, last_login: null, last_activity: null, permissions: {}, metadata: {}, dob: null, avatar: null, org: null, requires_mfa: false, created: Math.floor(Date.now() / 1000) };
+            db.users.push(user);
+        }
+        const existing = db.members.find((candidate) => candidate.group === groupId && candidate.user === user!.id);
+        if (existing) return { status: true, data: serializeMember(existing), graph: 'default' };
+        const now = Math.floor(Date.now() / 1000);
+        const member: MockMember = { id: Math.max(...db.members.map((candidate) => candidate.id)) + 1, created: now, modified: now, is_active: true, permissions: isPlainObject(opts.body?.permissions) ? opts.body!.permissions as Record<string, unknown> : {}, metadata: {}, user: user.id, group: groupId };
+        db.members.push(member);
+        return { status: true, data: serializeMember(member), graph: 'default' };
+    }
     // Members list/detail — /api/group/member (admin listing; the group-
     // scoped /api/group/<id>/member self-membership route stays separate
     // above). SEARCH_FIELDS parity: user__username / user__email /
@@ -2059,6 +2646,20 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (oneMember) {
         const m = db.members.find((x) => x.id === Number(oneMember[1]));
         if (!m) return { status: false, error: 'Member not found', error_code: 404 };
+        if (opts.method === 'POST' && opts.body) {
+            const caller = userFromBearer(opts.headers);
+            if (!groupCanManage(caller, m.group)) return permissionDenied(caller ? 403 : 401);
+            if ('is_active' in opts.body) m.is_active = Boolean(opts.body.is_active);
+            if (isPlainObject(opts.body.permissions)) {
+                for (const [permission, value] of Object.entries(opts.body.permissions)) {
+                    if (value) m.permissions[permission] = value;
+                    else delete m.permissions[permission];
+                }
+            }
+            if (isPlainObject(opts.body.metadata)) m.metadata = mergeDicts(m.metadata, opts.body.metadata);
+            m.modified = Math.floor(Date.now() / 1000);
+            if ('resend_invite' in opts.body) return { status: true };
+        }
         return { status: true, data: serializeMember(m), graph: 'default' };
     }
     if (path === '/api/group/member') {
