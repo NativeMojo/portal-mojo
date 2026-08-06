@@ -2,6 +2,7 @@ import type { AdminSection } from '../index';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
 import { TicketsPage } from './tickets';
 import { INCIDENTS_ADMIN_ROUTES } from '../incidents';
+import { RULES_ADMIN_ROUTES } from '../rules';
 
 export * from './models';
 export * from './tickets';
@@ -21,5 +22,6 @@ export const SECURITY_OPERATIONS_ADMIN_SECTION: AdminSection = {
             permissions: SECURITY_VIEW_PERMS,
         },
         ...INCIDENTS_ADMIN_ROUTES,
+        ...RULES_ADMIN_ROUTES,
     ],
 };

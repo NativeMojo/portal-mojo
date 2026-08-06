@@ -36,6 +36,7 @@ export * from './bouncer';
 export * from './security-permissions';
 export * from './security';
 export * from './incidents';
+export * from './rules';
 
 export type AdminNavigationGroup =
     | 'identity-access'

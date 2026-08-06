@@ -15,7 +15,7 @@ try {
     assert.deepEqual(admin.SECURITY_VIEW_PERMS, ['sys.view_security', 'sys.security']);
     assert.deepEqual(admin.SECURITY_MANAGE_PERMS, ['sys.manage_security', 'sys.security']);
     assert.deepEqual(admin.SECURITY_DELETE_PERMS, ['sys.manage_security']);
-    assert.deepEqual(admin.SECURITY_OPERATIONS_ADMIN_SECTION.routes.map((route) => route.path), ['tickets', 'incidents', 'events']);
+    assert.deepEqual(admin.SECURITY_OPERATIONS_ADMIN_SECTION.routes.map((route) => route.path), ['tickets', 'incidents', 'events', 'rules', 'rules/:id']);
     assert(admin.adminSectionRoutes([admin.SECURITY_OPERATIONS_ADMIN_SECTION], { mount: '/system' }).some((route) => route.path === 'system/security/incidents'));
 
     const normalized = incidents.normalizeIncidentListParams({ graph: 'detailed', download_format: 'json', filename: 'leak', mode: 'raw', status: 'new', priority__gte: 5, start: 0, size: 25 });

@@ -457,6 +457,20 @@ interface MockIncident {
     [field: string]: unknown;
 }
 
+interface MockRuleSet {
+    id: number; created: number; modified: number; priority: number; category: string; name: string | null;
+    bundle_minutes: number | null; bundle_by: number; bundle_by_rule_set: boolean; match_by: number;
+    handler: string | null; trigger_count: number | null; trigger_window: number | null;
+    retrigger_every: number | null; metadata: Record<string, unknown>; is_active: boolean;
+    [field: string]: unknown;
+}
+
+interface MockRule {
+    id: number; created: number; modified: number; parent: number; name: string | null; index: number;
+    comparator: string; field_name: string | null; value: string; value_type: string; is_required: number;
+    [field: string]: unknown;
+}
+
 interface MockBouncerDevice {
     id: number;
     muid: string;
@@ -616,6 +630,25 @@ function buildIncidents(): MockIncident[] {
             model_name: null, model_id: null, source_ip: null, hostname: null,
             metadata: { event_count: 1, maestro_url: 'https://maestro.example.test/items/1602' }, group_id: 2,
         },
+    ];
+}
+
+function buildRuleSets(): MockRuleSet[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 1101, created: now - 100 * 86400, modified: now - 3600, priority: 5, category: 'security:auth', name: 'High-risk authentication', bundle_minutes: 30, bundle_by: 4, bundle_by_rule_set: true, match_by: 0, handler: 'block://?ttl=3600&fleet_wide=1,ticket://?priority=9&status=open,notify://perm@manage_security,oncall', trigger_count: 3, trigger_window: 10, retrigger_every: 5, metadata: { owner: 'security', arbitrary_future: { mode: 'retain' } }, is_active: true, future_top_level: 'retain-me' },
+        { id: 1102, created: now - 50 * 86400, modified: now - 7200, priority: 5, category: 'security:auth', name: 'Legacy handler compatibility', bundle_minutes: null, bundle_by: 10, bundle_by_rule_set: true, match_by: 1, handler: 'job://myapp.jobs.inspect?window=300,email://perm@manage_security,protected@incident_emails,sms://oncall,maestro://?board=47,llm://,resolve://?status=resolved&note=Handled,custom://future?x=1', trigger_count: null, trigger_window: null, retrigger_every: null, metadata: { future: true }, is_active: false },
+        { id: 1103, created: now - 20 * 86400, modified: now - 900, priority: 20, category: 'health', name: 'Future enum fixture', bundle_minutes: 0, bundle_by: 99, bundle_by_rule_set: false, match_by: 7, handler: '', trigger_count: null, trigger_window: null, retrigger_every: null, metadata: {}, is_active: false },
+    ];
+}
+
+function buildRules(): MockRule[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 1201, created: now - 100 * 86400, modified: now - 3600, parent: 1101, name: 'Risk score', index: 0, comparator: '>=', field_name: 'risk_score', value: '80', value_type: 'int', is_required: 1 },
+        { id: 1202, created: now - 100 * 86400, modified: now - 3500, parent: 1101, name: 'Authentication category', index: 1, comparator: 'contains', field_name: 'category', value: 'auth', value_type: 'str', is_required: 1 },
+        { id: 1203, created: now - 50 * 86400, modified: now - 7000, parent: 1102, name: 'Legacy bool', index: 0, comparator: 'eq', field_name: 'metadata.suspicious', value: 'false', value_type: 'bool', is_required: 0, future_rule_field: { retain: true } },
+        { id: 1204, created: now - 50 * 86400, modified: now - 6900, parent: 1102, name: 'Future comparator', index: 1, comparator: 'future-op', field_name: 'metadata.future', value: 'x', value_type: 'future-type', is_required: 0 },
     ];
 }
 
@@ -1386,6 +1419,12 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         manage_users: true,
         users: true,
     };
+    const securityManageOnly = at(15);
+    securityManageOnly.is_active = true;
+    securityManageOnly.username = 'security.manage-only';
+    securityManageOnly.email = 'security.manage-only@nativemojo.com';
+    securityManageOnly.display_name = 'Security Manage Only';
+    securityManageOnly.permissions = { manage_security: true };
 
     // Auth-config inheritance fixtures: defaults -> deployment -> root -> child.
     groups[0]!.metadata = mergeDicts(groups[0]!.metadata, {
@@ -1442,6 +1481,8 @@ const db = {
     ticketNotes: buildTicketNotes(),
     maestroItemLinks: buildMaestroItemLinks(),
     incidentHistory: buildIncidentHistory(),
+    ruleSets: buildRuleSets(),
+    rules: buildRules(),
     bouncerDevices: buildBouncerDevices(),
     bouncerSignals: buildBouncerSignals(),
     botSignatures: buildBotSignatures(),
@@ -3126,6 +3167,72 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { ...rest, user: owner ? userBasic(owner) : null };
         });
         return { ...result, data: rows };
+    }
+    // ── Rule engine — exact RuleSet/Rule CRUD and global permissions ──
+    const ruleSetMatch = path.match(/^\/api\/incident\/event\/ruleset(?:\/(\d+))?$/);
+    if (ruleSetMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canView = hasGlobalPermission(caller, ['view_security', 'security']);
+        const canManage = hasGlobalPermission(caller, ['manage_security', 'security']);
+        if (!canView) return permissionDenied();
+        const detailId = ruleSetMatch[1] ? Number(ruleSetMatch[1]) : null;
+        const validate = (body: Record<string, unknown>, current?: MockRuleSet): string | null => {
+            const required = (key: string) => key in body ? String(body[key] ?? '').trim() : String(current?.[key] ?? '').trim();
+            if (!required('category')) return 'category is required';
+            const numeric = ['priority', 'bundle_by', 'bundle_minutes', 'match_by', 'trigger_count', 'trigger_window', 'retrigger_every'];
+            for (const key of numeric) if (key in body && body[key] != null && body[key] !== '' && !Number.isInteger(Number(body[key]))) return `${key} must be an integer`;
+            for (const key of ['trigger_count', 'trigger_window', 'retrigger_every']) if (key in body && body[key] != null && Number(body[key]) <= 0) return `${key} must be positive`;
+            return null;
+        };
+        const apply = (row: MockRuleSet, body: Record<string, unknown>) => {
+            const target = row as Record<string, unknown>;
+            for (const key of ['priority', 'bundle_minutes', 'bundle_by', 'match_by', 'trigger_count', 'trigger_window', 'retrigger_every']) if (key in body) target[key] = body[key] == null || body[key] === '' ? null : Number(body[key]);
+            for (const key of ['category', 'name', 'handler']) if (key in body) target[key] = body[key] == null ? null : String(body[key]);
+            for (const key of ['bundle_by_rule_set', 'is_active']) if (key in body) target[key] = Boolean(body[key]);
+            if (isPlainObject(body.metadata)) row.metadata = mergeDicts(row.metadata, body.metadata);
+            row.modified = Math.floor(Date.now() / 1000);
+        };
+        if (detailId != null) {
+            const row = db.ruleSets.find((candidate) => candidate.id === detailId);
+            if (!row) return { status: false, error: 'RuleSet not found', error_code: 404 };
+            if (method === 'DELETE') { if (!canManage) return permissionDenied(); db.ruleSets = db.ruleSets.filter((candidate) => candidate.id !== detailId); db.rules = db.rules.filter((candidate) => candidate.parent !== detailId); return { status: 'deleted' }; }
+            if (method === 'POST' && opts.body) { if (!canManage) return permissionDenied(); const error = validate(opts.body, row); if (error) return { status: false, error, error_code: 400 }; apply(row, opts.body); }
+            return { status: true, data: { ...row }, graph: 'default' };
+        }
+        if (method === 'POST' && opts.body) {
+            if (!canManage) return permissionDenied(); const error = validate(opts.body); if (error) return { status: false, error, error_code: 400 };
+            const now = Math.floor(Date.now() / 1000); const row: MockRuleSet = { id: Math.max(0, ...db.ruleSets.map((candidate) => candidate.id)) + 1, created: now, modified: now, priority: 0, category: '', name: null, bundle_minutes: 0, bundle_by: 3, bundle_by_rule_set: true, match_by: 0, handler: null, trigger_count: null, trigger_window: null, retrigger_every: null, metadata: {}, is_active: true };
+            apply(row, opts.body); db.ruleSets.push(row); return { status: true, data: { ...row }, graph: 'default' };
+        }
+        const result = listRows(db.ruleSets as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => String(row.name ?? ''), 'priority');
+        return { ...result, graph: 'default' };
+    }
+    const ruleMatch = path.match(/^\/api\/incident\/event\/ruleset\/rule(?:\/(\d+))?$/);
+    if (ruleMatch) {
+        const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
+        const canView = hasGlobalPermission(caller, ['view_security', 'security']); const canManage = hasGlobalPermission(caller, ['manage_security', 'security']); if (!canView) return permissionDenied();
+        const detailId = ruleMatch[1] ? Number(ruleMatch[1]) : null;
+        const validate = (body: Record<string, unknown>, current?: MockRule): string | null => {
+            const parent = Number(body.parent ?? current?.parent); if (!Number.isInteger(parent) || !db.ruleSets.some((candidate) => candidate.id === parent)) return 'parent is required';
+            const field = String(body.field_name ?? current?.field_name ?? '').trim(); if (!field) return 'field_name is required';
+            for (const key of ['index', 'is_required']) if (key in body && !Number.isInteger(Number(body[key]))) return `${key} must be an integer`;
+            return null;
+        };
+        const apply = (row: MockRule, body: Record<string, unknown>) => {
+            const target = row as Record<string, unknown>;
+            for (const key of ['parent', 'index', 'is_required']) if (key in body) target[key] = Number(body[key]);
+            for (const key of ['name', 'comparator', 'field_name', 'value', 'value_type']) if (key in body) target[key] = body[key] == null ? null : String(body[key]);
+            row.modified = Math.floor(Date.now() / 1000);
+        };
+        if (detailId != null) {
+            const row = db.rules.find((candidate) => candidate.id === detailId); if (!row) return { status: false, error: 'Rule not found', error_code: 404 };
+            if (method === 'DELETE') { if (!canManage) return permissionDenied(); db.rules = db.rules.filter((candidate) => candidate.id !== detailId); return { status: 'deleted' }; }
+            if (method === 'POST' && opts.body) { if (!canManage) return permissionDenied(); const error = validate(opts.body, row); if (error) return { status: false, error, error_code: 400 }; apply(row, opts.body); }
+            return { status: true, data: { ...row }, graph: 'default' };
+        }
+        if (method === 'POST' && opts.body) { if (!canManage) return permissionDenied(); const error = validate(opts.body); if (error) return { status: false, error, error_code: 400 }; const now = Math.floor(Date.now() / 1000); const row: MockRule = { id: Math.max(0, ...db.rules.map((candidate) => candidate.id)) + 1, created: now, modified: now, parent: Number(opts.body.parent), name: null, index: 0, comparator: '==', field_name: null, value: '', value_type: 'int', is_required: 0 }; apply(row, opts.body); db.rules.push(row); return { status: true, data: { ...row }, graph: 'default' }; }
+        const result = listRows(db.rules as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => String(row.name ?? ''), 'index'); return { ...result, graph: 'default' };
     }
     // ── Incident events — /api/incident/event (view_security-gated live) ──
     const eventMatch = path.match(/^\/api\/incident\/event(?:\/(\d+))?$/);
