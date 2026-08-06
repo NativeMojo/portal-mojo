@@ -3,7 +3,7 @@ import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
 } from '../../client';
 import {
-    DnsCredentialModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
+    DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
     sanitizeRegistrarDiscoveryResponse,
     type CertificateRow, type DnsCapabilities, type DnsCredentialRow,
     type DnsGroupChoice, type DnsProviderCapability, type DnsRecordRow,
