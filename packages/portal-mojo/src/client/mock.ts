@@ -1110,13 +1110,28 @@ function buildPushDevices(): MockPushDevice[] {
     }));
 }
 
+/**
+ * Login origins. WIDENED for #1291: the login-location map aggregates by
+ * country, so a three-country fixture produced a map with nothing to draw.
+ * Nine countries across five continents, plus the private-range row the live
+ * wire really does produce.
+ */
 const LOGIN_GEOS: { ip: string; cc: string | null; region: string | null; rc: string | null; city: string | null; lat: number | null; lng: number | null }[] = [
     { ip: '73.92.14.5', cc: 'US', region: 'California', rc: 'CA', city: 'San Diego', lat: 32.7157, lng: -117.1611 },
     { ip: '172.58.27.101', cc: 'US', region: 'Texas', rc: 'TX', city: 'Austin', lat: 30.2672, lng: -97.7431 },
+    { ip: '64.18.22.90', cc: 'US', region: 'New York', rc: 'NY', city: 'New York', lat: 40.7128, lng: -74.006 },
     { ip: '98.51.100.23', cc: 'DE', region: 'Berlin', rc: 'BE', city: 'Berlin', lat: 52.52, lng: 13.405 },
-    // Live parity: private-range logins geolocate as region "Private".
-    { ip: '127.0.0.1', cc: null, region: 'Private', rc: null, city: null, lat: null, lng: null },
     { ip: '203.0.113.9', cc: 'GB', region: 'England', rc: 'ENG', city: 'London', lat: 51.5072, lng: -0.1276 },
+    { ip: '45.83.220.14', cc: 'BR', region: 'São Paulo', rc: 'SP', city: 'São Paulo', lat: -23.5505, lng: -46.6333 },
+    { ip: '103.21.244.7', cc: 'IN', region: 'Maharashtra', rc: 'MH', city: 'Mumbai', lat: 19.076, lng: 72.8777 },
+    { ip: '133.242.19.58', cc: 'JP', region: 'Tokyo', rc: '13', city: 'Tokyo', lat: 35.6762, lng: 139.6503 },
+    { ip: '196.10.52.77', cc: 'ZA', region: 'Gauteng', rc: 'GP', city: 'Johannesburg', lat: -26.2041, lng: 28.0473 },
+    { ip: '1.128.44.201', cc: 'AU', region: 'New South Wales', rc: 'NSW', city: 'Sydney', lat: -33.8688, lng: 151.2093 },
+    { ip: '185.220.101.44', cc: 'NL', region: 'North Holland', rc: 'NH', city: 'Amsterdam', lat: 52.3676, lng: 4.9041 },
+    // Live parity: private-range logins geolocate as region "Private" and
+    // carry NO coordinates — invisible on the map by construction, visible
+    // in the Logins tab. The map's status line says so.
+    { ip: '127.0.0.1', cc: null, region: 'Private', rc: null, city: null, lat: null, lng: null },
 ];
 const LOGIN_SOURCES = ['password', 'password', 'magic', 'passkey'];
 
@@ -1125,8 +1140,15 @@ function buildLoginEvents(users: MockUser[]): MockLoginEvent[] {
     const nowSec = Math.floor(Date.now() / 1000);
     const events: MockLoginEvent[] = [];
     let id = 14400;
-    // Dense history for the detail-view seeds, sparse for the rest.
-    for (const uid of [1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 9, 10]) {
+    // Dense history for the detail-view seeds, sparse for the rest. Widened
+    // with #1291 so the country aggregation has real mass to plot.
+    const owners = [
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        2, 2, 2, 2, 2, 2,
+        3, 3, 3, 3, 3,
+        9, 9, 10, 10, 11, 12, 13, 14, 16,
+    ];
+    for (const uid of owners) {
         const geo = LOGIN_GEOS[Math.floor(rand() * LOGIN_GEOS.length)]!;
         const daysAgo = events.filter((e) => e.user === uid).length * (uid === 1 ? 2 : 9) + rand() * 2;
         events.push({
@@ -1147,6 +1169,689 @@ function buildLoginEvents(users: MockUser[]): MockLoginEvent[] {
     }
     // Guard: seeds only reference seeded users.
     return events.filter((e) => users.some((u) => u.id === e.user));
+}
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ #1291 — GeoIP cache + device locations (fixtures)                    ║
+// ║                                                                      ║
+// ║ Shapes mirror django-mojo `account/models/geolocated_ip.py` and      ║
+// ║ `account/models/device.py` exactly, including the four GeoLocatedIP  ║
+// ║ graphs and the computed `is_threat` / `is_suspicious` / `risk_score` ║
+// ║ / `block_active` / `whitelist_active` properties. This block is the  ║
+// ║ executable spec for the wire the admin surfaces speak.               ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+interface MockGeoIp {
+    id: number;
+    created: number;
+    modified: number;
+    last_seen: number;
+    ip_address: string;
+    subnet: string | null;
+    country_code: string | null;
+    country_name: string | null;
+    region: string | null;
+    region_code: string | null;
+    city: string | null;
+    postal_code: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    timezone: string | null;
+    is_tor: boolean;
+    is_vpn: boolean;
+    is_proxy: boolean;
+    is_cloud: boolean;
+    is_datacenter: boolean;
+    is_mobile: boolean;
+    is_known_attacker: boolean;
+    is_known_abuser: boolean;
+    threat_level: string | null;
+    asn: string | null;
+    asn_org: string | null;
+    isp: string | null;
+    mobile_carrier: string | null;
+    connection_type: string | null;
+    is_blocked: boolean;
+    blocked_at: number | null;
+    blocked_until: number | null;
+    blocked_reason: string | null;
+    block_count: number;
+    is_whitelisted: boolean;
+    whitelisted_reason: string | null;
+    whitelisted_until: number | null;
+    expires_at: number | null;
+    /** Excluded from the `default` graph — the raw provider blob. */
+    provider: string | null;
+    data: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockDeviceLocation {
+    id: number;
+    user: number;
+    user_device: number;
+    ip_address: string;
+    /** FK to a MockGeoIp id, or null while the row is unenriched. */
+    geolocation: number | null;
+    first_seen: number;
+    last_seen: number;
+    [field: string]: unknown;
+}
+
+/** IPv4 keeps the historical string-prefix subnet; IPv6 would use the /64. */
+function mockSubnetOf(ip: string): string {
+    return ip.includes(':') ? ip : ip.slice(0, ip.lastIndexOf('.'));
+}
+
+interface GeoIpSeed {
+    ip: string;
+    cc?: string | null;
+    country?: string | null;
+    region?: string | null;
+    rc?: string | null;
+    city?: string | null;
+    postal?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    tz?: string | null;
+    asn?: string | null;
+    asnOrg?: string | null;
+    isp?: string | null;
+    connection?: string | null;
+    mobileCarrier?: string | null;
+    threat?: string | null;
+    tor?: boolean;
+    vpn?: boolean;
+    proxy?: boolean;
+    cloud?: boolean;
+    datacenter?: boolean;
+    mobile?: boolean;
+    attacker?: boolean;
+    abuser?: boolean;
+    /** Enforcement. `blockedInDays` in the PAST produces an expired block. */
+    blockedReason?: string;
+    blockedInDays?: number | null;
+    blockCount?: number;
+    whitelistReason?: string;
+    whitelistInDays?: number | null;
+    provider?: string;
+    lastSeenHours?: number;
+}
+
+const GEOIP_SEEDS: GeoIpSeed[] = [
+    // ── Ordinary residential/business origins, mirroring LOGIN_GEOS ──
+    { ip: '73.92.14.5', cc: 'US', country: 'United States', region: 'California', rc: 'US-CA', city: 'San Diego', postal: '92101', lat: 32.7157, lng: -117.1611, tz: 'America/Los_Angeles', asn: 'AS20001', asnOrg: 'Charter Communications', isp: 'Spectrum', connection: 'residential', lastSeenHours: 1 },
+    { ip: '172.58.27.101', cc: 'US', country: 'United States', region: 'Texas', rc: 'US-TX', city: 'Austin', postal: '73301', lat: 30.2672, lng: -97.7431, tz: 'America/Chicago', asn: 'AS21928', asnOrg: 'T-Mobile USA', isp: 'T-Mobile', connection: 'cellular', mobile: true, mobileCarrier: 'T-Mobile', lastSeenHours: 6 },
+    { ip: '64.18.22.90', cc: 'US', country: 'United States', region: 'New York', rc: 'US-NY', city: 'New York', postal: '10001', lat: 40.7128, lng: -74.006, tz: 'America/New_York', asn: 'AS13444', asnOrg: 'Google', isp: 'Google Fiber', connection: 'business', lastSeenHours: 20 },
+    { ip: '98.51.100.23', cc: 'DE', country: 'Germany', region: 'Berlin', rc: 'DE-BE', city: 'Berlin', postal: '10115', lat: 52.52, lng: 13.405, tz: 'Europe/Berlin', asn: 'AS3320', asnOrg: 'Deutsche Telekom AG', isp: 'Telekom', connection: 'residential', lastSeenHours: 3 },
+    { ip: '103.21.244.7', cc: 'IN', country: 'India', region: 'Maharashtra', rc: 'IN-MH', city: 'Mumbai', lat: 19.076, lng: 72.8777, tz: 'Asia/Kolkata', asn: 'AS13335', asnOrg: 'Cloudflare', isp: 'Cloudflare', connection: 'hosting', cloud: true, datacenter: true, threat: 'low', lastSeenHours: 11 },
+    { ip: '133.242.19.58', cc: 'JP', country: 'Japan', region: 'Tokyo', rc: 'JP-13', city: 'Tokyo', lat: 35.6762, lng: 139.6503, tz: 'Asia/Tokyo', asn: 'AS9370', asnOrg: 'SAKURA Internet', isp: 'SAKURA', connection: 'hosting', datacenter: true, lastSeenHours: 30 },
+    { ip: '196.10.52.77', cc: 'ZA', country: 'South Africa', region: 'Gauteng', rc: 'ZA-GP', city: 'Johannesburg', lat: -26.2041, lng: 28.0473, tz: 'Africa/Johannesburg', asn: 'AS2018', asnOrg: 'TENET', isp: 'TENET', connection: 'business', lastSeenHours: 52 },
+    { ip: '1.128.44.201', cc: 'AU', country: 'Australia', region: 'New South Wales', rc: 'AU-NSW', city: 'Sydney', lat: -33.8688, lng: 151.2093, tz: 'Australia/Sydney', asn: 'AS1221', asnOrg: 'Telstra', isp: 'Telstra', connection: 'residential', lastSeenHours: 40 },
+
+    // ── A Tor exit: the maximum-signal row ──
+    { ip: '185.220.101.44', cc: 'NL', country: 'Netherlands', region: 'North Holland', rc: 'NL-NH', city: 'Amsterdam', lat: 52.3676, lng: 4.9041, tz: 'Europe/Amsterdam', asn: 'AS205100', asnOrg: 'F3 Netze e.V.', isp: 'Tor Exit Relay', connection: 'hosting', tor: true, proxy: true, datacenter: true, attacker: true, threat: 'critical', blockedReason: 'auto:threat_escalation', blockedInDays: null, blockCount: 4, lastSeenHours: 2 },
+
+    // ── A datacenter VPN, blocked with a live TTL ──
+    { ip: '45.33.32.156', cc: 'US', country: 'United States', region: 'California', rc: 'US-CA', city: 'Fremont', lat: 37.5483, lng: -121.9886, tz: 'America/Los_Angeles', asn: 'AS63949', asnOrg: 'Akamai Connected Cloud', isp: 'Linode', connection: 'hosting', vpn: true, cloud: true, datacenter: true, threat: 'high', blockedReason: 'Credential stuffing from a VPN exit', blockedInDays: 6, blockCount: 2, lastSeenHours: 4 },
+
+    // ── An EXPIRED block: is_blocked is still true, blocked_until is past.
+    //    web-mojo rendered this as "Blocked". block_active() says otherwise.
+    { ip: '104.28.14.33', cc: 'BR', country: 'Brazil', region: 'São Paulo', rc: 'BR-SP', city: 'São Paulo', lat: -23.5505, lng: -46.6333, tz: 'America/Sao_Paulo', asn: 'AS13335', asnOrg: 'Cloudflare', isp: 'Cloudflare', connection: 'hosting', proxy: true, cloud: true, threat: 'medium', blockedReason: 'Scraper burst', blockedInDays: -3, blockCount: 1, lastSeenHours: 9 },
+
+    // ── An ACTIVE whitelist (office egress) ──
+    { ip: '203.0.113.9', cc: 'GB', country: 'United Kingdom', region: 'England', rc: 'GB-ENG', city: 'London', postal: 'EC2A', lat: 51.5072, lng: -0.1276, tz: 'Europe/London', asn: 'AS2856', asnOrg: 'British Telecommunications', isp: 'BT Business', connection: 'business', whitelistReason: 'London office egress', whitelistInDays: null, lastSeenHours: 1 },
+
+    // ── An EXPIRED whitelist: is_whitelisted true, whitelisted_until past ──
+    { ip: '198.51.100.77', cc: 'US', country: 'United States', region: 'Virginia', rc: 'US-VA', city: 'Ashburn', lat: 39.0438, lng: -77.4874, tz: 'America/New_York', asn: 'AS14618', asnOrg: 'Amazon.com', isp: 'AWS', connection: 'hosting', cloud: true, datacenter: true, whitelistReason: 'Temporary contractor egress', whitelistInDays: -10, threat: 'low', lastSeenHours: 26 },
+
+    // ── A known abuser that is deliberately NOT blocked ──
+    { ip: '45.83.220.14', cc: 'BR', country: 'Brazil', region: 'São Paulo', rc: 'BR-SP', city: 'São Paulo', lat: -23.5505, lng: -46.6333, tz: 'America/Sao_Paulo', asn: 'AS262287', asnOrg: 'Maxihost', isp: 'Maxihost', connection: 'hosting', abuser: true, datacenter: true, threat: 'high', lastSeenHours: 14 },
+
+    // ── The private-range row the live wire really produces: created by
+    //    geolocate(), never enriched, provider 'internal', never expires. ──
+    { ip: '127.0.0.1', cc: null, country: null, region: 'Private', rc: null, city: null, lat: null, lng: null, tz: null, provider: 'internal', lastSeenHours: 5 },
+];
+
+function buildGeoIps(): MockGeoIp[] {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const HOUR = 3600;
+    return GEOIP_SEEDS.map((seed, index) => {
+        const provider = seed.provider ?? 'maxmind';
+        const lastSeen = nowSec - Math.round((seed.lastSeenHours ?? 12) * HOUR);
+        const blocked = seed.blockedReason != null;
+        const whitelisted = seed.whitelistReason != null;
+        return {
+            id: 4100 + index,
+            created: nowSec - 120 * DAY,
+            modified: lastSeen,
+            last_seen: lastSeen,
+            ip_address: seed.ip,
+            subnet: mockSubnetOf(seed.ip),
+            country_code: seed.cc ?? null,
+            country_name: seed.country ?? null,
+            region: seed.region ?? null,
+            region_code: seed.rc ?? null,
+            city: seed.city ?? null,
+            postal_code: seed.postal ?? null,
+            latitude: seed.lat ?? null,
+            longitude: seed.lng ?? null,
+            timezone: seed.tz ?? null,
+            is_tor: seed.tor ?? false,
+            is_vpn: seed.vpn ?? false,
+            is_proxy: seed.proxy ?? false,
+            is_cloud: seed.cloud ?? false,
+            is_datacenter: seed.datacenter ?? false,
+            is_mobile: seed.mobile ?? false,
+            is_known_attacker: seed.attacker ?? false,
+            is_known_abuser: seed.abuser ?? false,
+            threat_level: seed.threat ?? null,
+            asn: seed.asn ?? null,
+            asn_org: seed.asnOrg ?? null,
+            isp: seed.isp ?? null,
+            mobile_carrier: seed.mobileCarrier ?? null,
+            connection_type: seed.connection ?? null,
+            is_blocked: blocked,
+            blocked_at: blocked ? nowSec - 2 * DAY : null,
+            blocked_until: blocked && seed.blockedInDays != null ? nowSec + seed.blockedInDays * DAY : null,
+            blocked_reason: seed.blockedReason ?? null,
+            block_count: seed.blockCount ?? 0,
+            is_whitelisted: whitelisted,
+            whitelisted_reason: seed.whitelistReason ?? null,
+            whitelisted_until: whitelisted && seed.whitelistInDays != null ? nowSec + seed.whitelistInDays * DAY : null,
+            // `is_expired`: internal records never expire.
+            expires_at: provider === 'internal' ? null : nowSec + 60 * DAY,
+            provider,
+            // The raw provider blob the `default` graph EXCLUDES. It carries
+            // firewall hints on purpose so the scrubbing rule is testable.
+            data: {
+                threat_data: {
+                    is_blocklisted: seed.attacker === true || seed.abuser === true,
+                    sources: seed.attacker ? ['abuseipdb', 'firehol'] : [],
+                    firewall_hint: blocked ? 'mojo_blocked ipset member' : 'none',
+                },
+                threat_checked_at: new Date((lastSeen - HOUR) * 1000).toISOString(),
+                raw: { queried: seed.ip, provider },
+            },
+        } satisfies MockGeoIp;
+    });
+}
+
+/** Every device location the fleet has recorded, linked to its GeoIP row. */
+function buildDeviceLocations(devices: MockDevice[], geoIps: MockGeoIp[]): MockDeviceLocation[] {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const DAY = 86400;
+    const geoFor = (ip: string) => geoIps.find((row) => row.ip_address === ip)?.id ?? null;
+    // Deterministic secondary addresses so at least one device has travelled
+    // and at least one has been seen from the Tor exit.
+    const EXTRA: Record<number, string[]> = {
+        0: ['203.0.113.9', '133.242.19.58'],
+        1: ['172.58.27.101'],
+        4: ['185.220.101.44'],
+        6: ['45.33.32.156', '104.28.14.33'],
+    };
+    const out: MockDeviceLocation[] = [];
+    let id = 7300;
+    devices.forEach((device, index) => {
+        const addresses = [device.last_ip, ...(EXTRA[index] ?? [])].filter((ip): ip is string => Boolean(ip));
+        addresses.forEach((ip, position) => {
+            out.push({
+                id: id--,
+                user: device.user,
+                user_device: device.id,
+                ip_address: ip,
+                geolocation: geoFor(ip),
+                first_seen: device.first_seen + position * DAY,
+                last_seen: nowSec - (position * 3 + 1) * DAY - index * 900,
+            });
+        });
+    });
+    return out;
+}
+
+/**
+ * `UserLoginEvent.device` is a real FK the backend sets on every tracked
+ * login, and web-mojo never used it. Link each event to a device of the same
+ * user — preferring one whose `last_ip` matches, so the device dossier's
+ * Logins tab tells a coherent story.
+ */
+function linkLoginDevices(events: MockLoginEvent[], devices: MockDevice[]): MockLoginEvent[] {
+    for (const event of events) {
+        const owned = devices.filter((device) => device.user === event.user);
+        if (!owned.length) { event.device = null; continue; }
+        const matched = owned.find((device) => device.last_ip === event.ip_address);
+        event.device = (matched ?? owned[0]!).id;
+    }
+    return events;
+}
+
+// ── GeoLocatedIP: the computed properties, ported verbatim ────────────
+
+const GEOIP_VIEW_PERMS_MOCK = ['manage_users', 'view_security', 'manage_security', 'security', 'users'];
+const GEOIP_SAVE_PERMS_MOCK = ['manage_users', 'manage_security', 'security'];
+const GEOIP_THREAT_ORDER: (string | null)[] = [null, 'low', 'medium', 'high', 'critical'];
+/** `@md.rate_limit("geoip_lookup", ip_limit=30)`. */
+const GEOIP_LOOKUP_LIMIT = 30;
+let geoIpLookupCount = 0;
+
+function mockIsThreat(row: MockGeoIp): boolean {
+    return Boolean(row.is_known_attacker || row.is_known_abuser);
+}
+
+function mockIsSuspicious(row: MockGeoIp): boolean {
+    return Boolean(row.is_tor || row.is_vpn || row.is_proxy
+        || row.threat_level === 'high' || row.threat_level === 'critical');
+}
+
+function mockRiskScore(row: MockGeoIp): number {
+    let score = 0;
+    if (row.is_tor) score += 40;
+    if (row.is_vpn) score += 20;
+    if (row.is_proxy) score += 25;
+    if (row.threat_level === 'critical') score += 30;
+    else if (row.threat_level === 'high') score += 20;
+    else if (row.threat_level === 'medium') score += 10;
+    return Math.min(score, 100);
+}
+
+function mockWhitelistActive(row: MockGeoIp): boolean {
+    if (!row.is_whitelisted) return false;
+    const now = Math.floor(Date.now() / 1000);
+    if (row.whitelisted_until != null && now > row.whitelisted_until) return false;
+    return true;
+}
+
+function mockBlockActive(row: MockGeoIp): boolean {
+    if (!row.is_blocked) return false;
+    if (mockWhitelistActive(row)) return false;
+    const now = Math.floor(Date.now() / 1000);
+    if (row.blocked_until != null && now > row.blocked_until) return false;
+    return true;
+}
+
+/** The `basic` graph's exact field list (GeoLocatedIP.RestMeta.GRAPHS). */
+const GEOIP_BASIC_FIELDS = [
+    'id', 'ip_address', 'country_code', 'country_name', 'city', 'region',
+    'is_tor', 'is_vpn', 'is_proxy', 'is_known_attacker', 'is_known_abuser',
+    'threat_level', 'is_blocked', 'blocked_at', 'blocked_until', 'provider',
+    'blocked_reason', 'block_count', 'is_whitelisted', 'whitelisted_reason',
+    'whitelisted_until',
+];
+
+/** The `federation` graph: NO enforcement state and NO raw provider blob. */
+const GEOIP_FEDERATION_FIELDS = [
+    'id', 'ip_address',
+    'country_code', 'country_name', 'region', 'region_code',
+    'city', 'postal_code', 'latitude', 'longitude', 'timezone',
+    'asn', 'asn_org', 'isp', 'connection_type', 'mobile_carrier',
+    'is_tor', 'is_vpn', 'is_proxy', 'is_cloud',
+    'is_datacenter', 'is_mobile',
+    'is_known_attacker', 'is_known_abuser', 'threat_level',
+    'provider',
+];
+
+function serializeGeoIp(row: MockGeoIp, graph = 'default'): Record<string, unknown> {
+    const extras = {
+        is_threat: mockIsThreat(row),
+        is_suspicious: mockIsSuspicious(row),
+        risk_score: mockRiskScore(row),
+    };
+    const pick = (fields: string[]) => {
+        const out: Record<string, unknown> = {};
+        for (const field of fields) out[field] = row[field] ?? null;
+        return out;
+    };
+    if (graph === 'federation') return pick(GEOIP_FEDERATION_FIELDS);
+    if (graph === 'basic') {
+        return {
+            ...pick(GEOIP_BASIC_FIELDS),
+            ...extras,
+            block_active: mockBlockActive(row),
+            whitelist_active: mockWhitelistActive(row),
+        };
+    }
+    if (graph === 'detailed') return { ...row, ...extras };
+    // `default`: everything EXCEPT the raw provider blob and the provider name.
+    const { data: _data, provider: _provider, ...rest } = row;
+    if (graph !== 'default') {
+        console.warn(`mock /api/system/geoip: unknown graph "${graph}" — serving "default"`);
+    }
+    return { ...rest, ...extras };
+}
+
+/**
+ * `on_rest_save`: plain fields save first, then each declared
+ * POST_SAVE_ACTION handler runs. All six GeoLocatedIP handlers return
+ * nothing, so the response is always the refreshed row.
+ */
+const GEOIP_ACTIONS = new Set(['refresh', 'threat_analysis', 'block', 'unblock', 'whitelist', 'unwhitelist']);
+const GEOIP_WRITABLE_FIELDS = new Set([
+    'subnet', 'country_code', 'country_name', 'region', 'region_code', 'city',
+    'postal_code', 'latitude', 'longitude', 'timezone',
+    'asn', 'asn_org', 'isp', 'connection_type', 'mobile_carrier',
+    'threat_level', 'is_tor', 'is_vpn', 'is_proxy', 'is_cloud',
+    'is_datacenter', 'is_mobile', 'is_known_attacker', 'is_known_abuser',
+]);
+
+function mockGeoIpBlock(row: MockGeoIp, reason: string, ttl: number): void {
+    // Whitelisted IPs are never blocked — the model returns False early.
+    if (mockWhitelistActive(row)) return;
+    // Idempotent: an already-active block is a no-op.
+    if (mockBlockActive(row)) return;
+    const now = Math.floor(Date.now() / 1000);
+    row.is_blocked = true;
+    row.blocked_at = now;
+    row.blocked_reason = reason;
+    row.blocked_until = ttl > 0 ? now + ttl : null;
+    row.block_count = (row.block_count ?? 0) + 1;
+    // block() ALWAYS escalates threat_level to at least 'high'. Never down.
+    const current = GEOIP_THREAT_ORDER.indexOf(row.threat_level);
+    if (current < GEOIP_THREAT_ORDER.indexOf('high')) row.threat_level = 'high';
+}
+
+function applyGeoIpSave(row: MockGeoIp, body: Record<string, unknown>, caller: MockUser): string | null {
+    const now = Math.floor(Date.now() / 1000);
+    const actions: [string, unknown][] = [];
+    for (const [key, value] of Object.entries(body)) {
+        if (GEOIP_ACTIONS.has(key)) { actions.push([key, value]); continue; }
+        if (!GEOIP_WRITABLE_FIELDS.has(key)) continue;
+        if (key === 'latitude' || key === 'longitude') {
+            if (value === '' || value == null) { row[key] = null; continue; }
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed)) return `${key} must be a number`;
+            row[key] = parsed;
+            continue;
+        }
+        if (key.startsWith('is_')) { row[key] = Boolean(value) && value !== 'false' && value !== '0'; continue; }
+        if (key === 'threat_level') {
+            const level = value === '' || value == null ? null : String(value);
+            if (level != null && !GEOIP_THREAT_ORDER.includes(level)) return 'Invalid threat_level';
+            row.threat_level = level;
+            continue;
+        }
+        row[key] = value === '' ? null : value;
+    }
+    for (const [action, value] of actions) {
+        if (action === 'refresh') {
+            row.modified = now;
+            row.last_seen = now;
+            row.expires_at = row.provider === 'internal' ? null : now + 60 * 86400;
+        } else if (action === 'threat_analysis') {
+            const blob = isPlainObject(row.data) ? row.data : {};
+            blob.threat_checked_at = new Date(now * 1000).toISOString();
+            row.data = blob;
+            row.modified = now;
+        } else if (action === 'block') {
+            const dict = isPlainObject(value) ? value : {};
+            const reason = String(dict.reason ?? `manual block: by ${caller.username}`);
+            const ttl = Number(dict.ttl ?? 600) || 0;
+            mockGeoIpBlock(row, reason, ttl);
+        } else if (action === 'unblock') {
+            const reason = typeof value === 'string' && value ? value : `manual unblock: by ${caller.username}`;
+            row.is_blocked = false;
+            row.blocked_until = null;
+            row.blocked_reason = `unblocked: ${reason}`;
+        } else if (action === 'whitelist') {
+            const dict = isPlainObject(value) ? value : {};
+            const reason = typeof value === 'string' && value
+                ? value
+                : String(dict.reason ?? `manual whitelist: by ${caller.username}`);
+            const ttl = Number(dict.ttl ?? 0) || 0;
+            row.is_whitelisted = true;
+            row.whitelisted_reason = reason;
+            row.whitelisted_until = ttl > 0 ? now + ttl : null;
+            // A whitelist CLEARS an active block.
+            if (row.is_blocked) { row.is_blocked = false; row.blocked_until = null; }
+        } else if (action === 'unwhitelist') {
+            row.is_whitelisted = false;
+            row.whitelisted_reason = null;
+            row.whitelisted_until = null;
+        }
+        row.modified = now;
+    }
+    return null;
+}
+
+/** `_param_is_true`: the STRING "false" arrives truthy without coercion. */
+function mockParamIsTrue(value: unknown): boolean {
+    if (typeof value === 'string') return !['false', '0', 'no', 'off', 'n', ''].includes(value.trim().toLowerCase());
+    return Boolean(value);
+}
+
+/** `GeoLocatedIP.geolocate`: get-or-create, touch last_seen, refresh if stale. */
+function geolocateMock(ip: string, autoRefresh: boolean): MockGeoIp {
+    const now = Math.floor(Date.now() / 1000);
+    let row = db.geoIps.find((candidate) => candidate.ip_address === ip);
+    if (!row) {
+        row = {
+            id: Math.max(0, ...db.geoIps.map((candidate) => candidate.id)) + 1,
+            created: now, modified: now, last_seen: now,
+            ip_address: ip, subnet: mockSubnetOf(ip),
+            country_code: null, country_name: null, region: null, region_code: null,
+            city: null, postal_code: null, latitude: null, longitude: null, timezone: null,
+            is_tor: false, is_vpn: false, is_proxy: false, is_cloud: false,
+            is_datacenter: false, is_mobile: false,
+            is_known_attacker: false, is_known_abuser: false,
+            threat_level: null, asn: null, asn_org: null, isp: null,
+            mobile_carrier: null, connection_type: null,
+            is_blocked: false, blocked_at: null, blocked_until: null,
+            blocked_reason: null, block_count: 0,
+            is_whitelisted: false, whitelisted_reason: null, whitelisted_until: null,
+            expires_at: null, provider: null, data: {},
+        };
+        db.geoIps.unshift(row);
+    } else {
+        row.last_seen = now;
+    }
+    // is_expired: internal records never expire; a null expires_at DOES.
+    const expired = row.provider !== 'internal' && (row.expires_at == null || now > row.expires_at);
+    if (autoRefresh && expired) {
+        row.provider = row.provider ?? 'maxmind';
+        row.expires_at = now + 60 * 86400;
+        row.modified = now;
+    }
+    return row;
+}
+
+// ── Device / device-location / login-event serializers ───────────────
+
+/** The `basic` UserDevice sub-graph — note it carries NO `id`, which is why
+ *  cross-links from a location or login row resolve the device by DUID. */
+function deviceBasic(row: MockDevice): Record<string, unknown> {
+    return {
+        muid: row.muid, duid: row.duid, last_ip: row.last_ip,
+        last_seen: row.last_seen, device_info: row.device_info,
+    };
+}
+
+/** `bouncer_device` / `active_sessions` / `recent_locations` — the three
+ *  `extra` properties the `sessions` graph exposes. All three are real. */
+function deviceSessionExtras(row: MockDevice): Record<string, unknown> {
+    if (!row.muid) return { bouncer_device: null, active_sessions: [], recent_locations: [] };
+    const now = Math.floor(Date.now() / 1000);
+    const bouncer = db.bouncerDevices.find((candidate) => candidate.muid === row.muid);
+    const rand = mulberry32(row.id * 7919);
+    const sessionCount = row.last_seen > now - 86400 ? 1 + Math.floor(rand() * 2) : 0;
+    const sessions = Array.from({ length: sessionCount }, () => {
+        const started = now - Math.floor(rand() * 20 * 3600) - 1800;
+        const lastActivity = Math.min(now - 60, started + Math.floor(rand() * 5400) + 300);
+        const tabCount = 1 + Math.floor(rand() * 3);
+        return {
+            msid: `${mockHex32(rand)}`,
+            started,
+            last_activity: lastActivity,
+            ip: row.last_ip,
+            signal_count: 4 + Math.floor(rand() * 30),
+            tabs: Array.from({ length: tabCount }, (_2, tab) => ({
+                mtab: `${mockHex32(rand).slice(0, 16)}`,
+                started: started + tab * 120,
+                last_activity: lastActivity,
+                signal_count: 1 + Math.floor(rand() * 9),
+            })),
+        };
+    });
+    const locations = db.deviceLocations
+        .filter((location) => location.user_device === row.id)
+        .sort((a, b) => b.last_seen - a.last_seen)
+        .slice(0, 10)
+        .map((location) => {
+            const geo = db.geoIps.find((candidate) => candidate.id === location.geolocation);
+            return {
+                ip_address: location.ip_address,
+                first_seen: location.first_seen,
+                last_seen: location.last_seen,
+                ...(geo ? { city: geo.city ?? '', country: geo.country_code ?? '' } : {}),
+            };
+        });
+    return {
+        bouncer_device: bouncer
+            ? {
+                risk_tier: bouncer.risk_tier,
+                event_count: bouncer.event_count,
+                block_count: bouncer.block_count,
+                fingerprint_id: bouncer.fingerprint_id ?? '',
+                first_seen: bouncer.first_seen,
+                last_seen: bouncer.last_seen,
+            }
+            : null,
+        active_sessions: sessions,
+        recent_locations: locations,
+    };
+}
+
+function serializeDevice(row: MockDevice, graph = 'default'): Record<string, unknown> {
+    const owner = db.users.find((candidate) => candidate.id === row.user);
+    if (graph === 'basic') return deviceBasic(row);
+    if (graph === 'locations') {
+        return {
+            muid: row.muid, duid: row.duid, last_ip: row.last_ip, last_seen: row.last_seen,
+            locations: db.deviceLocations
+                .filter((location) => location.user_device === row.id)
+                .map((location) => serializeDeviceLocation(location)),
+        };
+    }
+    if (graph === 'sessions') {
+        return {
+            id: row.id, muid: row.muid, duid: row.duid, last_ip: row.last_ip,
+            device_info: row.device_info,
+            first_seen: row.first_seen, last_seen: row.last_seen,
+            user: owner ? userBasic(owner) : null,
+            ...deviceSessionExtras(row),
+        };
+    }
+    if (graph !== 'default') {
+        console.warn(`mock /api/user/device: unknown graph "${graph}" — serving "default"`);
+    }
+    const { user: _uid, ...rest } = row;
+    return { ...rest, user: owner ? userBasic(owner) : null };
+}
+
+function serializeDeviceLocation(row: MockDeviceLocation): Record<string, unknown> {
+    const owner = db.users.find((candidate) => candidate.id === row.user);
+    const device = db.devices.find((candidate) => candidate.id === row.user_device);
+    const geo = db.geoIps.find((candidate) => candidate.id === row.geolocation);
+    const { user: _uid, user_device: _did, geolocation: _gid, ...rest } = row;
+    return {
+        ...rest,
+        user: owner ? userBasic(owner) : null,
+        // The `basic` device sub-graph — no `id`, by the model's own field list.
+        user_device: device ? deviceBasic(device) : null,
+        geolocation: geo ? serializeGeoIp(geo, 'default') : null,
+    };
+}
+
+/** UserLoginEvent graphs. NONE of them carries an `event_type` field. */
+const LOGIN_EVENT_BASIC_FIELDS = [
+    'id', 'ip_address', 'country_code', 'region', 'region_code', 'city',
+    'latitude', 'longitude', 'source', 'is_new_country', 'is_new_region', 'created',
+];
+
+function serializeLoginEvent(row: MockLoginEvent, graph = 'list'): Record<string, unknown> {
+    const owner = db.users.find((candidate) => candidate.id === row.user);
+    const out: Record<string, unknown> = {};
+    for (const field of LOGIN_EVENT_BASIC_FIELDS) out[field] = row[field] ?? null;
+    if (graph === 'basic') return out;
+    out.user = owner ? userBasic(owner) : null;
+    if (graph === 'list') return out;
+    if (graph !== 'default') {
+        console.warn(`mock /api/account/logins: unknown graph "${graph}" — serving "default"`);
+    }
+    const device = db.devices.find((candidate) => candidate.id === row.device);
+    out.modified = row.modified ?? row.created;
+    out.user_agent_info = device?.device_info ?? null;
+    out.device = device ? deviceBasic(device) : null;
+    return out;
+}
+
+// ── Login geography aggregation (`_build_aggregation`) ────────────────
+
+/** `/summary` and `/user` accept ONLY dr_start / dr_end, parsed by dates.parse
+ *  — NOT the dr_field triple the list endpoint uses. */
+function applyMockDateBounds(rows: MockLoginEvent[], params: Params): MockLoginEvent[] {
+    const start = params.dr_start ? String(params.dr_start) : '';
+    const end = params.dr_end ? String(params.dr_end) : '';
+    if (!start && !end) return rows;
+    return rows.filter((row) => {
+        const day = new Date(row.created * 1000).toISOString().slice(0, 10);
+        if (start && day < start) return false;
+        if (end && day > end) return false;
+        return true;
+    });
+}
+
+const MOCK_COUNTRY_CODE_RE = /^[A-Z]{2,3}$/;
+/** `MAX_REGION_RESULTS` — the region drill is capped server-side. */
+const MOCK_MAX_REGION_RESULTS = 500;
+
+function buildLoginAggregation(rows: MockLoginEvent[], params: Params): Record<string, unknown>[] {
+    const rawCountry = params.country_code == null ? '' : String(params.country_code).toUpperCase();
+    const country = MOCK_COUNTRY_CODE_RE.test(rawCountry) ? rawCountry : null;
+    // `request.DATA.get('region')` with NO coercion: the STRING "false" is
+    // truthy here exactly as it is on the backend. Clients must send
+    // `region=1` only while drilling and never `region=false`.
+    const drill = Boolean(params.region);
+
+    const avg = (values: (number | null)[]) => {
+        const usable = values.filter((value): value is number => typeof value === 'number');
+        if (!usable.length) return null;
+        return usable.reduce((sum, value) => sum + value, 0) / usable.length;
+    };
+
+    if (country && drill) {
+        const scoped = rows.filter((row) => String(row.country_code ?? '').toUpperCase() === country);
+        const buckets = new Map<string, MockLoginEvent[]>();
+        for (const row of scoped) {
+            const key = row.region ?? '';
+            buckets.set(key, [...(buckets.get(key) ?? []), row]);
+        }
+        return [...buckets.entries()]
+            .map(([region, group]) => ({
+                country_code: group[0]!.country_code,
+                region: region || null,
+                count: group.length,
+                latitude: avg(group.map((row) => row.latitude)),
+                longitude: avg(group.map((row) => row.longitude)),
+                new_region_count: group.filter((row) => row.is_new_region).length,
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, MOCK_MAX_REGION_RESULTS);
+    }
+
+    const buckets = new Map<string, MockLoginEvent[]>();
+    for (const row of rows) {
+        const key = row.country_code ?? '';
+        buckets.set(key, [...(buckets.get(key) ?? []), row]);
+    }
+    return [...buckets.entries()]
+        .map(([code, group]) => ({
+            country_code: code,
+            count: group.length,
+            latitude: avg(group.map((row) => row.latitude)),
+            longitude: avg(group.map((row) => row.longitude)),
+            new_country_count: group.filter((row) => row.is_new_country).length,
+        }))
+        .sort((a, b) => b.count - a.count);
 }
 
 function buildIncidentEvents(): MockIncidentEvent[] {
@@ -1480,15 +2185,23 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
 const users = buildUsers();
 const groups = buildGroups();
 decorateUsers(users, groups);
+// #1291: devices and GeoIP rows are built up-front so device locations can
+// join them by id — the same FK the backend has.
+const deviceRows = buildDevices();
+const geoIpRows = buildGeoIps();
+const loginEventRows = linkLoginDevices(buildLoginEvents(users), deviceRows);
+
 const db = {
     users,
     groups,
     members: buildMembers(users, groups),
     apiKeys: buildApiKeys(),
     logs: buildLogs(users, groups),
-    devices: buildDevices(),
+    devices: deviceRows,
+    geoIps: geoIpRows,
+    deviceLocations: buildDeviceLocations(deviceRows, geoIpRows),
     pushDevices: buildPushDevices(),
-    loginEvents: buildLoginEvents(users),
+    loginEvents: loginEventRows,
     incidentEvents: buildIncidentEvents(),
     passkeys: buildPasskeys(),
     oauthConnections: buildOAuthConnections(),
@@ -3181,20 +3894,175 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const result = listRows(db.botSignatures as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.sig_type} ${row.value} ${row.source}`, '-modified');
         return { ...result, graph: opts.params?.graph ? graph : 'list', data: (result.data as unknown as MockBotSignature[]).map((row) => serializeBotSignature(row, graph)) };
     }
-    // ── Browser devices — /api/user/device (account/models/device.py) ──
-    if (path === '/api/user/device') {
+    // ╔══════════════════════════════════════════════════════════════════╗
+    // ║ #1291 — devices · device locations · login geography · GeoIP     ║
+    // ║ Nine endpoints, one contiguous block. Owner scoping, graph       ║
+    // ║ selection, POST_SAVE_ACTIONS and the verb refusals are the real  ║
+    // ║ ones from django-mojo `account/rest/device.py`,                  ║
+    // ║ `account/rest/login_event.py` and the two model RestMetas.       ║
+    // ╚══════════════════════════════════════════════════════════════════╝
+
+    // ── Browser devices — /api/user/device (+ /<pk>, /lookup) ──
+    // `on_user_device` carries NO URL decorator: the model's VIEW_PERMS
+    // (`manage_users | users | owner`) is the whole gate, so a caller without
+    // a global grant sees ONLY their own devices.
+    const deviceMatch = path.match(/^\/api\/user\/device(?:\/(\d+))?$/);
+    if (deviceMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const global = hasGlobalPermission(caller, ['manage_users', 'users']);
+        if (deviceMatch[1]) {
+            const row = db.devices.find((candidate) => candidate.id === Number(deviceMatch[1]));
+            if (!row) return { status: false, error: 'UserDevice not found', error_code: 404 };
+            if (!global && row.user !== caller.id) return permissionDenied();
+            // No CAN_DELETE on UserDevice ⇒ rest.py defaults it to False.
+            if (method === 'DELETE') return { status: false, error: 'DELETE not allowed: UserDevice', error_code: 403 };
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: serializeDevice(row, graph), graph };
+        }
+        const scoped = global ? db.devices : db.devices.filter((row) => row.user === caller.id);
+        const graph = String(opts.params?.graph ?? 'default');
+        // UserDevice declares NO SEARCH_FIELDS — only what the fallback can
+        // reach (the DUID and the raw user-agent string) is searchable.
         const result = listRows(
-            db.devices as unknown as Record<string, unknown>[],
+            scoped as unknown as Record<string, unknown>[],
             opts.params ?? {},
             (d) => `${d.duid} ${(d as unknown as MockDevice).device_info?.string ?? ''}`,
             '-last_seen',
         );
-        const rows = (result.data as unknown as MockDevice[]).map((d) => {
-            const owner = db.users.find((u) => u.id === d.user);
-            const { user: _uid, ...rest } = d;
-            return { ...rest, user: owner ? userBasic(owner) : null };
-        });
-        return { ...result, data: rows };
+        return {
+            ...result,
+            graph,
+            data: (result.data as unknown as MockDevice[]).map((row) => serializeDevice(row, graph)),
+        };
+    }
+    // Cross-tenant DUID lookup — requires a GLOBAL grant because on_rest_get
+    // does not re-run the permission gate.
+    if (path === '/api/user/device/lookup') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const duid = String(opts.params?.duid ?? '');
+        if (!duid) return { status: false, error: 'duid is required', error_code: 400 };
+        if (!hasGlobalPermission(caller, ['manage_users', 'manage_devices', 'users'])) return permissionDenied();
+        const row = db.devices.find((candidate) => candidate.duid === duid);
+        if (!row) return { status: false, error: 'Device not found', error_code: 404 };
+        const graph = String(opts.params?.graph ?? 'default');
+        return { status: true, data: serializeDevice(row, graph), graph };
+    }
+    // ── Device locations — /api/user/device/location (+ /<pk>) ──
+    // TWO gates in series: the URL decorator accepts manage_devices, the
+    // MODEL's VIEW_PERMS does not. A caller holding only `manage_devices`
+    // therefore passes the first and is denied by the second — which is why
+    // `sys.manage_devices` appears in no client permission clause.
+    const deviceLocationMatch = path.match(/^\/api\/user\/device\/location(?:\/(\d+))?$/);
+    if (deviceLocationMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['manage_users', 'manage_devices', 'users'])) return permissionDenied();
+        if (!hasGlobalPermission(caller, ['manage_users', 'users'])) return permissionDenied();
+        if (deviceLocationMatch[1]) {
+            const row = db.deviceLocations.find((candidate) => candidate.id === Number(deviceLocationMatch[1]));
+            if (!row) return { status: false, error: 'UserDeviceLocation not found', error_code: 404 };
+            if (method === 'DELETE') return { status: false, error: 'DELETE not allowed: UserDeviceLocation', error_code: 403 };
+            return { status: true, data: serializeDeviceLocation(row), graph: 'default' };
+        }
+        const result = listRows(
+            db.deviceLocations as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            (row) => String(row.ip_address ?? ''),
+            '-last_seen',
+        );
+        return {
+            ...result,
+            graph: 'default',
+            data: (result.data as unknown as MockDeviceLocation[]).map((row) => serializeDeviceLocation(row)),
+        };
+    }
+    // ── GeoIP cache — /api/system/geoip (+ /<pk>, /lookup) ──
+    const geoIpMatch = path.match(/^\/api\/system\/geoip(?:\/(\d+))?$/);
+    if (geoIpMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        // GeoLocatedIP.RestMeta — note there is NO `owner` clause: this model
+        // is groupless fleet data, so no self-scoped fallback exists.
+        if (!hasGlobalPermission(caller, GEOIP_VIEW_PERMS_MOCK)) return permissionDenied();
+        const canSave = hasGlobalPermission(caller, GEOIP_SAVE_PERMS_MOCK);
+        if (geoIpMatch[1]) {
+            const row = db.geoIps.find((candidate) => candidate.id === Number(geoIpMatch[1]));
+            if (!row) return { status: false, error: 'GeoLocatedIP not found', error_code: 404 };
+            // GeoLocatedIP declares no CAN_DELETE.
+            if (method === 'DELETE') return { status: false, error: 'DELETE not allowed: GeoLocatedIP', error_code: 403 };
+            if (method === 'POST' && opts.body) {
+                if (!canSave) return permissionDenied();
+                const error = applyGeoIpSave(row, opts.body, caller);
+                if (error) return { status: false, error, error_code: 400 };
+            }
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: serializeGeoIp(row, graph), graph };
+        }
+        // GeoLocatedIP has no CAN_CREATE path through the collection either —
+        // records are minted by geolocate(), i.e. by /lookup.
+        if (method === 'POST') return { status: false, error: 'POST not allowed on the GeoIP collection — use /api/system/geoip/lookup', error_code: 403 };
+        const graph = String(opts.params?.graph ?? 'default');
+        const result = listRows(
+            db.geoIps as unknown as Record<string, unknown>[],
+            opts.params ?? {},
+            // The model's real SEARCH_FIELDS.
+            (row) => `${row.ip_address} ${row.city ?? ''} ${row.country_name ?? ''} ${row.asn_org ?? ''} ${row.isp ?? ''}`,
+            '-last_seen',
+        );
+        if (opts.params?.download_format) {
+            return exportRows(
+                (result.data as unknown as MockGeoIp[]).map((row) => serializeGeoIp(row, graph) as Record<string, unknown>),
+                opts.params,
+                'GeoLocatedIP',
+            );
+        }
+        return {
+            ...result,
+            graph,
+            data: (result.data as unknown as MockGeoIp[]).map((row) => serializeGeoIp(row, graph)),
+        };
+    }
+    // GET /api/system/geoip/lookup — the federation read path.
+    // `@requires_auth()` ONLY: deliberately open to any authenticated
+    // identity (a downstream instance uses this one as its GeoIP provider).
+    // But the caller does not pick the payload shape — anything richer than
+    // the `federation` graph needs the same VIEW_PERMS the CRUD endpoints
+    // demand, and everyone else is served `federation` whatever they asked
+    // for. Rate limited 30 per source.
+    if (path === '/api/system/geoip/lookup') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const ip = String(opts.params?.ip ?? '');
+        if (!ip) return { status: false, error: 'ip is required', error_code: 400 };
+        geoIpLookupCount += 1;
+        if (geoIpLookupCount > GEOIP_LOOKUP_LIMIT) {
+            return { status: false, error: 'rate limit exceeded for geoip_lookup (30 per source)', error_code: 429 };
+        }
+        let graph = String(opts.params?.graph ?? 'default');
+        if (graph !== 'federation' && !hasGlobalPermission(caller, GEOIP_VIEW_PERMS_MOCK)) graph = 'federation';
+        const row = geolocateMock(ip, mockParamIsTrue(opts.params?.auto_refresh ?? true));
+        return { status: true, data: serializeGeoIp(row, graph), graph };
+    }
+    // ── Login geography — /api/account/logins/summary and /user ──
+    // Both are `@requires_global_perms('manage_users','security','users')`;
+    // `/user` additionally `@requires_params('user_id')` and answers a 400
+    // when it does not parse as an int.
+    if (path === '/api/account/logins/summary' || path === '/api/account/logins/user') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['manage_users', 'security', 'users'])) return permissionDenied();
+        let rows = db.loginEvents.filter((row) => row.country_code != null && row.country_code !== '');
+        if (path === '/api/account/logins/user') {
+            const raw = opts.params?.user_id;
+            if (raw == null || raw === '') return { status: false, error: 'user_id is required', error_code: 400 };
+            const userId = Number(raw);
+            if (!Number.isInteger(userId)) return { status: false, error: 'user_id must be an integer', code: 400 };
+            rows = rows.filter((row) => row.user === userId);
+        }
+        rows = applyMockDateBounds(rows, opts.params ?? {});
+        return { status: true, data: buildLoginAggregation(rows, opts.params ?? {}) };
     }
     // ── Push devices — /api/account/devices/push (RegisteredDevice) ──
     if (path === '/api/account/devices/push') {
@@ -3211,20 +4079,47 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         });
         return { ...result, data: rows };
     }
-    // ── Login events — /api/account/logins (list graph; no event_type) ──
-    if (path === '/api/account/logins') {
+    // ── Login events — /api/account/logins (+ /<pk>) ──
+    // `uses_model_security(UserLoginEvent)`: VIEW_PERMS carries `owner`, so a
+    // caller without a global grant sees only their own logins. CAN_CREATE,
+    // CAN_UPDATE and CAN_DELETE are ALL False — every write verb is refused.
+    // The wire carries NO `event_type` field, at any graph.
+    const loginEventMatch = path.match(/^\/api\/account\/logins(?:\/(\d+))?$/);
+    if (loginEventMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const global = hasGlobalPermission(caller, ['manage_users', 'security', 'users']);
+        if (loginEventMatch[1]) {
+            const row = db.loginEvents.find((candidate) => candidate.id === Number(loginEventMatch[1]));
+            if (!row) return { status: false, error: 'UserLoginEvent not found', error_code: 404 };
+            if (!global && row.user !== caller.id) return permissionDenied();
+            if (method === 'DELETE') return { status: false, error: 'DELETE not allowed: UserLoginEvent', error_code: 403 };
+            if (method === 'POST') return { status: false, error: 'UPDATE not allowed: UserLoginEvent', error_code: 403 };
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: serializeLoginEvent(row, graph), graph };
+        }
+        if (method === 'POST') return { status: false, error: 'CREATE not allowed: UserLoginEvent', error_code: 403 };
+        const scoped = global ? db.loginEvents : db.loginEvents.filter((row) => row.user === caller.id);
+        const graph = String(opts.params?.graph ?? 'list');
         const result = listRows(
-            db.loginEvents as unknown as Record<string, unknown>[],
+            scoped as unknown as Record<string, unknown>[],
             opts.params ?? {},
+            // The model's real SEARCH_FIELDS — user is NOT among them.
             (l) => `${l.ip_address ?? ''} ${l.country_code ?? ''} ${l.region ?? ''} ${l.city ?? ''}`,
             '-created',
         );
-        const rows = (result.data as unknown as MockLoginEvent[]).map((l) => {
-            const owner = db.users.find((u) => u.id === l.user);
-            const { user: _uid, ...rest } = l;
-            return { ...rest, user: owner ? userBasic(owner) : null };
-        });
-        return { ...result, data: rows };
+        if (opts.params?.download_format) {
+            return exportRows(
+                (result.data as unknown as MockLoginEvent[]).map((row) => serializeLoginEvent(row, graph) as Record<string, unknown>),
+                opts.params,
+                'UserLoginEvent',
+            );
+        }
+        return {
+            ...result,
+            graph,
+            data: (result.data as unknown as MockLoginEvent[]).map((row) => serializeLoginEvent(row, graph)),
+        };
     }
     // ── Rule engine — exact RuleSet/Rule CRUD and global permissions ──
     const ruleSetMatch = path.match(/^\/api\/incident\/event\/ruleset(?:\/(\d+))?$/);
