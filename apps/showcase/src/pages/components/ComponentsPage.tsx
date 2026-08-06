@@ -20,6 +20,7 @@ import { DisplayDemo, SkeletonDemo, AccessDemo } from './demos-display';
 import { PopoverDemo } from './demos-popover';
 import { TagInputDemo } from './demos-taginput';
 import { DrawerDemo } from './demos-drawer';
+import { RightPanelDemo } from './demos-right-panel';
 import { ComboBoxDemo } from './demos-combobox';
 import { FormatDemo } from './demos-format';
 import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
@@ -191,6 +192,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'drawer', title: 'Drawer', icon: 'bi-layout-sidebar-inset-reverse',
                 blurb: 'Right slide-over on the same awaitable <dialog> manager: width presets, eyebrow/title/meta header, stacking over a modal, awaited result.',
                 render: () => <DrawerDemo />,
+            },
+            {
+                key: 'right-panel', title: 'Right panel', icon: 'bi-layout-sidebar-reverse',
+                blurb: 'Persistent non-modal complementary shell slot: route-independent open/replace/close, focus restoration, Escape/dialog ordering, and narrow layout.',
+                render: () => <RightPanelDemo />,
             },
             {
                 key: 'toasts', title: 'Toasts', icon: 'bi-chat-square-dots',

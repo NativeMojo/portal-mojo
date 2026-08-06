@@ -1,0 +1,24 @@
+.right-panel {
+    min-width: 0; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column;
+    background: var(--surface); border-left: 1px solid var(--line);
+    box-shadow: -8px 0 24px rgba(13, 20, 32, 0.08);
+}
+.right-panel-head {
+    flex: none; display: flex; align-items: center; gap: 12px;
+    min-height: 48px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--line);
+}
+.right-panel-head h2 { flex: 1; min-width: 0; margin: 0; color: var(--ink-strong); font-size: 14px; font-weight: 750; }
+.right-panel-body { flex: 1; min-height: 0; overflow: auto; }
+.right-panel-demo-shell {
+    min-height: 330px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 38%);
+    overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+}
+.right-panel-demo-main { min-width: 0; padding: 18px; }
+.right-panel-demo-main-only { grid-column: 1 / -1; }
+.right-panel-demo-content { padding: 14px; }
+@media (max-width: 720px) {
+    .right-panel-demo-shell { display: block; position: relative; }
+    .right-panel-demo-shell > .right-panel { position: absolute; inset: 0 0 0 auto; width: min(320px, calc(100% - 24px)); }
+}
+@media (prefers-reduced-motion: reduce) { .right-panel { transition: none; } }

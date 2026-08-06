@@ -7,7 +7,7 @@
 //   · multi-value filters collapse to `field__in=a,b` (single value → `field`)
 //   · a daterange is the TRIPLE `dr_field` / `dr_start` / `dr_end`, so only
 //     one range can be active at a time — by construction, not by convention.
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Params } from './types';
 
@@ -129,16 +129,26 @@ export function clearTableState(key: string): void {
     try { store.removeItem(PERSIST_PREFIX + key); } catch { /* denied */ }
 }
 
-export function useTableParams(defaults: Partial<TableParams> = {}): TableParamsApi {
+export function useTableParams(
+    defaults: Partial<TableParams> = {},
+    defaultFilters: Readonly<Record<string, string>> = {},
+): TableParamsApi {
     const [sp, setSp] = useSearchParams();
+    // Defaults seed only the untouched route. Once this table writes params,
+    // an intentionally empty filter set must stay empty ("Clear all" must
+    // not immediately resurrect a route default).
+    const wroteParams = useRef(false);
 
     const filters = useMemo(() => {
-        const out: Record<string, string> = {};
+        // Defaults are real params-store state: shared URLs override them,
+        // and applySaved() overwrites them when no URL key is present.
+        // This is the same URL > persisted > defaults precedence as sort.
+        const out: Record<string, string> = wroteParams.current ? {} : { ...defaultFilters };
         for (const [key, value] of sp.entries()) {
             if (!RESERVED.has(key) && !NON_FILTER.has(key)) out[key] = value;
         }
         return out;
-    }, [sp]);
+    }, [sp, defaultFilters]);
 
     const state = useMemo<TableParams>(() => ({
         search: sp.get('search') ?? defaults.search ?? '',
@@ -148,6 +158,7 @@ export function useTableParams(defaults: Partial<TableParams> = {}): TableParams
     }), [sp, defaults.search, defaults.sort, defaults.size]);
 
     const write = useCallback((next: TableParams, nextFilters: Record<string, string>) => {
+        wroteParams.current = true;
         const out = new URLSearchParams();
         if (next.search) out.set('search', next.search);
         if (next.sort) out.set('sort', next.sort);
@@ -262,7 +273,13 @@ export function useTableParams(defaults: Partial<TableParams> = {}): TableParams
         applySaved: (saved) => {
             const urlKeys = new Set(Array.from(sp.keys()));
             const next = { ...state };
-            const nextFilters = { ...filters };
+            // A persisted filter set replaces defaults wholesale; only keys
+            // explicitly present in the URL survive above it. This makes an
+            // intentionally saved "all tickets" view beat a route default.
+            const nextFilters: Record<string, string> = {};
+            for (const [key, value] of Object.entries(filters)) {
+                if (urlKeys.has(key)) nextFilters[key] = value;
+            }
             if (saved.sort !== undefined && saved.sort !== '' && !urlKeys.has('sort')) next.sort = saved.sort;
             if (saved.search !== undefined && !urlKeys.has('search')) next.search = saved.search;
             if (saved.size !== undefined && PAGE_SIZES.includes(saved.size)) next.size = saved.size;

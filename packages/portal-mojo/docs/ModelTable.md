@@ -15,6 +15,7 @@ URL-synced params store. All features below are opt-in props; a bare
     title="Users" eyebrow="Account"
     columns={COLUMNS} filters={FILTERS} presets={PRESETS}
     defaultSort="-last_activity"
+    defaultParams={{ status__in: 'new,open' }}
     selectable batchActions={BATCH}
     columnChooser persistState persistKey="users"
     exportFormats={['csv', 'json']}
@@ -63,6 +64,12 @@ search / filters / hidden columns per table (`persistKey`, else
 route+endpoint) — precedence URL > saved > defaults, saved `size` wins; the
 first fetch waits for the restore so it queries the restored view.
 "Reset to defaults" in the chooser clears the whole saved view.
+
+`defaultParams` supplies route defaults for any query key, including Django
+lookups such as `status__in`. They are part of the same params store as URL and
+persisted values. Precedence is URL > persisted > defaults; `defaultSort`
+remains the backwards-compatible sort shorthand and wins over
+`defaultParams.sort` when both are present.
 
 ## autoRefresh
 

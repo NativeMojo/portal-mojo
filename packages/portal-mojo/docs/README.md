@@ -16,6 +16,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [admin-monitoring.md](admin-monitoring.md) | Logs and metrics-permissions admin — safe stored-record inspection and exact Redis-backed permission mutations |
 | [admin-settings.md](admin-settings.md) | Runtime settings admin — direction-aware atomic writes, write-only secrets, and global/group scope |
 | [admin-bouncer.md](admin-bouncer.md) | Bouncer decisions, device investigations, and bot-signature administration with token-safe caching |
+| [admin-security-tickets.md](admin-security-tickets.md) | Ticket queue, workflow panel, notes, approvals, and Maestro sync contract |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
@@ -38,6 +39,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [dataview.md](dataview.md) | Auto-inferring key/value grid + safe JSON viewer — schema or inference, nested records |
 | [markdown.md](markdown.md) | MarkdownView — server render via docit, allowlist sanitizer trust model, client fallback |
 | [record-feed.md](record-feed.md) | RecordFeed — ticket/incident adapters, chronological latest-window normalization, optimistic sends, controlled mode |
+| [right-panel.md](right-panel.md) | Persistent non-modal shell slot — provider state, focus/Escape semantics, route preservation, responsive layout |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart` (+stats/data dialogs, custom `dt_*` range), `MetricsMiniWidget`, `KPITile/KPIStrip`, `CircularProgress`, `PieChart`, `exportChartPng`, the metrics wire shape |
 | [menus-and-access.md](menus-and-access.md) | Menu registry + SidebarNav; `useMe`/`useCan`/`Guarded`; group context |
 | [grouping-and-fmt.md](grouping-and-fmt.md) | `groupBy*` helpers, `fmt.*` formatters |

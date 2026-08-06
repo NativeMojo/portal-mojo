@@ -23,6 +23,7 @@ import { PAGE_SIZES, useTableParams, readTableState, writeTableState, clearTable
 import { useModelList } from '../client/hooks';
 import { mojoDownload } from '../client/client';
 import type { ModelDef } from '../client/model';
+import type { Params } from '../client/types';
 import { FilterBar, FilterPills, type FilterDef } from './FilterBar';
 import { busyWhile } from './loading';
 import { modal } from './modal';
@@ -183,7 +184,7 @@ function MenuDropdown({ button, children, align = 'end' }: {
 
 export function ModelTable<T extends { id: number }>({
     model, endpoint, columns, filters = [], presets = [], eyebrow, title,
-    searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort,
+    searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort, defaultParams,
     selectable = false, batchActions = [],
     columnChooser = false, persistState = false, persistKey,
     autoRefresh = 0,
@@ -208,6 +209,12 @@ export function ModelTable<T extends { id: number }>({
     onAdd?: () => void;
     /** Initial sort when the URL doesn't carry one (default '-created'). */
     defaultSort?: string;
+    /**
+     * Initial URL-backed query state. URL keys win; persisted state wins over
+     * these defaults. `defaultSort` remains as the backwards-compatible
+     * shorthand and wins over `defaultParams.sort` when both are supplied.
+     */
+    defaultParams?: Params;
     /** Checkbox selection — independent of batchActions by construction. */
     selectable?: boolean;
     batchActions?: BatchAction<T>[];
@@ -235,7 +242,22 @@ export function ModelTable<T extends { id: number }>({
     }
 
     const qc = useQueryClient();
-    const p = useTableParams(defaultSort !== undefined ? { sort: defaultSort } : {});
+    const paramDefaults = useMemo(() => ({
+        ...(defaultParams?.search != null ? { search: String(defaultParams.search) } : {}),
+        ...(defaultParams?.size != null ? { size: Number(defaultParams.size) } : {}),
+        ...(defaultParams?.page != null ? { page: Number(defaultParams.page) } : {}),
+        ...(defaultParams?.sort != null ? { sort: String(defaultParams.sort) } : {}),
+        ...(defaultSort !== undefined ? { sort: defaultSort } : {}),
+    }), [defaultParams, defaultSort]);
+    const defaultFilters = useMemo<Record<string, string>>(() => {
+        const out: Record<string, string> = {};
+        for (const [key, value] of Object.entries(defaultParams ?? {})) {
+            if (key === 'search' || key === 'sort' || key === 'page' || key === 'size') continue;
+            if (value != null && value !== '') out[key] = String(value);
+        }
+        return out;
+    }, [defaultParams]);
+    const p = useTableParams(paramDefaults, defaultFilters);
 
     // ── View persistence (WM-035): restore once BEFORE the first fetch ──
     const storageKey = persistKey ?? `${(typeof location !== 'undefined' ? location.hash.split('?')[0] : '') || '#/'}::${resolvedEndpoint}`;

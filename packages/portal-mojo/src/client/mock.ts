@@ -388,6 +388,39 @@ interface MockTicketNote {
     [field: string]: unknown;
 }
 
+interface MockTicket {
+    id: number;
+    created: number;
+    modified: number;
+    user: number | null;
+    group: number | null;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: number;
+    category: string;
+    assignee: number | null;
+    incident: number | null;
+    metadata: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockMaestroItemLink {
+    id: number;
+    created: number;
+    modified: number;
+    ticket: number;
+    incident: number | null;
+    remote_integration_id: string;
+    remote_item_id: number;
+    remote_board_id: number | null;
+    remote_url: string;
+    last_synced: number | null;
+    source_kind: string;
+    source_id: number;
+    [field: string]: unknown;
+}
+
 interface MockIncidentHistory {
     id: number;
     parent: number;
@@ -510,10 +543,33 @@ function buildSettings(): MockSetting[] {
 function buildTicketNotes(): MockTicketNote[] {
     const now = Math.floor(Date.now() / 1000);
     return [
+        { id: 705, parent: 504, created: now - 240, group: 1, user: null, note: 'Approve blocking the suspicious client fingerprint?', media: null, metadata: { action: { handler: 'incident.rule_approval', label: 'Block suspicious fingerprint', context: { target: 'fp-headless', detail: 'Apply the reviewed bot signature to future requests.' }, references: ['signal:1003'], resolved: false } } },
+        { id: 704, parent: 505, created: now - 3600, group: null, user: null, note: 'Previously reviewed action.', media: null, metadata: { action: { handler: 'incident.rule_approval', label: 'Escalate alert', context: { target: 'incident:603' }, resolved: true, resolution: 'approve' } } },
+        { id: 703, parent: 501, created: now - 480, group: 1, user: null, note: 'Status changed from new to open.', media: null, metadata: { type: 'status_change', old_status: 'new', new_status: 'open' } },
         { id: 701, parent: 501, created: now - 900, group: 1, user: 1, note: 'Confirmed the webhook failures began after the receiver deploy.', media: null, metadata: {} },
         { id: 700, parent: 501, created: now - 7200, group: 1, user: null, note: '[LLM Agent] Five consecutive 503 responses observed.', media: null, metadata: { origin: 'agent' } },
         { id: 699, parent: 502, created: now - 86400, group: 2, user: 2, note: 'Customer supplied a fresh trace id.', media: null, metadata: {} },
     ];
+}
+
+function buildTickets(): MockTicket[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 501, created: now - 3 * 86400, modified: now - 480, user: 1, group: 1, title: 'Webhook receiver failures', description: 'Five consecutive **503 responses** began after the receiver deploy.', status: 'open', priority: 8, category: 'incident', assignee: 12, incident: 601, metadata: { llm_enabled: true } },
+        { id: 502, created: now - 2 * 86400, modified: now - 7200, user: 2, group: 2, title: 'Vendor escalation needs review', description: 'Preserves a category not present in the client catalog.', status: 'pending', priority: 6, category: 'vendor_escalation', assignee: null, incident: 602, metadata: {} },
+        { id: 503, created: now - 18 * 3600, modified: now - 18 * 3600, user: 1, group: null, title: 'Unassigned login investigation', description: null, status: 'new', priority: 9, category: 'security', assignee: null, incident: 603, metadata: {} },
+        { id: 504, created: now - 7 * 3600, modified: now - 240, user: 12, group: 1, title: 'Approve bot fingerprint block', description: 'An operator decision is required before applying the rule.', status: 'assistant_review', priority: 10, category: 'security', assignee: 12, incident: 603, metadata: { llm_enabled: true } },
+        { id: 505, created: now - 8 * 86400, modified: now - 3600, user: 1, group: null, title: 'Resolved account escalation', description: 'Retains a resolved approval card for showcase coverage.', status: 'resolved', priority: 4, category: 'ticket', assignee: 1, incident: null, metadata: {} },
+        { id: 506, created: now - 6 * 3600, modified: now - 1200, user: 1, group: 1, title: 'Incident summary linked', description: 'Demonstrates a ticket related to an active incident.', status: 'in_progress', priority: 7, category: 'incident', assignee: 1, incident: 601, metadata: {} },
+        { id: 507, created: now - 5 * 86400, modified: now - 1800, user: 1, group: 1, title: 'Already tracked in Maestro', description: 'The remote work item is already linked.', status: 'open', priority: 5, category: 'feature', assignee: 12, incident: null, metadata: {} },
+        { id: 508, created: now - 5 * 3600, modified: now - 600, user: 12, group: null, title: 'LLM-assisted log triage', description: 'Assistant review is active for this queue item.', status: 'llm_review', priority: 6, category: 'bug', assignee: 12, incident: null, metadata: { llm_enabled: true } },
+        { id: 509, created: now - 12 * 86400, modified: now - 2 * 86400, user: 1, group: null, title: 'Closed fulfillment request', description: null, status: 'closed', priority: 2, category: 'fulfillment', assignee: 1, incident: null, metadata: {} },
+    ];
+}
+
+function buildMaestroItemLinks(): MockMaestroItemLink[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [{ id: 901, created: now - 2 * 86400, modified: now - 1800, ticket: 507, incident: null, remote_integration_id: 'mock-maestro', remote_item_id: 1413, remote_board_id: 7, remote_url: 'https://maestro.example.test/items/1413', last_synced: now - 1800, source_kind: 'ticket', source_id: 507 }];
 }
 
 function buildIncidentHistory(): MockIncidentHistory[] {
@@ -626,6 +682,30 @@ function serializeFeedUser(userId: number | null): Record<string, unknown> | nul
 
 function serializeTicketNote(row: MockTicketNote): Record<string, unknown> {
     return { ...row, user: serializeFeedUser(row.user), media: null };
+}
+
+function serializeTicket(row: MockTicket): Record<string, unknown> {
+    const group = row.group == null ? null : db.groups.find((candidate) => candidate.id === row.group);
+    const user = row.user == null ? null : db.users.find((candidate) => candidate.id === row.user);
+    const assignee = row.assignee == null ? null : db.users.find((candidate) => candidate.id === row.assignee);
+    const incident = row.incident == null ? null : db.incidentRecords.find((candidate) => candidate.id === row.incident);
+    return {
+        ...row,
+        group: group ? groupBasic(group) : null,
+        user: user ? userBasic(user) : null,
+        assignee: assignee ? userBasic(assignee) : null,
+        incident: incident ? { id: incident.id, title: incident.title, status: incident.status, priority: incident.priority } : null,
+    };
+}
+
+function serializeMaestroItemLink(row: MockMaestroItemLink): Record<string, unknown> {
+    const ticket = db.tickets.find((candidate) => candidate.id === row.ticket);
+    const incident = row.incident == null ? null : db.incidentRecords.find((candidate) => candidate.id === row.incident);
+    return {
+        ...row,
+        ticket: ticket ? { id: ticket.id, title: ticket.title, status: ticket.status, priority: ticket.priority } : row.ticket,
+        incident: incident ? { id: incident.id, title: incident.title, status: incident.status, priority: incident.priority } : null,
+    };
 }
 
 function serializeIncidentHistory(row: MockIncidentHistory): Record<string, unknown> {
@@ -1253,7 +1333,7 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     securityManager.username = 'security.manager';
     securityManager.email = 'security.manager@nativemojo.com';
     securityManager.display_name = 'Security Manager';
-    securityManager.permissions = { manage_security: true, manage_geofence: true, manage_settings: true, manage_metrics: true };
+    securityManager.permissions = { view_security: true, manage_security: true, manage_geofence: true, manage_settings: true, manage_metrics: true };
     const groupsManager = at(13);
     groupsManager.is_active = true;
     groupsManager.username = 'groups.manager';
@@ -1328,10 +1408,11 @@ const db = {
     ]),
     geoRules: { countries: { deny: ['CN'] } } as Record<string, unknown>,
     geoAllowlist: [{ cidr: '203.0.113.0/24', reason: 'Office egress', until: null }] as unknown[],
-    tickets: new Map<number, { group: number | null }>([[501, { group: 1 }], [502, { group: 2 }]]),
+    tickets: buildTickets(),
     incidents: new Map<number, { group: number | null }>([[601, { group: 1 }], [602, { group: 2 }]]),
     incidentRecords: buildIncidents(),
     ticketNotes: buildTicketNotes(),
+    maestroItemLinks: buildMaestroItemLinks(),
     incidentHistory: buildIncidentHistory(),
     bouncerDevices: buildBouncerDevices(),
     bouncerSignals: buildBouncerSignals(),
@@ -2607,20 +2688,139 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const data = [...db.metricPermissions.entries()].map(([id, row]) => ({ id, account: id, ...row }));
         return { status: true, data, size: 10, start: 0, count: data.length };
     }
+    // ── Security tickets + queued Maestro links ───────────────────────
+    const ticketMatch = path.match(/^\/api\/incident\/ticket(?:\/(\d+))?$/);
+    if (ticketMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canView = hasGlobalPermission(caller, ['view_security', 'security']);
+        const canManage = hasGlobalPermission(caller, ['manage_security', 'security']);
+        if (!canView) return permissionDenied();
+        const detailId = ticketMatch[1] ? Number(ticketMatch[1]) : null;
+        if (detailId != null) {
+            const row = db.tickets.find((candidate) => candidate.id === detailId);
+            if (!row) return { status: false, error: 'Ticket not found', error_code: 404 };
+            if (method === 'DELETE') {
+                if (!canManage) return permissionDenied();
+                if (db.maestroItemLinks.some((candidate) => candidate.ticket === row.id)) {
+                    return { status: false, error: 'Ticket is linked to a Maestro item', error_code: 409 };
+                }
+                db.tickets = db.tickets.filter((candidate) => candidate.id !== row.id);
+                db.ticketNotes = db.ticketNotes.filter((candidate) => candidate.parent !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST' && opts.body) {
+                if (!canManage) return permissionDenied();
+                const oldStatus = row.status;
+                const body = opts.body;
+                if ('title' in body) {
+                    const title = String(body.title ?? '').trim();
+                    if (!title) return { status: false, error: 'title is required', error_code: 400 };
+                    row.title = title;
+                }
+                if ('priority' in body) {
+                    const priority = Number(body.priority);
+                    if (!Number.isInteger(priority) || priority < 1 || priority > 10) return { status: false, error: 'priority must be a whole number from 1 to 10', error_code: 400 };
+                    row.priority = priority;
+                }
+                if ('assignee' in body) {
+                    const assignee = body.assignee == null || body.assignee === '' ? null : Number(body.assignee);
+                    if (assignee != null && !db.users.some((candidate) => candidate.id === assignee)) return { status: false, error: 'Assignee not found', error_code: 404 };
+                    row.assignee = assignee;
+                }
+                if ('description' in body) row.description = body.description == null ? null : String(body.description);
+                if ('category' in body) row.category = String(body.category);
+                if ('status' in body) row.status = String(body.status);
+                if ('enable_llm' in body) row.metadata = { ...row.metadata, llm_enabled: true };
+                if ('disable_llm' in body) row.metadata = { ...row.metadata, llm_enabled: false };
+                if ('push_to_maestro' in body && !db.maestroItemLinks.some((candidate) => candidate.ticket === row.id)) {
+                    const queuedTicketId = row.id;
+                    setTimeout(() => {
+                        if (db.maestroItemLinks.some((candidate) => candidate.ticket === queuedTicketId)) return;
+                        const now = Math.floor(Date.now() / 1000);
+                        db.maestroItemLinks.push({
+                            id: Math.max(0, ...db.maestroItemLinks.map((candidate) => candidate.id)) + 1,
+                            created: now, modified: now, ticket: queuedTicketId, incident: row.incident,
+                            remote_integration_id: 'mock-maestro', remote_item_id: 2000 + queuedTicketId,
+                            remote_board_id: 7, remote_url: `https://maestro.example.test/items/${2000 + queuedTicketId}`,
+                            last_synced: now, source_kind: 'ticket', source_id: queuedTicketId,
+                        });
+                    }, 250);
+                }
+                row.modified = Math.floor(Date.now() / 1000);
+                if (row.status !== oldStatus) {
+                    db.ticketNotes.unshift({
+                        id: Math.max(0, ...db.ticketNotes.map((candidate) => candidate.id)) + 1,
+                        parent: row.id, created: row.modified, group: row.group, user: caller.id,
+                        note: `Status changed from ${oldStatus} to ${row.status}.`, media: null,
+                        metadata: { type: 'status_change', old_status: oldStatus, new_status: row.status },
+                    });
+                }
+                return { status: true, data: serializeTicket(row), graph: 'default' };
+            }
+            return { status: true, data: serializeTicket(row), graph: 'default' };
+        }
+        if (method === 'POST' && opts.body) {
+            if (!canManage) return permissionDenied();
+            const title = String(opts.body.title ?? '').trim();
+            const priority = Number(opts.body.priority ?? 5);
+            if (!title) return { status: false, error: 'title is required', error_code: 400 };
+            if (!Number.isInteger(priority) || priority < 1 || priority > 10) return { status: false, error: 'priority must be a whole number from 1 to 10', error_code: 400 };
+            const assignee = opts.body.assignee == null || opts.body.assignee === '' ? null : Number(opts.body.assignee);
+            if (assignee != null && !db.users.some((candidate) => candidate.id === assignee)) return { status: false, error: 'Assignee not found', error_code: 404 };
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockTicket = {
+                id: Math.max(0, ...db.tickets.map((candidate) => candidate.id)) + 1,
+                created: now, modified: now, user: caller.id,
+                group: opts.body.group == null || opts.body.group === '' ? null : Number(opts.body.group),
+                title, description: opts.body.description == null ? null : String(opts.body.description),
+                status: String(opts.body.status ?? 'new'), priority,
+                category: String(opts.body.category ?? 'ticket'), assignee, incident: null,
+                metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
+            };
+            db.tickets.push(row);
+            return { status: true, data: serializeTicket(row), graph: 'default' };
+        }
+        const params = opts.params ?? {};
+        const search = (row: Record<string, unknown>) => `${row.title ?? ''} ${row.description ?? ''} ${row.status ?? ''} ${row.category ?? ''}`;
+        if (params.download_format) {
+            const full = listRows(db.tickets as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.tickets.length }, search, '-priority');
+            return exportRows((full.data as unknown as MockTicket[]).map(serializeTicket), params, 'Ticket');
+        }
+        const result = listRows(db.tickets as unknown as Record<string, unknown>[], params, search, '-priority');
+        return { ...result, data: (result.data as unknown as MockTicket[]).map(serializeTicket) };
+    }
+    const maestroLinkMatch = path.match(/^\/api\/incident\/maestro\/item-link(?:\/(\d+))?$/);
+    if (maestroLinkMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['view_security', 'security'])) return permissionDenied();
+        if (method !== 'GET') return { status: false, error: 'MaestroItemLink is read-only', error_code: 403 };
+        if (maestroLinkMatch[1]) {
+            const row = db.maestroItemLinks.find((candidate) => candidate.id === Number(maestroLinkMatch[1]));
+            if (!row) return { status: false, error: 'MaestroItemLink not found', error_code: 404 };
+            return { status: true, data: serializeMaestroItemLink(row), graph: 'default' };
+        }
+        const result = listRows(db.maestroItemLinks as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.remote_item_id ?? ''} ${row.remote_integration_id ?? ''}`, '-modified');
+        return { ...result, data: (result.data as unknown as MockMaestroItemLink[]).map(serializeMaestroItemLink) };
+    }
     // ── Shared record feeds: newest 100, parent/group scoped, graph=default ──
     const ticketNoteMatch = path.match(/^\/api\/incident\/ticket\/note(?:\/(\d+))?$/);
     if (ticketNoteMatch) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, ['view_security', 'security'])) return permissionDenied();
         if (ticketNoteMatch[1]) {
             const row = db.ticketNotes.find((candidate) => candidate.id === Number(ticketNoteMatch[1]));
             if (!row) return { status: false, error: 'TicketNote not found', error_code: 404 };
             return { status: true, data: serializeTicketNote(row), graph: 'default' };
         }
         if (opts.method === 'POST' && opts.body) {
+            if (!hasGlobalPermission(caller, ['manage_security', 'security'])) return permissionDenied();
             const parentId = Number(opts.body.parent ?? 0);
-            const parent = db.tickets.get(parentId);
+            const parent = db.tickets.find((candidate) => candidate.id === parentId);
             if (!parent) return { status: false, error: 'Ticket not found', error_code: 404 };
+            if (opts.body.group != null && Number(opts.body.group) !== parent.group) return permissionDenied();
             const now = Math.floor(Date.now() / 1000);
             const row: MockTicketNote = {
                 id: Math.max(0, ...db.ticketNotes.map((candidate) => candidate.id)) + 1,
@@ -2629,6 +2829,24 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                 metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
             };
             db.ticketNotes.unshift(row);
+            const response = isPlainObject(row.metadata.action_response) ? row.metadata.action_response : null;
+            if (response) {
+                const handler = response.handler;
+                const source = db.ticketNotes.find((candidate) => {
+                    if (candidate.parent !== parentId || candidate.id === row.id) return false;
+                    const action = isPlainObject(candidate.metadata.action) ? candidate.metadata.action : null;
+                    return action != null && action.handler === handler && action.resolved !== true;
+                });
+                if (source) {
+                    const action = { ...(source.metadata.action as Record<string, unknown>) };
+                    const decision = response.action === 'deny' ? 'deny' : 'approve';
+                    action.resolved = true;
+                    action.resolution = decision;
+                    source.metadata = { ...source.metadata, action };
+                    parent.status = decision === 'approve' ? 'resolved' : 'closed';
+                    parent.modified = now;
+                }
+            }
             return { status: true, data: serializeTicketNote(row), graph: 'default' };
         }
         const requestedSize = Number(opts.params?.size ?? 100);
