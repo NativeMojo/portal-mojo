@@ -18,3 +18,7 @@ export * from './sections/JobOperationsSection';
 export * from './ScheduledTasksPage';
 export * from './ScheduledTaskDetail';
 export * from './scheduled-task-form';
+// Stage B — the jobs table and the job inspector.
+export * from './columns';
+export * from './JobsTablePage';
+export * from './JobDetail';

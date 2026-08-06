@@ -204,6 +204,25 @@ button.jobs-strip-row:hover { background: var(--surface2); }
 .jobs-task-result + .jobs-task-result { margin-top: 9px; }
 .jobs-task-result-bad { border-left-color: var(--bad); }
 .jobs-task-result-head { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; font-size: 12px; }
+/* ── Jobs table cells ───────────────────────────────────────────── */
+.jobs-cell-id { color: var(--ink-strong); font-weight: 600; }
+.jobs-cell-id code { font-size: 12px; }
+.jobs-cell-sub { color: var(--mute); font-size: 11.5px; overflow-wrap: anywhere; }
+.jobs-cell-error { color: var(--bad); font-size: 12px; overflow-wrap: anywhere; }
+.jobs-cell-stack { display: grid; gap: 2px; }
+.jobs-nums { font-variant-numeric: tabular-nums; }
+
+/* ── Job detail ─────────────────────────────────────────────────── */
+.jobs-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.jobs-error-block {
+    max-height: 260px; margin: 12px 0 0; padding: 10px 12px; overflow: auto;
+    border-radius: 8px; background: var(--bad-soft); color: var(--bad);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.jobs-error-more { margin-top: 8px; }
+.jobs-json-inline { font-size: 11.5px; overflow-wrap: anywhere; }
+.jobs-result-note { display: grid; gap: 4px; margin-bottom: 6px; }
 
 /* ── Narrow viewports ───────────────────────────────────────────── */
 @media (max-width: 1080px) {
