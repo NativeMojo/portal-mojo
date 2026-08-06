@@ -26,16 +26,24 @@ permissions cannot open a fleet-wide settings surface.
 
 `SettingsPage` searches only the key (the backend's sole `SEARCH_FIELDS`
 entry), and offers server filters for `is_secret` and `group__isnull`. Keys are
-immutable after creation. Scope changes send a group id or explicit `null` for
+immutable after creation. Operators with `sys.groups` may change scope, sending
+a group id or explicit `null` for Global. A `sys.manage_settings`-only operator
+sees the current scope read-only; the editor never mounts the group picker or
+queries `/api/group`, and preserves that scope on save. New settings default to
 Global. Delete is intentionally absent because live `Setting.RestMeta` does not
 declare deletion.
 
 ## Atomic write contract
 
 Use `saveSettingAtomic()` / `buildSettingPayload()` rather than a generic
-autosave. django-mojo processes fields in request insertion order: creates and
-Plain↔Secret transitions therefore insert `is_secret` before `value` in one
-POST body. Both transitions require an explicit replacement; a new secret or a
+autosave. django-mojo processes fields against the model's current secrecy
+state in request insertion order. Create-secret remains `is_secret → value`.
+An existing Plain→Secret transition must be `value → is_secret`, so the current
+plain row still holds the replacement when the flag flips and the pre-save hook
+encrypts it. Secret→Plain is the reverse: `is_secret → value`, so the explicit
+replacement lands as plain text. Same-secret replacement sends only `value`.
+
+Both transitions require an explicit replacement; a new secret or a
 Plain→Secret transition requires a non-empty secret, while Secret→Plain may
 explicitly replace it with an empty plain value. An unchanged secret with a
 blank replacement omits `value`; an unchanged plain setting may intentionally

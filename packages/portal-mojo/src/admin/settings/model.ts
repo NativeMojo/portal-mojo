@@ -68,8 +68,10 @@ function groupId(group: SettingRow['group']): number | null {
 
 /**
  * Build one atomic django-mojo save body. Property insertion order is part of
- * the wire contract: Setting.on_rest_pre_save interprets `value` according to
- * the current `is_secret`, so every create/transition inserts is_secret first.
+ * the wire contract: django-mojo applies each field against the model's
+ * current secrecy state. Create keeps is_secret→value. Existing transitions
+ * are directional: Plain→Secret is value→is_secret; Secret→Plain is
+ * is_secret→value. Same-secret replacement needs only value.
  */
 export function buildSettingPayload(draft: SettingDraft, original: SettingRow | null): Record<string, unknown> | null {
     const changes: Record<string, unknown> = {};
@@ -94,10 +96,17 @@ export function buildSettingPayload(draft: SettingDraft, original: SettingRow | 
             throw new Error('Enter a replacement value when changing secret status');
         }
         if (draft.is_secret && draft.value === '') throw new Error('Enter a secret replacement value');
-        changes.is_secret = draft.is_secret;
-        // Keep this assignment after is_secret. Empty is a valid plain value,
-        // including the Secret → Plain transition.
-        changes.value = draft.value;
+        if (draft.is_secret) {
+            // Plain → Secret: stage the plaintext while the row is still
+            // plain, then flip the flag so on_rest_pre_save encrypts it.
+            changes.value = draft.value;
+            changes.is_secret = true;
+        } else {
+            // Secret → Plain: flip first, then write the explicit plain
+            // replacement. Empty is valid in this direction.
+            changes.is_secret = false;
+            changes.value = draft.value;
+        }
     } else if (original.is_secret) {
         // Blank means preserve the write-only value. It never becomes a
         // placeholder payload, even if the input was focused and cleared.

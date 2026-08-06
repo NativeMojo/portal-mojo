@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCan } from '../../client';
 import {
     CollectionSelect, modal, toast, type CollectionSelectValue,
 } from '../../ui';
 import {
-    SettingModel, saveSettingAtomic,
+    SettingModel, saveSettingAtomic, settingGroupLabel,
     type SettingDraft, type SettingGroup, type SettingRow,
 } from './model';
 
@@ -18,6 +19,7 @@ function SettingEditor({ row, close }: {
     close: (result: SettingRow | null) => void;
 }) {
     const queryClient = useQueryClient();
+    const { can: canChooseGroup } = useCan('sys.groups');
     const valueRef = useRef<HTMLTextAreaElement>(null);
     const valueTouched = useRef(false);
     const [key, setKey] = useState(row?.key ?? '');
@@ -116,14 +118,26 @@ function SettingEditor({ row, close }: {
                     </label>
                 </div>
                 <div className="col-12">
-                    <CollectionSelect<SettingGroup>
-                        endpoint="/api/group"
-                        value={group as CollectionSelectValue}
-                        onChange={(id) => setGroup(id == null ? null : Number(id))}
-                        label="Group scope"
-                        placeholder="Search groups…"
-                        help="Clear the selection for a global setting."
-                    />
+                    {canChooseGroup ? (
+                        <CollectionSelect<SettingGroup>
+                            endpoint="/api/group"
+                            value={group as CollectionSelectValue}
+                            onChange={(id) => setGroup(id == null ? null : Number(id))}
+                            label="Group scope"
+                            placeholder="Search groups…"
+                            help="Clear the selection for a global setting."
+                        />
+                    ) : (
+                        <div className="field">
+                            <span className="field-label">Group scope</span>
+                            <div className="input" aria-readonly="true">
+                                {row ? settingGroupLabel(row.group) : 'Global'}
+                            </div>
+                            <span className="field-help">
+                                Scope changes require the system Groups permission.
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="modal-actions">

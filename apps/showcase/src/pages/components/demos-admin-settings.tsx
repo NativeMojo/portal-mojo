@@ -16,23 +16,42 @@ const SECRET_ROW: SettingRow = {
     group: null,
 };
 
+const PLAIN_ROW: SettingRow = {
+    ...SECRET_ROW,
+    id: 401,
+    key: 'MAIL_FROM_NAME',
+    value: 'NativeMojo',
+    display_value: 'NativeMojo',
+    is_secret: false,
+};
+
 export function AdminSettingsDemo() {
-    const transition = buildSettingPayload({
+    const toPlain = buildSettingPayload({
         key: SECRET_ROW.key,
         value: '',
         valueTouched: true,
         is_secret: false,
         group: null,
     }, SECRET_ROW);
+    const toSecret = buildSettingPayload({
+        key: PLAIN_ROW.key,
+        value: 'replacement-token',
+        valueTouched: true,
+        is_secret: true,
+        group: null,
+    }, PLAIN_ROW);
     return (
         <div style={{ display: 'grid', gap: 16 }}>
             <div className="panel panel-pad">
-                <div className="eyebrow">Ordered atomic write</div>
+                <div className="eyebrow">Directional atomic writes</div>
                 <p className="dim">
-                    Secret → Plain sends an explicit replacement; the ordered keys below prove
-                    <code> is_secret </code> precedes <code>value</code>.
+                    The live backend applies fields in insertion order. The two transitions
+                    deliberately serialize in opposite directions.
                 </p>
-                <code>{Object.keys(transition ?? {}).join(' → ')}</code>
+                <div style={{ display: 'grid', gap: 8 }}>
+                    <span>Plain → Secret: <code>{Object.keys(toSecret ?? {}).join(' → ')}</code></span>
+                    <span>Secret → Plain: <code>{Object.keys(toPlain ?? {}).join(' → ')}</code></span>
+                </div>
             </div>
             <SettingsPage />
         </div>
