@@ -11,6 +11,7 @@ import {
     replaceMetricSlugParams,
     type MetricGaugeValue,
     type MetricAccount,
+    type MetricPoint,
 } from './metrics-explorer-data';
 import {
     discoverMetrics,
@@ -329,7 +330,7 @@ export function MetricsExplorerPage() {
                     </div>
                     {pointsQuery.isError && <div className="metrics-compact-state metrics-compact-error"><span>{errorMessage(pointsQuery.error, 'Point comparison failed.')}</span><button type="button" className="btn btn-compact" onClick={() => void pointsQuery.refetch()}>Retry</button></div>}
                     <div className="metrics-kpi-grid">
-                        {(pointsQuery.data ?? selectedSlugs.map((slug) => ({ slug, value: 0, previous: 0, delta: 0 }))).map((point) => (
+                        {(pointsQuery.data ?? selectedSlugs.map<MetricPoint>((slug) => ({ slug, value: 0, previous: 0, delta: 0 }))).map((point) => (
                             <KPITile key={point.slug} label={point.slug} value={pointsQuery.data ? point.value : null} delta={pointsQuery.data ? point.delta : null} deltaPct={pointsQuery.data ? point.deltaPct : null} loading={pointsQuery.isPending} />
                         ))}
                     </div>
