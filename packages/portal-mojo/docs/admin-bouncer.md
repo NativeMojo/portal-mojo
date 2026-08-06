@@ -88,6 +88,8 @@ Related signals query the signal endpoint by MUID. Related incidents query
 contract. The reporter does not populate Incident `model_name`/`model_id`, so
 those fields must not be used as a relationship filter. Incident rows remain
 typed independently from incident events.
+Matching rows open the shared incident forensic detail while preserving this
+prefix-plus-MUID contract.
 
 ## Signature writes
 

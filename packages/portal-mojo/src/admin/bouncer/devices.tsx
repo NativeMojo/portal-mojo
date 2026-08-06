@@ -11,6 +11,7 @@ import {
     type BouncerDeviceRow, type BouncerIncidentRow, type BouncerRiskTier,
 } from './models';
 import { bouncerDecisionTone, bouncerRiskTone, showBouncerSignalDetail } from './signals';
+import { showIncidentDetail } from '../incidents';
 
 function riskTierTone(tier: BouncerRiskTier): Tone {
     if (tier === 'low') return 'success';
@@ -101,7 +102,7 @@ function RelatedIncidents({ device }: { device: BouncerDeviceRow }) {
                 <thead><tr><th>Created</th><th>Status</th><th>Priority</th><th>Category</th><th>Title</th></tr></thead>
                 <tbody>
                     {rows.map((row) => (
-                        <tr key={row.id}>
+                        <tr key={row.id} className="row-click" onClick={() => showIncidentDetail(row.id)}>
                             <td>{fmt.datetime(row.created)}</td>
                             <td><Badge>{row.status}</Badge></td>
                             <td><Badge tone={incidentPriorityTone(row.priority)}>{row.priority}</Badge></td>

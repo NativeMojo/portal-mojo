@@ -578,6 +578,7 @@ function buildIncidentHistory(): MockIncidentHistory[] {
         { id: 801, parent: 601, created: now - 600, group: 1, kind: 'note', to: null, user: 1, state: 2, priority: 7, note: 'Escalated after the fifth failed delivery.', media: null, metadata: {} },
         { id: 800, parent: 601, created: now - 5400, group: 1, kind: 'state', to: null, user: 12, state: 1, priority: 5, note: 'Investigation opened.', media: null, metadata: { old_state: 0 } },
         { id: 799, parent: 602, created: now - 2 * 86400, group: 2, kind: 'note', to: 2, user: null, state: 1, priority: 3, note: 'Automated monitor linked related events.', media: null, metadata: {} },
+        { id: 798, parent: 603, created: now - 7000, group: null, kind: 'created', to: null, user: null, state: 0, priority: 7, note: 'Bouncer created the incident. Authorization: Bearer sentinel-history-secret', media: null, metadata: { token: 'sentinel-history-token' } },
     ];
 }
 
@@ -592,21 +593,28 @@ function buildIncidents(): MockIncident[] {
             // the generic model_name/model_id relation to BouncerDevice.
             details: 'Bouncer blocked muid-bot-003 after webdriver, headless, and rapid-navigation signals.',
             model_name: null, model_id: null, source_ip: '198.51.100.66', hostname: 'auth.example.test',
-            metadata: { decision: 'block', risk_score: 94 }, group_id: null,
+            metadata: {
+                decision: 'block', risk_score: 94, muid: 'muid-bot-003', triggered_signals: ['webdriver', 'headless'],
+                http_method: 'POST', http_url: 'https://auth.example.test/login?api_key=sentinel-url-secret',
+                request_headers: { authorization: 'Bearer sentinel-incident-secret', cookie: 'sid=sentinel-session-secret' },
+                request_body: { username: 'bot@example.test', password: 'sentinel-body-secret' },
+                stack_trace: 'Traceback (most recent call last):\n  File "bouncer.py", line 91, in assess\nValueError: Bearer sentinel-stack-secret',
+                event_count: 2,
+            }, group_id: null,
         },
         {
-            id: 601, created: now - 600, priority: 7, state: 'open', status: 'escalated',
+            id: 601, created: now - 600, priority: 7, state: 'open', status: 'open',
             scope: 'group', category: 'delivery:webhook', country_code: 'US',
             title: 'Webhook receiver failures', details: 'Five consecutive delivery failures.',
             model_name: null, model_id: null, source_ip: null, hostname: 'hooks.example.test',
-            metadata: {}, group_id: 1,
+            metadata: { event_count: 1, maestro_url: 'https://maestro.example.test/items/1601' }, group_id: 1,
         },
         {
             id: 602, created: now - 2 * 86400, priority: 3, state: 'open', status: 'new',
             scope: 'group', category: 'account:review', country_code: 'US',
             title: 'Account review requested', details: 'Automated monitor linked related events.',
             model_name: null, model_id: null, source_ip: null, hostname: null,
-            metadata: {}, group_id: 2,
+            metadata: { event_count: 1, maestro_url: 'https://maestro.example.test/items/1602' }, group_id: 2,
         },
     ];
 }
@@ -718,6 +726,11 @@ function serializeIncidentHistory(row: MockIncidentHistory): Record<string, unkn
         state_display: stateLabels[row.state] ?? String(row.state),
         priority_display: priorityLabels[row.priority] ?? String(row.priority),
     };
+}
+
+function serializeIncidentEvent(row: MockIncidentEvent): Record<string, unknown> {
+    const incident = row.incident == null ? null : db.incidentRecords.find((candidate) => candidate.id === row.incident);
+    return { ...row, incident: incident ? { id: incident.id, title: incident.title, status: incident.status, priority: incident.priority } : null };
 }
 
 function serializeBouncerDevice(row: MockBouncerDevice, graph: string): Record<string, unknown> {
@@ -938,6 +951,7 @@ interface MockIncidentEvent {
     model_id: number | null;
     metadata: Record<string, unknown>;
     group_id: number | null;
+    incident: number | null;
     [field: string]: unknown;
 }
 
@@ -1111,7 +1125,7 @@ function buildIncidentEvents(): MockIncidentEvent[] {
         model_name: 'account.User',
         model_id: s.uid,
         metadata: {},
-        group_id: null,
+        group_id: null, incident: null,
     }));
     rows.push(
         {
@@ -1119,14 +1133,14 @@ function buildIncidentEvents(): MockIncidentEvent[] {
             category: 'security:webhook_delivery', source_ip: '203.0.113.44',
             hostname: 'worker-2', uid: 1, country_code: 'US',
             title: 'Repeated webhook delivery failures', details: 'Endpoint returned 503 for five attempts',
-            model_name: 'account.Group', model_id: 1, metadata: { webhook_subscription_id: 301 }, group_id: 1,
+            model_name: 'account.Group', model_id: 1, metadata: { webhook_subscription_id: 301 }, group_id: 1, incident: 601,
         },
         {
             id: 8989, created: nowSec - 3 * DAY, level: 5, scope: 'group',
             category: 'security:member_invite', source_ip: '198.51.100.18',
             hostname: 'portal-1', uid: 1, country_code: 'US',
             title: 'Member invite retried', details: 'Invite resent after the original link expired',
-            model_name: 'account.Group', model_id: 1, metadata: {}, group_id: 1,
+            model_name: 'account.Group', model_id: 1, metadata: {}, group_id: 1, incident: 602,
         },
         {
             id: 8988, created: nowSec - 2 * 3600, level: 8, scope: 'global',
@@ -1135,7 +1149,14 @@ function buildIncidentEvents(): MockIncidentEvent[] {
             title: 'Bouncer blocked a high-risk login assessment',
             details: 'muid=muid-bot-003 score=94 decision=block',
             model_name: 'account.BouncerDevice', model_id: 903,
-            metadata: { muid: 'muid-bot-003', risk_score: 94, triggered_signals: ['webdriver', 'headless'] }, group_id: null,
+            metadata: {
+                muid: 'muid-bot-003', risk_score: 94, decision: 'block', page_type: 'login',
+                triggered_signals: ['webdriver', 'headless'], server: 'auth-1',
+                http_method: 'POST', http_url: 'https://auth.example.test/login?token=sentinel-query-secret',
+                request_headers: { Authorization: 'Bearer sentinel-bearer-secret', Cookie: 'session=sentinel-cookie-secret' },
+                request_data: { username: 'bot@example.test', password: 'sentinel-password-secret' },
+                stack_trace: 'ValueError: rejected token sentinel-trace-secret\n  File "auth.py", line 42, in assess',
+            }, group_id: null, incident: 603,
         },
         {
             id: 8987, created: nowSec - 1800, level: 5, scope: 'global',
@@ -1144,7 +1165,15 @@ function buildIncidentEvents(): MockIncidentEvent[] {
             title: 'Bouncer monitoring a medium-risk registration',
             details: 'muid=muid-monitor-002 score=51 decision=monitor',
             model_name: 'account.BouncerDevice', model_id: 902,
-            metadata: { muid: 'muid-monitor-002', risk_score: 51 }, group_id: null,
+            metadata: { muid: 'muid-monitor-002', risk_score: 51, decision: 'monitor', server: 'auth-1' }, group_id: null, incident: 603,
+        },
+        {
+            id: 8986, created: nowSec - 5 * 3600, level: 9, scope: 'ossec', category: 'ossec',
+            source_ip: '203.0.113.90', hostname: 'edge-1', uid: null, country_code: 'US',
+            title: 'OSSEC file-integrity alert', details: 'Protected file changed unexpectedly',
+            model_name: null, model_id: null,
+            metadata: { alert_id: 'ossec-42', rule_id: 550, logfile: '/var/log/ossec.log', text: 'Integrity alert token sentinel-ossec-secret' },
+            group_id: null, incident: null,
         },
     );
     return rows;
@@ -1409,7 +1438,6 @@ const db = {
     geoRules: { countries: { deny: ['CN'] } } as Record<string, unknown>,
     geoAllowlist: [{ cidr: '203.0.113.0/24', reason: 'Office egress', until: null }] as unknown[],
     tickets: buildTickets(),
-    incidents: new Map<number, { group: number | null }>([[601, { group: 1 }], [602, { group: 2 }]]),
     incidentRecords: buildIncidents(),
     ticketNotes: buildTicketNotes(),
     maestroItemLinks: buildMaestroItemLinks(),
@@ -1425,7 +1453,13 @@ const db = {
 };
 
 function getField(row: Record<string, unknown>, field: string): unknown {
-    return row[field];
+    if (Object.prototype.hasOwnProperty.call(row, field)) return row[field];
+    let cursor: unknown = row;
+    for (const part of field.split('__')) {
+        if (cursor == null || typeof cursor !== 'object') return undefined;
+        cursor = (cursor as Record<string, unknown>)[part];
+    }
+    return cursor;
 }
 
 /**
@@ -1475,7 +1509,7 @@ function compareWireValues(left: unknown, right: unknown): number {
 function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, raw: string): T[] {
     const parts = key.split('__');
     const lookup = parts.length > 1 ? parts[parts.length - 1] : 'exact';
-    const known = ['exact', 'in', 'icontains', 'startswith', 'gte', 'lte', 'isnull'];
+    const known = ['exact', 'in', 'not', 'not_in', 'icontains', 'startswith', 'gte', 'lte', 'gt', 'lt', 'isnull'];
     const field = known.includes(lookup) && parts.length > 1 ? parts.slice(0, -1).join('__') : key;
     const op = known.includes(lookup) && parts.length > 1 ? lookup : 'exact';
 
@@ -1483,10 +1517,14 @@ function applyLookup<T extends Record<string, unknown>>(rows: T[], key: string, 
         const v = fkValue(getField(row, field));
         switch (op) {
             case 'in': return raw.split(',').map((s) => s.trim()).some((candidate) => compareWireValues(v, candidate) === 0);
+            case 'not': return compareWireValues(v, raw) !== 0;
+            case 'not_in': return !raw.split(',').map((s) => s.trim()).some((candidate) => compareWireValues(v, candidate) === 0);
             case 'icontains': return String(v ?? '').toLowerCase().includes(raw.toLowerCase());
             case 'startswith': return String(v ?? '').startsWith(raw);
             case 'gte': return v != null && compareWireValues(v, raw) >= 0;
             case 'lte': return v != null && compareWireValues(v, raw) <= 0;
+            case 'gt': return v != null && compareWireValues(v, raw) > 0;
+            case 'lt': return v != null && compareWireValues(v, raw) < 0;
             case 'isnull': return raw === 'true' ? v == null : v != null;
             default:
                 if (raw === 'true' || raw === 'false') return v === (raw === 'true');
@@ -2858,6 +2896,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (incidentHistoryMatch) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
+        const canView = hasGlobalPermission(caller, ['view_security', 'security']);
+        const canManage = hasGlobalPermission(caller, ['manage_security', 'security']);
+        if (!canView) return permissionDenied();
+        if (method === 'DELETE') return { status: false, error: 'Incident history is immutable', error_code: 403 };
         const detailId = incidentHistoryMatch[1] ? Number(incidentHistoryMatch[1]) : null;
         if (detailId != null) {
             const row = db.incidentHistory.find((candidate) => candidate.id === detailId);
@@ -2865,13 +2907,14 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { status: true, data: serializeIncidentHistory(row), graph: 'default' };
         }
         if (opts.method === 'POST' && opts.body) {
+            if (!canManage) return permissionDenied();
             const parentId = Number(opts.body.parent ?? 0);
-            const parent = db.incidents.get(parentId);
+            const parent = db.incidentRecords.find((candidate) => candidate.id === parentId);
             if (!parent) return { status: false, error: 'Incident not found', error_code: 404 };
             const now = Math.floor(Date.now() / 1000);
             const row: MockIncidentHistory = {
                 id: Math.max(0, ...db.incidentHistory.map((candidate) => candidate.id)) + 1,
-                parent: parentId, created: now, group: parent.group,
+                parent: parentId, created: now, group: parent.group_id,
                 kind: opts.body.kind == null ? null : String(opts.body.kind),
                 to: opts.body.to == null ? null : Number(opts.body.to), user: caller.id,
                 state: Number(opts.body.state ?? 0), priority: Number(opts.body.priority ?? 0),
@@ -2890,19 +2933,71 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (incidentMatch) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
-        if (!hasGlobalPermission(caller, ['view_security', 'security'])) return permissionDenied();
-        if (opts.method && opts.method !== 'GET') return { status: false, error: 'Incident mutation is not available in this mock surface', error_code: 403 };
+        const canView = hasGlobalPermission(caller, ['view_security', 'security']);
+        const canManage = hasGlobalPermission(caller, ['manage_security', 'security']);
+        if (!canView) return permissionDenied();
         const detailId = incidentMatch[1] ? Number(incidentMatch[1]) : null;
         if (detailId != null) {
             const row = db.incidentRecords.find((candidate) => candidate.id === detailId);
             if (!row) return { status: false, error: 'Incident not found', error_code: 404 };
-            return { status: true, data: { ...row }, graph: 'default' };
+            if (method === 'DELETE') {
+                if (!hasGlobalPermission(caller, ['manage_security'])) return permissionDenied();
+                if (row.metadata.do_not_delete) return { status: false, error: 'Incident is protected from deletion', error_code: 409 };
+                db.incidentRecords = db.incidentRecords.filter((candidate) => candidate.id !== row.id);
+                db.incidentHistory = db.incidentHistory.filter((candidate) => candidate.parent !== row.id);
+                db.incidentEvents = db.incidentEvents.filter((candidate) => candidate.incident !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST' && opts.body) {
+                if (!canManage) return permissionDenied();
+                if (Array.isArray(opts.body.merge)) {
+                    const sourceIds = [...new Set(opts.body.merge.map(Number))].filter((sourceId) => sourceId !== row.id);
+                    const sources = sourceIds.map((sourceId) => db.incidentRecords.find((candidate) => candidate.id === sourceId));
+                    if (sources.some((source) => !source)) return { status: false, error: 'One or more source incidents were not found', error_code: 404 };
+                    const linked = [row, ...sources as MockIncident[]].filter((candidate) => candidate.metadata.maestro_url);
+                    if (linked.length > 1) return { status: false, error: 'Cannot merge incidents linked to different Maestro items', error_code: 409 };
+                    let moved = 0;
+                    for (const source of sources as MockIncident[]) {
+                        for (const event of db.incidentEvents) if (event.incident === source.id) { event.incident = row.id; moved += 1; }
+                        for (const ticket of db.tickets) if (ticket.incident === source.id) ticket.incident = row.id;
+                        db.incidentHistory.unshift({
+                            id: Math.max(0, ...db.incidentHistory.map((candidate) => candidate.id)) + 1,
+                            parent: row.id, created: Math.floor(Date.now() / 1000), group: row.group_id,
+                            kind: 'merged', to: null, user: caller.id, state: Number(row.state) || 0,
+                            priority: row.priority, note: `Merged incident #${source.id}`, media: null, metadata: {},
+                        });
+                    }
+                    row.metadata = { ...row.metadata, event_count: Number(row.metadata.event_count ?? 0) + moved };
+                    db.incidentRecords = db.incidentRecords.filter((candidate) => !sourceIds.includes(candidate.id));
+                    db.incidentHistory = db.incidentHistory.filter((candidate) => !sourceIds.includes(candidate.parent));
+                    return { status: true };
+                }
+                const oldStatus = row.status;
+                if ('status' in opts.body) row.status = String(opts.body.status);
+                if ('priority' in opts.body) row.priority = Number(opts.body.priority);
+                if ('state' in opts.body) row.state = String(opts.body.state);
+                if ('metadata' in opts.body && isPlainObject(opts.body.metadata)) row.metadata = mergeDicts(row.metadata, opts.body.metadata);
+                if (row.status !== oldStatus || 'priority' in opts.body || 'metadata' in opts.body) {
+                    db.incidentHistory.unshift({
+                        id: Math.max(0, ...db.incidentHistory.map((candidate) => candidate.id)) + 1,
+                        parent: row.id, created: Math.floor(Date.now() / 1000), group: row.group_id,
+                        kind: row.status !== oldStatus ? 'status_change' : 'updated', to: null, user: caller.id,
+                        state: Number(row.state) || 0, priority: row.priority,
+                        note: row.status !== oldStatus ? `Status changed from ${oldStatus} to ${row.status}.` : 'Incident updated.',
+                        media: null, metadata: row.status !== oldStatus ? { type: 'status_change', old_status: oldStatus, new_status: row.status } : {},
+                    });
+                }
+                return { status: true, data: { ...row }, graph: String(opts.params?.graph ?? 'default') };
+            }
+            const graph = String(opts.params?.graph ?? 'default');
+            return { status: true, data: { ...row, ...(graph === 'detailed' ? { ip_info: { ip_address: row.source_ip, country_code: row.country_code } } : {}) }, graph };
         }
+        if (method === 'POST') return { status: false, error: 'Incident creation is not available', error_code: 403 };
         const result = listRows(
             db.incidentRecords as unknown as Record<string, unknown>[],
             opts.params ?? {},
-            (row) => `${row.title ?? ''} ${row.details ?? ''}`,
-            '-created',
+            (row) => `${row.details ?? ''}`,
+            '-id',
         );
         return { ...result, graph: 'default' };
     }
@@ -3033,14 +3128,35 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { ...result, data: rows };
     }
     // ── Incident events — /api/incident/event (view_security-gated live) ──
-    if (path === '/api/incident/event') {
+    const eventMatch = path.match(/^\/api\/incident\/event(?:\/(\d+))?$/);
+    if (eventMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canView = hasGlobalPermission(caller, ['view_security', 'security']);
+        const canManage = hasGlobalPermission(caller, ['manage_security', 'security']);
+        if (!canView) return permissionDenied();
+        const detailId = eventMatch[1] ? Number(eventMatch[1]) : null;
+        if (detailId != null) {
+            const row = db.incidentEvents.find((candidate) => candidate.id === detailId);
+            if (!row) return { status: false, error: 'Event not found', error_code: 404 };
+            if (method === 'DELETE') return { status: false, error: 'Event deletion is not supported', error_code: 403 };
+            if (method === 'POST' && opts.body) {
+                if (!canManage) return permissionDenied();
+                for (const key of ['level', 'scope', 'category', 'source_ip', 'hostname', 'title', 'details', 'model_name', 'model_id'] as const) {
+                    if (key in opts.body) (row as Record<string, unknown>)[key] = opts.body[key];
+                }
+                if (isPlainObject(opts.body.metadata)) row.metadata = mergeDicts(row.metadata, opts.body.metadata);
+            }
+            return { status: true, data: serializeIncidentEvent(row), graph: String(opts.params?.graph ?? 'default') };
+        }
+        if (method === 'DELETE') return { status: false, error: 'Event deletion is not supported', error_code: 403 };
         const result = listRows(
             db.incidentEvents as unknown as Record<string, unknown>[],
             opts.params ?? {},
             (e) => `${e.details ?? ''}`, // SEARCH_FIELDS = ["details"]
             '-created',
         );
-        return result;
+        return { ...result, graph: 'default', data: (result.data as unknown as MockIncidentEvent[]).map(serializeIncidentEvent) };
     }
     // ── Passkeys — /api/account/passkeys (save: friendly_name/is_enabled) ──
     const onePasskey = path.match(/^\/api\/account\/passkeys\/(\d+)$/);

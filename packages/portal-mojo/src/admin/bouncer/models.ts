@@ -3,6 +3,8 @@ import {
     defineModel, mojoCall,
     type Params,
 } from '../../client';
+import { SECURITY_VIEW_PERMS } from '../security-permissions';
+import { sanitizeIncidentRow } from '../incidents/sanitize';
 
 /** Bouncer data is global. `sys.` prevents an active group grant from opening it. */
 export const BOUNCER_VIEW_PERMS = [
@@ -21,7 +23,7 @@ export const BOUNCER_MANAGE_PERMS = [
 ];
 
 /** Incident rows have their own, narrower model gate. */
-export const BOUNCER_INCIDENT_VIEW_PERMS = ['sys.view_security', 'sys.security'];
+export const BOUNCER_INCIDENT_VIEW_PERMS = SECURITY_VIEW_PERMS;
 
 export type BouncerStage = 'assess' | 'submit' | 'event';
 export type BouncerDecision = 'allow' | 'monitor' | 'block' | 'log';
@@ -164,6 +166,7 @@ export const BouncerIncidentModel = defineModel<BouncerIncidentRow>({
     name: 'bouncer_incident',
     endpoint: '/api/incident/incident',
     permissions: { view: BOUNCER_INCIDENT_VIEW_PERMS },
+    sanitizeRow: sanitizeIncidentRow,
 });
 
 /** Graph is part of the key so a sparse default record cannot satisfy detail. */

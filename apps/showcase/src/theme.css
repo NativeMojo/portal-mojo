@@ -13,6 +13,7 @@
 @import "./theme/admin-security.css";
 @import "./theme/admin-monitoring.css";
 @import "./theme/admin-bouncer.css";
+@import "./theme/admin-incidents.css";
 @import "./theme/multiselect-dropdown.css";
 @import "./theme/datepicker.css";
 @import "./theme/formview.css";
