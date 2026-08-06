@@ -15,6 +15,7 @@
 // pages (Chunk C3) — then they 401 without a bearer, like the real backend.
 import { markdownToHtml } from './markdown-parse';
 import type { Params, User } from './types';
+import { registerDnsAdminIntegration } from '../admin/dns/dns-integration';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
 function mulberry32(seed: number) {
@@ -655,6 +656,11 @@ function buildDnsDomains(): MockDnsDomain[] {
     return [
         { id: 8201, created: now - 360 * 86400, modified: now - 86400, group: 1, user: 1, name: 'acme.example', provider: 'route53', credential: null, status: 'active', hosted_zone_id: 'ZMOCKACME', auto_renew: true, privacy: true, verified: true, registered_on: now - 360 * 86400, expires: now + 365 * 86400, last_error: null, metadata: {} },
         { id: 8202, created: now - 120 * 86400, modified: now - 7200, group: 1, user: 1, name: 'acme-byo.example', provider: 'godaddy', credential: 8101, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: now - 900 * 86400, expires: now + 90 * 86400, last_error: null, metadata: {} },
+        { id: 8203, created: now - 3600, modified: now - 3600, group: 1, user: 1, name: 'pending-acme.example', provider: 'route53', credential: null, status: 'pending', hosted_zone_id: null, auto_renew: false, privacy: false, verified: false, registered_on: null, expires: null, last_error: null, metadata: {} },
+        { id: 8204, created: now - 40 * 86400, modified: now - 86400, group: 1, user: 1, name: 'cert-only.example', provider: 'mojo', credential: null, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} },
+        { id: 8205, created: now - 80 * 86400, modified: now - 3600, group: 2, user: 2, name: 'bad-credential.example', provider: 'godaddy', credential: 8102, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: false, registered_on: now - 80 * 86400, expires: now + 285 * 86400, last_error: 'Provider verification failed', metadata: {} },
+        { id: 8206, created: now - 1800, modified: now - 900, group: 1, user: 1, name: 'registering-acme.example', provider: 'route53', credential: null, status: 'registering', hosted_zone_id: null, auto_renew: true, privacy: true, verified: false, registered_on: null, expires: null, last_error: null, metadata: {} },
+        { id: 8207, created: now - 200 * 86400, modified: now - 86400, group: 1, user: 1, name: 'unknown-provider.example', provider: 'otherdns', credential: null, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: 'Provider adapter is unavailable', metadata: {} },
     ];
 }
 
@@ -676,10 +682,21 @@ function buildDnsCertificates(): MockDnsCertificate[] {
 function buildDnsRecords(): Map<number, MockDnsRecord[]> {
     return new Map([
         [8201, [
-            { type: 'A', name: 'acme.example', record_values: ['192.0.2.10'], ttl: 300 },
-            { type: 'TXT', name: '_status.acme.example', record_values: ['portal-mojo'], ttl: 300 },
+            { type: 'A', name: 'acme.example', record_values: ['192.0.2.10', '192.0.2.11'], ttl: 300 },
+            { type: 'AAAA', name: 'ipv6.acme.example', record_values: ['2001:db8::10'], ttl: 300 },
+            { type: 'TXT', name: '_status.acme.example', record_values: ['portal-mojo', 'v=spf1 -all'], ttl: 300 },
+            { type: 'CNAME', name: 'www.acme.example', record_values: ['acme.example'], ttl: 300 },
+            { type: 'MX', name: 'acme.example', record_values: ['10 mail.acme.example'], ttl: 1800 },
+            { type: 'SRV', name: '_sip._tcp.acme.example', record_values: ['10 5 5060 sip.acme.example'], ttl: 300 },
+            { type: 'CAA', name: 'acme.example', record_values: ['0 issue "letsencrypt.org"'], ttl: 3600 },
+            { type: 'NS', name: 'delegated.acme.example', record_values: ['ns1.example.net', 'ns2.example.net'], ttl: 3600 },
+            { type: 'HTTPS', name: 'svc.acme.example', record_values: ['1 . alpn=h2'], ttl: 300 },
+            { type: 'TXT', name: '_acme-challenge.acme.example', record_values: ['live-token'], ttl: 60 },
         ]],
-        [8202, [{ type: 'CNAME', name: 'www.acme-byo.example', record_values: ['acme-byo.example'], ttl: 600 }]],
+        [8202, [
+            { type: 'CNAME', name: 'www.acme-byo.example', record_values: ['acme-byo.example'], ttl: 600 },
+            { type: 'TXT', name: '_acme-challenge.acme-byo.example', record_values: ['retired'], ttl: 600 },
+        ]],
     ]);
 }
 
@@ -3766,6 +3783,13 @@ const db = {
         [3, { count: 11, limit: 10, window: 900, retry_after_seconds: 412 }],
     ]),
 };
+
+registerDnsAdminIntegration({
+    applyManagedDnsRecords: (domainId, records) => {
+        if (!db.dnsDomains.some((domain) => domain.id === domainId)) throw new Error('Domain not found');
+        db.dnsRecords.set(domainId, records.map((record) => ({ ...record, record_values: [...record.record_values] })));
+    },
+});
 
 function getField(row: Record<string, unknown>, field: string): unknown {
     if (Object.prototype.hasOwnProperty.call(row, field)) return row[field];
@@ -6864,31 +6888,49 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (path === '/api/dnsman/dns' || path === '/api/dnsman/dns/delete') {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
+        if (!['GET', 'POST'].includes(method)) return { status: false, error: 'Method not allowed', error_code: 405 };
         const bodyOrParams = method === 'GET' ? opts.params ?? {} : opts.body ?? {};
         const domain = db.dnsDomains.find((candidate) => candidate.id === Number(bodyOrParams.domain));
         if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
         if (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, method !== 'GET')) return permissionDenied();
+        if (domain.status !== 'active') return { status: false, error: 'DNS records are available only for active domains', error_code: 400 };
+        if (!['route53', 'godaddy'].includes(domain.provider)) return { status: false, error: domain.provider === 'mojo' ? 'Mojo domains are certificate-only and do not support general DNS operations' : `Unsupported DNS provider: ${domain.provider}`, error_code: 400 };
+        if (domain.provider === 'godaddy') {
+            const credential = db.dnsCredentials.find((candidate) => candidate.id === domain.credential);
+            if (!credential) return { status: false, error: 'Provider credential is required', error_code: 400 };
+            if (!credential.is_active) return { status: false, error: 'Provider credential is inactive', error_code: 400 };
+            if (!credential.verified) return { status: false, error: credential.last_error || 'Provider credential is not verified', error_code: 400 };
+        }
         const records = db.dnsRecords.get(domain.id) ?? [];
         if (method === 'GET') return { status: true, data: { domain: domain.name, provider: domain.provider, records: records.map((record) => ({ ...record, record_values: [...record.record_values] })) } };
         const type = String(bodyOrParams.type ?? '').toUpperCase();
-        const name = String(bodyOrParams.name ?? '').toLowerCase().replace(/\.+$/, '');
-        if (!type || !name) return missingParams('type', 'name');
+        const rawName = String(bodyOrParams.name ?? '').trim().toLowerCase().replace(/\.+$/, '');
+        const name = !rawName || rawName === '@' ? domain.name : rawName.includes('.') ? rawName : `${rawName}.${domain.name}`;
+        if (!type || !rawName) return missingParams('type', 'name');
+        const allowedTypes = ['A', 'AAAA', 'CAA', 'CNAME', 'MX', 'NS', 'SRV', 'TXT'];
+        if (!allowedTypes.includes(type)) return { status: false, error: `Record type ${type} is not allowed`, error_code: 400 };
+        if (!(name === domain.name || name.endsWith(`.${domain.name}`))) return { status: false, error: `Record name must be inside the ${domain.name} zone`, error_code: 400 };
+        const labels = name.split('.');
+        if (!labels.every((label, position) => label === '*' ? position === 0 : /^[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?$/i.test(label))) return { status: false, error: 'Invalid DNS record name', error_code: 400 };
+        if (name === domain.name && ['NS', 'SOA'].includes(type)) return { status: false, error: `The apex ${type} record set cannot be changed`, error_code: 400 };
         const index = records.findIndex((record) => record.type === type && record.name.toLowerCase().replace(/\.+$/, '') === name);
         if (path.endsWith('/delete')) {
-            const selected = Array.isArray(bodyOrParams.record_values) ? bodyOrParams.record_values.map(String) : null;
-            if (index >= 0 && selected) {
-                records[index]!.record_values = records[index]!.record_values.filter((value) => !selected.includes(value));
-                if (records[index]!.record_values.length === 0) records.splice(index, 1);
-            } else if (index >= 0) records.splice(index, 1);
+            if ('record_values' in bodyOrParams) return { status: false, error: 'Whole-set deletion does not accept record_values', error_code: 400 };
+            if (domain.provider === 'godaddy') return { status: false, error: 'GoDaddy cannot delete the last value in a record set', error_code: 400 };
+            if (index >= 0) records.splice(index, 1);
         } else {
-            const values = Array.isArray(bodyOrParams.record_values) ? bodyOrParams.record_values.map(String) : [String(bodyOrParams.record_values ?? '')];
-            if (values.some((value) => !value)) return { status: false, error: 'record_values is required', error_code: 400 };
-            const next = { type, name, record_values: values, ttl: Number(bodyOrParams.ttl ?? 300) };
+            if (!Array.isArray(bodyOrParams.record_values) || bodyOrParams.record_values.length === 0 || bodyOrParams.record_values.some((value) => typeof value !== 'string' || value === '')) return { status: false, error: 'record_values must be a non-empty list', error_code: 400 };
+            const ttl = Number(bodyOrParams.ttl);
+            if (!Number.isInteger(ttl) || ttl <= 0) return { status: false, error: 'ttl must be a positive integer', error_code: 400 };
+            const values = bodyOrParams.record_values.map(String);
+            const colliding = records.filter((record, candidateIndex) => candidateIndex !== index && record.name.toLowerCase().replace(/\.+$/, '') === name);
+            if ((type === 'CNAME' && colliding.length) || (type !== 'CNAME' && colliding.some((record) => record.type === 'CNAME'))) return { status: false, error: 'CNAME cannot coexist with another record at the same name', error_code: 400 };
+            const next = { type, name, record_values: values, ttl: domain.provider === 'godaddy' ? Math.max(600, ttl) : ttl };
             if (index >= 0) records[index] = next;
             else records.push(next);
         }
         db.dnsRecords.set(domain.id, records);
-        return { status: true, data: { status: true, change_id: `mock-change-${Date.now()}`, provider: domain.provider } };
+        return { status: true, data: { status: true, ...(domain.provider === 'route53' ? { change_id: `mock-change-${Date.now()}` } : {}), provider: domain.provider } };
     }
 
     if (path === '/api/dnsman/certificate/request' || path === '/api/dnsman/certificate/revoke') {

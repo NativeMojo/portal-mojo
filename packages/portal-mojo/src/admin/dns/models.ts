@@ -118,7 +118,6 @@ export interface CertificateRow {
 }
 
 export interface DnsRecordRow {
-    id?: string;
     type: string;
     name: string;
     record_values: string[];
@@ -357,7 +356,7 @@ export function normalizeCredentialListParams(params: Params): Params {
 export function normalizeDomainListParams(params: Params): Params {
     return normalizeListParams(
         params,
-        new Set(['group', 'provider', 'provider__in', 'status', 'status__in', 'expires__gte', 'expires__lte']),
+        new Set(['group', 'provider', 'status']),
         new Set(['name', 'provider', 'status', 'expires', 'created']),
         'list',
     );
