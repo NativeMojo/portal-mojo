@@ -8,7 +8,7 @@
 // `.failed`. There is NO per-channel slug for retried or expired, so those two
 // series exist only in the all-channel view and the UI says so rather than
 // plotting an empty line.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MetricsChart, MetricsMiniWidget } from '../../../charts';
 
 const GLOBAL_SLUGS = ['jobs.completed', 'jobs.failed', 'jobs.retried', 'jobs.expired'];
@@ -34,8 +34,11 @@ export function JobThroughputSection({ channels }: { channels: string[] }) {
     const [channel, setChannel] = useState('');
     // A channel that disappears from the list (stream removed, settings
     // change) must not leave the chart requesting slugs that no longer exist.
+    // The fallback is loud, but once per channel — not once per render.
+    const warned = useRef<Set<string>>(new Set());
     const active = channel && channels.includes(channel) ? channel : '';
-    if (channel && !active) {
+    if (channel && !active && !warned.current.has(channel)) {
+        warned.current.add(channel);
         console.warn(`[admin/jobs] channel ${JSON.stringify(channel)} is no longer reported — falling back to all channels.`);
     }
     const scoped = active ? channelSlugs(active) : null;
