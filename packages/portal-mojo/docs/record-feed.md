@@ -72,9 +72,11 @@ interface RecordFeedPage {
 }
 ```
 
-POST uses the same collection endpoint and `{parent, note}`. Incident posts
-also carry `kind: 'comment'`. No `media` field or attachment placeholder is
-sent. Failed saves reject at the shared client boundary.
+POST uses the same collection endpoint and `{parent, group, note}` when the
+adapter has a group (`group` is the bare ForeignKey primary key django-mojo's
+generic REST saver consumes). Incident posts also carry `kind: 'comment'`.
+No `media` field or attachment placeholder is sent. Failed saves reject at
+the shared client boundary.
 
 The cache key is always:
 
@@ -83,7 +85,9 @@ The cache key is always:
 ```
 
 That final group slot is not cosmetic. Two group contexts viewing the same
-numeric record ID must never share a cache entry.
+numeric record ID must never share a cache entry. Changing any adapter key
+slot also remounts adapter mode so its composer draft, mutation/error state,
+scroll position, and bottom-pin refs cannot leak into the next record.
 
 ## Author/type normalization
 

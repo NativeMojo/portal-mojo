@@ -241,6 +241,11 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
         async addNote(text) {
             const raw = await mojoSave<Record<string, unknown>>(endpoint, null, {
                 parent: parentId,
+                // django-mojo's generic REST saver consumes ForeignKeys as a
+                // bare primary key (`{"group": 5}`), permission-checks the
+                // related row, then assigns it. Keep create scope identical
+                // to the group-aware list/cache scope.
+                ...(groupId === null ? {} : { group: groupId }),
                 note: text,
                 ...(postKind ? { kind: postKind } : {}),
             });

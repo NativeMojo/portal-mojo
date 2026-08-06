@@ -507,6 +507,9 @@ function ControlledFeed(props: ControlledRecordFeedProps) {
  */
 export function RecordFeed(props: RecordFeedProps) {
     return 'adapter' in props && props.adapter
-        ? <AdapterFeed {...props} />
+        // A record/group switch is a new composer and scroll context, not
+        // just a new Query. Remounting on the structural key prevents draft,
+        // mutation/error, and bottom-pin refs from crossing records.
+        ? <AdapterFeed key={JSON.stringify(props.adapter.queryKey)} {...props} />
         : <ControlledFeed {...props as ControlledRecordFeedProps} />;
 }
