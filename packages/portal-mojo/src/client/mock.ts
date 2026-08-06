@@ -2456,6 +2456,13 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     dnsPlatform.email = 'dns.platform@nativemojo.com';
     dnsPlatform.display_name = 'DNS Platform Operator';
     dnsPlatform.permissions = {};
+    const dnsTenant = at(23);
+    dnsTenant.is_active = true;
+    dnsTenant.is_superuser = false;
+    dnsTenant.username = 'dns.tenant';
+    dnsTenant.email = 'dns.tenant@nativemojo.com';
+    dnsTenant.display_name = 'DNS Tenant Member';
+    dnsTenant.permissions = {};
 
     // Auth-config inheritance fixtures: defaults -> deployment -> root -> child.
     groups[0]!.metadata = mergeDicts(groups[0]!.metadata, {
@@ -3663,11 +3670,18 @@ const jobsSeed = buildJobs();
 const deviceRows = buildDevices();
 const geoIpRows = buildGeoIps();
 const loginEventRows = linkLoginDevices(buildLoginEvents(users), deviceRows);
+const members = buildMembers(users, groups);
+members.push({
+    id: 190, created: groups[0]!.created, modified: groups[0]!.modified,
+    is_active: true, permissions: { view_dns: true }, metadata: {},
+    user: 23, group: 1,
+});
+groups[0]!.member_count += 1;
 
 const db = {
     users,
     groups,
-    members: buildMembers(users, groups),
+    members,
     apiKeys: buildApiKeys(),
     // #1287: firewall rows ride the same Log table the monitoring page reads.
     logs: [...buildFirewallLogs(), ...buildLogs(users, groups)],

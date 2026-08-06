@@ -95,7 +95,7 @@ try {
     };
     const viewer = await login('dns.viewer@nativemojo.com');
     const manager = await login('dns.manager@nativemojo.com');
-    const tenant = await login('ian@mojoverify.com');
+    const tenant = await login('dns.tenant@nativemojo.com');
     const platform = await login('dns.platform@nativemojo.com');
 
     const config = await mock.mockFetch('/api/dnsman/config', { headers: viewer });
