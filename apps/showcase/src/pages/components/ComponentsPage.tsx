@@ -46,6 +46,7 @@ import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
 import { AdminNetworkDemo } from './demos-admin-network';
+import { AdminDnsDemo } from './demos-admin-dns';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminJobsDemo } from './demos-admin-jobs';
@@ -356,6 +357,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-network', title: 'Network security', icon: 'bi-hdd-network',
                 blurb: 'Perimeter control: blocked IPs with honest expiry state, the firewall log with the target IP pulled out of the payload, kernel IP sets created disabled behind an armed enable, and the geofencing page — posture header, rules editor, simulator, evidence log and exemptions.',
                 render: () => <AdminNetworkDemo />,
+            },
+            {
+                key: 'admin-dns', title: 'DNS', icon: 'bi-globe2',
+                blurb: 'Global DNS provider credentials with strict capability gating, exact eligible-group lookup, masked KISS detail, and imperative secret verification outside the query cache.',
+                render: () => <AdminDnsDemo />,
             },
             {
                 key: 'admin-incidents', title: 'Incidents & events', icon: 'bi-shield-exclamation',

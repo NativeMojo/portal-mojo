@@ -376,6 +376,93 @@ interface MockSetting {
     [field: string]: unknown;
 }
 
+// ── DNSMan — safe state only ─────────────────────────────────────────
+// Provider plaintext, quote confirmation values, registrant/WHOIS PII and
+// certificate bodies are deliberately absent. Custom handlers consume/return
+// transient values without adding them to this database.
+interface MockDnsCredential {
+    id: number;
+    created: number;
+    modified: number;
+    group: number;
+    name: string;
+    provider: string;
+    is_active: boolean;
+    verified: boolean;
+    verified_at: number | null;
+    domain_count: number;
+    last_error: string | null;
+    api_key_masked: string;
+    api_secret_masked: string;
+    [field: string]: unknown;
+}
+
+interface MockDnsDomain {
+    id: number;
+    created: number;
+    modified: number;
+    group: number | null;
+    user: number | null;
+    name: string;
+    provider: string;
+    credential: number | null;
+    status: string;
+    hosted_zone_id: string | null;
+    auto_renew: boolean;
+    privacy: boolean;
+    verified: boolean;
+    registered_on: number | null;
+    expires: number | null;
+    last_error: string | null;
+    metadata: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockDomainPurchase {
+    id: number;
+    created: number;
+    modified: number;
+    group: number;
+    user: number | null;
+    domain_name: string;
+    kind: string;
+    status: string;
+    price: string | null;
+    cost: string | null;
+    currency: string;
+    years: number;
+    quote_expires: number | null;
+    operation_id: string | null;
+    error: string | null;
+    metadata: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+interface MockDnsCertificate {
+    id: number;
+    created: number;
+    modified: number;
+    domain: number;
+    common_name: string;
+    sans: string[];
+    status: string;
+    issuer: string | null;
+    serial: string | null;
+    not_before: number | null;
+    not_after: number | null;
+    renew_after: number | null;
+    last_error: string | null;
+    attempts: number;
+    [field: string]: unknown;
+}
+
+interface MockDnsRecord {
+    type: string;
+    name: string;
+    record_values: string[];
+    ttl: number;
+}
+
 interface MockTicketNote {
     id: number;
     parent: number;
@@ -554,6 +641,48 @@ function buildSettings(): MockSetting[] {
     ];
 }
 
+function buildDnsCredentials(): MockDnsCredential[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8101, created: now - 180 * 86400, modified: now - 7 * 86400, group: 1, name: 'Acme registrar', provider: 'godaddy', is_active: true, verified: true, verified_at: now - 7 * 86400, domain_count: 12, last_error: null, api_key_masked: '********A1B2', api_secret_masked: '********C3D4' },
+        { id: 8102, created: now - 90 * 86400, modified: now - 3600, group: 2, name: 'Engineering legacy', provider: 'godaddy', is_active: true, verified: false, verified_at: now - 30 * 86400, domain_count: 4, last_error: 'Provider verification failed', api_key_masked: '********E5F6', api_secret_masked: '********G7H8' },
+        { id: 8103, created: now - 30 * 86400, modified: now - 3 * 86400, group: 4, name: 'Support retired', provider: 'godaddy', is_active: false, verified: true, verified_at: now - 30 * 86400, domain_count: 2, last_error: null, api_key_masked: '********J1K2', api_secret_masked: '********L3M4' },
+    ];
+}
+
+function buildDnsDomains(): MockDnsDomain[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8201, created: now - 360 * 86400, modified: now - 86400, group: 1, user: 1, name: 'acme.example', provider: 'route53', credential: null, status: 'active', hosted_zone_id: 'ZMOCKACME', auto_renew: true, privacy: true, verified: true, registered_on: now - 360 * 86400, expires: now + 365 * 86400, last_error: null, metadata: {} },
+        { id: 8202, created: now - 120 * 86400, modified: now - 7200, group: 1, user: 1, name: 'acme-byo.example', provider: 'godaddy', credential: 8101, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: now - 900 * 86400, expires: now + 90 * 86400, last_error: null, metadata: {} },
+    ];
+}
+
+function buildDomainPurchases(): MockDomainPurchase[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8301, created: now - 360 * 86400, modified: now - 360 * 86400, group: 1, user: 1, domain_name: 'acme.example', kind: 'register', status: 'completed', price: '12.00', cost: '12.00', currency: 'USD', years: 1, quote_expires: now - 360 * 86400, operation_id: 'op-mock-8301', error: null, metadata: {} },
+        { id: 8302, created: now - 14 * 86400, modified: now - 14 * 86400, group: 2, user: 2, domain_name: 'failed-example.dev', kind: 'register', status: 'failed', price: '18.00', cost: '18.00', currency: 'USD', years: 1, quote_expires: now - 14 * 86400, operation_id: null, error: 'Registrar operation failed', metadata: {} },
+    ];
+}
+
+function buildDnsCertificates(): MockDnsCertificate[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8401, created: now - 60 * 86400, modified: now - 2 * 86400, domain: 8201, common_name: 'acme.example', sans: ['acme.example', '*.acme.example'], status: 'active', issuer: "Let's Encrypt", serial: 'mock-8401', not_before: now - 60 * 86400, not_after: now + 30 * 86400, renew_after: now + 5 * 86400, last_error: null, attempts: 1 },
+    ];
+}
+
+function buildDnsRecords(): Map<number, MockDnsRecord[]> {
+    return new Map([
+        [8201, [
+            { type: 'A', name: 'acme.example', record_values: ['192.0.2.10'], ttl: 300 },
+            { type: 'TXT', name: '_status.acme.example', record_values: ['portal-mojo'], ttl: 300 },
+        ]],
+        [8202, [{ type: 'CNAME', name: 'www.acme-byo.example', record_values: ['acme-byo.example'], ttl: 600 }]],
+    ]);
+}
+
 function buildTicketNotes(): MockTicketNote[] {
     const now = Math.floor(Date.now() / 1000);
     return [
@@ -712,6 +841,72 @@ function serializeSetting(row: MockSetting): Record<string, unknown> {
         is_secret: row.is_secret,
         group: group ? groupBasic(group) : null,
         display_value: row.is_secret ? '******' : row.value,
+    };
+}
+
+function serializeDnsCredential(row: MockDnsCredential): Record<string, unknown> {
+    const group = db.groups.find((candidate) => candidate.id === row.group);
+    return {
+        id: row.id, created: row.created, modified: row.modified,
+        name: row.name, provider: row.provider, is_active: row.is_active,
+        verified: row.verified, verified_at: row.verified_at,
+        domain_count: row.domain_count, last_error: row.last_error,
+        api_key_masked: row.api_key_masked, api_secret_masked: row.api_secret_masked,
+        group: group ? groupBasic(group) : null,
+    };
+}
+
+function serializeDnsDomain(row: MockDnsDomain, graph = 'default'): Record<string, unknown> {
+    const group = row.group == null ? null : db.groups.find((candidate) => candidate.id === row.group);
+    const credential = row.credential == null ? null : db.dnsCredentials.find((candidate) => candidate.id === row.credential);
+    if (graph === 'list') {
+        return {
+            id: row.id, created: row.created, name: row.name, provider: row.provider,
+            status: row.status, expires: row.expires, group: group ? groupBasic(group) : null,
+        };
+    }
+    const user = row.user == null ? null : db.users.find((candidate) => candidate.id === row.user);
+    return {
+        id: row.id, created: row.created, modified: row.modified,
+        name: row.name, provider: row.provider, status: row.status,
+        hosted_zone_id: row.hosted_zone_id, auto_renew: row.auto_renew,
+        privacy: row.privacy, verified: row.verified, registered_on: row.registered_on,
+        expires: row.expires, last_error: row.last_error,
+        group: group ? groupBasic(group) : null,
+        user: user ? userBasic(user) : null,
+        credential: credential ? {
+            id: credential.id, name: credential.name, provider: credential.provider,
+            is_active: credential.is_active, verified: credential.verified,
+        } : null,
+    };
+}
+
+function serializeDomainPurchase(row: MockDomainPurchase): Record<string, unknown> {
+    const group = db.groups.find((candidate) => candidate.id === row.group);
+    const user = row.user == null ? null : db.users.find((candidate) => candidate.id === row.user);
+    return {
+        id: row.id, created: row.created, modified: row.modified,
+        domain_name: row.domain_name, kind: row.kind, status: row.status,
+        price: row.price, cost: row.cost, currency: row.currency, years: row.years,
+        quote_expires: row.quote_expires, operation_id: row.operation_id, error: row.error,
+        group: group ? groupBasic(group) : null, user: user ? userBasic(user) : null,
+    };
+}
+
+function serializeDnsCertificate(row: MockDnsCertificate): Record<string, unknown> {
+    const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+    const now = Math.floor(Date.now() / 1000);
+    return {
+        id: row.id, created: row.created, modified: row.modified,
+        common_name: row.common_name, sans: [...row.sans], status: row.status,
+        issuer: row.issuer, serial: row.serial, not_before: row.not_before,
+        not_after: row.not_after, renew_after: row.renew_after,
+        last_error: row.last_error, attempts: row.attempts,
+        days_remaining: row.not_after == null ? null : Math.floor((row.not_after - now) / 86400),
+        domain: domain ? {
+            id: domain.id, name: domain.name, provider: domain.provider,
+            status: domain.status, expires: domain.expires,
+        } : null,
     };
 }
 
@@ -2238,6 +2433,37 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     securityManageOnly.display_name = 'Security Manage Only';
     securityManageOnly.permissions = { manage_security: true };
 
+    // DNS-specific global identities keep the view/manage split executable
+    // without changing the established Security personas above.
+    const dnsViewer = at(20);
+    dnsViewer.is_active = true;
+    dnsViewer.is_superuser = false;
+    dnsViewer.username = 'dns.viewer';
+    dnsViewer.email = 'dns.viewer@nativemojo.com';
+    dnsViewer.display_name = 'DNS Viewer';
+    dnsViewer.permissions = { view_dns: true };
+    const dnsManager = at(21);
+    dnsManager.is_active = true;
+    dnsManager.is_superuser = false;
+    dnsManager.username = 'dns.manager';
+    dnsManager.email = 'dns.manager@nativemojo.com';
+    dnsManager.display_name = 'DNS Manager';
+    dnsManager.permissions = { view_dns: true, manage_dns: true };
+    const dnsPlatform = at(22);
+    dnsPlatform.is_active = true;
+    dnsPlatform.is_superuser = true;
+    dnsPlatform.username = 'dns.platform';
+    dnsPlatform.email = 'dns.platform@nativemojo.com';
+    dnsPlatform.display_name = 'DNS Platform Operator';
+    dnsPlatform.permissions = {};
+    const dnsTenant = at(23);
+    dnsTenant.is_active = true;
+    dnsTenant.is_superuser = false;
+    dnsTenant.username = 'dns.tenant';
+    dnsTenant.email = 'dns.tenant@nativemojo.com';
+    dnsTenant.display_name = 'DNS Tenant Member';
+    dnsTenant.permissions = {};
+
     // Auth-config inheritance fixtures: defaults -> deployment -> root -> child.
     groups[0]!.metadata = mergeDicts(groups[0]!.metadata, {
         auth_config: {
@@ -3444,11 +3670,18 @@ const jobsSeed = buildJobs();
 const deviceRows = buildDevices();
 const geoIpRows = buildGeoIps();
 const loginEventRows = linkLoginDevices(buildLoginEvents(users), deviceRows);
+const members = buildMembers(users, groups);
+members.push({
+    id: 190, created: groups[0]!.created, modified: groups[0]!.modified,
+    is_active: true, permissions: { view_dns: true }, metadata: {},
+    user: 23, group: 1,
+});
+groups[0]!.member_count += 1;
 
 const db = {
     users,
     groups,
-    members: buildMembers(users, groups),
+    members,
     apiKeys: buildApiKeys(),
     // #1287: firewall rows ride the same Log table the monitoring page reads.
     logs: [...buildFirewallLogs(), ...buildLogs(users, groups)],
@@ -3466,6 +3699,11 @@ const db = {
     webhooks: buildWebhookSubscriptions(),
     webhookSecrets: new Map<number, { value: string; created_at: string; last_rotated_at: string }>(),
     settings: buildSettings(),
+    dnsCredentials: buildDnsCredentials(),
+    dnsDomains: buildDnsDomains(),
+    domainPurchases: buildDomainPurchases(),
+    dnsCertificates: buildDnsCertificates(),
+    dnsRecords: buildDnsRecords(),
     metricPermissions: new Map<string, { view_permissions: string | string[] | null; write_permissions: string | string[] | null }>([
         ['global', { view_permissions: 'view_metrics', write_permissions: ['write_metrics', 'metrics'] }],
         ['group-1', { view_permissions: ['view_metrics', 'metrics'], write_permissions: null }],
@@ -3889,6 +4127,27 @@ function isEffectivelyActive(group: MockGroup): boolean {
         current = parentId ? db.groups.find((candidate) => candidate.id === parentId) : undefined;
     }
     return true;
+}
+
+/** Group.is_effectively_active(max_depth=8), as DNS credential choices use it. */
+function isDnsCredentialChoiceEligible(group: MockGroup): boolean {
+    if (!group.is_active) return false;
+    let current: MockGroup | undefined = group;
+    for (let depth = 0; depth < 8; depth++) {
+        const parentId: number | null = current.parent ? Number(current.parent.id) : null;
+        if (!parentId) return true;
+        current = db.groups.find((candidate) => candidate.id === parentId);
+        if (!current || !current.is_active) return false;
+    }
+    return true;
+}
+
+function mockGroupChoiceInteger(value: unknown, fallback: number, minimum: number, maximum: number): number | null {
+    const input = value == null ? fallback : value;
+    if (typeof input === 'boolean' || (typeof input !== 'string' && typeof input !== 'number')) return null;
+    if (typeof input === 'string' && !/^[0-9]+$/.test(input)) return null;
+    const parsed = typeof input === 'number' ? input : Number(input);
+    return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
 }
 
 function resolveAuthConfig(group?: MockGroup): Record<string, unknown> {
@@ -4570,6 +4829,23 @@ function authFetch(path: string, body: Record<string, unknown>, params: Params =
 // (e.g. three concurrent refreshes must produce ONE '/api/token/refresh').
 const callCounts = new Map<string, number>();
 
+export interface MockRequestHistoryEntry {
+    method: string;
+    path: string;
+    /** Only non-sensitive DNS query values needed by contract verification. */
+    params?: Params;
+}
+
+const requestHistory: MockRequestHistoryEntry[] = [];
+
+export function getMockRequestHistory(): MockRequestHistoryEntry[] {
+    return requestHistory.map((entry) => ({ ...entry, ...(entry.params ? { params: { ...entry.params } } : {}) }));
+}
+
+export function clearMockRequestHistory(): void {
+    requestHistory.length = 0;
+}
+
 export function getMockCallCounts(): Record<string, number> {
     return Object.fromEntries(callCounts);
 }
@@ -4579,6 +4855,13 @@ let armedReauth: { method: string; path: string } | null = null;
 /** Mock-only one-shot fresh-auth challenge, matched by BOTH method and path. */
 export function armMockReauth(method: string, path: string): void {
     armedReauth = { method: method.toUpperCase(), path };
+}
+
+let dnsConfigMalformed = false;
+
+/** Showcase-only fail-closed state; production transports never call this. */
+export function setMockDnsConfigMalformed(value: boolean): void {
+    dnsConfigMalformed = value;
 }
 
 const LATENCY_MS = 220;
@@ -4657,6 +4940,25 @@ function canReadUserDirectory(user: MockUser | undefined): boolean {
 
 function requestGroupId(opts: MockFetchOpts): number {
     return Number(opts.body?.group ?? opts.params?.group ?? 0);
+}
+
+const DNS_VIEW_GRANTS = ['view_dns', 'manage_dns', 'security'];
+const DNS_MANAGE_GRANTS = ['manage_dns', 'security'];
+
+function dnsMemberCan(user: MockUser | undefined, groupId: number, manage: boolean): boolean {
+    if (!user) return false;
+    if (hasGlobalPermission(user, manage ? DNS_MANAGE_GRANTS : DNS_VIEW_GRANTS)) return true;
+    const member = db.members.find((row) => row.group === groupId && row.user === user.id && row.is_active);
+    if (!member) return false;
+    const grants = manage ? ['admin', 'manage_dns'] : ['admin', 'view_dns', 'manage_dns'];
+    return grants.some((permission) => Boolean(member.permissions[permission]));
+}
+
+function dnsCollectionCan(user: MockUser | undefined, opts: MockFetchOpts, manage = false): boolean {
+    const groupId = requestGroupId(opts);
+    return groupId > 0
+        ? dnsMemberCan(user, groupId, manage)
+        : hasGlobalPermission(user, manage ? DNS_MANAGE_GRANTS : DNS_VIEW_GRANTS);
 }
 
 function permissionDenied(code = 403): Record<string, unknown> {
@@ -5778,6 +6080,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     const method = (opts.method ?? 'GET').toUpperCase();
     const key = `${method} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
+    const safeDnsParams = path === '/api/dnsman/credential/group-choice'
+        || path === '/api/dnsman/registrar/discover'
+        ? { ...(opts.params ?? {}) }
+        : undefined;
+    requestHistory.push({ method, path, ...(safeDnsParams ? { params: safeDnsParams } : {}) });
     await new Promise((r) => setTimeout(r, LATENCY_MS));
     if (armedReauth?.method === method && armedReauth.path === path) {
         // The real @requires_fresh_auth runs after authentication. An armed
@@ -6084,6 +6391,411 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { ...result, graph, data: (result.data as unknown as MockIPSet[]).map((row) => serializeIPSet(row, graph)) };
     }
     // ══ end network security wire ════════════════════════════════════
+    // ══ DNSMan — capabilities, safe models and custom operations ════════
+    if (path === '/api/dnsman/config') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        if (groupId > 0 && !db.groups.some((group) => group.id === groupId && group.is_active)) {
+            return { status: false, error: 'The requested group does not exist or is not active', error_code: 400 };
+        }
+        if (dnsConfigMalformed) return { status: true, data: { providers: [] } };
+        return {
+            status: true,
+            data: {
+                purchase_enabled: true,
+                registrant_contact_configured: groupId === 0 || groupId % 2 === 1,
+                max_domain_price: '100.00', currency: 'USD', quote_ttl_minutes: 15,
+                allowed_record_types: ['A', 'AAAA', 'CAA', 'CNAME', 'MX', 'NS', 'SRV', 'TXT'],
+                search_batch_limit: 20, suggestions_enabled: true,
+                providers: [
+                    { name: 'route53', purchase: true, requires_credential: false },
+                    { name: 'godaddy', purchase: false, requires_credential: true },
+                ],
+                acme: { configured: true, staging: true },
+                delegated_acme: {
+                    available: true, record_type: 'CNAME', target_suffix: null,
+                    profile: 'apex_wildcard', requires_provider_credentials: false,
+                },
+                cert_renew_days: 30,
+            },
+        };
+    }
+
+    if (path === '/api/dnsman/credential/group-choice') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, DNS_MANAGE_GRANTS)) return permissionDenied();
+        if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const params = opts.params ?? {};
+        const keys = Object.keys(params).filter((name) => params[name] != null);
+        if (keys.some((name) => !['id', 'search', 'start', 'size'].includes(name))) {
+            return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+        }
+        let eligible = db.groups.filter((group) => isDnsCredentialChoiceEligible(group));
+        if (keys.includes('id')) {
+            if (keys.length !== 1) return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+            const idInput = params.id;
+            if (typeof idInput === 'boolean' || (typeof idInput !== 'string' && typeof idInput !== 'number')) {
+                return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+            }
+            const idText = String(idInput);
+            if (!/^[0-9]+$/.test(idText) || BigInt(idText) < 1n || BigInt(idText) > 9223372036854775807n) return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+            const id = Number(idText);
+            const row = eligible.find((group) => group.id === id);
+            return { status: true, data: row ? [{ id: row.id, name: row.name }] : [], start: 0, size: 1, count: row ? 1 : 0 };
+        }
+        const searchInput = params.search;
+        if (searchInput != null && typeof searchInput !== 'string') return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+        const search = (searchInput ?? '').trim();
+        const start = mockGroupChoiceInteger(params.start, 0, 0, 100000);
+        const size = mockGroupChoiceInteger(params.size, 25, 1, 50);
+        if (search.length > 100 || start == null || size == null) {
+            return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+        }
+        if (search) eligible = eligible.filter((group) => group.name.toLowerCase().includes(search.toLowerCase()));
+        eligible.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) || left.id - right.id);
+        return {
+            status: true, count: eligible.length, start, size,
+            data: eligible.slice(start, start + size).map((group) => ({ id: group.id, name: group.name })),
+        };
+    }
+
+    if (path === '/api/dnsman/credential/link') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const body = opts.body ?? {};
+        const missing = ['group', 'provider', 'api_key', 'api_secret'].filter((name) => !(name in body));
+        if (missing.length) return missingParams(...missing);
+        const groupId = Number(body.group);
+        const group = db.groups.find((candidate) => candidate.id === groupId && candidate.is_active);
+        if (!group) return { status: false, error: 'A valid group is required to link a credential', error_code: 400 };
+        if (!dnsMemberCan(caller, groupId, true)) return permissionDenied();
+        if (String(body.provider) !== 'godaddy') return { status: false, error: 'Unsupported DNS credential provider', error_code: 400 };
+        const keyValue = String(body.api_key ?? '');
+        const secretValue = String(body.api_secret ?? '');
+        const verificationFails = !keyValue || !secretValue
+            || keyValue.toLowerCase().includes('invalid') || secretValue.toLowerCase().includes('invalid')
+            || keyValue.toLowerCase().includes('reject') || secretValue.toLowerCase().includes('reject');
+        const existingId = body.credential == null ? null : Number(body.credential);
+        const existing = existingId == null ? null : db.dnsCredentials.find((row) => row.id === existingId);
+        if (existingId != null && !existing) return { status: false, error: 'DnsCredential not found', error_code: 404 };
+        if (existing && !dnsMemberCan(caller, existing.group, true)) return permissionDenied();
+        if (verificationFails) {
+            if (existing) {
+                existing.verified = false;
+                existing.last_error = 'Provider verification failed';
+                existing.modified = Math.floor(Date.now() / 1000);
+            }
+            return { status: false, error: 'The provider rejected those credentials', error_code: 400 };
+        }
+        const mask = (value: string) => value.length <= 4 ? '*'.repeat(value.length) : `${'*'.repeat(Math.max(4, value.length - 4))}${value.slice(-4)}`;
+        const now = Math.floor(Date.now() / 1000);
+        const row = existing ?? {
+            id: Math.max(8100, ...db.dnsCredentials.map((candidate) => candidate.id)) + 1,
+            created: now, modified: now, group: groupId, name: '', provider: 'godaddy',
+            is_active: true, verified: false, verified_at: null,
+            domain_count: 0, last_error: null, api_key_masked: '', api_secret_masked: '',
+        } satisfies MockDnsCredential;
+        row.name = String(body.name ?? (row.name || `${group.name} GoDaddy`));
+        row.api_key_masked = mask(keyValue);
+        row.api_secret_masked = mask(secretValue);
+        row.verified = true;
+        row.verified_at = now;
+        row.domain_count = Math.max(row.domain_count, 3);
+        row.last_error = null;
+        row.modified = now;
+        if (!existing) db.dnsCredentials.unshift(row);
+        return { status: true, data: serializeDnsCredential(row), graph: 'default' };
+    }
+
+    const credentialMatch = path.match(/^\/api\/dnsman\/credential(?:\/(\d+))?$/);
+    if (credentialMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const id = credentialMatch[1] ? Number(credentialMatch[1]) : null;
+        if (id != null) {
+            const row = db.dnsCredentials.find((candidate) => candidate.id === id);
+            if (!row) return { status: false, error: 'DnsCredential not found', error_code: 404 };
+            if (!dnsMemberCan(caller, row.group, method !== 'GET')) return permissionDenied();
+            if (method === 'DELETE') {
+                db.dnsCredentials = db.dnsCredentials.filter((candidate) => candidate.id !== row.id);
+                for (const domain of db.dnsDomains) if (domain.credential === row.id) domain.credential = null;
+                return { status: 'deleted' };
+            }
+            if (method === 'POST' && opts.body) {
+                if ('name' in opts.body) row.name = String(opts.body.name ?? '');
+                if ('is_active' in opts.body) row.is_active = Boolean(opts.body.is_active);
+                row.modified = Math.floor(Date.now() / 1000);
+            }
+            return { status: true, data: serializeDnsCredential(row), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts, method !== 'GET')) return permissionDenied();
+        if (method !== 'GET') return { status: false, error: 'Credential creation requires credential/link', error_code: 403 };
+        if (opts.params?.download_format || opts.params?.filename) return { status: false, error: 'Credential export is not available', error_code: 400 };
+        const groupId = requestGroupId(opts);
+        const rows = groupId > 0 ? db.dnsCredentials.filter((row) => row.group === groupId) : db.dnsCredentials;
+        const result = listRows(rows as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.name} ${row.provider}`, 'name');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockDnsCredential[]).map(serializeDnsCredential) };
+    }
+
+    const domainMatch = path.match(/^\/api\/dnsman\/domain(?:\/(\d+))?$/);
+    if (domainMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const id = domainMatch[1] ? Number(domainMatch[1]) : null;
+        if (id != null) {
+            const row = db.dnsDomains.find((candidate) => candidate.id === id);
+            if (!row) return { status: false, error: 'Domain not found', error_code: 404 };
+            if (row.group == null ? !caller.is_superuser : !dnsMemberCan(caller, row.group, method !== 'GET')) return permissionDenied();
+            if (method === 'DELETE') {
+                db.dnsDomains = db.dnsDomains.filter((candidate) => candidate.id !== row.id);
+                db.dnsRecords.delete(row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST' && opts.body) {
+                if ('auto_renew' in opts.body) row.auto_renew = Boolean(opts.body.auto_renew);
+                if ('privacy' in opts.body) row.privacy = Boolean(opts.body.privacy);
+                if ('credential' in opts.body) row.credential = opts.body.credential == null ? null : Number(opts.body.credential);
+                row.modified = Math.floor(Date.now() / 1000);
+            }
+            return { status: true, data: serializeDnsDomain(row), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts, method !== 'GET')) return permissionDenied();
+        if (method !== 'GET') return { status: false, error: 'Domain creation is not allowed', error_code: 403 };
+        if (opts.params?.download_format || opts.params?.filename) return { status: false, error: 'Domain export is not available', error_code: 400 };
+        const groupId = requestGroupId(opts);
+        const rows = groupId > 0 ? db.dnsDomains.filter((row) => row.group === groupId) : db.dnsDomains;
+        const graph = String(opts.params?.graph ?? 'list');
+        const result = listRows(rows as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.name} ${row.provider} ${row.status}`, 'name');
+        return { ...result, graph, data: (result.data as unknown as MockDnsDomain[]).map((row) => serializeDnsDomain(row, graph)) };
+    }
+
+    const purchaseMatch = path.match(/^\/api\/dnsman\/purchase(?:\/(\d+))?$/);
+    if (purchaseMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const id = purchaseMatch[1] ? Number(purchaseMatch[1]) : null;
+        if (method !== 'GET') return { status: false, error: 'DomainPurchase is read-only', error_code: 403 };
+        if (id != null) {
+            const row = db.domainPurchases.find((candidate) => candidate.id === id);
+            if (!row) return { status: false, error: 'DomainPurchase not found', error_code: 404 };
+            if (!dnsMemberCan(caller, row.group, false)) return permissionDenied();
+            return { status: true, data: serializeDomainPurchase(row), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        if (opts.params?.download_format || opts.params?.filename) return { status: false, error: 'Purchase export is not available', error_code: 400 };
+        const groupId = requestGroupId(opts);
+        const rows = groupId > 0 ? db.domainPurchases.filter((row) => row.group === groupId) : db.domainPurchases;
+        const result = listRows(rows as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.domain_name} ${row.status}`, '-created');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockDomainPurchase[]).map(serializeDomainPurchase) };
+    }
+
+    const certificateMatch = path.match(/^\/api\/dnsman\/certificate(?:\/(\d+))?$/);
+    if (certificateMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (method !== 'GET') return { status: false, error: 'Certificate writes use explicit actions', error_code: 403 };
+        const id = certificateMatch[1] ? Number(certificateMatch[1]) : null;
+        if (id != null) {
+            const row = db.dnsCertificates.find((candidate) => candidate.id === id);
+            if (!row) return { status: false, error: 'Certificate not found', error_code: 404 };
+            const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+            if (!domain || (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, false))) return permissionDenied();
+            return { status: true, data: serializeDnsCertificate(row), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        if (opts.params?.download_format || opts.params?.filename) return { status: false, error: 'Certificate export is not available', error_code: 400 };
+        const groupId = requestGroupId(opts);
+        const rows = groupId > 0 ? db.dnsCertificates.filter((row) => db.dnsDomains.find((domain) => domain.id === row.domain)?.group === groupId) : db.dnsCertificates;
+        const result = listRows(rows as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.common_name} ${row.status}`, '-created');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockDnsCertificate[]).map(serializeDnsCertificate) };
+    }
+
+    if (path === '/api/dnsman/dns' || path === '/api/dnsman/dns/delete') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const bodyOrParams = method === 'GET' ? opts.params ?? {} : opts.body ?? {};
+        const domain = db.dnsDomains.find((candidate) => candidate.id === Number(bodyOrParams.domain));
+        if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
+        if (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, method !== 'GET')) return permissionDenied();
+        const records = db.dnsRecords.get(domain.id) ?? [];
+        if (method === 'GET') return { status: true, data: { domain: domain.name, provider: domain.provider, records: records.map((record) => ({ ...record, record_values: [...record.record_values] })) } };
+        const type = String(bodyOrParams.type ?? '').toUpperCase();
+        const name = String(bodyOrParams.name ?? '').toLowerCase().replace(/\.+$/, '');
+        if (!type || !name) return missingParams('type', 'name');
+        const index = records.findIndex((record) => record.type === type && record.name.toLowerCase().replace(/\.+$/, '') === name);
+        if (path.endsWith('/delete')) {
+            const selected = Array.isArray(bodyOrParams.record_values) ? bodyOrParams.record_values.map(String) : null;
+            if (index >= 0 && selected) {
+                records[index]!.record_values = records[index]!.record_values.filter((value) => !selected.includes(value));
+                if (records[index]!.record_values.length === 0) records.splice(index, 1);
+            } else if (index >= 0) records.splice(index, 1);
+        } else {
+            const values = Array.isArray(bodyOrParams.record_values) ? bodyOrParams.record_values.map(String) : [String(bodyOrParams.record_values ?? '')];
+            if (values.some((value) => !value)) return { status: false, error: 'record_values is required', error_code: 400 };
+            const next = { type, name, record_values: values, ttl: Number(bodyOrParams.ttl ?? 300) };
+            if (index >= 0) records[index] = next;
+            else records.push(next);
+        }
+        db.dnsRecords.set(domain.id, records);
+        return { status: true, data: { status: true, change_id: `mock-change-${Date.now()}`, provider: domain.provider } };
+    }
+
+    if (path === '/api/dnsman/certificate/request' || path === '/api/dnsman/certificate/revoke') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const body = opts.body ?? {};
+        if (path.endsWith('/request')) {
+            const domain = db.dnsDomains.find((candidate) => candidate.id === Number(body.domain));
+            if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
+            if (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, true)) return permissionDenied();
+            const now = Math.floor(Date.now() / 1000);
+            const row: MockDnsCertificate = {
+                id: Math.max(8400, ...db.dnsCertificates.map((candidate) => candidate.id)) + 1,
+                created: now, modified: now, domain: domain.id, common_name: domain.name,
+                sans: Array.isArray(body.names) ? body.names.map(String) : [domain.name, `*.${domain.name}`],
+                status: 'pending', issuer: null, serial: null, not_before: null,
+                not_after: null, renew_after: null, last_error: null, attempts: 0,
+            };
+            db.dnsCertificates.unshift(row);
+            return { status: true, data: serializeDnsCertificate(row) };
+        }
+        const row = db.dnsCertificates.find((candidate) => candidate.id === Number(body.certificate));
+        if (!row) return { status: false, error: 'Certificate not found', error_code: 404 };
+        const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+        if (!domain || (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, true))) return permissionDenied();
+        row.status = 'revoked'; row.modified = Math.floor(Date.now() / 1000);
+        return { status: true, data: serializeDnsCertificate(row) };
+    }
+
+    if (path.startsWith('/api/dnsman/registrar/')) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const action = path.slice('/api/dnsman/registrar/'.length);
+        const body = opts.body ?? {};
+        const houseAction = ['discover', 'adopt', 'assign-group'].includes(action);
+        if (houseAction && !caller.is_superuser) return permissionDenied();
+        if (!houseAction) {
+            const groupId = Number(body.group ?? opts.params?.group ?? 0);
+            if (groupId > 0 ? !dnsMemberCan(caller, groupId, action !== 'search' && action !== 'suggest')
+                : !hasGlobalPermission(caller, action === 'search' || action === 'suggest' ? DNS_VIEW_GRANTS : DNS_MANAGE_GRANTS)) return permissionDenied();
+        }
+        const resultRow = (name: string) => {
+            const normalized = name.trim().toLowerCase().replace(/\.+$/, '');
+            const tld = normalized.includes('.') ? normalized.split('.').pop()! : null;
+            const available = normalized.includes('taken') ? false : normalized.includes('unknown') ? null : true;
+            return { name: normalized, available, status: available === true ? 'AVAILABLE' : available === false ? 'UNAVAILABLE' : null, price: available === true ? '12.00' : null, currency: available === true ? 'USD' : null, tld, tld_supported: tld != null, privacy_supported: tld != null, reason: available === false ? 'This domain is already registered.' : available === null ? 'The registry did not answer for this name yet — try the search again in a moment.' : null };
+        };
+        if (action === 'search') {
+            if (Array.isArray(body.domains)) return { status: true, data: { results: body.domains.map((name) => resultRow(String(name))) } };
+            if (Array.isArray(body.tlds)) {
+                const base = String(body.domain ?? '').split('.')[0];
+                return { status: true, data: { results: body.tlds.map((tld) => resultRow(`${base}.${String(tld).replace(/^\./, '')}`)) } };
+            }
+            return { status: true, data: resultRow(String(body.domain ?? '')) };
+        }
+        if (action === 'suggest') {
+            const base = String(body.domain ?? '').split('.')[0] || 'example';
+            const count = Math.max(1, Math.min(Number(body.count ?? 10), 50));
+            return { status: true, data: { results: Array.from({ length: count }, (_, index) => resultRow(`${base}${index + 1}.com`)) } };
+        }
+        if (action === 'quote') {
+            const groupId = Number(body.group);
+            const group = db.groups.find((candidate) => candidate.id === groupId && candidate.is_active);
+            if (!group || !body.domain) return missingParams('group', 'domain');
+            const now = Math.floor(Date.now() / 1000);
+            const id = Math.max(8300, ...db.domainPurchases.map((candidate) => candidate.id)) + 1;
+            const purchase: MockDomainPurchase = { id, created: now, modified: now, group: groupId, user: caller.id, domain_name: String(body.domain).toLowerCase(), kind: 'register', status: 'quoted', price: '12.00', cost: '12.00', currency: 'USD', years: Number(body.years ?? 1), quote_expires: now + 900, operation_id: null, error: null, metadata: {} };
+            db.domainPurchases.unshift(purchase);
+            return { status: true, data: { purchase: id, name: purchase.domain_name, price: purchase.price, currency: purchase.currency, years: purchase.years, token: `mock-confirm-${id}`, expires: purchase.quote_expires, privacy_supported: true } };
+        }
+        if (action === 'purchase') {
+            const purchase = db.domainPurchases.find((candidate) => candidate.id === Number(body.purchase));
+            if (!purchase || String(body.confirm_token ?? '') !== `mock-confirm-${purchase?.id}` || purchase.status !== 'quoted') return { status: false, error: 'Invalid or expired confirmation token', error_code: 400 };
+            purchase.status = 'completed'; purchase.operation_id = `op-mock-${purchase.id}`; purchase.modified = Math.floor(Date.now() / 1000);
+            const now = purchase.modified;
+            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: purchase.group, user: caller.id, name: purchase.domain_name, provider: 'route53', credential: null, status: 'active', hosted_zone_id: `ZMOCK${purchase.id}`, auto_renew: true, privacy: true, verified: true, registered_on: now, expires: now + purchase.years * 365 * 86400, last_error: null, metadata: {} };
+            db.dnsDomains.push(domain); db.dnsRecords.set(domain.id, []);
+            return { status: true, data: serializeDnsDomain(domain) };
+        }
+        if (action === 'register-existing') {
+            const credential = db.dnsCredentials.find((candidate) => candidate.id === Number(body.credential));
+            if (!credential || !credential.is_active || !credential.verified || credential.group !== Number(body.group)) return { status: false, error: 'A verified credential is required', error_code: 400 };
+            const now = Math.floor(Date.now() / 1000);
+            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: credential.group, user: caller.id, name: String(body.domain).toLowerCase(), provider: credential.provider, credential: credential.id, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} };
+            db.dnsDomains.push(domain); db.dnsRecords.set(domain.id, []);
+            return { status: true, data: serializeDnsDomain(domain) };
+        }
+        if (action === 'discover') {
+            const untrackedValue = opts.params?.untracked ?? false;
+            const untrackedOnly = typeof untrackedValue === 'string'
+                ? ['1', 'true', 'yes'].includes(untrackedValue.toLowerCase())
+                : Boolean(untrackedValue);
+            const domains = [
+                ...db.dnsDomains.filter((domain) => domain.provider === 'route53').map((domain) => ({
+                    name: domain.name, registered: domain.registered_on != null,
+                    hosted_zone: domain.hosted_zone_id != null, hosted_zone_id: domain.hosted_zone_id,
+                    record_count: (db.dnsRecords.get(domain.id) ?? []).length,
+                    expires: domain.expires, auto_renew: domain.auto_renew,
+                    tracked: true, domain: domain.id, adoptable: false,
+                    reason: 'already tracked by this system',
+                })),
+                ...(!db.dnsDomains.some((domain) => domain.name === 'untracked-house.example') ? [{
+                    name: 'untracked-house.example', registered: false, hosted_zone: true,
+                    hosted_zone_id: 'ZUNTRACKEDHOUSE', record_count: 3,
+                    expires: null, auto_renew: null, tracked: false, domain: null,
+                    adoptable: true, reason: null,
+                }] : []),
+            ].filter((row) => !untrackedOnly || !row.tracked)
+                .sort((left, right) => left.name.localeCompare(right.name));
+            return { status: true, data: { count: domains.length, truncated: false, domains } };
+        }
+        if (action === 'adopt') {
+            const now = Math.floor(Date.now() / 1000);
+            const groupId = body.group == null ? null : Number(body.group);
+            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: groupId, user: caller.id, name: String(body.domain).toLowerCase(), provider: 'route53', credential: null, status: 'active', hosted_zone_id: `ZADOPT${now}`, auto_renew: false, privacy: true, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} };
+            db.dnsDomains.push(domain); db.dnsRecords.set(domain.id, []);
+            return { status: true, data: serializeDnsDomain(domain) };
+        }
+        if (action === 'assign-group') {
+            const domain = db.dnsDomains.find((candidate) => candidate.id === Number(body.domain));
+            const group = db.groups.find((candidate) => candidate.id === Number(body.group) && candidate.is_active);
+            if (!domain || !group || domain.group != null) return { status: false, error: 'Domain cannot be assigned', error_code: 400 };
+            domain.group = group.id; domain.modified = Math.floor(Date.now() / 1000);
+            return { status: true, data: serializeDnsDomain(domain) };
+        }
+    }
+
+    if (path === '/api/dnsman/registrant') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const groupId = requestGroupId(opts);
+        if (groupId === 0 ? !caller.is_superuser : !dnsMemberCan(caller, groupId, true)) return permissionDenied();
+        const contact = method === 'POST' && opts.body?.contact && typeof opts.body.contact === 'object'
+            ? { ...opts.body.contact } : null;
+        return { status: true, data: { scope: groupId > 0 ? 'group' : 'global', group: groupId || null, contact: opts.body?.clear ? null : contact, source: contact ? 'database' : 'none', inherited: groupId > 0 && !contact, effective_configured: groupId === 0 || groupId % 2 === 1 || Boolean(contact), problems: [] } };
+    }
+
+    if (path === '/api/dnsman/whois' || path === '/api/dnsman/whois/privacy') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const input = method === 'GET' ? opts.params ?? {} : opts.body ?? {};
+        const domain = db.dnsDomains.find((candidate) => candidate.id === Number(input.domain));
+        if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
+        if (domain.provider !== 'route53') return { status: false, error: 'Registrar operations are not available for this provider', error_code: 400 };
+        if (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, true)) return permissionDenied();
+        if (path.endsWith('/privacy')) {
+            domain.privacy = Boolean(input.enabled); domain.modified = Math.floor(Date.now() / 1000);
+            return { status: true, data: { name: domain.name, privacy: domain.privacy, operation_id: `op-privacy-${domain.id}` } };
+        }
+        if (method === 'POST') return { status: true, data: { name: domain.name, operation_id: `op-contact-${domain.id}` } };
+        const transientContact = { ContactType: 'COMPANY', FirstName: 'Example', LastName: 'Operator', OrganizationName: 'Example Operations', AddressLine1: '100 Example Way', City: 'Example City', State: 'CA', CountryCode: 'US', ZipCode: '90000', PhoneNumber: '+1.5555550100', Email: 'dns-contact@example.invalid' };
+        return { status: true, data: { name: domain.name, registrant: transientContact, admin: transientContact, tech: transientContact, privacy: domain.privacy, admin_privacy: domain.privacy, registrant_privacy: domain.privacy, tech_privacy: domain.privacy, auto_renew: domain.auto_renew, nameservers: ['ns-1.example.invalid', 'ns-2.example.invalid'], registrar: 'Amazon Registrar, Inc.', registered_on: domain.registered_on, expires: domain.expires, status_list: ['ok'], privacy_supported: true } };
+    }
+    // ══ end DNSMan wire ═══════════════════════════════════════════════
     // ── Settings — plaintext stays private; secrets serialize masked ─────
     const oneSetting = path.match(/^\/api\/settings\/(\d+)$/);
     if (oneSetting || path === '/api/settings') {
