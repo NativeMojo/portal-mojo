@@ -4,7 +4,7 @@ import { CollectionSelect, modal } from '../../ui';
 import { useCan } from '../../client';
 import {
     GROUP_DIRECTORY_PERMS, USER_DIRECTORY_PERMS, SUPPORTED_FILE_MANAGER_BACKENDS,
-    saveFileManagerAtomic, type FileManagerRow, type RelationRow, relationId,
+    saveFileManagerAtomic, storageRefreshFailure, type FileManagerRow, type RelationRow, relationId,
 } from './models';
 
 type ManagerEditorMode = 'create' | 'general' | 'credentials' | 'owner';
@@ -52,7 +52,10 @@ function ManagerEditor({ row, mode, close }: { row: FileManagerRow | null; mode:
             const saved = await saveFileManagerAtomic({ queryClient, id: row?.id ?? null, changes, ...(ownerMode ? { expectedOwner: { group, user } } : {}) });
             close(saved);
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : 'Backend save failed');
+            const primary = cause instanceof Error ? cause.message : 'Backend save failed';
+            setError(storageRefreshFailure(cause) === undefined
+                ? primary
+                : `${primary} Authoritative refresh also failed; refresh before another action.`);
         } finally { inFlight.current = false; setBusy(false); }
     };
 

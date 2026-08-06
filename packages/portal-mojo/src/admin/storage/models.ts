@@ -97,6 +97,7 @@ export interface S3FailureEvidence {
     remaining?: Record<string, number | null> | null;
     failure?: { operation?: string; provider_code?: string; retryable?: boolean };
     requested_public?: boolean;
+    created_new?: boolean | null;
     is_public?: boolean | null;
     configured_public?: boolean | null;
     safety_lock?: 'applied' | 'failed' | 'not_needed';
@@ -244,16 +245,65 @@ export async function saveFileManagerAtomic(args: {
     expectedOwner?: { group: number | null; user: number | null };
 }): Promise<FileManagerRow> {
     const changes = scrubFileManagerChanges(args.changes);
-    const saved = sanitizeFileManagerRow(await withFreshAuth(() => mojoSave<FileManagerRow>(FileManagerModel.endpoint, args.id, changes)));
-    await FileManagerModel.invalidate(args.queryClient);
-    const id = saved.id;
-    args.queryClient.removeQueries({ queryKey: FileManagerModel.keys.one(id), exact: true });
-    const authoritative = sanitizeFileManagerRow(await mojoGet<FileManagerRow>(FileManagerModel.endpoint, id));
-    args.queryClient.setQueryData(FileManagerModel.keys.one(id), authoritative);
+    let saved: FileManagerRow | null = null;
+    let authoritative: FileManagerRow | null = null;
+    let mutationError: unknown;
+    let refreshError: unknown;
+    try {
+        saved = sanitizeFileManagerRow(await withFreshAuth(() => mojoSave<FileManagerRow>(FileManagerModel.endpoint, args.id, changes)));
+    } catch (error) {
+        mutationError = error;
+    } finally {
+        const knownId = saved?.id ?? args.id;
+        const retainRefreshError = (error: unknown) => { refreshError ??= error; };
+        try {
+            await args.queryClient.invalidateQueries({ queryKey: FileManagerModel.keys.root, refetchType: 'none' });
+        } catch (error) { retainRefreshError(error); }
+        if (knownId != null) {
+            // A failed mutation can still have changed external state. Never let the
+            // pre-mutation detail snapshot regain authority while reconciliation fails.
+            args.queryClient.removeQueries({ queryKey: FileManagerModel.keys.one(knownId), exact: true });
+            try {
+                authoritative = sanitizeFileManagerRow(await mojoGet<FileManagerRow>(FileManagerModel.endpoint, knownId));
+                args.queryClient.setQueryData(FileManagerModel.keys.one(knownId), authoritative);
+            } catch (error) { retainRefreshError(error); }
+        }
+        try {
+            await args.queryClient.refetchQueries({
+                type: 'active',
+                predicate: (query) => query.queryKey[0] === FileManagerModel.endpoint && query.queryKey[1] !== 'one',
+            }, { throwOnError: true });
+        } catch (error) { retainRefreshError(error); }
+    }
+    if (mutationError !== undefined) {
+        if (refreshError !== undefined) attachStorageRefreshFailure(mutationError, refreshError);
+        throw mutationError;
+    }
+    if (refreshError !== undefined || !authoritative) {
+        const error = new MojoError('The backend may have changed, but authoritative refresh failed. Refresh before another action.', 0, 'storage_refresh_failed');
+        attachStorageRefreshFailure(error, refreshError ?? new Error('Authoritative backend row was not returned'));
+        throw error;
+    }
     if (args.expectedOwner && (relationId(authoritative.group) !== args.expectedOwner.group || relationId(authoritative.user) !== args.expectedOwner.user)) {
         throw new MojoError('The backend did not attach the requested owner. Check your directory permissions and try again.', 403, 'fk_attach_denied');
     }
     return authoritative;
+}
+
+const STORAGE_REFRESH_FAILURE = 'storageRefreshError';
+const storageRefreshFailures = new WeakMap<object, unknown>();
+
+function attachStorageRefreshFailure(error: unknown, refreshError: unknown): void {
+    if ((typeof error !== 'object' && typeof error !== 'function') || error === null) return;
+    storageRefreshFailures.set(error as object, refreshError);
+    try {
+        Object.defineProperty(error, STORAGE_REFRESH_FAILURE, { value: refreshError, configurable: true });
+    } catch { /* Preserve the primary mutation failure even when it is frozen. */ }
+}
+
+export function storageRefreshFailure(error: unknown): unknown {
+    if ((typeof error !== 'object' && typeof error !== 'function') || error === null) return undefined;
+    return storageRefreshFailures.get(error as object) ?? (error as Record<string, unknown>)[STORAGE_REFRESH_FAILURE];
 }
 
 export async function runFileManagerAction(id: number, action: 'test_connection' | 'check_cors' | 'fix_cors' | 'clone', value: unknown = true): Promise<Record<string, unknown>> {
@@ -358,6 +408,15 @@ function finite(value: unknown, name: string): number {
     return value;
 }
 
+function safeAggregate(value: unknown): Record<string, number | null> | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const aggregate: Record<string, number | null> = {};
+    for (const [key, count] of Object.entries(value)) {
+        if (count === null || (typeof count === 'number' && Number.isFinite(count) && count >= 0)) aggregate[key] = count;
+    }
+    return aggregate;
+}
+
 export function parseBucketList(body: Envelope): S3BucketRow[] {
     if (!Array.isArray(body.data)) throw new Error('Bucket inventory returned an invalid list');
     return body.data.map((value) => {
@@ -395,11 +454,19 @@ export function parseS3Failure(error: unknown): S3FailureEvidence | null {
         name: typeof raw.name === 'string' ? raw.name : undefined,
         action: typeof raw.action === 'string' ? raw.action : undefined,
         complete: false, mutation_state: state,
-        counts: raw.counts && typeof raw.counts === 'object' ? raw.counts as Record<string, number | null> : undefined,
-        failed: raw.failed && typeof raw.failed === 'object' ? raw.failed as Record<string, number | null> : undefined,
-        remaining: raw.remaining === null ? null : raw.remaining && typeof raw.remaining === 'object' ? raw.remaining as Record<string, number | null> : undefined,
-        failure: raw.failure && typeof raw.failure === 'object' ? raw.failure as S3FailureEvidence['failure'] : undefined,
+        counts: safeAggregate(raw.counts),
+        failed: safeAggregate(raw.failed),
+        remaining: raw.remaining === null ? null : safeAggregate(raw.remaining),
+        failure: raw.failure && typeof raw.failure === 'object' && !Array.isArray(raw.failure) ? (() => {
+            const failure = raw.failure as Record<string, unknown>;
+            return {
+                ...(typeof failure.operation === 'string' ? { operation: failure.operation } : {}),
+                ...(typeof failure.provider_code === 'string' ? { provider_code: failure.provider_code } : {}),
+                ...(typeof failure.retryable === 'boolean' ? { retryable: failure.retryable } : {}),
+            };
+        })() : undefined,
         requested_public: typeof raw.requested_public === 'boolean' ? raw.requested_public : undefined,
+        created_new: raw.created_new === null || typeof raw.created_new === 'boolean' ? raw.created_new : undefined,
         is_public: raw.is_public === null || typeof raw.is_public === 'boolean' ? raw.is_public : undefined,
         configured_public: raw.configured_public === null || typeof raw.configured_public === 'boolean' ? raw.configured_public : undefined,
         safety_lock: ['applied', 'failed', 'not_needed'].includes(String(raw.safety_lock)) ? raw.safety_lock as S3FailureEvidence['safety_lock'] : undefined,

@@ -45,12 +45,19 @@ try {
     assert.equal(me.hasPermission({ id: 1, permissions: {} }, section.permissions, { permissions: { files: true, manage_aws: true } }), false);
 
     // Shared error boundary preserves numeric status + semantic code + safe evidence.
-    const safeEvidence = { complete: false, mutation_state: 'partial', counts: { deleted_objects: 2 } };
+    const safeEvidence = { complete: false, mutation_state: 'partial', counts: { deleted_objects: 2 }, failed: { versions: 1 }, remaining: null, failure: { operation: 'create', provider_code: 'AccessDenied', retryable: false }, requested_public: false, configured_public: null, created_new: true };
     const mojoError = new errors.MojoError('incomplete', 409, 's3_operation_incomplete', safeEvidence);
     assert.equal(mojoError.status, 409);
     assert.equal(mojoError.errorCode, 's3_operation_incomplete');
     assert.deepEqual(mojoError.data, safeEvidence);
-    assert.deepEqual(models.parseS3Failure(mojoError).counts, { deleted_objects: 2 });
+    const parsedEvidence = models.parseS3Failure(mojoError);
+    assert.deepEqual(parsedEvidence.counts, { deleted_objects: 2 });
+    assert.deepEqual(parsedEvidence.failed, { versions: 1 });
+    assert.equal(parsedEvidence.remaining, null);
+    assert.deepEqual(parsedEvidence.failure, safeEvidence.failure);
+    assert.equal(parsedEvidence.requested_public, false);
+    assert.equal(parsedEvidence.configured_public, null);
+    assert.equal(parsedEvidence.created_new, true);
 
     // Strict bucket parsers distinguish true empty, success, and malformed data.
     assert.deepEqual(models.parseBucketList({ status: true, data: [] }), []);
@@ -83,12 +90,15 @@ try {
     assert.deepEqual(renditions.normalizeRenditionRoles([' a ', 'a', '', 'b']), ['a', 'b']);
     assert.equal(renditions.normalizeRenditionRoles(Array.from({ length: 25 }, (_, index) => `r${index}`)).length, 20);
     const beforeFile = { upload_status: 'completed', renditions: { thumbnail: baseRendition } };
-    const before = renditions.renditionMapSignature(beforeFile);
-    assert.deepEqual(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 2, open: true, attempt: 1, beforeSignature: before, file: beforeFile }), { done: true, reason: 'file-changed' });
-    assert.equal(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 1, open: true, attempt: 12, beforeSignature: before, file: beforeFile }).reason, 'timeout');
-    assert.equal(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 1, open: true, attempt: 1, beforeSignature: before, file: { upload_status: 'failed', renditions: {} } }).reason, 'failed');
+    const before = renditions.renditionTargetSignature(beforeFile, ['thumbnail']);
+    assert.deepEqual(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 2, open: true, attempt: 1, beforeSignature: before, targetRoles: ['thumbnail'], file: beforeFile }), { done: true, reason: 'file-changed' });
+    assert.equal(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 1, open: true, attempt: 12, beforeSignature: before, targetRoles: ['thumbnail'], file: beforeFile }).reason, 'timeout');
+    assert.equal(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 1, open: true, attempt: 1, beforeSignature: before, targetRoles: ['thumbnail'], file: { upload_status: 'failed', renditions: {} } }).reason, 'failed');
+    const unrelatedChange = { upload_status: 'completed', renditions: { thumbnail: baseRendition, preview: { ...baseRendition, id: 2, role: 'preview', modified: 99 } } };
+    assert.equal(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 1, open: true, attempt: 1, beforeSignature: before, targetRoles: ['thumbnail'], file: unrelatedChange }).done, false);
+    assert.equal(renditions.decideRenditionPoll({ expectedFileId: 1, currentFileId: 1, open: true, attempt: 1, beforeSignature: before, targetRoles: ['thumbnail'], file: { upload_status: 'completed', renditions: { thumbnail: { ...baseRendition, modified: 2 } } } }).reason, 'changed');
     let fetches = 0;
-    const converged = await renditions.pollRenditionConvergence({ fileId: 1, beforeSignature: before, isCurrent: () => true, wait: async () => {}, fetch: async () => ({ id: 1, upload_status: 'completed', renditions: { thumbnail: { ...baseRendition, modified: ++fetches + 1 } } }) });
+    const converged = await renditions.pollRenditionConvergence({ fileId: 1, beforeSignature: before, targetRoles: ['thumbnail'], isCurrent: () => true, wait: async () => {}, fetch: async () => ({ id: 1, upload_status: 'completed', renditions: { thumbnail: { ...baseRendition, modified: ++fetches + 1 } } }) });
     assert.equal(converged, 'changed');
     assert(fetches <= 12);
 
@@ -100,6 +110,7 @@ try {
     const manager = await login('storage.manager@nativemojo.com');
     const bucketManager = await login('bucket.manager@nativemojo.com');
     const member = await login('storage.member@nativemojo.com');
+    const superuser = await login('dns.platform@nativemojo.com');
     assert.equal((await mock.mockFetch('/api/fileman/file', { headers: viewer })).status, true);
     assert.equal((await mock.mockFetch('/api/fileman/file/5101', { method: 'POST', headers: viewer, body: { is_public: true } })).error_code, 403);
     assert.equal((await mock.mockFetch('/api/aws/s3/bucket', { headers: manager })).error_code, 403);
@@ -127,7 +138,21 @@ try {
     const partial = await mock.mockFetch('/api/aws/s3/bucket/mojo-partial-demo', { method: 'POST', headers: bucketManager, body: { empty: { confirm_name: 'mojo-partial-demo' } } });
     assert.equal(partial.error_code, 's3_operation_incomplete');
     assert.equal(partial.data.mutation_state, 'partial');
+    const incompleteCreate = await mock.mockFetch('/api/aws/s3/bucket/mojo-create-incomplete-demo', { method: 'POST', headers: bucketManager, body: {} });
+    assert.equal(incompleteCreate.error_code, 's3_operation_incomplete');
+    assert.equal(incompleteCreate.data.created_new, true);
+    assert.equal(incompleteCreate.data.requested_public, false);
+    assert.equal(incompleteCreate.data.configured_public, null);
 
+    const managerCountBeforeDeniedCreate = (await mock.mockFetch('/api/fileman/manager', { headers: manager })).count;
+    const deniedSystemCreate = await mock.mockFetch('/api/fileman/manager', { method: 'POST', headers: manager, body: { name: 'Unauthorized system backend', backend_type: 'file', backend_url: '/tmp/nope' } });
+    assert.equal(deniedSystemCreate.error_code, 403);
+    assert.equal((await mock.mockFetch('/api/fileman/manager', { headers: manager })).count, managerCountBeforeDeniedCreate);
+    const scopedCreate = await mock.mockFetch('/api/fileman/manager', { method: 'POST', headers: manager, body: { name: 'Scoped backend', backend_type: 'file', backend_url: '/srv/scoped', group: 1 } });
+    assert.equal(scopedCreate.data.group.id, 1);
+    const systemCreate = await mock.mockFetch('/api/fileman/manager', { method: 'POST', headers: superuser, body: { name: 'System backend', backend_type: 'file', backend_url: '/srv/system' } });
+    assert.equal(systemCreate.data.group, null);
+    assert.equal(systemCreate.data.user, null);
     const credentialWrite = await mock.mockFetch('/api/fileman/manager/4101', { method: 'POST', headers: manager, body: { aws_key: canary, aws_secret: canary } });
     assert.equal(credentialWrite.status, true);
     assert(!JSON.stringify(credentialWrite).includes(canary));
@@ -139,8 +164,21 @@ try {
     const visibleShares = await mock.mockFetch('/api/shortlink/link', { headers: manager, params: { graph: 'default', source: 'fileman-share', file: 5101 } });
     assert.equal(visibleShares.count, 1);
     assert.equal((await mock.mockFetch(`/api/shortlink/link/${visibleShares.data[0].id}`, { method: 'POST', headers: manager, body: { is_active: false } })).data.is_active, false);
+    const initialPending = await mock.mockFetch('/api/fileman/file/5106', { headers: manager });
+    assert.deepEqual(initialPending.data.renditions, {});
+    const initialArrived = await mock.mockFetch('/api/fileman/file/5106', { headers: manager });
+    assert.deepEqual(Object.keys(initialArrived.data.renditions).sort(), ['preview', 'thumbnail']);
+    const previewModified = initialArrived.data.renditions.preview.modified;
     const regenerated = await mock.mockFetch('/api/fileman/file/5106', { method: 'POST', headers: manager, body: { regenerate_renditions: ['preview', 'preview'] } });
     assert.deepEqual(regenerated.data.roles, ['preview']);
+    assert.equal((await mock.mockFetch('/api/fileman/file/5106', { headers: manager })).data.renditions.preview.modified, previewModified);
+    assert((await mock.mockFetch('/api/fileman/file/5106', { headers: manager })).data.renditions.preview.modified > previewModified);
+    await mock.mockFetch('/api/fileman/file/5107', { method: 'POST', headers: manager, body: { regenerate_renditions: ['preview'] } });
+    assert.equal((await mock.mockFetch('/api/fileman/file/5107', { headers: manager })).data.upload_status, 'completed');
+    assert.equal((await mock.mockFetch('/api/fileman/file/5107', { headers: manager })).data.upload_status, 'failed');
+    await mock.mockFetch('/api/fileman/file/5108', { method: 'POST', headers: manager, body: { regenerate_renditions: ['preview'] } });
+    await mock.mockFetch('/api/fileman/file/5108', { headers: manager });
+    assert.equal((await mock.mockFetch('/api/fileman/file/5108', { headers: manager })).data.upload_status, 'expired');
 
     // Source-level omissions and the imperative secret/capability boundary.
     const storageSources = stripComments(await Promise.all([
@@ -155,6 +193,22 @@ try {
     assert.match(storageSources, /withFreshAuth\(request\)/);
     assert.match(storageSources, /createFileShare/);
     assert.match(storageSources, /StableMediaPreview/);
+    assert.match(storageSources, /storageRefreshFailure/);
+    assert.match(storageSources, /finally\s*\{/);
+    assert.match(storageSources, /refetchQueries/);
+    assert.match(storageSources, /removeQueries/);
+    assert.match(storageSources, /evidence\.failed/);
+    assert.match(storageSources, /evidence\.remaining/);
+    assert.match(storageSources, /evidence\.failure/);
+    assert.match(storageSources, /evidence\.requested_public/);
+    assert.match(storageSources, /evidence\.configured_public/);
+    const managerDetailSource = await read('packages/portal-mojo/src/admin/storage/FileManagerDetail.tsx');
+    assert.equal((managerDetailSource.match(/useCan\(/g) ?? []).length, 3);
+    assert(!managerDetailSource.includes('|| useCan('));
+    const fileViewSource = await read('packages/portal-mojo/src/admin/storage/FileView.tsx');
+    assert.match(fileViewSource, /pollGeneration/);
+    assert.match(fileViewSource, /regenerationBusyRef/);
+    assert.match(fileViewSource, /disabled=\{pollingDisabled\}/);
     const clientSource = await read('packages/portal-mojo/src/client/client.ts');
     assert.match(clientSource, /errorCode = body\.error_code/);
     assert.match(clientSource, /body\.code \?\? legacyStatus/);

@@ -8,9 +8,18 @@ import {
 
 function message(error: unknown): string { return error instanceof Error ? error.message : 'Storage operation failed'; }
 
-function IncompleteEvidence({ evidence }: { evidence: S3FailureEvidence }) {
-    const entries = Object.entries(evidence.counts ?? {});
-    return <div className="storage-operation-evidence"><b>External operation incomplete: {evidence.mutation_state}</b><p>AWS state may have changed. Stop writers where relevant, correct IAM/provider posture, refresh, and retry.</p>{entries.length > 0 && <dl>{entries.map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{value == null ? 'Unknown' : value.toLocaleString()}</dd></div>)}</dl>}{evidence.safety_lock && <p>Safety lock: <b>{evidence.safety_lock}</b></p>}</div>;
+function AggregateEvidence({ label, values }: { label: string; values: Record<string, number | null> | null | undefined }) {
+    if (values === undefined) return null;
+    if (values === null) return <p><b>{label}:</b> Unknown (no safe final probe)</p>;
+    const entries = Object.entries(values);
+    return entries.length > 0 ? <><h4>{label}</h4><dl>{entries.map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{value == null ? 'Unknown' : value.toLocaleString()}</dd></div>)}</dl></> : null;
+}
+
+function posture(value: boolean | null | undefined): string { return value == null ? 'Unknown' : value ? 'Public' : 'Private'; }
+
+export function IncompleteEvidence({ evidence }: { evidence: S3FailureEvidence }) {
+    const failure = evidence.failure;
+    return <div className="storage-operation-evidence"><b>External operation incomplete: {evidence.mutation_state}</b><p>AWS state may have changed. Stop writers where relevant, correct IAM/provider posture, refresh, and retry.</p><AggregateEvidence label="Acknowledged counts" values={evidence.counts} /><AggregateEvidence label="Failed" values={evidence.failed} /><AggregateEvidence label="Remaining" values={evidence.remaining} />{failure && <dl>{failure.operation !== undefined && <div><dt>Failure operation</dt><dd>{failure.operation}</dd></div>}{failure.provider_code !== undefined && <div><dt>Provider code</dt><dd>{failure.provider_code}</dd></div>}{failure.retryable !== undefined && <div><dt>Retryable</dt><dd>{failure.retryable ? 'Yes' : 'No'}</dd></div>}</dl>}{evidence.requested_public !== undefined && <p>Requested posture: <b>{posture(evidence.requested_public)}</b></p>}{evidence.configured_public !== undefined && <p>Configured posture: <b>{posture(evidence.configured_public)}</b></p>}{evidence.created_new !== undefined && <p>Bucket newly created: <b>{evidence.created_new == null ? 'Unknown' : evidence.created_new ? 'Yes' : 'No'}</b></p>}{evidence.safety_lock && <p>Safety lock: <b>{evidence.safety_lock}</b></p>}</div>;
 }
 
 function Outcome({ value }: { value: BucketMutationOutcome<unknown> | null }) {

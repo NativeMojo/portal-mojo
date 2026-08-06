@@ -16,8 +16,11 @@ function NestedFiles({ managerId }: { managerId: number }) {
 export function FileManagerDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const queryClient = useQueryClient();
     const query = FileManagerModel.useOne(id);
-    const canManage = useCan(STORAGE_MANAGE_PERMS).can;
-    const canChangeOwner = useCan(GROUP_DIRECTORY_PERMS).can || useCan(USER_DIRECTORY_PERMS).can || Boolean(useCan([]).me?.is_superuser);
+    const managerPermission = useCan(STORAGE_MANAGE_PERMS);
+    const groupDirectoryPermission = useCan(GROUP_DIRECTORY_PERMS);
+    const userDirectoryPermission = useCan(USER_DIRECTORY_PERMS);
+    const canManage = managerPermission.can;
+    const canChangeOwner = groupDirectoryPermission.can || userDirectoryPermission.can || Boolean(managerPermission.me?.is_superuser);
     if (query.isLoading) return <div className="empty"><p>Loading storage backend…</p></div>;
     if (!query.data) return <div className="empty"><h2>Storage backend unavailable</h2><p>{query.error instanceof Error ? query.error.message : 'The record was not returned.'}</p><button className="btn" onClick={onClose}>Close</button></div>;
     const row = query.data;

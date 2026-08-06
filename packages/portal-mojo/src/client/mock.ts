@@ -3772,6 +3772,8 @@ interface MockStorageFile {
     content_type: string; category: string; upload_status: string; is_active: boolean; is_public: boolean;
     group: number | null; user: number | null; file_manager: number; metadata: Record<string, unknown>;
     url: string | null;
+    rendition_demo?: 'initial' | 'failed' | 'expired';
+    rendition_reads?: number;
 }
 
 interface MockStorageRendition {
@@ -3811,7 +3813,9 @@ function buildStorageFiles(): MockStorageFile[] {
         { id: 5103, created: now - 5400, modified: now - 2500, filename: 'field-note.mp3', file_size: 4125440, content_type: 'audio/mpeg', category: 'audio', upload_status: 'completed', is_active: true, is_public: false, group: 2, user: 14, file_manager: 4101, metadata: { duration: 31 }, url: '/mock-storage/files/5103' },
         { id: 5104, created: now - 4400, modified: now - 2200, filename: 'quarterly-report.pdf', file_size: 940122, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: true, group: null, user: 14, file_manager: 4102, metadata: { pages: 14 }, url: 'https://files.example.test/report.pdf' },
         { id: 5105, created: now - 1800, modified: now - 900, filename: 'unsafe-link.txt', file_size: 112, content_type: 'text/plain', category: 'text', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: 'javascript:alert(1)' },
-        { id: 5106, created: now - 600, modified: now - 600, filename: 'rendering-slides.pptx', file_size: 802114, content_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', category: 'presentation', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5106' },
+        { id: 5106, created: now - 600, modified: now - 600, filename: 'rendering-slides.pptx', file_size: 802114, content_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', category: 'presentation', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5106', rendition_demo: 'initial' },
+        { id: 5107, created: now - 500, modified: now - 500, filename: 'renderer-failure.pdf', file_size: 402114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5107', rendition_demo: 'failed' },
+        { id: 5108, created: now - 400, modified: now - 400, filename: 'renderer-expired.pdf', file_size: 302114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5108', rendition_demo: 'expired' },
     ];
 }
 
@@ -3886,6 +3890,7 @@ const db = {
     fileManagers: buildFileManagers(),
     storageFiles: buildStorageFiles(),
     fileRenditions: buildStorageRenditions(),
+    storageRenditionJobs: new Map<number, { roles: string[]; detailGets: number; finalStatus: 'completed' | 'failed' | 'expired' }>(),
     storageShares: [] as MockStorageShare[],
     // The scheduler lock, as `control/force-scheduler-lead` sees it: a Redis
     // string key whose VALUE is the holder. Deleting it is the whole control.
@@ -5273,19 +5278,62 @@ function maskStorageCredential(value: unknown, prefix = ''): string | null {
     return `${prefix}${'•'.repeat(8)}${clean.slice(-3)}`;
 }
 
-function storageIncomplete(bucket: MockStorageBucket, action: 'empty' | 'set_public', extra: Record<string, unknown> = {}) {
+function storageIncomplete(bucket: MockStorageBucket, action: 'create' | 'empty' | 'set_public', extra: Record<string, unknown> = {}) {
     return {
         status: false, code: 409, error: `S3 bucket ${action} did not reach a verified state`,
         error_code: 's3_operation_incomplete',
         data: {
             name: bucket.name, action, complete: false, mutation_state: 'partial',
-            counts: { deleted_objects: 2, deleted_versions: 1, deleted_markers: 0, aborted_uploads: 0 },
-            failed: { objects: 0, versions: 1, markers: 0, uploads: 0 },
-            remaining: { objects: null, versions: null, markers: null, uploads: null },
+            ...(action === 'empty' ? {
+                counts: { deleted_objects: 2, deleted_versions: 1, deleted_markers: 0, aborted_uploads: 0 },
+                failed: { objects: 0, versions: 1, markers: 0, uploads: 0 },
+                remaining: { objects: null, versions: null, markers: null, uploads: null },
+            } : {}),
             failure: { operation: action === 'empty' ? 'delete_objects' : 'put_public_access_block', provider_code: 'AccessDenied', retryable: false },
             ...extra,
         },
     };
+}
+
+function completeMockRendition(file: MockStorageFile, role: string): void {
+    const now = Math.floor(Date.now() / 1000);
+    const existing = db.fileRenditions.find((row) => row.original_file === file.id && row.role === role);
+    if (existing) {
+        existing.modified = Math.max(existing.modified + 1, now);
+        existing.upload_status = 'completed';
+        return;
+    }
+    db.fileRenditions.push({
+        id: Math.max(6100, ...db.fileRenditions.map((row) => row.id)) + 1,
+        original_file: file.id, created: now, modified: now,
+        filename: `${file.filename}-${role}.jpg`, file_size: 64000,
+        content_type: 'image/jpeg', category: 'image', role, upload_status: 'completed',
+        width: role === 'thumbnail' ? 320 : 1280, height: role === 'thumbnail' ? 180 : 720,
+        url: `/mock-storage/renditions/${file.id}-${role}`,
+    });
+}
+
+/** Renderer work becomes observable only through later authoritative detail GETs. */
+function advanceMockRenditionLifecycle(file: MockStorageFile): void {
+    if (file.rendition_demo === 'initial') {
+        file.rendition_reads = (file.rendition_reads ?? 0) + 1;
+        if (file.rendition_reads >= 2) {
+            completeMockRendition(file, 'thumbnail');
+            completeMockRendition(file, 'preview');
+            file.rendition_demo = undefined;
+        }
+    }
+    const job = db.storageRenditionJobs.get(file.id);
+    if (!job) return;
+    job.detailGets += 1;
+    if (job.detailGets < 2) return;
+    if (job.finalStatus === 'completed') {
+        for (const role of job.roles) completeMockRendition(file, role);
+    } else {
+        file.upload_status = job.finalStatus;
+        file.modified = Math.max(file.modified + 1, Math.floor(Date.now() / 1000));
+    }
+    db.storageRenditionJobs.delete(file.id);
 }
 
 function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown> | undefined {
@@ -5327,6 +5375,9 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
                 const now = Math.floor(Date.now() / 1000);
                 bucket = { id: name, name, created: now, is_public: false, objects: 0, versions: 0, markers: 0, uploads: 0 };
                 db.storageBuckets.push(bucket);
+            }
+            if (createdNew && name === 'mojo-create-incomplete-demo') {
+                return storageIncomplete(bucket, 'create', { created_new: true, requested_public: false, configured_public: null, safety_lock: 'applied' });
             }
             return { status: true, code: 200, data: { id: name, name, created_new: createdNew } };
         }
@@ -5379,10 +5430,17 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
             }
             return { status: true, data: { status: true, ...(action === 'test_connection' ? {} : { result: { ok: true, origins: [...manager.allowed_origins] } }) } };
         }
+        if (!manager) {
+            const requestedGroup = body.group == null ? null : Number(body.group);
+            const requestedUser = body.user == null ? null : Number(body.user);
+            if (requestedGroup == null && requestedUser == null && !caller.is_superuser) return permissionDenied();
+            if (requestedGroup != null && !hasGlobalPermission(caller, STORAGE_GROUP_DIRECTORY_GRANTS)) return permissionDenied();
+            if (requestedUser != null && !hasGlobalPermission(caller, STORAGE_USER_DIRECTORY_GRANTS)) return permissionDenied();
+        }
         const target = manager ?? (() => {
             const backendType = String(body.backend_type ?? 'file');
             if (!['file', 's3'].includes(backendType)) return null;
-            const created: MockFileManager = { id: Math.max(...db.fileManagers.map((row) => row.id)) + 1, created: Math.floor(Date.now() / 1000), name: String(body.name ?? 'Storage backend'), use: String(body.use ?? 'uploads'), backend_type: backendType, backend_url: String(body.backend_url ?? ''), is_active: body.is_active == null ? true : Boolean(body.is_active), is_default: Boolean(body.is_default), is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: null };
+            const created: MockFileManager = { id: Math.max(...db.fileManagers.map((row) => row.id)) + 1, created: Math.floor(Date.now() / 1000), name: String(body.name ?? 'Storage backend'), use: String(body.use ?? 'uploads'), backend_type: backendType, backend_url: String(body.backend_url ?? ''), is_active: body.is_active == null ? true : Boolean(body.is_active), is_default: Boolean(body.is_default), is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: body.group == null ? null : Number(body.group), user: body.user == null ? null : Number(body.user) };
             db.fileManagers.push(created);
             return created;
         })();
@@ -5407,7 +5465,10 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         const id = fileMatch[1] == null ? null : Number(fileMatch[1]);
         const file = id == null ? null : db.storageFiles.find((candidate) => candidate.id === id);
         if (id != null && !file) return { status: false, error: 'File not found', error_code: 404 };
-        if (method === 'GET' && file) return { status: true, data: serializeStorageFile(file), graph: 'default' };
+        if (method === 'GET' && file) {
+            advanceMockRenditionLifecycle(file);
+            return { status: true, data: serializeStorageFile(file), graph: 'default' };
+        }
         if (method === 'GET') {
             const serialized = db.storageFiles.map(serializeStorageFile);
             const result = listRows(serialized, opts.params ?? {}, (row) => `${row.filename} ${row.content_type}`, '-created');
@@ -5424,13 +5485,10 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         const body = opts.body ?? {};
         if ('regenerate_renditions' in body) {
             const roles = Array.isArray(body.regenerate_renditions) ? [...new Set(body.regenerate_renditions.map(String).filter(Boolean))].slice(0, 20) : null;
-            const now = Math.floor(Date.now() / 1000);
-            const wanted = roles ?? ['thumbnail', 'preview'];
-            for (const role of wanted) {
-                const existing = db.fileRenditions.find((row) => row.original_file === file.id && row.role === role);
-                if (existing) { existing.modified = now; existing.upload_status = 'completed'; }
-                else db.fileRenditions.push({ id: Math.max(6100, ...db.fileRenditions.map((row) => row.id)) + 1, original_file: file.id, created: now, modified: now, filename: `${file.filename}-${role}.jpg`, file_size: 64000, content_type: 'image/jpeg', category: 'image', role, upload_status: 'completed', width: role === 'thumbnail' ? 320 : 1280, height: role === 'thumbnail' ? 180 : 720, url: `/mock-storage/renditions/${file.id}-${role}` });
-            }
+            const existingRoles = db.fileRenditions.filter((row) => row.original_file === file.id).map((row) => row.role);
+            const wanted = roles ?? (existingRoles.length > 0 ? existingRoles : ['thumbnail', 'preview']);
+            const finalStatus = file.rendition_demo === 'failed' ? 'failed' : file.rendition_demo === 'expired' ? 'expired' : 'completed';
+            db.storageRenditionJobs.set(file.id, { roles: wanted, detailGets: 0, finalStatus });
             return { status: true, data: { queued: true, roles } };
         }
         if ('share' in body) {

@@ -25,6 +25,18 @@ export function renditionMapSignature(file: Pick<FileRow, 'renditions'>): string
         .join('|');
 }
 
+/** Signature only the roles queued by one regeneration generation can satisfy. */
+export function renditionTargetSignature(
+    file: Pick<FileRow, 'renditions'>,
+    targetRoles: readonly string[] | null,
+): string {
+    if (targetRoles === null) return renditionMapSignature(file);
+    const byRole = new Map(normalizeRenditions(file.renditions).map((row) => [row.role, row]));
+    return normalizeRenditionRoles(targetRoles)
+        .map((role) => `${role}:${renditionSignature(byRole.get(role)) ?? 'missing'}`)
+        .join('|');
+}
+
 export function normalizeRenditionRoles(roles: readonly string[]): string[] {
     return [...new Set(roles.map((role) => role.trim()).filter(Boolean))].slice(0, MAX_RENDITION_ROLES);
 }
@@ -42,13 +54,14 @@ export function decideRenditionPoll(args: {
     open: boolean;
     attempt: number;
     beforeSignature: string;
+    targetRoles: readonly string[] | null;
     file: Pick<FileRow, 'upload_status' | 'renditions'> | null;
 }): RenditionPollDecision {
     if (!args.open) return { done: true, reason: 'closed' };
     if (args.currentFileId !== args.expectedFileId) return { done: true, reason: 'file-changed' };
     if (args.file?.upload_status === 'failed') return { done: true, reason: 'failed' };
     if (args.file?.upload_status === 'expired') return { done: true, reason: 'expired' };
-    if (args.file && renditionMapSignature(args.file) !== args.beforeSignature) {
+    if (args.file && renditionTargetSignature(args.file, args.targetRoles) !== args.beforeSignature) {
         return { done: true, reason: 'changed' };
     }
     if (args.attempt >= RENDITION_POLL_MAX_ATTEMPTS) return { done: true, reason: 'timeout' };
@@ -59,6 +72,7 @@ export function decideRenditionPoll(args: {
 export async function pollRenditionConvergence(args: {
     fileId: number;
     beforeSignature: string;
+    targetRoles: readonly string[] | null;
     isCurrent: () => boolean;
     fetch: () => Promise<FileRow>;
     wait?: (ms: number) => Promise<void>;
@@ -76,6 +90,7 @@ export async function pollRenditionConvergence(args: {
             open: args.isCurrent(),
             attempt,
             beforeSignature: args.beforeSignature,
+            targetRoles: args.targetRoles,
             file,
         });
         if (decision.done) return decision.reason!;

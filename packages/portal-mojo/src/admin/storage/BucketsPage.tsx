@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fmt, modal, toast } from '../../ui';
-import { BucketDetail } from './BucketDetail';
-import { createBucket, useBuckets, type S3BucketRow } from './models';
+import { BucketDetail, IncompleteEvidence } from './BucketDetail';
+import { createBucket, useBuckets, type BucketMutationOutcome, type BucketCreateResult, type S3BucketRow } from './models';
 
 export function showBucketDetail(bucket: S3BucketRow): void {
     void modal.detail((close) => <BucketDetail bucket={bucket} onClose={() => close(null)} />);
@@ -14,6 +14,7 @@ export function BucketsPage() {
     const [search, setSearch] = useState('');
     const [name, setName] = useState('');
     const [creating, setCreating] = useState(false);
+    const [createOutcome, setCreateOutcome] = useState<BucketMutationOutcome<BucketCreateResult> | null>(null);
     const rows = useMemo(() => [...(query.data ?? [])]
         .filter((row) => row.name.toLowerCase().includes(search.trim().toLowerCase()))
         .sort((a, b) => a.name.localeCompare(b.name)), [query.data, search]);
@@ -23,7 +24,9 @@ export function BucketsPage() {
         const bucketName = name.trim();
         if (!bucketName) return;
         setCreating(true);
+        setCreateOutcome(null);
         const outcome = await createBucket(queryClient, bucketName);
+        setCreateOutcome(outcome);
         setCreating(false);
         if (outcome.error) {
             toast.error(outcome.error instanceof Error ? outcome.error.message : 'Bucket create failed');
@@ -48,6 +51,7 @@ export function BucketsPage() {
                     <label className="field"><span className="field-label">New private bucket</span><input value={name} onChange={(event) => setName(event.target.value)} required placeholder="exact-bucket-name" /></label>
                     <button className="btn btn-primary" disabled={creating || !name.trim()}>{creating ? 'Creating…' : 'Create private'}</button>
                 </form>
+                {createOutcome && (createOutcome.evidence || createOutcome.refreshError) && <div className={`storage-operation-result${createOutcome.error ? ' is-error' : ''}`}>{createOutcome.error && <p>{createOutcome.error instanceof Error ? createOutcome.error.message : 'Bucket create failed'}</p>}{createOutcome.evidence && <IncompleteEvidence evidence={createOutcome.evidence} />}{createOutcome.refreshError && <p className="text-warn"><i className="bi bi-exclamation-triangle" /> Authoritative refresh also failed. Refresh manually before another action.</p>}</div>}
             </div>
             {query.isError ? (
                 <div className="empty storage-error"><i className="bi bi-cloud-slash" /><h2>Bucket inventory unavailable</h2><p>{query.error instanceof Error ? query.error.message : 'AWS did not return a conclusive inventory.'}</p><button className="btn" onClick={() => void query.refetch()}>Retry</button></div>
