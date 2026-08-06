@@ -3,12 +3,21 @@
 // events + stale guards did by hand in web-mojo.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mojoGet, mojoList, mojoSave } from './client';
-import type { Params } from './types';
+import type { MojoList, Params } from './types';
 
-export function useModelList<T>(endpoint: string, params: Params = {}, opts: { enabled?: boolean } = {}) {
+export function useModelList<T>(
+    endpoint: string,
+    params: Params = {},
+    opts: { enabled?: boolean; sanitizeRow?: (row: T) => T } = {},
+) {
     return useQuery({
         queryKey: [endpoint, params],
-        queryFn: () => mojoList<T>(endpoint, params),
+        queryFn: async (): Promise<MojoList<T>> => {
+            const list = await mojoList<T>(endpoint, params);
+            return opts.sanitizeRow
+                ? { ...list, rows: list.rows.map(opts.sanitizeRow) }
+                : list;
+        },
         // Old page stays visible while the next loads — no skeleton flash on
         // page/sort changes (web-mojo needed careful fetch-event juggling for
         // this; here it's one option).
@@ -19,10 +28,13 @@ export function useModelList<T>(endpoint: string, params: Params = {}, opts: { e
     });
 }
 
-export function useModel<T>(endpoint: string, id: number | string | null) {
+export function useModel<T>(endpoint: string, id: number | string | null, sanitizeRow?: (row: T) => T) {
     return useQuery({
         queryKey: [endpoint, 'one', id],
-        queryFn: () => mojoGet<T>(endpoint, id!),
+        queryFn: async () => {
+            const row = await mojoGet<T>(endpoint, id!);
+            return sanitizeRow ? sanitizeRow(row) : row;
+        },
         enabled: id != null,
     });
 }

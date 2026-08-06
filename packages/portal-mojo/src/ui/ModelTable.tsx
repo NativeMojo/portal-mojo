@@ -183,7 +183,7 @@ function MenuDropdown({ button, children, align = 'end' }: {
 
 export function ModelTable<T extends { id: number }>({
     model, endpoint, columns, filters = [], presets = [], eyebrow, title,
-    searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort,
+    searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort,
     selectable = false, batchActions = [],
     columnChooser = false, persistState = false, persistKey,
     autoRefresh = 0,
@@ -200,6 +200,8 @@ export function ModelTable<T extends { id: number }>({
     presets?: Preset[];
     eyebrow?: string;
     title: string;
+    /** Whether the backend model exposes a real search contract. */
+    searchable?: boolean;
     searchPlaceholder?: string;
     onRowClick?: (row: T) => void;
     addLabel?: string;
@@ -255,13 +257,17 @@ export function ModelTable<T extends { id: number }>({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot mount restore
     }, []);
 
-    const query = useModelList<T>(resolvedEndpoint, p.wire, { enabled: hydrated });
+    const listParams = model?.normalizeListParams ? model.normalizeListParams(p.wire) : p.wire;
+    const query = useModelList<T>(resolvedEndpoint, listParams, {
+        enabled: hydrated,
+        sanitizeRow: model?.sanitizeRow,
+    });
     const rows = useMemo(() => query.data?.rows ?? [], [query.data]);
     const count = query.data?.count ?? 0;
     const totalPages = Math.max(1, Math.ceil(count / p.size));
     const firstRow = count === 0 ? 0 : (p.page - 1) * p.size + 1;
     const lastRow = Math.min(count, (p.page - 1) * p.size + rows.length);
-    const isFiltered = p.activeFilters.length > 0 || p.search !== '';
+    const isFiltered = p.activeFilters.length > 0 || (searchable && p.search !== '');
 
     // Save the view on every params/visibility change (post-hydration only,
     // so the restore itself never writes back a half-applied state).
@@ -270,7 +276,7 @@ export function ModelTable<T extends { id: number }>({
         const state: PersistedTableState = { v: 2 };
         if (p.sort) state.sort = p.sort;
         state.size = p.size;
-        if (p.search) state.search = p.search;
+        if (searchable && p.search) state.search = p.search;
         const rawFilters: Record<string, string> = {};
         for (const [key, value] of Object.entries(p.wire)) {
             if (key === 'start' || key === 'size' || key === 'sort' || key === 'search') continue;
@@ -525,7 +531,7 @@ export function ModelTable<T extends { id: number }>({
                     <h1 className="panel-title">{title}</h1>
                 </div>
                 <div className="toolbar-controls">
-                    <ExpandingSearch value={p.search} onChange={p.setSearch} placeholder={searchPlaceholder} />
+                    {searchable && <ExpandingSearch value={p.search} onChange={p.setSearch} placeholder={searchPlaceholder} />}
                     {/* Tool cluster: one joined icon group (web-mojo's compact
                         toolbar). Icons + tooltips only; text labels appear
                         only on very wide screens via .btn-label. */}

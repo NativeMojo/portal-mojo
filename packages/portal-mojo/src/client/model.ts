@@ -43,7 +43,7 @@ export interface ModelActionDef {
     response?: 'row' | 'payload';
 }
 
-export interface ModelConfig {
+export interface ModelConfig<T> {
     /** Singular slug ('user') — labels, export filenames, devtools. */
     name: string;
     /** REST collection endpoint ('/api/account/user'). */
@@ -58,6 +58,10 @@ export interface ModelConfig {
     forms?: Record<string, ModelForm>;
     /** The POST_SAVE_ACTIONS the backend RestMeta declares for this model. */
     actions?: Record<string, ModelActionDef>;
+    /** Normalize/allowlist list params before they become a query key or request. */
+    normalizeListParams?: (params: Params) => Params;
+    /** Strip fields that must never enter Query or Mutation cache. */
+    sanitizeRow?(row: T): T;
 }
 
 export interface SaveVars {
@@ -88,6 +92,8 @@ export interface ModelDef<T extends { id: number | string }> {
     permissions: Record<string, PermSpec>;
     forms: Record<string, ModelForm>;
     actions: Record<string, ModelActionDef>;
+    normalizeListParams?: (params: Params) => Params;
+    sanitizeRow?(row: T): T;
     /** Query-key builders — for targeted setQueryData/invalidate in app code. */
     keys: {
         root: readonly [string];
@@ -114,13 +120,18 @@ export interface ModelDef<T extends { id: number | string }> {
     invalidate: (qc: QueryClient) => Promise<void>;
 }
 
-export function defineModel<T extends { id: number | string }>(config: ModelConfig): ModelDef<T> {
+export function defineModel<T extends { id: number | string }>(config: ModelConfig<T>): ModelDef<T> {
     const { endpoint } = config;
     const actions = config.actions ?? {};
+    const normalizeListParams = config.normalizeListParams;
+    const sanitizeRow = config.sanitizeRow;
 
     const keys = {
         root: [endpoint] as const,
-        list: (params: Params) => [endpoint, params] as const,
+        list: (params: Params) => [
+            endpoint,
+            normalizeListParams ? normalizeListParams(params) : params,
+        ] as const,
         one: (id: number | string) => [endpoint, 'one', id] as const,
     };
 
@@ -130,16 +141,24 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
         permissions: config.permissions ?? {},
         forms: config.forms ?? {},
         actions,
+        normalizeListParams,
+        sanitizeRow,
         keys,
 
-        useList: (params: Params = {}) => useModelList<T>(endpoint, params),
+        useList: (params: Params = {}) => {
+            const safeParams = normalizeListParams ? normalizeListParams(params) : params;
+            return useModelList<T>(endpoint, safeParams, { sanitizeRow });
+        },
 
-        useOne: (id: number | string | null) => useModel<T>(endpoint, id),
+        useOne: (id: number | string | null) => useModel<T>(endpoint, id, sanitizeRow),
 
         useSave: () => {
             const qc = useQueryClient();
             return useMutation({
-                mutationFn: ({ id, changes }: SaveVars) => withFreshAuth(() => mojoSave<T>(endpoint, id, changes)),
+                mutationFn: async ({ id, changes }: SaveVars) => {
+                    const row = await withFreshAuth(() => mojoSave<T>(endpoint, id, changes));
+                    return sanitizeRow ? sanitizeRow(row) : row;
+                },
                 onSuccess: (row) => {
                     // The response body is the server-authoritative record —
                     // paint it immediately, then let invalidation re-sort and
@@ -177,7 +196,8 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
                         method: 'POST',
                         body: { [bodyKey]: payload },
                     }));
-                    return { row: returnsRow ? (body.data as T) : null, body };
+                    const row = returnsRow ? (body.data as T) : null;
+                    return { row: row && sanitizeRow ? sanitizeRow(row) : row, body };
                 },
                 onSuccess: (outcome, { id }) => {
                     if (outcome.row) qc.setQueryData(keys.one(id), outcome.row);
@@ -187,7 +207,13 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
         },
 
         fetchOne: (qc: QueryClient, id: number | string) =>
-            qc.fetchQuery({ queryKey: keys.one(id), queryFn: () => mojoGet<T>(endpoint, id) }),
+            qc.fetchQuery({
+                queryKey: keys.one(id),
+                queryFn: async () => {
+                    const row = await mojoGet<T>(endpoint, id);
+                    return sanitizeRow ? sanitizeRow(row) : row;
+                },
+            }),
 
         invalidate: (qc: QueryClient) => qc.invalidateQueries({ queryKey: keys.root }),
     };

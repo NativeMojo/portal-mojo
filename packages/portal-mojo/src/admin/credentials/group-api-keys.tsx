@@ -124,23 +124,26 @@ function useGroupApiKeyActions(permission: PermSpec) {
             return;
         }
         try {
-            const created = await create.mutateAsync({
-                name: String(result.name ?? ''),
-                group,
-                ...(Object.keys(permissions).length ? { permissions } : {}),
+            let tokenShown = false;
+            await create.mutateAsync({
+                changes: {
+                    name: String(result.name ?? ''),
+                    group,
+                    ...(Object.keys(permissions).length ? { permissions } : {}),
+                },
+                onToken: async (token, row) => {
+                    tokenShown = true;
+                    await showSecretDialog({
+                        title: 'API key created — save your token',
+                        intro: <><i className="bi bi-check-circle-fill text-ok" /> API key <b>{row.name}</b> created.</>,
+                        warning: 'Save this token now — creation reveals it automatically only once.',
+                        secret: token,
+                        ariaLabel: 'API token',
+                        footer: <TokenFooter permissions={Object.keys(permissions)} />,
+                    });
+                },
             });
-            if (created.token) {
-                await showSecretDialog({
-                    title: 'API key created — save your token',
-                    intro: <><i className="bi bi-check-circle-fill text-ok" /> API key <b>{created.row.name}</b> created.</>,
-                    warning: 'Save this token now — creation reveals it automatically only once.',
-                    secret: created.token,
-                    ariaLabel: 'API token',
-                    footer: <TokenFooter permissions={Object.keys(permissions)} />,
-                });
-            } else {
-                toast.success('API key created');
-            }
+            if (!tokenShown) toast.success('API key created');
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to create API key');
         }
@@ -211,12 +214,14 @@ function useGroupApiKeyActions(permission: PermSpec) {
     };
 
     const deleteKey = async (row: GroupApiKeyRow) => {
-        if (!can) return;
+        if (!can) return false;
         try {
             await destroy.mutateAsync({ id: row.id });
             toast.success('API key deleted');
+            return true;
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to delete API key');
+            return false;
         }
     };
 
@@ -267,7 +272,7 @@ function ApiKeyCard({ row, actions }: {
                         label={<i className="bi bi-trash" aria-label="Delete this key" />}
                         armedLabel="Click again — services using this key lose access"
                         title="Delete this key"
-                        onConfirm={() => actions.deleteKey(row)}
+                        onConfirm={async () => { await actions.deleteKey(row); }}
                     />
                 </div>
             )}
@@ -336,7 +341,9 @@ export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => 
                                     className="btn-compact"
                                     label="Delete"
                                     armedLabel="Click again — delete now"
-                                    onConfirm={() => actions.deleteKey(row).then(onClose)}
+                                    onConfirm={async () => {
+                                        if (await actions.deleteKey(row)) onClose();
+                                    }}
                                 />
                             </div>
                         </>
@@ -371,7 +378,7 @@ const API_KEY_COLUMNS: Column<GroupApiKeyRow>[] = [
             </div>
         ),
     },
-    { key: 'group.name', label: 'Group', sortable: true, render: (row) => groupLabel(row.group) },
+    { key: 'group', label: 'Group', render: (row) => groupLabel(row.group) },
     { key: 'is_active', label: 'Status', render: (row) => <Badge tone={row.is_active ? 'success' : 'muted'}>{row.is_active ? 'Active' : 'Inactive'}</Badge> },
     { key: 'permissions', label: 'Grants', align: 'center', render: (row) => String(grantedPermissions(row.permissions).length) },
     { key: 'last_used', label: 'Last used', sortable: true, render: (row) => fmt.relative(row.last_used, 'never') },
@@ -398,7 +405,7 @@ export function GroupApiKeysPage() {
             model={GroupApiKeyModel}
             eyebrow="Account"
             title="Group API Keys"
-            searchPlaceholder="Search key or group…"
+            searchable={false}
             columns={API_KEY_COLUMNS}
             filters={API_KEY_FILTERS}
             presets={[

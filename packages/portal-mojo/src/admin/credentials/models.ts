@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     defineModel, mojoCall, mojoSave, withFreshAuth,
-    type PermSpec,
+    type Params, type PermSpec,
 } from '../../client';
 
 /** Global operator gate for the cross-group credential pages. */
@@ -40,6 +40,30 @@ interface GroupApiKeyCreateResponse extends GroupApiKeyRow {
     token?: string;
 }
 
+/** Defense in depth for every Query/Mutation cache write. */
+function sanitizeGroupApiKeyRow(row: GroupApiKeyRow): GroupApiKeyRow {
+    const safe = { ...row } as GroupApiKeyRow & Record<string, unknown>;
+    delete safe.token;
+    delete safe.token_hash;
+    return safe;
+}
+
+/**
+ * Ordinary lists are always the safe default graph. URL/persisted state may
+ * carry arbitrary params, so remove graph/search and reject unsupported sort
+ * fields before this object becomes either the query key or wire request.
+ */
+function normalizeGroupApiKeyListParams(params: Params): Params {
+    const safe: Params = { ...params };
+    delete safe.graph;
+    delete safe.search;
+    if (typeof safe.sort === 'string') {
+        const field = safe.sort.replace(/^-/, '');
+        if (!['name', 'is_active', 'last_used', 'created'].includes(field)) delete safe.sort;
+    }
+    return { ...safe, graph: 'default' };
+}
+
 export const GroupApiKeyModel = defineModel<GroupApiKeyRow>({
     name: 'group_api_key',
     endpoint: '/api/group/apikey',
@@ -47,28 +71,41 @@ export const GroupApiKeyModel = defineModel<GroupApiKeyRow>({
         view: GROUP_CREDENTIAL_PERMS,
         manage: GROUP_CREDENTIAL_PERMS,
     },
+    normalizeListParams: normalizeGroupApiKeyListParams,
+    sanitizeRow: sanitizeGroupApiKeyRow,
 });
 
-export interface CreatedGroupApiKey {
-    row: GroupApiKeyRow;
-    token: string | null;
+export interface CreateGroupApiKeyVariables {
+    changes: Record<string, unknown>;
+    /** Uncached one-shot channel invoked before the mutation resolves. */
+    onToken?: (token: string, row: GroupApiKeyRow) => void | Promise<void>;
 }
 
 /**
  * Create is deliberately separate from ModelDef.useSave(): the backend adds
- * the raw token to the create echo. Split it before any cache write, keep only
- * the safe row in Query, and hand the token directly to the reveal dialog.
+ * the raw token to the create echo. Split it before any cache write and invoke
+ * the transient callback while the mutation is still pending. MutationCache
+ * resolves with only the safe row and never retains the raw token as data.
  */
 export function useCreateGroupApiKey() {
     const qc = useQueryClient();
-    return useMutation<CreatedGroupApiKey, Error, Record<string, unknown>>({
-        mutationFn: async (changes) => {
+    return useMutation<GroupApiKeyRow, Error, CreateGroupApiKeyVariables>({
+        mutationFn: async ({ changes, onToken }) => {
             const created = await withFreshAuth(() =>
                 mojoSave<GroupApiKeyCreateResponse>(GroupApiKeyModel.endpoint, null, changes));
-            const { token, ...safeRow } = created;
-            return { row: safeRow, token: token ?? null };
+            const safeRow = sanitizeGroupApiKeyRow(created);
+            let token = typeof created.token === 'string' && created.token ? created.token : null;
+            try {
+                if (token && onToken) await onToken(token, safeRow);
+            } finally {
+                // Drop both references before the safe result resolves into
+                // MutationCache. The dialog has unmounted when its promise ends.
+                token = null;
+                delete created.token;
+            }
+            return safeRow;
         },
-        onSuccess: ({ row }) => {
+        onSuccess: (row) => {
             qc.setQueryData(GroupApiKeyModel.keys.one(row.id), row);
             void qc.invalidateQueries({ queryKey: GroupApiKeyModel.keys.root });
         },
@@ -157,6 +194,16 @@ export interface WebhookSubscriptionRow {
     group: CredentialGroup | number | null;
 }
 
+function normalizeWebhookListParams(params: Params): Params {
+    const safe: Params = { ...params };
+    delete safe.search;
+    if (typeof safe.sort === 'string') {
+        const field = safe.sort.replace(/^-/, '');
+        if (!['url', 'is_active', 'created'].includes(field)) delete safe.sort;
+    }
+    return safe;
+}
+
 export const WebhookSubscriptionModel = defineModel<WebhookSubscriptionRow>({
     name: 'webhook_subscription',
     endpoint: '/api/group/webhook_subscriptions',
@@ -164,6 +211,7 @@ export const WebhookSubscriptionModel = defineModel<WebhookSubscriptionRow>({
         view: GROUP_CREDENTIAL_PERMS,
         manage: GROUP_CREDENTIAL_PERMS,
     },
+    normalizeListParams: normalizeWebhookListParams,
 });
 
 /** TagInput CSV or an existing array to the backend JSON-list contract. */

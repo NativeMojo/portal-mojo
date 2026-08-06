@@ -196,10 +196,14 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
                 { key: 'Members', label: 'Members', icon: 'bi-people', render: () => <MembersSection group={group} /> },
                 { key: 'SubGroups', label: 'Sub-Groups', icon: 'bi-diagram-3', render: () => <SubGroupsSection group={group} openGroup={openGroupById} /> },
                 { divider: 'Access' },
-                { key: 'ApiKeys', label: 'API Keys', icon: 'bi-key', render: () => <GroupApiKeysSection group={group} /> },
+                {
+                    key: 'ApiKeys', label: 'API Keys', icon: 'bi-key',
+                    permissions: GROUP_CREDENTIAL_PERMS,
+                    render: () => <GroupApiKeysSection group={group} />,
+                },
                 {
                     key: 'Webhooks', label: 'Webhooks', icon: 'bi-broadcast',
-                    permissions: 'manage_group',
+                    permissions: GROUP_CREDENTIAL_PERMS,
                     render: () => <WebhookSubscriptionsSection group={group} />,
                 },
                 {

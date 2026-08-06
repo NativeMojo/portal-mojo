@@ -40,10 +40,16 @@ import {
 
 Creation uses `useCreateGroupApiKey()`, not the generic model save hook. The
 backend create echo contains `{token, ...row}`; the hook splits it immediately,
-writes only the safe row to TanStack Query, and returns the token directly to
-the one-time reveal dialog. A later operator reveal is a deliberate
+writes only the safe row to TanStack Query, and passes the token through a
+one-shot callback while the mutation is still pending. MutationCache resolves
+with only the scrubbed row; the callback lifetime ends when the dialog closes.
+A later operator reveal is a deliberate
 `graph=token` request through `fetchApiKeyToken()`. django-mojo audits that graph
 as `api_key:token_read`, and the response never enters Query cache.
+
+All ordinary API-key lists force `graph=default`, discard URL/persisted
+`graph` and unsupported search params before creating a query key, and scrub
+token fields from every list/detail/save result before any cache write.
 
 Create sends only permission controls whose value is `true`. Edit compares only
 controls that were actually rendered and sends a partial permission dictionary;

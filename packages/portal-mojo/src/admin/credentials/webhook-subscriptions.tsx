@@ -109,7 +109,7 @@ export function WebhookSecretPanel({ group, permission = GROUP_CREDENTIAL_PERMS 
 
 const WEBHOOK_FIELDS: Field[] = [
     {
-        name: 'url', type: 'url', label: 'URL', required: true,
+        name: 'url', type: 'text', label: 'URL', required: true,
         placeholder: 'https://example.com/webhooks/mojo',
         help: 'HTTPS only. Embedded credentials are rejected server-side.',
     },
@@ -210,12 +210,14 @@ function useWebhookActions(permission: PermSpec) {
     };
 
     const deleteSubscription = async (row: WebhookSubscriptionRow) => {
-        if (!can) return;
+        if (!can) return false;
         try {
             await destroy.mutateAsync({ id: row.id });
             toast.success('Webhook subscription deleted');
+            return true;
         } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Failed to delete subscription');
+            return false;
         }
     };
 
@@ -274,7 +276,7 @@ function WebhookCard({ row, actions }: {
                         label={<i className="bi bi-trash" aria-label="Delete this subscription" />}
                         armedLabel="Click again — deliveries stop"
                         title="Delete this subscription"
-                        onConfirm={() => actions.deleteSubscription(row)}
+                        onConfirm={async () => { await actions.deleteSubscription(row); }}
                     />
                 </div>
             )}
@@ -339,7 +341,9 @@ export function WebhookSubscriptionDetail({ id, onClose }: { id: number; onClose
                                     className="btn-compact"
                                     label="Delete"
                                     armedLabel="Click again — delete now"
-                                    onConfirm={() => actions.deleteSubscription(row).then(onClose)}
+                                    onConfirm={async () => {
+                                        if (await actions.deleteSubscription(row)) onClose();
+                                    }}
                                 />
                             </div>
                         </>
@@ -366,7 +370,7 @@ export function WebhookSubscriptionDetail({ id, onClose }: { id: number; onClose
 
 const WEBHOOK_COLUMNS: Column<WebhookSubscriptionRow>[] = [
     { key: 'url', label: 'URL', sortable: true, hideable: false, render: (row) => <code className="ga-url">{row.url}</code> },
-    { key: 'group.name', label: 'Group', sortable: true, render: (row) => groupLabel(row.group) },
+    { key: 'group', label: 'Group', render: (row) => groupLabel(row.group) },
     { key: 'events', label: 'Events', render: (row) => row.events.slice(0, 3).map((event) => <Badge key={event} tone="info">{event}</Badge>) },
     { key: 'is_active', label: 'Status', render: (row) => <Badge tone={row.is_active ? 'success' : 'muted'}>{row.is_active ? 'Active' : 'Inactive'}</Badge> },
     { key: 'created', label: 'Created', sortable: true, render: (row) => fmt.date(row.created) },
@@ -391,7 +395,7 @@ export function WebhookSubscriptionsPage() {
             model={WebhookSubscriptionModel}
             eyebrow="Account"
             title="Webhook Subscriptions"
-            searchPlaceholder="Search URL or group…"
+            searchable={false}
             columns={WEBHOOK_COLUMNS}
             filters={WEBHOOK_FILTERS}
             presets={[
