@@ -14,3 +14,7 @@ export * from './sections/JobRunnersStrip';
 export * from './sections/JobChannelsPanel';
 export * from './sections/JobThroughputSection';
 export * from './sections/JobOperationsSection';
+// Stage B — the jobs table and the job inspector.
+export * from './columns';
+export * from './JobsTablePage';
+export * from './JobDetail';
