@@ -16,7 +16,7 @@ const read = (relative) => readFile(new URL(`../${relative}`, import.meta.url), 
 const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 try {
-    const [admin, data, explorer, client, mock, me, stats] = await Promise.all([
+    const [admin, data, explorer, client, mock, me, stats, chart] = await Promise.all([
         server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts'),
         server.ssrLoadModule('/packages/portal-mojo/src/admin/monitoring/metrics-explorer-data.ts'),
         server.ssrLoadModule('/packages/portal-mojo/src/admin/monitoring/metrics-explorer-client.ts'),
@@ -24,6 +24,7 @@ try {
         server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts'),
         server.ssrLoadModule('/packages/portal-mojo/src/client/me.ts'),
         server.ssrLoadModule('/packages/portal-mojo/src/charts/stats.ts'),
+        server.ssrLoadModule('/packages/portal-mojo/src/charts/MetricsChart.tsx'),
     ]);
     const [pageSource, pickerSource, adapterSource, chartSource] = await Promise.all([
         read('packages/portal-mojo/src/admin/monitoring/MetricsExplorerPage.tsx'),
@@ -119,10 +120,25 @@ try {
     assert.equal(stats.csvEscape(-42), '-42', 'numeric negatives stay numeric');
     assert.equal(stats.csvEscape('line\r\n"two"'), '"line\r\n""two"""');
 
+    const geofence = chart.remapMetricSeriesIdentity({
+        labels: ['now'],
+        datasets: [
+            { label: 'blocks', data: [9] },
+            { label: 'exempt', data: [2] },
+        ],
+    }, ['geofence:blocks', 'geofence:exempt']);
+    assert.deepEqual(geofence.datasets.map((series) => series.label),
+        ['geofence:blocks', 'geofence:exempt'], 'default charts repair unique live tails');
+    assert.throws(() => chart.remapMetricSeriesIdentity({
+        labels: ['now'], datasets: [{ label: 'count', data: [1] }],
+    }, ['foo:count', 'bar:count']), /ambiguous.*exact series loader/i);
+
     assert.match(adapterSource, /mojoCall\('\/api\/metrics\/discover'/);
     assert.doesNotMatch(adapterSource, /mojoList/);
     assert.match(chartSource, /queryKey:\s*\['metrics',\s*seriesCacheKey,\s*wire\]/);
     assert.match(chartSource, /loadSeries\(wire\)/);
+    assert.match(pageSource, /const callerId = auth\.uid \?\? 'anonymous'/);
+    assert.match(pageSource, /enabled:\s*identityReady/);
     assert.match(pickerSource, /\{groupDirectory\s*&&\s*\([\s\S]*?<CollectionSelect/);
     assert.match(pickerSource, /\{userDirectory\s*&&\s*\([\s\S]*?<CollectionSelect/);
     const productionPage = stripComments(pageSource);

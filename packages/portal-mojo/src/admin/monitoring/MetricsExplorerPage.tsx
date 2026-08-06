@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { KPITile, MetricsChart } from '../../charts';
-import { useMe } from '../../client';
+import { useAuthSnapshot, useMe } from '../../client';
 import { modal } from '../../ui';
 import {
     dedupeMetricSlugs,
@@ -64,9 +64,15 @@ function ScalarMetricDetail({ result, scale, onClose }: { result: MetricGaugeVal
 
 export function MetricsExplorerPage() {
     const [params, setParams] = useSearchParams();
+    const auth = useAuthSnapshot();
     const { data: me } = useMe();
     const queryClient = useQueryClient();
-    const callerId = me?.id ?? 'anonymous';
+    // The token uid is synchronous and changes before the async `me` query.
+    // Hold every protected read until both identities agree, so neither boot
+    // nor a direct login switch can cache data under a shared placeholder.
+    const callerId = auth.uid ?? 'anonymous';
+    const identityReady = auth.authenticated && auth.uid != null
+        && me != null && String(me.id) === auth.uid;
     const account = params.get('account') ?? 'global';
     const category = params.get('category') ?? '';
     let parsedAccount: MetricAccount | null = null;
@@ -92,20 +98,21 @@ export function MetricsExplorerPage() {
     const accountQuery = useQuery({
         queryKey: metricsDiscoveryKey(callerId, accountRequest),
         queryFn: () => discoverMetrics(accountRequest),
+        enabled: identityReady,
     });
 
     const categoryRequest = { resource: 'categories' as const, account, search: categorySearch, start: categoryStart, size: 50 };
     const categoryQuery = useQuery({
         queryKey: metricsDiscoveryKey(callerId, categoryRequest),
         queryFn: () => discoverMetrics(categoryRequest),
-        enabled: parsedAccount != null,
+        enabled: identityReady && parsedAccount != null,
     });
 
     const slugRequest = { resource: 'slugs' as const, account, category, search: slugSearch, start: slugStart, size: 50 };
     const slugQuery = useQuery({
         queryKey: metricsDiscoveryKey(callerId, slugRequest),
         queryFn: () => discoverMetrics(slugRequest),
-        enabled: parsedAccount != null && category !== '',
+        enabled: identityReady && parsedAccount != null && category !== '',
     });
 
     const commitParams = useCallback((next: URLSearchParams) => setParams(next, { replace: true }), [setParams]);
@@ -163,7 +170,7 @@ export function MetricsExplorerPage() {
     };
 
     const chartSlugs = fanout === 'breakdown' ? selectedSlugs.slice(0, 1) : selectedSlugs;
-    const chartReady = parsedAccount != null && chartSlugs.length > 0
+    const chartReady = identityReady && parsedAccount != null && chartSlugs.length > 0
         && (fanout === 'off' || childKind.trim() !== '');
     const chartCacheKey = `metrics-explorer:${callerId}:exact-history`;
     const seriesLabels = useMemo(() => Object.fromEntries(chartSlugs.map((slug) => [slug, slug])), [chartSlugs]);
@@ -171,7 +178,7 @@ export function MetricsExplorerPage() {
     const pointsQuery = useQuery({
         queryKey: ['metrics-series', callerId, account, selectedSlugs, 'hours', pointWhen],
         queryFn: () => fetchMetricPoints({ account, slugs: selectedSlugs, granularity: 'hours', when: pointWhen }),
-        enabled: parsedAccount != null && selectedSlugs.length > 0 && fanout === 'off',
+        enabled: identityReady && parsedAccount != null && selectedSlugs.length > 0 && fanout === 'off',
     });
 
     const readScalar = async () => {
@@ -344,7 +351,7 @@ export function MetricsExplorerPage() {
                 <div className="metrics-scalar-controls">
                     <label className="field"><span className="field-label">Full scalar slug</span><input className="input" value={scalarSlug} onChange={(event) => setScalarSlug(event.target.value)} placeholder="limits:max_users" /></label>
                     <label className="field"><span className="field-label">Display scale</span><input className="input" type="number" step="any" value={scalarScale} onChange={(event) => setScalarScale(event.target.value)} /></label>
-                    <button type="button" className="btn btn-primary" disabled={scalarPending || !parsedAccount || !scalarSlug.trim()} onClick={() => void readScalar()}>{scalarPending ? 'Reading…' : 'Read value'}</button>
+                    <button type="button" className="btn btn-primary" disabled={scalarPending || !identityReady || !parsedAccount || !scalarSlug.trim()} onClick={() => void readScalar()}>{scalarPending ? 'Reading…' : 'Read value'}</button>
                 </div>
                 {scalarError && <div className="metrics-compact-state metrics-compact-error">{scalarError}</div>}
             </section>

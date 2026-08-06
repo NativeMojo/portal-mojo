@@ -100,6 +100,9 @@ smearing).
   `dt_start`, `dt_end`, and optional fan-out fields. The loader namespace is
   part of the TanStack key, preventing a custom exact-identity loader from
   reusing a cached default response with the same wire params.
+- The default loader remaps live tail-only response keys back to configured
+  full slugs when that mapping is unique. Duplicate tails remain an explicit
+  error and require an exact loader that can split/reassemble requests.
 - CSV data export neutralizes formula-looking **string** cells before RFC
   quoting. Negative numeric metrics remain numeric.
 - Deliberately NOT carried: `compactHeader` (MetricsMiniWidget IS the

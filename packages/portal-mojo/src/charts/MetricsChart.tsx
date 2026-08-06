@@ -71,6 +71,37 @@ function humanizeSlug(slug: string): string {
     return slug.split(/[_-]/).map((w) => (w ? w[0]!.toUpperCase() + w.slice(1) : w)).join(' ');
 }
 
+function metricTail(slug: string): string {
+    return slug.split(':').at(-1) ?? slug;
+}
+
+/**
+ * Live `/fetch` labels datasets with only the final colon segment. Repair
+ * that identity for default chart callers when the configured slug set makes
+ * the mapping unique. A duplicate tail remains an error: only an exact loader
+ * can safely split and reassemble those requests.
+ */
+export function remapMetricSeriesIdentity(response: MetricsResponse, requestedSlugs: readonly string[]): MetricsResponse {
+    const requested = [...new Set(requestedSlugs)];
+    const requestedSet = new Set(requested);
+    const byTail = new Map<string, string[]>();
+    for (const slug of requested) {
+        const tail = metricTail(slug);
+        byTail.set(tail, [...(byTail.get(tail) ?? []), slug]);
+    }
+    return {
+        ...response,
+        datasets: response.datasets.map((dataset) => {
+            if (requestedSet.has(dataset.label)) return dataset;
+            const candidates = byTail.get(dataset.label) ?? [];
+            if (candidates.length > 1) {
+                throw new Error(`MetricsChart: response key "${dataset.label}" is ambiguous for ${candidates.join(', ')}; use an exact series loader.`);
+            }
+            return candidates.length === 1 ? { ...dataset, label: candidates[0]! } : dataset;
+        }),
+    };
+}
+
 /** The active window: a quick range anchored at pick time, or custom days. */
 type RangeState =
     | { kind: 'quick'; value: string; anchor: number }
@@ -214,13 +245,18 @@ export function MetricsChart({
     const query = useQuery({
         queryKey: ['metrics', seriesCacheKey, wire],
         queryFn: () => loadSeries(wire),
-        select: (res) => ({
-            ...res,
-            datasets: res.datasets.map((d) => ({
-                ...d,
-                label: seriesLabels[d.label] ?? (preserveSeriesLabels ? d.label : humanizeSlug(d.label)),
-            })),
-        }),
+        select: (res) => {
+            const identitySafe = loadSeries === mojoMetrics
+                ? remapMetricSeriesIdentity(res, slugs)
+                : res;
+            return {
+                ...identitySafe,
+                datasets: identitySafe.datasets.map((d) => ({
+                    ...d,
+                    label: seriesLabels[d.label] ?? (preserveSeriesLabels ? d.label : humanizeSlug(d.label)),
+                })),
+            };
+        },
     });
 
     // Switching range re-points granularity at the nearest sensible bucket

@@ -48,7 +48,7 @@ breakdown?: boolean;
 preserveSeriesLabels?: boolean;
 ```
 
-The default loader remains `mojoMetrics`. A custom loader must supply a stable namespace through `seriesCacheKey`; the namespace is part of the TanStack key so exact explorer data cannot reuse a cached lossy default response. The explorer namespace includes caller identity. Its discovery, KPI, and scalar keys also include caller, account, filters, pagination, and ordered full slugs as applicable.
+The default loader remains `mojoMetrics` and repairs a tail-only response key when the configured full-slug set makes that mapping unique; ambiguous duplicate tails still require the exact loader. A custom loader must supply a stable namespace through `seriesCacheKey`; the namespace is part of the TanStack key so exact explorer data cannot reuse a cached lossy default response. The explorer namespace and every discovery/KPI/scalar key use the synchronous auth-token uid. Protected reads stay disabled until the async `me` identity agrees with that uid, preventing boot or direct identity switches from caching authenticated data under a shared placeholder.
 
 ## Fan-out, KPI, scalar, and export
 
