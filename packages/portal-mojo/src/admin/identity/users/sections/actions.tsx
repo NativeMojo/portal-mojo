@@ -11,12 +11,12 @@
 // auth/verify/email/send).
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { mojoCall, type Field } from 'portal-mojo/client';
+import { mojoCall, withFreshAuth, type Field } from '../../../../client';
 import {
     Badge, PasswordStrengthMeter, fmt, formModal, modal, toast,
-} from 'portal-mojo/ui';
-import { PasskeyModel, UserModel, type UserRow } from '../../models';
-import { inactivityWarning, openGroupDetail } from './shared';
+} from '../../../../ui';
+import { PasskeyModel, UserModel, type UserRow } from '../models';
+import { openGroupDetail } from './shared';
 import { OAuthConnectionList } from './OAuthSection';
 
 /** One-field prompt modal (the source's Modal.prompt pencils). */
@@ -48,7 +48,6 @@ export interface UserAdminActions {
     resendInvite: () => Promise<void>;
     disableUser: () => Promise<void>;
     reactivateUser: () => Promise<void>;
-    resetInactivity: () => Promise<void>;
     openAvatarModal: () => void;
     openPasskeysModal: () => void;
     openLinkedAccountsModal: () => void;
@@ -57,7 +56,7 @@ export interface UserAdminActions {
 
 export function useUserAdminActions(
     user: UserRow,
-    opts: { throttleRetry?: number; refetchThrottle?: () => void } = {},
+    opts: { throttleRetry?: number; refetchThrottle?: () => void; onOpenGroup?: (groupId: number) => void } = {},
 ): UserAdminActions {
     const qc = useQueryClient();
     const save = UserModel.useSave();
@@ -65,6 +64,7 @@ export function useUserAdminActions(
     const reactivate = UserModel.useAction('reactivate');
     const sendInvite = UserModel.useAction('send_invite');
     const revokeSessions = UserModel.useAction('revoke_sessions');
+    const changeUsername = UserModel.useAction('change_username');
 
     const fail = (err: unknown, fallback: string) =>
         toast.error(err instanceof Error ? err.message : fallback);
@@ -226,7 +226,13 @@ export function useUserAdminActions(
     };
     const editUsername = async () => {
         const v = await promptField('Edit username', { name: 'username', type: 'text', label: 'Username' }, user.username ?? '');
-        if (v != null) await saveFields({ username: v }, 'Username');
+        if (v == null) return;
+        try {
+            await changeUsername.mutateAsync({ id: user.id, payload: { username: v } });
+            toast.success('Username updated');
+        } catch (err) {
+            fail(err, 'Failed to update username');
+        }
     };
     const editEmail = async () => {
         const v = await promptField('Change email', { name: 'email', type: 'email', label: 'Email address' }, user.email ?? '');
@@ -353,7 +359,7 @@ export function useUserAdminActions(
         const body: Record<string, unknown> = { disable_totp: true };
         if (data.clear_requirement === true) body.requires_mfa = false;
         try {
-            await mojoCall(`/api/user/${user.id}`, { method: 'POST', body });
+            await withFreshAuth(() => mojoCall(`/api/user/${user.id}`, { method: 'POST', body }));
             toast.success('MFA reset — authenticator enrollment cleared');
             await UserModel.invalidate(qc);
         } catch (err) {
@@ -381,7 +387,7 @@ export function useUserAdminActions(
         });
         if (!ok) return;
         try {
-            await mojoCall(`/api/user/${user.id}`, { method: 'POST', body: { disable_totp: true } });
+            await withFreshAuth(() => mojoCall(`/api/user/${user.id}`, { method: 'POST', body: { disable_totp: true } }));
             toast.success('Authenticator disabled');
             await UserModel.invalidate(qc);
         } catch (err) {
@@ -471,18 +477,6 @@ export function useUserAdminActions(
         }
     };
 
-    const resetInactivity = async () => {
-        // Same action as reactivate — clears the warning + restarts the
-        // inactivity clock (source onActionResetInactivity).
-        if (!inactivityWarning(user)) return;
-        try {
-            await reactivate.mutateAsync({ id: user.id, payload: { note: 'Inactivity warning reset' } });
-            toast.success('Inactivity warning cleared');
-        } catch (err) {
-            fail(err, 'Failed to reset');
-        }
-    };
-
     // ── Avatar / passkeys / linked accounts / org ─────────────────────
 
     const openAvatarModal = () => {
@@ -508,7 +502,7 @@ export function useUserAdminActions(
     const openOrg = async () => {
         const orgId = typeof user.org === 'object' && user.org ? user.org.id : typeof user.org === 'number' ? user.org : null;
         if (orgId == null) return;
-        openGroupDetail(orgId);
+        openGroupDetail(orgId, opts.onOpenGroup);
     };
 
     return {
@@ -517,7 +511,7 @@ export function useUserAdminActions(
         editUser, editAccount, changePassword,
         resetMfa, toggleMfaRequirement, disableTotp,
         clearRateLimit, revokeAllSessions, resendInvite,
-        disableUser, reactivateUser, resetInactivity,
+        disableUser, reactivateUser,
         openAvatarModal, openPasskeysModal, openLinkedAccountsModal, openOrg,
     };
 }
@@ -632,10 +626,6 @@ function AvatarModal({ user, onClose }: { user: UserRow; onClose: () => void }) 
                     ? <img src={url} alt="Current avatar" />
                     : <span className="dim-italic">No avatar set — the initials placeholder shows.</span>}
             </div>
-            <p className="dim" style={{ margin: '10px 0 0' }}>
-                Uploading a new image lands with the fileman client (multipart
-                upload → <code>avatar</code> file id). Clearing works now.
-            </p>
             <div className="modal-actions">
                 <button className="btn" onClick={onClose} disabled={busy}>Close</button>
                 {url && (
@@ -750,4 +740,3 @@ function PasskeysModal({ userId, onClose }: { userId: number; onClose: () => voi
         </div>
     );
 }
-

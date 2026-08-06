@@ -27,7 +27,6 @@ if (import.meta.env.DEV) {
 }
 import { ThemeProvider } from 'portal-mojo/ui';
 import { DashboardPage } from './pages/DashboardPage';
-import { UsersPage } from './pages/UsersPage';
 
 // This artifact is the fleet-wide Admin, never a group-scoped product portal.
 // Remove stale deep-link scope without erasing another portal's remembered
@@ -50,7 +49,6 @@ const router = createHashRouter([
         element: <RequireAuth><App /></RequireAuth>,
         children: [
             { index: true, element: <DashboardPage /> },
-            { path: 'users', element: <UsersPage /> },
             ...adminRoutes,
         ],
     },

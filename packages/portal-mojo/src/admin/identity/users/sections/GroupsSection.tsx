@@ -4,11 +4,12 @@
 // (SEARCH_FIELDS sweep user__username/email/display_name — search here
 // narrows by the group side too on the mock) and pageSize-5 paging. Row
 // click opens the group's detail, stacked.
-import { Badge, fmt } from 'portal-mojo/ui';
-import { MemberModel, type UserRow } from '../../models';
-import { openGroupDetail, Pager, SectionSearch, useSectionList } from './shared';
+import { Badge, fmt } from '../../../../ui';
+import { MemberModel } from '../../members';
+import type { UserRow } from '../models';
+import { Pager, SectionSearch, useSectionList } from './shared';
 
-export function GroupsSection({ user }: { user: UserRow }) {
+export function GroupsSection({ user, onOpenGroup }: { user: UserRow; onOpenGroup?: (groupId: number) => void }) {
     const list = useSectionList(5, { user: user.id, sort: '-created' });
     const { data, isPending } = MemberModel.useList(list.params);
     const rows = data?.rows ?? [];
@@ -29,13 +30,8 @@ export function GroupsSection({ user }: { user: UserRow }) {
                 const grants = Object.entries(m.permissions ?? {})
                     .filter(([, v]) => v === true || v === 1)
                     .map(([k]) => k);
-                return (
-                    <button
-                        key={m.id}
-                        type="button"
-                        className="us-feed-row"
-                        onClick={() => { if (m.group?.id) openGroupDetail(m.group.id); }}
-                    >
+                const content = (
+                    <>
                         <div className="us-feed-top">
                             <strong>{m.group?.name ?? '—'}</strong>
                             {m.group?.kind && <Badge tone="muted">{m.group.kind}</Badge>}
@@ -47,7 +43,19 @@ export function GroupsSection({ user }: { user: UserRow }) {
                                 {grants.map((g) => <span key={g} className="chip chip-muted">{g}</span>)}
                             </div>
                         )}
+                    </>
+                );
+                return onOpenGroup && m.group?.id ? (
+                    <button
+                        key={m.id}
+                        type="button"
+                        className="us-feed-row"
+                        onClick={() => onOpenGroup(m.group!.id)}
+                    >
+                        {content}
                     </button>
+                ) : (
+                    <div key={m.id} className="us-feed-row">{content}</div>
                 );
             })}
             <Pager state={list} count={data?.count ?? 0} />

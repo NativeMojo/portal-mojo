@@ -9,9 +9,9 @@
 // django-mojo's NO_SAVE_FIELDS (user.py RestMeta, read 2026-08-05), so the
 // server silently DROPS the write and the source UI toasts a success that
 // never happened. The verified badge still renders from the row.
-import { Badge, Eyebrow, FlatRow, FormView } from 'portal-mojo/ui';
-import type { Field } from 'portal-mojo/client';
-import { UserModel, type UserRow } from '../../models';
+import { Badge, Eyebrow, FlatRow, FormView } from '../../../../ui';
+import type { Field } from '../../../../client';
+import { UserModel, type UserRow } from '../models';
 
 const NAME_FIELDS: Field[] = [
     { name: 'display_name', type: 'text', label: 'Display name', columns: 6 },

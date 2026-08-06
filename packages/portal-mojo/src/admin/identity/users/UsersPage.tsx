@@ -3,12 +3,12 @@
 // fanned out with allSettled), column chooser, persisted view state,
 // auto-refresh, expandable rows, recency grouping, and server-side export.
 import { useQueryClient } from '@tanstack/react-query';
-import { type User } from 'portal-mojo/client';
+import { useCan, type User } from '../../../client';
 import {
     Badge, fmt, formModal, groupByRecency, modal, toast, ModelTable,
     type BatchAction, type Column, type FilterDef,
-} from 'portal-mojo/ui';
-import { UserModel } from '../models';
+} from '../../../ui';
+import { USER_MANAGE_PERMISSIONS, UserModel } from './models';
 import { UserDetail } from './UserDetail';
 
 const COLUMNS: Column<User>[] = [
@@ -82,8 +82,9 @@ function UserExpand({ u }: { u: User }) {
     );
 }
 
-export function UsersPage() {
+export function UsersPage({ onOpenGroup }: { onOpenGroup?: (groupId: number) => void } = {}) {
     const qc = useQueryClient();
+    const { can: canManage } = useCan(USER_MANAGE_PERMISSIONS);
     const save = UserModel.useSave();
     const disable = UserModel.useAction('disable');
     const reactivate = UserModel.useAction('reactivate');
@@ -105,7 +106,7 @@ export function UsersPage() {
         // Prefetch through the shared cache key: the modal's useOne attaches
         // to this in-flight request instead of issuing its own.
         void UserModel.fetchOne(qc, u.id).catch(() => {});
-        void modal.detail((close) => <UserDetail id={u.id} onClose={() => close(null)} />);
+        void modal.detail((close) => <UserDetail id={u.id} onClose={() => close(null)} onOpenGroup={onOpenGroup} />);
     };
 
     // Batch actions run the model's REAL POST_SAVE_ACTIONS per row; the
@@ -113,6 +114,7 @@ export function UsersPage() {
     const BATCH: BatchAction<User>[] = [
         {
             key: 'disable', label: 'Disable', icon: 'bi-slash-circle', danger: true, confirm: false,
+            eligible: (row) => row.is_active,
             prepare: async () => {
                 const data = await formModal(UserModel.forms.disable!);
                 if (!data) return null;
@@ -124,6 +126,7 @@ export function UsersPage() {
         },
         {
             key: 'reactivate', label: 'Reactivate', icon: 'bi-arrow-counterclockwise',
+            eligible: (row) => !row.is_active,
             run: (row) => reactivate.mutateAsync({ id: row.id }),
         },
     ];
@@ -144,8 +147,8 @@ export function UsersPage() {
                 { key: 'inactive', label: 'Inactive', params: { is_active: 'false' } },
             ]}
             defaultSort="-last_activity"
-            selectable
-            batchActions={BATCH}
+            selectable={canManage}
+            batchActions={canManage ? BATCH : []}
             columnChooser
             persistState
             exportFormats={['csv', 'json']}
@@ -154,7 +157,7 @@ export function UsersPage() {
             {...groupByRecency<User>('last_activity')}
             onRowClick={openUser}
             addLabel="Add User"
-            onAdd={addUser}
+            onAdd={canManage ? addUser : undefined}
         />
     );
 }

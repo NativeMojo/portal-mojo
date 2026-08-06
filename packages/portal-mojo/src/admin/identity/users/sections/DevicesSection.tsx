@@ -9,9 +9,9 @@
 //     shape (platform / device_name / os_version / app_version /
 //     push_enabled) — web-mojo's template bound a device_info block that
 //     this backend never serializes; the row binds the live fields instead.
-import { useState } from 'react';
-import { Badge, Eyebrow, fmt } from 'portal-mojo/ui';
-import { DeviceModel, PushDeviceModel, type UserRow } from '../../models';
+import { useEffect, useState } from 'react';
+import { Badge, Eyebrow, fmt } from '../../../../ui';
+import { DeviceModel, PushDeviceModel, type UserRow } from '../models';
 import { lastSeenLabel, Pager, SectionSearch, SectionTabs, useSectionList } from './shared';
 
 const PLATFORM_ICON: Record<string, string> = {
@@ -20,9 +20,9 @@ const PLATFORM_ICON: Record<string, string> = {
     web: 'bi-globe2',
 };
 
-function BrowserTab({ user }: { user: UserRow }) {
+function BrowserTab({ user, enabled }: { user: UserRow; enabled: boolean }) {
     const list = useSectionList(5, { user: user.id, sort: '-last_seen' });
-    const { data, isPending } = DeviceModel.useList(list.params);
+    const { data, isPending } = DeviceModel.useList(list.params, { enabled });
     const rows = data?.rows ?? [];
     return (
         <>
@@ -61,9 +61,9 @@ function BrowserTab({ user }: { user: UserRow }) {
     );
 }
 
-function PushTab({ user }: { user: UserRow }) {
+function PushTab({ user, enabled }: { user: UserRow; enabled: boolean }) {
     const list = useSectionList(5, { user: user.id, sort: '-last_seen' });
-    const { data, isPending } = PushDeviceModel.useList(list.params);
+    const { data, isPending } = PushDeviceModel.useList(list.params, { enabled });
     const rows = data?.rows ?? [];
     return (
         <>
@@ -98,23 +98,32 @@ function PushTab({ user }: { user: UserRow }) {
     );
 }
 
-export function DevicesSection({ user, counts }: { user: UserRow; counts: { browser: number; push: number } }) {
-    const [tab, setTab] = useState('browser');
+export function DevicesSection({ user, counts, canBrowser, canPush }: {
+    user: UserRow;
+    counts: { browser: number; push: number };
+    canBrowser: boolean;
+    canPush: boolean;
+}) {
+    const [tab, setTab] = useState(canBrowser ? 'browser' : 'push');
+    useEffect(() => {
+        if (tab === 'browser' && !canBrowser) setTab('push');
+        if (tab === 'push' && !canPush) setTab('browser');
+    }, [canBrowser, canPush, tab]);
     return (
         <>
             <Eyebrow>Devices &amp; sessions</Eyebrow>
             <SectionTabs
                 tabs={[
-                    { key: 'browser', label: 'Browser', badge: counts.browser || null },
-                    { key: 'push', label: 'Push', badge: counts.push || null },
+                    ...(canBrowser ? [{ key: 'browser', label: 'Browser', badge: counts.browser || null }] : []),
+                    ...(canPush ? [{ key: 'push', label: 'Push', badge: counts.push || null }] : []),
                 ]}
                 active={tab}
                 onSelect={setTab}
             />
             {/* Tabs stay mounted-but-hidden so page/search state survives a
                 tab switch (web-mojo TabView keep-alive semantic). */}
-            <div hidden={tab !== 'browser'}><BrowserTab user={user} /></div>
-            <div hidden={tab !== 'push'}><PushTab user={user} /></div>
+            {canBrowser && <div hidden={tab !== 'browser'}><BrowserTab user={user} enabled={canBrowser} /></div>}
+            {canPush && <div hidden={tab !== 'push'}><PushTab user={user} enabled={canPush} /></div>}
         </>
     );
 }

@@ -6,13 +6,13 @@
 //   Events    — /api/incident/event?model_name=account.User&model_id=<id>
 //   Audit Log — /api/logs?model_name=account.User&model_id=<id>
 //               (changes made TO the record)
-// The whole section is view_logs-gated at the rail (UserDetail); incident
-// events additionally need view_security live — a denial there surfaces as
-// the tab's error text, not a crash.
-import { useState } from 'react';
-import { Badge, Eyebrow, fmt } from 'portal-mojo/ui';
-import { LogModel, type LogRow } from 'portal-mojo/admin';
-import { IncidentEventModel, type UserRow } from '../../models';
+// Log and incident tabs are independently system-gated. A denied feed never
+// mounts and therefore cannot issue a background request.
+import { useEffect, useState } from 'react';
+import { Badge, Eyebrow, fmt } from '../../../../ui';
+import { LogModel, type LogRow } from '../../../monitoring';
+import { EventModel } from '../../../incidents';
+import type { UserRow } from '../models';
 import {
     DISABLE_REASON_BADGES, disableBlock, groupRowsByDay,
     LOG_LEVEL_ICON, LOG_LEVEL_TONE,
@@ -111,7 +111,7 @@ function LogsTab({ params, placeholder, empty, showPath }: {
 
 function EventsTab({ user }: { user: UserRow }) {
     const list = useSectionList(5, { model_name: 'account.User', model_id: user.id, sort: '-created' });
-    const { data, isPending, isError, error } = IncidentEventModel.useList(list.params);
+    const { data, isPending, isError, error } = EventModel.useList(list.params);
     const rows = data?.rows ?? [];
     const groups = groupRowsByDay(rows, (e) => e.created);
     return (
@@ -147,40 +147,44 @@ function EventsTab({ user }: { user: UserRow }) {
 
 // ── The section ───────────────────────────────────────────────────────
 
-export function AuditSection({ user }: { user: UserRow }) {
-    const [tab, setTab] = useState('activity');
+export function AuditSection({ user, canLogs, canEvents }: { user: UserRow; canLogs: boolean; canEvents: boolean }) {
+    const [tab, setTab] = useState(canLogs ? 'activity' : 'events');
+    const tabs = [
+        ...(canLogs ? [{ key: 'activity', label: 'Activity' }, { key: 'audit', label: 'Audit Log' }] : []),
+        ...(canEvents ? [{ key: 'events', label: 'Events' }] : []),
+    ];
+    useEffect(() => {
+        const visible = (tab === 'events' && canEvents) || (tab !== 'events' && canLogs);
+        if (!visible) setTab(canLogs ? 'activity' : 'events');
+    }, [canEvents, canLogs, tab]);
     return (
         <>
             <DisableHistory user={user} />
             <Eyebrow>Audit</Eyebrow>
             <SectionTabs
-                tabs={[
-                    { key: 'activity', label: 'Activity' },
-                    { key: 'events', label: 'Events' },
-                    { key: 'audit', label: 'Audit Log' },
-                ]}
+                tabs={tabs}
                 active={tab}
                 onSelect={setTab}
             />
             {/* Tabs stay mounted-but-hidden so page/search state survives a
                 tab switch (web-mojo TabView keep-alive semantic). */}
-            <div hidden={tab !== 'activity'}>
+            {canLogs && <div hidden={tab !== 'activity'}>
                 <LogsTab
                     params={{ uid: user.id }}
                     placeholder="Search activity…"
                     empty="No activity recorded yet."
                     showPath
                 />
-            </div>
-            <div hidden={tab !== 'events'}><EventsTab user={user} /></div>
-            <div hidden={tab !== 'audit'}>
+            </div>}
+            {canEvents && <div hidden={tab !== 'events'}><EventsTab user={user} /></div>}
+            {canLogs && <div hidden={tab !== 'audit'}>
                 <LogsTab
                     params={{ model_name: 'account.User', model_id: user.id }}
                     placeholder="Search audit log…"
                     empty="No record changes logged."
                     showPath={false}
                 />
-            </div>
+            </div>}
         </>
     );
 }

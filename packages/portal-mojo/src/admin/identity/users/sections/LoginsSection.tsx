@@ -11,8 +11,8 @@
 // latitude/longitude (already serialized by the live wire, see
 // LoginEventRow), so a future map tab mounts beside this list inside
 // LoginsSection with zero wire changes.
-import { Eyebrow, fmt } from 'portal-mojo/ui';
-import { LoginEventModel, type UserRow } from '../../models';
+import { Eyebrow, fmt } from '../../../../ui';
+import { LoginEventModel, type UserRow } from '../models';
 import { groupRowsByDay, loginTone, Pager, SectionSearch, useSectionList } from './shared';
 
 export function LoginsSection({ user }: { user: UserRow }) {

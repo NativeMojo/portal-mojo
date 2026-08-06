@@ -9,8 +9,8 @@
 //
 // plus header parity (presence, reason-keyed status badge, throttle chip,
 // inactivity warning, verified/2FA/role chips, active toggle → disable-flow
-// modal) and the full kebab. Sections live in ./user-sections/* — one file
-// per section; ./user-sections/actions.tsx holds the canonical handler per
+// modal) and the full kebab. Sections live in ./sections/* — one file
+// per section; ./sections/actions.tsx holds the canonical handler per
 // action (kebab + Profile cards + Security rows share them, the source's
 // Phase 4 dedup).
 //
@@ -18,35 +18,47 @@
 // wave — MERGE-WIRE notes filed): chips are not clickable, so the org chip's
 // click-through lives in the kebab ("Open organization") and as an Overview
 // row link; the avatar slot renders initials (no image/click slot), so
-// avatar management hangs off the kebab ("Avatar…" → clear + upload seam);
+// avatar clearing hangs off the kebab; upload awaits the multipart seam;
 // presence/status/locked/warning render as chips instead of a two-row aux.
 import { useSyncExternalStore } from 'react';
+import { useCan, useMe } from '../../../client';
 import {
     DetailView, getFormTabs, subscribeFormTabs, fmt, modal,
     type Chip, type DetailMenuEntry,
-} from 'portal-mojo/ui';
-import { UserModel, type UserRow } from '../models';
-import { useUserAdminActions } from './user-sections/actions';
-import { useSharedUserQueries } from './user-sections/queries';
+} from '../../../ui';
+import {
+    USER_DEVICE_PERMISSIONS, USER_EVENT_PERMISSIONS, USER_LOGIN_PERMISSIONS,
+    USER_LOG_PERMISSIONS, USER_MANAGE_PERMISSIONS, USER_PUSH_DEVICE_PERMISSIONS,
+    UserModel, type UserRow,
+} from './models';
+import { MEMBER_READ_PERMISSIONS } from '../members';
+import { useUserAdminActions } from './sections/actions';
+import { useSharedUserQueries } from './sections/queries';
 import {
     accountType, inactivityWarning, isAnonymized, isOnline, statusBadge, useAdminCaller,
-} from './user-sections/shared';
-import { USER_APP_PERMS_TABSET } from './user-sections/permission-catalog';
-import { OverviewSection } from './user-sections/OverviewSection';
-import { ProfileSection } from './user-sections/ProfileSection';
-import { PersonalSection } from './user-sections/PersonalSection';
-import { SecuritySection } from './user-sections/SecuritySection';
-import { OAuthSection } from './user-sections/OAuthSection';
-import { GroupsSection } from './user-sections/GroupsSection';
-import { AppPermsSection, SysPermsSection } from './user-sections/PermissionsSection';
-import { ApiKeysSection } from './user-sections/ApiKeysSection';
-import { DevicesSection } from './user-sections/DevicesSection';
-import { LoginsSection } from './user-sections/LoginsSection';
-import { AuditSection } from './user-sections/AuditSection';
-import { NotificationsSection } from './user-sections/NotificationsSection';
-import { UserMetadataSection } from './user-sections/MetadataPanel';
+} from './sections/shared';
+import { USER_APP_PERMS_TABSET } from './sections/permission-catalog';
+import { OverviewSection } from './sections/OverviewSection';
+import { ProfileSection } from './sections/ProfileSection';
+import { PersonalSection } from './sections/PersonalSection';
+import { SecuritySection } from './sections/SecuritySection';
+import { OAuthSection } from './sections/OAuthSection';
+import { GroupsSection } from './sections/GroupsSection';
+import { AppPermsSection, SysPermsSection } from './sections/PermissionsSection';
+import { ApiKeysSection } from './sections/ApiKeysSection';
+import { DevicesSection } from './sections/DevicesSection';
+import { LoginsSection } from './sections/LoginsSection';
+import { AuditSection } from './sections/AuditSection';
+import { NotificationsSection } from './sections/NotificationsSection';
+import { UserMetadataSection } from './sections/MetadataPanel';
 
-export function UserDetail({ id, onClose }: { id: number; onClose: () => void }) {
+export interface UserDetailProps {
+    id: number;
+    onClose: () => void;
+    onOpenGroup?: (groupId: number) => void;
+}
+
+export function UserDetail({ id, onClose, onOpenGroup }: UserDetailProps) {
     const { data: user, isPending } = UserModel.useOne(id);
     const isAdmin = useAdminCaller();
     // App Perms renders only when an app registered tabs — the portal's
@@ -61,20 +73,40 @@ export function UserDetail({ id, onClose }: { id: number; onClose: () => void })
     if (isPending || !user) {
         return <div className="detail-loading"><span className="skel skel-block" /></div>;
     }
-    return <UserDetailLoaded user={user} isAdmin={isAdmin} hasAppPerms={appPermsCount > 0} onClose={onClose} />;
+    return <UserDetailLoaded user={user} isAdmin={isAdmin} hasAppPerms={appPermsCount > 0} onClose={onClose} onOpenGroup={onOpenGroup} />;
 }
 
-function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose }: {
+function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: {
     user: UserRow;
     isAdmin: boolean;
     hasAppPerms: boolean;
     onClose: () => void;
+    onOpenGroup?: (groupId: number) => void;
 }) {
-    const shared = useSharedUserQueries(user.id, isAdmin);
+    const { data: me } = useMe();
+    const isSelf = me?.id === user.id;
+    const canMembers = useCan(MEMBER_READ_PERMISSIONS).can;
+    const canDevices = useCan(USER_DEVICE_PERMISSIONS).can;
+    const canPushDevices = useCan(USER_PUSH_DEVICE_PERMISSIONS).can;
+    const canLogins = useCan(USER_LOGIN_PERMISSIONS).can;
+    const canLogs = useCan(USER_LOG_PERMISSIONS).can;
+    const canEvents = useCan(USER_EVENT_PERMISSIONS).can;
+    const canCredentials = isSelf || isAdmin;
+    const shared = useSharedUserQueries(user.id, {
+        devices: canDevices,
+        pushDevices: canPushDevices,
+        members: canMembers,
+        logins: canLogins,
+        events: canEvents,
+        logs: canLogs,
+        apiKeys: canCredentials,
+        throttle: isAdmin,
+    });
     const throttleRetry = Math.max(0, Math.floor(Number(shared.throttle.data?.retry_after_seconds ?? 0))) || 0;
     const actions = useUserAdminActions(user, {
         throttleRetry,
         refetchThrottle: () => void shared.throttle.refetch(),
+        onOpenGroup,
     });
 
     // ── Header chips ──────────────────────────────────────────────────
@@ -104,26 +136,28 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose }: {
         // Login-throttle badge — independent of is_active; admin-only fetch,
         // absent while the GET hasn't settled (non-fatal).
         ...(throttleRetry > 0 ? [{ icon: 'bi-clock-history', text: `Login locked ${throttleRetry}s`, tone: 'danger' as const }] : []),
-        // Inactivity-warning surface; the Reset action lives in the kebab.
+        // Inactivity-warning surface is read-only until the backend exposes a
+        // supported clear action for active users.
         ...(warning ? [{ icon: 'bi-exclamation-triangle', text: `Inactivity warning — ${warning.days ?? '?'}d to auto-disable`, tone: 'warning' as const }] : []),
     ];
 
     // ── Kebab (UserView contextItems at full scope) ───────────────────
-    const ADMIN = ['users', 'manage_users'];
+    const ADMIN = USER_MANAGE_PERMISSIONS;
     const MENU: DetailMenuEntry<UserRow>[] = [
         { label: 'Edit user', icon: 'bi-pencil', permissions: ADMIN, onSelect: () => void actions.editUser() },
-        { label: 'Avatar…', icon: 'bi-image', permissions: ADMIN, onSelect: () => actions.openAvatarModal() },
+        {
+            label: 'Clear avatar…', icon: 'bi-image', permissions: ADMIN,
+            when: (u) => Boolean(u?.avatar), onSelect: () => actions.openAvatarModal(),
+        },
         {
             label: 'Open organization', icon: 'bi-buildings',
-            when: (u) => Boolean(typeof u?.org === 'object' ? u.org?.id : u?.org),
+            when: (u) => Boolean(onOpenGroup && (typeof u?.org === 'object' ? u.org?.id : u?.org)),
             onSelect: () => void actions.openOrg(),
         },
         { divider: true },
         { label: 'Change password', icon: 'bi-key', permissions: ADMIN, onSelect: () => void actions.changePassword() },
-        // Contact-keyed send flows stay UNGATED — the backend trusts the
-        // email/SMS recipient, not the JWT (anti-enumeration routes).
-        { label: 'Send password reset', icon: 'bi-envelope', onSelect: () => void actions.sendPasswordReset() },
-        { label: 'Send magic login link', icon: 'bi-link-45deg', onSelect: () => void actions.sendMagicLink() },
+        { label: 'Send password reset', icon: 'bi-envelope', permissions: ADMIN, onSelect: () => void actions.sendPasswordReset() },
+        { label: 'Send magic login link', icon: 'bi-link-45deg', permissions: ADMIN, onSelect: () => void actions.sendMagicLink() },
         {
             label: 'Resend invite', icon: 'bi-envelope-plus', permissions: ADMIN,
             when: (u) => Boolean(u?.email) && u?.last_login == null,
@@ -134,11 +168,6 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose }: {
             label: 'Reset MFA', icon: 'bi-shield-x', permissions: ADMIN,
             when: (u) => u?.requires_mfa === true,
             onSelect: () => void actions.resetMfa(),
-        },
-        {
-            label: 'Reset inactivity warning', icon: 'bi-alarm', permissions: ADMIN,
-            when: (u) => (u ? inactivityWarning(u) != null : false),
-            onSelect: () => void actions.resetInactivity(),
         },
         { label: 'Clear rate limit', icon: 'bi-shield-slash', permissions: ADMIN, onSelect: () => void actions.clearRateLimit() },
         {
@@ -184,43 +213,44 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose }: {
             badges={badges}
             onClose={onClose}
             sections={[
-                { key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <OverviewSection user={user} shared={shared} /> },
-                { key: 'Profile', label: 'Profile', icon: 'bi-person', render: () => <ProfileSection user={user} actions={actions} /> },
-                { key: 'Personal', label: 'Personal', icon: 'bi-card-text', render: () => <PersonalSection user={user} /> },
-                { key: 'Security', label: 'Security', icon: 'bi-shield-lock', render: () => <SecuritySection user={user} actions={actions} /> },
-                { key: 'OAuth', label: 'OAuth', icon: 'bi-link-45deg', render: () => <OAuthSection user={user} /> },
+                { key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <OverviewSection user={user} shared={shared} onOpenGroup={onOpenGroup} /> },
+                { key: 'Profile', label: 'Profile', icon: 'bi-person', render: () => <ProfileSection user={user} actions={actions} canManage={isAdmin} canCredentials={canCredentials} /> },
+                { key: 'Personal', label: 'Personal', icon: 'bi-card-text', permissions: ADMIN, render: () => <PersonalSection user={user} /> },
+                { key: 'Security', label: 'Security', icon: 'bi-shield-lock', render: () => <SecuritySection user={user} actions={actions} canManage={isAdmin} canPasskeys={canCredentials} /> },
+                ...(canCredentials ? [{ key: 'OAuth', label: 'OAuth', icon: 'bi-link-45deg', render: () => <OAuthSection user={user} canManage={canCredentials} /> }] : []),
                 { divider: 'Access' },
-                { key: 'Groups', label: 'Groups', icon: 'bi-people', render: () => <GroupsSection user={user} /> },
+                ...(canMembers ? [{ key: 'Groups', label: 'Groups', icon: 'bi-people', render: () => <GroupsSection user={user} onOpenGroup={onOpenGroup} /> }] : []),
                 {
                     key: 'SysPerms', label: 'Sys Perms', icon: 'bi-shield-check',
-                    permissions: ['users', 'manage_users'],
+                    permissions: ADMIN,
                     render: () => <SysPermsSection user={user} />,
                 },
                 ...(hasAppPerms ? [{
                     key: 'AppPerms', label: 'App Perms', icon: 'bi-puzzle',
-                    permissions: ['users', 'manage_users'],
+                    permissions: ADMIN,
                     render: () => <AppPermsSection user={user} />,
                 }] : []),
-                { key: 'ApiKeys', label: 'API Keys', icon: 'bi-key', render: () => <ApiKeysSection user={user} /> },
+                ...(canCredentials ? [{ key: 'ApiKeys', label: 'API Keys', icon: 'bi-key', render: () => <ApiKeysSection user={user} canManage={canCredentials} isSelf={isSelf} /> }] : []),
                 { divider: 'Activity' },
-                {
+                ...((canDevices || canPushDevices) ? [{
                     key: 'Devices', label: 'Devices', icon: 'bi-laptop',
                     render: () => (
                         <DevicesSection
                             user={user}
                             counts={{ browser: shared.devices.data?.count ?? 0, push: shared.pushDevices.data?.count ?? 0 }}
+                            canBrowser={canDevices}
+                            canPush={canPushDevices}
                         />
                     ),
-                },
-                { key: 'Logins', label: 'Logins', icon: 'bi-geo-alt', render: () => <LoginsSection user={user} /> },
-                {
+                }] : []),
+                ...(canLogins ? [{ key: 'Logins', label: 'Logins', icon: 'bi-geo-alt', render: () => <LoginsSection user={user} /> }] : []),
+                ...((canLogs || canEvents) ? [{
                     key: 'Audit', label: 'Audit', icon: 'bi-clock-history',
-                    permissions: ['view_logs', 'manage_logs', 'security'],
-                    render: () => <AuditSection user={user} />,
-                },
+                    render: () => <AuditSection user={user} canLogs={canLogs} canEvents={canEvents} />,
+                }] : []),
                 { divider: 'Settings' },
                 { key: 'Notifications', label: 'Notifications', icon: 'bi-bell', render: () => <NotificationsSection user={user} /> },
-                { key: 'Metadata', label: 'Metadata', icon: 'bi-braces', render: () => <UserMetadataSection user={user} /> },
+                { key: 'Metadata', label: 'Metadata', icon: 'bi-braces', render: () => <UserMetadataSection user={user} canManage={isAdmin} /> },
             ]}
         />
     );

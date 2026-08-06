@@ -4,14 +4,21 @@
 // passkeys). Non-admin viewers see read-only cards + the send flows —
 // contact-keyed actions stay ungated (the backend trusts the email/SMS
 // recipient, not the JWT).
-import { Badge, Eyebrow, FlatRow, SecurityItem, fmt } from 'portal-mojo/ui';
-import { OAuthConnectionModel, type UserRow } from '../../models';
+import { Badge, Eyebrow, FlatRow, SecurityItem, fmt } from '../../../../ui';
+import { OAuthConnectionModel, type UserRow } from '../models';
 import type { UserAdminActions } from './actions';
-import { accountType, providerIcon, useAdminCaller } from './shared';
+import { accountType, providerIcon } from './shared';
 
-export function ProfileSection({ user, actions }: { user: UserRow; actions: UserAdminActions }) {
-    const isAdmin = useAdminCaller();
-    const { data: connections } = OAuthConnectionModel.useList({ user: user.id, size: 25, sort: '-created' });
+export function ProfileSection({ user, actions, canManage, canCredentials }: {
+    user: UserRow;
+    actions: UserAdminActions;
+    canManage: boolean;
+    canCredentials: boolean;
+}) {
+    const { data: connections } = OAuthConnectionModel.useList(
+        { user: user.id, size: 25, sort: '-created' },
+        { enabled: canCredentials },
+    );
     const meta = (user.metadata ?? {}) as Record<string, unknown>;
     const timezone = typeof meta.timezone === 'string' ? meta.timezone : null;
     const hasEmail = Boolean(user.email);
@@ -23,7 +30,7 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
             <Eyebrow>Personal</Eyebrow>
             <FlatRow
                 label="Display name"
-                action={isAdmin ? () => void actions.editDisplayName() : undefined}
+                action={canManage ? () => void actions.editDisplayName() : undefined}
             >
                 {user.display_name ?? <span className="dim">—</span>}
             </FlatRow>
@@ -33,13 +40,9 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
             {/* Username card */}
             <SecurityItem icon="bi-at" title="Username" desc="">
                 <code className="us-id-value">{user.username || '—'}</code>
-                {isAdmin ? (
+                {canManage && (
                     <button className="btn-icon btn-icon-sm" title="Edit username" aria-label="Edit username" onClick={() => void actions.editUsername()}>
                         <i className="bi bi-pencil" />
-                    </button>
-                ) : (
-                    <button className="btn btn-compact" onClick={() => void actions.sendMagicLink()}>
-                        <i className="bi bi-link-45deg" /> Send magic link
                     </button>
                 )}
             </SecurityItem>
@@ -53,12 +56,12 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
                 {hasEmail
                     ? <Badge tone={user.is_email_verified ? 'success' : 'warning'}>{user.is_email_verified ? 'Verified' : 'Unverified'}</Badge>
                     : <span className="dim-italic">Not set</span>}
-                {isAdmin && hasEmail && user.is_email_verified && (
+                {canManage && hasEmail && user.is_email_verified && (
                     <button className="btn-icon btn-icon-sm" title="Mark as unverified" aria-label="Mark email as unverified" onClick={() => void actions.setVerification('is_email_verified', false, 'Email')}>
                         <i className="bi bi-x-circle" />
                     </button>
                 )}
-                {isAdmin && hasEmail && !user.is_email_verified && (
+                {canManage && hasEmail && !user.is_email_verified && (
                     <>
                         <button className="btn-icon btn-icon-sm" title="Send verification email" aria-label="Send verification email" onClick={() => void actions.sendVerificationEmail()}>
                             <i className="bi bi-envelope-arrow-up" />
@@ -68,14 +71,9 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
                         </button>
                     </>
                 )}
-                {isAdmin && (
+                {canManage && (
                     <button className="btn-icon btn-icon-sm" title="Edit email" aria-label="Edit email" onClick={() => void actions.editEmail()}>
                         <i className="bi bi-pencil" />
-                    </button>
-                )}
-                {!isAdmin && hasEmail && (
-                    <button className="btn btn-compact" onClick={() => void actions.sendMagicLink()}>
-                        <i className="bi bi-link-45deg" /> Send magic link
                     </button>
                 )}
             </SecurityItem>
@@ -89,7 +87,7 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
                 {hasPhone
                     ? <Badge tone={user.is_phone_verified ? 'success' : 'warning'}>{user.is_phone_verified ? 'Verified' : 'Unverified'}</Badge>
                     : <span className="dim-italic">Not set</span>}
-                {isAdmin && hasPhone && (
+                {canManage && hasPhone && (
                     <>
                         {user.is_phone_verified ? (
                             <button className="btn-icon btn-icon-sm" title="Mark as unverified" aria-label="Mark phone as unverified" onClick={() => void actions.setVerification('is_phone_verified', false, 'Phone')}>
@@ -108,7 +106,7 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
                         </button>
                     </>
                 )}
-                {isAdmin && !hasPhone && (
+                {canManage && !hasPhone && (
                     <button className="btn-icon btn-icon-sm" title="Set phone" aria-label="Set phone" onClick={() => void actions.setPhone()}>
                         <i className="bi bi-plus-lg" />
                     </button>
@@ -121,7 +119,7 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
                 title="Password"
                 desc={resetContact ? `Send a password reset link or code to ${resetContact}` : 'No email or phone on file'}
             >
-                {resetContact && (
+                {canManage && resetContact && (
                     <button className="btn btn-compact" onClick={() => void actions.sendPasswordReset()}>
                         <i className="bi bi-envelope" /> Send reset…
                     </button>
@@ -130,7 +128,7 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
 
             <Eyebrow>
                 Account
-                {isAdmin && (
+                {canManage && (
                     <button className="btn-icon btn-icon-sm us-eyebrow-action" title="Edit account" aria-label="Edit account" onClick={() => void actions.editAccount()}>
                         <i className="bi bi-pencil" />
                     </button>
@@ -151,9 +149,9 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
 
             <Eyebrow>
                 Linked accounts
-                <button className="btn-icon btn-icon-sm us-eyebrow-action" title="Manage linked accounts" aria-label="Manage linked accounts" onClick={() => actions.openLinkedAccountsModal()}>
+                {canCredentials && <button className="btn-icon btn-icon-sm us-eyebrow-action" title="Manage linked accounts" aria-label="Manage linked accounts" onClick={() => actions.openLinkedAccountsModal()}>
                     <i className="bi bi-pencil" />
-                </button>
+                </button>}
             </Eyebrow>
             <FlatRow label="SSO providers">
                 {(connections?.rows.length ?? 0) === 0
@@ -170,7 +168,7 @@ export function ProfileSection({ user, actions }: { user: UserRow; actions: User
             </FlatRow>
             <FlatRow label="2-factor">
                 <Badge tone={user.requires_mfa ? 'success' : 'muted'}>{user.requires_mfa ? 'Required' : 'Not required'}</Badge>
-                <a href="#" className="us-inline-link" onClick={(e) => { e.preventDefault(); actions.openPasskeysModal(); }}>Manage passkeys</a>
+                {canCredentials && <a href="#" className="us-inline-link" onClick={(e) => { e.preventDefault(); actions.openPasskeysModal(); }}>Manage passkeys</a>}
             </FlatRow>
         </>
     );

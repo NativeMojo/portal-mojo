@@ -6,12 +6,14 @@
 // lists with their own paging/search run their own param'd queries and
 // dedupe through the TanStack cache.
 import { useQuery } from '@tanstack/react-query';
-import { mojoCall } from 'portal-mojo/client';
-import { LogModel } from 'portal-mojo/admin';
+import { mojoCall } from '../../../../client';
+import { LogModel } from '../../../monitoring';
+import { EventModel } from '../../../incidents';
+import { MemberModel } from '../../members';
 import {
-    DeviceModel, IncidentEventModel, LoginEventModel, MemberModel, PushDeviceModel,
+    DeviceModel, LoginEventModel, PushDeviceModel,
     ApiKeyModel,
-} from '../../models';
+} from '../models';
 
 export interface ThrottleState {
     count: number;
@@ -20,16 +22,33 @@ export interface ThrottleState {
     retry_after_seconds: number;
 }
 
-export function useSharedUserQueries(userId: number, isAdminCaller: boolean) {
+export interface SharedUserQueryAccess {
+    devices: boolean;
+    pushDevices: boolean;
+    members: boolean;
+    logins: boolean;
+    events: boolean;
+    logs: boolean;
+    apiKeys: boolean;
+    throttle: boolean;
+}
+
+export function useSharedUserQueries(userId: number, access: SharedUserQueryAccess) {
     // Sizes mirror the source's shared collections (25/25/10/10/25/25/25).
-    const devices = DeviceModel.useList({ user: userId, size: 25 });
-    const pushDevices = PushDeviceModel.useList({ user: userId, size: 25 });
-    const members = MemberModel.useList({ user: userId, size: 10 });
-    const logins = LoginEventModel.useList({ user: userId, size: 10, sort: '-created' });
-    const events = IncidentEventModel.useList({ size: 25, model_name: 'account.User', model_id: userId, sort: '-created' });
-    const activity = LogModel.useList({ size: 25, uid: userId, sort: '-created' });
-    const objectLogs = LogModel.useList({ size: 25, model_name: 'account.User', model_id: userId, sort: '-created' });
-    const apiKeys = ApiKeyModel.useList({ user: userId, size: 25, sort: '-id' });
+    const devices = DeviceModel.useList({ user: userId, size: 25 }, { enabled: access.devices });
+    const pushDevices = PushDeviceModel.useList({ user: userId, size: 25 }, { enabled: access.pushDevices });
+    const members = MemberModel.useList({ user: userId, size: 10 }, { enabled: access.members });
+    const logins = LoginEventModel.useList({ user: userId, size: 10, sort: '-created' }, { enabled: access.logins });
+    const events = EventModel.useList(
+        { size: 25, model_name: 'account.User', model_id: userId, sort: '-created' },
+        { enabled: access.events },
+    );
+    const activity = LogModel.useList({ size: 25, uid: userId, sort: '-created' }, { enabled: access.logs });
+    const objectLogs = LogModel.useList(
+        { size: 25, model_name: 'account.User', model_id: userId, sort: '-created' },
+        { enabled: access.logs },
+    );
+    const apiKeys = ApiKeyModel.useList({ user: userId, size: 25, sort: '-id' }, { enabled: access.apiKeys });
 
     // Login-throttle state for the header "Login locked Xs" badge.
     // Admin-tier endpoint; failure (or a non-admin viewer) is non-fatal —
@@ -44,7 +63,7 @@ export function useSharedUserQueries(userId: number, isAdminCaller: boolean) {
                 return null;
             }
         },
-        enabled: isAdminCaller,
+        enabled: access.throttle,
         staleTime: 30_000,
         retry: false,
     });

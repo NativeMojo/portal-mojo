@@ -101,7 +101,7 @@ export interface ModelDef<T extends { id: number | string }> {
         one: (id: number | string) => readonly [string, 'one', number | string];
     };
     /** Server-driven list under the shared cache key (keepPreviousData). */
-    useList: (params?: Params) => ReturnType<typeof useModelList<T>>;
+    useList: (params?: Params, opts?: { enabled?: boolean }) => ReturnType<typeof useModelList<T>>;
     /** One record; disabled while id is null. */
     useOne: (id: number | string | null) => ReturnType<typeof useModel<T>>;
     /** Create/update mutation. Write-through + invalidate. Rejects on failure. */
@@ -145,9 +145,9 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
         sanitizeRow,
         keys,
 
-        useList: (params: Params = {}) => {
+        useList: (params: Params = {}, opts: { enabled?: boolean } = {}) => {
             const safeParams = normalizeListParams ? normalizeListParams(params) : params;
-            return useModelList<T>(endpoint, safeParams, { sanitizeRow });
+            return useModelList<T>(endpoint, safeParams, { ...opts, sanitizeRow });
         },
 
         useOne: (id: number | string | null) => useModel<T>(endpoint, id, sanitizeRow),

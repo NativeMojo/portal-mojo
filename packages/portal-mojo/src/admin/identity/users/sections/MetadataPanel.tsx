@@ -6,14 +6,14 @@
 //   · the whole-record JSON view via DataView (the source section's "JSON
 //     dump" reading) — inference-typed grid + collapsible JSON blocks.
 import { useQueryClient } from '@tanstack/react-query';
-import { DataView, Eyebrow, MetadataSection } from 'portal-mojo/ui';
-import { UserModel, type UserRow } from '../../models';
+import { DataView, Eyebrow, MetadataSection } from '../../../../ui';
+import { UserModel, type UserRow } from '../models';
 
-export function UserMetadataSection({ user }: { user: UserRow }) {
+export function UserMetadataSection({ user, canManage }: { user: UserRow; canManage: boolean }) {
     const qc = useQueryClient();
     return (
         <>
-            <MetadataSection
+            {canManage && <MetadataSection
                 endpoint={UserModel.endpoint}
                 id={user.id}
                 metadata={(user.metadata ?? {}) as Record<string, unknown>}
@@ -23,7 +23,7 @@ export function UserMetadataSection({ user }: { user: UserRow }) {
                     qc.setQueryData(UserModel.keys.one(user.id), { ...user, metadata: next });
                     void UserModel.invalidate(qc);
                 }}
-            />
+            />}
 
             <Eyebrow>Raw record</Eyebrow>
             <DataView

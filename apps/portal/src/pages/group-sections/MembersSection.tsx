@@ -1,9 +1,8 @@
 // Thin app adapter: the package owns member listing, admission, and detail.
-// Cross-domain navigation stays in the app so portal-mojo/admin never imports
-// app UserDetail/GroupDetail implementations.
-import { GroupMembersPanel } from 'portal-mojo/admin';
+// Cross-domain navigation stays in the app so the package never imports the
+// app-owned GroupDetail implementation.
+import { GroupMembersPanel, UserDetail } from 'portal-mojo/admin';
 import type { GroupRow } from '../../models';
-import { UserDetail } from '../UserDetail';
 import { modal } from 'portal-mojo/ui';
 
 export function MembersSection({ group, openGroup }: { group: GroupRow; openGroup: (id: number) => void }) {

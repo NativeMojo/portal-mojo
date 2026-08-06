@@ -8,10 +8,9 @@
 // DISABLE_REASON_BADGES, _statusBadge, _inactivityWarning, LOG_LEVEL_*,
 // LOGIN_TONE, PROVIDER_ICONS) — read in full 2026-08-05.
 import { useState, type ReactNode } from 'react';
-import { dateFns, fmt, modal, type Tone } from 'portal-mojo/ui';
-import { useCan, type Params } from 'portal-mojo/client';
-import type { UserRow } from '../../models';
-import { GroupDetail } from '../GroupDetail';
+import { dateFns, fmt, type Tone } from '../../../../ui';
+import { useCan, type Params } from '../../../../client';
+import { USER_MANAGE_PERMISSIONS, type UserRow } from '../models';
 
 // ── Disable lifecycle (metadata.protected.disable.*) ──────────────────
 // Truth field is `is_active`; the block carries reason/by/note/warning/
@@ -154,19 +153,19 @@ export function providerIcon(provider: string | null | undefined): string {
 // ── Admin tier ────────────────────────────────────────────────────────
 
 /**
- * Admin tier == users / manage_users / is_superuser (UserView.isAdminCaller;
- * superusers + system `admin` pass inside hasPermission). Gates credential
- * writes, force-verify, the active toggle, and the destructive kebab items.
+ * System-pinned User mutation tier. Active-member grants cannot satisfy it;
+ * superusers retain their normal override. Gates credential writes,
+ * force-verify, the active toggle, and the destructive kebab items.
  */
 export function useAdminCaller(): boolean {
-    return useCan(['users', 'manage_users']).can;
+    return useCan(USER_MANAGE_PERMISSIONS).can;
 }
 
 // ── Cross-record nav ──────────────────────────────────────────────────
 
-/** Open a group's detail as a stacked modal (org chip / groups rows). */
-export function openGroupDetail(id: number) {
-    void modal.detail((close) => <GroupDetail id={id} onClose={() => close(null)} />);
+/** Invoke the consuming app's optional Group-detail seam. */
+export function openGroupDetail(id: number, onOpenGroup?: (groupId: number) => void) {
+    onOpenGroup?.(id);
 }
 
 // ── Time helpers ──────────────────────────────────────────────────────

@@ -6,8 +6,8 @@
 import { useModelList, type User } from 'portal-mojo/client';
 import { Badge, fmt, modal } from 'portal-mojo/ui';
 import { KPIStrip, MetricsChart, MetricsMiniWidget, PieChart } from 'portal-mojo/charts';
+import { UserDetail } from 'portal-mojo/admin';
 import { GroupModel } from '../models';
-import { UserDetail } from './UserDetail';
 
 const ENDPOINT = '/api/user';
 

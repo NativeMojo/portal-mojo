@@ -14,8 +14,8 @@
 // expands it to a partial dict and django-mojo MERGES it into the
 // permissions JSONField (rest.py on_rest_update_jsonfield), so absent keys
 // keep their grants.
-import type { Field } from 'portal-mojo/client';
-import type { FormTab } from 'portal-mojo/ui';
+import type { Field } from '../../../../client';
+import type { FormTab } from '../../../../ui';
 
 interface CatalogPerm {
     name: string;

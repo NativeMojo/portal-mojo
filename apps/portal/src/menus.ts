@@ -27,7 +27,6 @@ const identity: MenuItem = {
     label: identityMeta.label,
     icon: identityMeta.icon,
     children: [
-        { id: 'admin:users', label: 'Users', route: '/users' },
         { id: 'admin:groups', label: 'Groups', route: '/groups', permissions: GROUP_VIEW_PERMS },
         { id: 'admin:personal-api-keys', label: 'Personal API Keys', route: '/apikeys' },
         ...(identityContribution?.children ?? []),

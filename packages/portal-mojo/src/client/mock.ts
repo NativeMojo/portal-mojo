@@ -1702,8 +1702,8 @@ function exportUsers(params: Params, users: MockUser[] = db.users) {
 // response is the refreshed row UNLESS a handler returned its own payload
 // (action_resp wins verbatim). The mocked subset matches django-mojo
 // account/models/user.py RestMeta.POST_SAVE_ACTIONS (which also declares
-// change_username + the TOTP trio — unmocked until a screen needs them).
-const USER_ACTIONS = new Set(['send_invite', 'disable', 'reactivate', 'revoke_sessions', 'disable_totp']);
+// change_username plus the action subset exercised by the packaged Admin.
+const USER_ACTIONS = new Set(['change_username', 'send_invite', 'disable', 'reactivate', 'revoke_sessions', 'disable_totp']);
 const USER_DISABLE_REASONS = new Set(['abuse', 'admin']); // services/disable.py USER_REST_REASONS
 
 /** The live disable block, as a mutable dict (creates the path when absent). */
@@ -1727,6 +1727,9 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
             // (ISO `at` stamps — services/disable.py schema) and clears any
             // pending inactivity warning.
             const reason = String(dict.reason ?? '');
+            if (!user.is_active) {
+                return { status: false, error: 'User is already inactive', error_code: 400 };
+            }
             if (!USER_DISABLE_REASONS.has(reason)) {
                 return { status: false, error: `reason must be one of: ${[...USER_DISABLE_REASONS].sort().join(', ')}`, error_code: 400 };
             }
@@ -1747,6 +1750,9 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
         case 'reactivate': {
             // Pushes the live disable block into history with reactivated_*
             // fields; the new block keeps ONLY the history list.
+            if (user.is_active) {
+                return { status: false, error: 'User is already active', error_code: 400 };
+            }
             user.is_active = true;
             const block = disableBlockOf(user);
             const history = Array.isArray(block.history) ? [...block.history] : [];
@@ -1766,6 +1772,16 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
             for (const key of Object.keys(block)) delete block[key];
             block.history = history.slice(-20); // HISTORY_CAP parity
             return null;
+        }
+        case 'change_username': {
+            const username = String(dict.username ?? '').toLowerCase().trim();
+            if (!username) return { status: false, error: 'username is required', error_code: 400 };
+            if (username === user.username) return { status: false, error: 'New username must be different from current username', error_code: 400 };
+            if (db.users.some((candidate) => candidate.id !== user.id && candidate.username === username)) {
+                return { status: false, error: 'A user with that username already exists', error_code: 400 };
+            }
+            user.username = username;
+            return { status: true, data: { username } };
         }
         case 'send_invite':
             // Sends mail server-side; the REST-visible effect is just the row.
@@ -2636,46 +2652,13 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             data: { id: record.id, jti, expires: record.expires, token: `mock_ak_${jti}` },
         };
     }
-    if (path === '/api/auth/manage/generate_api_key') {
-        // Admin-tier variant: mints a key FOR ANOTHER USER (`uid` body field)
-        // — the UserView "Generate Key" surface. Gated users|manage_users.
-        // NOTE: not yet mounted in django-mojo (only the caller-scoped
-        // /api/auth/generate_api_key is) — the mock carries the target
-        // contract; see the UserDetail report's MERGE-WIRE note.
-        const caller = userFromBearer(opts.headers);
-        if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
-        if (!caller.is_superuser && !caller.permissions['users'] && !caller.permissions['manage_users'] && !caller.permissions['admin']) {
-            return { status: false, error: 'permission denied', error_code: 403 };
-        }
-        const body = opts.body ?? {};
-        const target = db.users.find((u) => u.id === Number(body.uid));
-        if (!target) return { status: false, error: 'User not found', error_code: 404 };
-        const expireDays = Number(body.expire_days ?? 360);
-        if (!Number.isFinite(expireDays) || expireDays > 360 || expireDays <= 0) {
-            return { status: false, error: 'Invalid expire_days', error_code: 400 };
-        }
-        const nowSec = Math.floor(Date.now() / 1000);
-        const rand = mulberry32(nowSec ^ target.id);
-        const jti = mockHex32(rand);
-        db.apiKeys.unshift({
-            id: Math.max(0, ...db.apiKeys.map((k) => k.id)) + 1,
-            label: String(body.label ?? ''),
-            allowed_ips: Array.isArray(body.allowed_ips) ? (body.allowed_ips as string[]) : [],
-            expires: nowSec + expireDays * 86400,
-            is_active: true,
-            last_used: null,
-            created: nowSec,
-            jti,
-            user: target.id,
-        });
-        return { status: true, data: { id: db.apiKeys[0]!.id, jti, expires: db.apiKeys[0]!.expires, token: `mock_ak_${jti}` } };
-    }
     if (path === '/api/auth/manage/throttle') {
         // GET {user_id|username, key='login'} → the per-account attempt
         // counter (rest/user.py on_read_throttle). Admin-tier; reading never
         // mutates the counter.
         const caller = userFromBearer(opts.headers);
         if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
+        if (!hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
         const params = opts.params ?? {};
         const key = String(params.key ?? 'login');
         if (key !== 'login') return { status: false, error: "only key='login' is supported", error_code: 400 };
@@ -2688,6 +2671,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         // POST {user_id, key} → {deleted:n} (rest/user.py on_clear_rate_limit).
         const caller = userFromBearer(opts.headers);
         if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
+        if (!hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
         const uid = Number(opts.body?.user_id ?? 0);
         const had = db.throttle.delete(uid);
         return { status: true, data: { deleted: had ? 1 : 0 } };
@@ -3389,17 +3373,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { ...result, data: rows };
     }
     // ── Notification preferences (notification_prefs.py service shape) ──
-    // Live scope note: the real handler reads request.user and IGNORES
-    // ?user= / body.user (admin-view-of-another-user is not yet a backend
-    // surface). The mock honors the target param so the admin grid is
-    // buildable now; the report carries the backend gap.
+    // The real handler reads request.user and ignores ?user=/body.user.
     if (path === '/api/account/notification/preferences') {
         const caller = userFromBearer(opts.headers);
         if (!caller) return { status: false, error: 'permission denied', error_code: 401 };
-        const targetId = Number(opts.body?.user ?? opts.params?.user ?? caller.id);
-        if (!db.users.some((u) => u.id === targetId)) {
-            return { status: false, error: 'User not found', error_code: 404 };
-        }
+        const targetId = caller.id;
         if (opts.method === 'POST') {
             const incoming = opts.body?.preferences;
             if (!isPlainObject(incoming)) return { status: false, error: 'preferences is required', error_code: 400 };
@@ -3731,8 +3709,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     // NOT the row. NO_SAVE_FIELDS: jti / expires / user / last_used.
     const oneApiKey = path.match(/^\/api\/account\/api_keys\/(\d+)$/);
     if (oneApiKey) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
         const k = db.apiKeys.find((x) => x.id === Number(oneApiKey[1]));
         if (!k) return { status: false, error: 'UserAPIKey not found', error_code: 404 };
+        if (k.user !== caller.id && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
         if (opts.method === 'DELETE') {
             return { status: false, error: 'DELETE not allowed: UserAPIKey', error_code: 403 };
         }
@@ -3758,7 +3739,12 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: serializeApiKey(k), graph: 'default' };
     }
     if (path === '/api/account/api_keys') {
-        const params = opts.params ?? {};
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const canManageOthers = hasGlobalPermission(caller, ['users', 'manage_users']);
+        const requestedUser = opts.params?.user == null ? null : Number(opts.params.user);
+        if (requestedUser != null && requestedUser !== caller.id && !canManageOthers) return permissionDenied();
+        const params = { ...(opts.params ?? {}), user: requestedUser ?? caller.id };
         const search = (k: Record<string, unknown>) => String(k.label ?? '');
         if (params.download_format) {
             const full = listRows(db.apiKeys as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.apiKeys.length }, search, '-id');
@@ -3823,6 +3809,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             return { status: 'deleted' };
         }
         if (opts.method === 'POST' && opts.body) {
+            if (caller.id !== id && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
+            if (Object.keys(opts.body).some((key) => USER_ACTIONS.has(key))
+                && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
             return saveUser(user, opts.body, userFromBearer(opts.headers));
         }
         return { status: true, data: serializeUser(user, 'default'), graph: 'default' };
@@ -3833,6 +3822,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const visibleUsers = canReadUserDirectory(caller) ? db.users : [caller];
         if (opts.params?.download_format) return exportUsers(opts.params, visibleUsers);
         if (opts.method === 'POST' && opts.body) {
+            if (!hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
             const id = Math.max(...db.users.map((u) => u.id)) + 1;
             const email = String(opts.body.email ?? `user${id}@nativemojo.com`);
             // Backend parity: username derives from the email localpart when

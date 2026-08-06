@@ -9,8 +9,8 @@
 // USER_APP_PERMS_TABSET via registerFormTabs — the portal's
 // User.registerPermissions equivalent (UserDetail gates the section on the
 // registry being non-empty).
-import { Eyebrow, FormView } from 'portal-mojo/ui';
-import { UserModel, type UserRow } from '../../models';
+import { Eyebrow, FormView } from '../../../../ui';
+import { UserModel, type UserRow } from '../models';
 import { SYSTEM_PERMISSION_TABS, USER_APP_PERMS_TABSET } from './permission-catalog';
 
 export function SysPermsSection({ user }: { user: UserRow }) {

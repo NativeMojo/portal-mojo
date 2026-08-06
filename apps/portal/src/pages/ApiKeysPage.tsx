@@ -12,14 +12,14 @@
 //   · no DELETE (CAN_DELETE false server-side)
 // NOTE: the group-scoped /api/group/apikey surface 500s on the live dev
 // backend — this user-key surface is the one that works today.
-import { useQueryClient } from '@tanstack/react-query';
-import { mojoCall } from 'portal-mojo/client';
 import {
-    Badge, fmt, formModal, modal, toast, ModelTable,
+    Badge, fmt, formModal, toast, ModelTable,
     ArmedButton,
     type Column, type FilterDef,
 } from 'portal-mojo/ui';
-import { ApiKeyModel, type ApiKeyRow } from '../models';
+import {
+    ApiKeyModel, showSecretDialog, useGenerateUserApiKey, type ApiKeyRow,
+} from 'portal-mojo/admin';
 
 const nowSec = () => Math.floor(Date.now() / 1000);
 
@@ -62,43 +62,6 @@ const FILTERS: FilterDef[] = [
     { key: 'created', label: 'Created', type: 'daterange' },
     { key: 'expires', label: 'Expires', type: 'daterange' },
 ];
-
-/**
- * Show-once token reveal — the GroupView recipe: loud "not shown again"
- * banner, selectable monospace token, copy affordance. Deliberately a modal
- * the user must dismiss (no auto-close).
- */
-function revealToken(token: string, label: string) {
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(token);
-            toast.success('Token copied to clipboard');
-        } catch {
-            toast.error('Copy failed — select the token text instead');
-        }
-    };
-    void modal.open((close) => (
-        <div className="modal-pad">
-            <h2 className="modal-title"><i className="bi bi-check-circle-fill text-ok" /> API key created</h2>
-            <p><b>{label || 'Unlabeled key'}</b> is ready.</p>
-            <p className="dim" style={{ margin: '6px 0 10px' }}>
-                <i className="bi bi-exclamation-triangle-fill" style={{ color: 'var(--warn)' }} /> Save this token now — it will not be shown again.
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--line)' }}>
-                <code style={{ userSelect: 'all', wordBreak: 'break-all', flex: 1 }}>{token}</code>
-                <button className="btn-icon" title="Copy token" aria-label="Copy token" onClick={() => void copy()}>
-                    <i className="bi bi-clipboard" />
-                </button>
-            </div>
-            <p className="dim" style={{ marginTop: 10 }}>
-                Treat this token like a password. Anyone holding it can call the API as you.
-            </p>
-            <div className="modal-actions">
-                <button className="btn btn-primary" onClick={() => close(null)}>Done</button>
-            </div>
-        </div>
-    ));
-}
 
 /** Expanded row: full facts + the two write flows (disable/undo · revoke). */
 function KeyExpand({ k, onToggle, onRevoke }: {
@@ -145,9 +108,9 @@ function KeyExpand({ k, onToggle, onRevoke }: {
 }
 
 export function ApiKeysPage() {
-    const qc = useQueryClient();
     const save = ApiKeyModel.useSave();
     const revoke = ApiKeyModel.useAction('revoke');
+    const generateKey = useGenerateUserApiKey();
 
     const generate = async () => {
         const data = await formModal(ApiKeyModel.forms.generate!);
@@ -159,11 +122,20 @@ export function ApiKeysPage() {
         const ips = String(data.allowed_ips ?? '').trim();
         if (ips) body.allowed_ips = ips.split(',').map((s) => s.trim()).filter(Boolean);
         try {
-            const resp = await mojoCall('/api/auth/generate_api_key', { method: 'POST', body });
-            const minted = resp.data as { token?: string } | undefined;
-            if (minted?.token) revealToken(minted.token, String(data.label ?? ''));
-            else toast.success('API key generated');
-            await ApiKeyModel.invalidate(qc);
+            await generateKey.mutateAsync({
+                changes: body,
+                onToken: async (token) => {
+                    await showSecretDialog({
+                        title: 'API key created',
+                        intro: <><b>{String(data.label || 'Unlabeled key')}</b> is ready.</>,
+                        warning: 'Save this token now. It will not be shown again.',
+                        secret: token,
+                        ariaLabel: 'Generated API key',
+                        footer: <p className="dim">Treat this token like a password. Anyone holding it can call the API as you.</p>,
+                    });
+                },
+            });
+            toast.success('API key generated');
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to generate key');
         }

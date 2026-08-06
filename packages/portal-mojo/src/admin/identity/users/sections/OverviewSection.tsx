@@ -6,13 +6,16 @@
 // KPI values are TOTAL row counts from the API envelopes (`count`), never
 // the fetched-page length — the source read collection.meta.count for
 // exactly this reason.
-import { Eyebrow, FlatRow, MetricCard, Timeline, fmt, type TimelineItem } from 'portal-mojo/ui';
-import type { UserRow } from '../../models';
+import { Eyebrow, FlatRow, MetricCard, Timeline, fmt, type TimelineItem } from '../../../../ui';
+import type { UserRow } from '../models';
 import { accountType, LOG_LEVEL_TONE, toMs } from './shared';
-import { openGroupDetail } from './shared';
 import type { SharedUserQueries } from './queries';
 
-export function OverviewSection({ user, shared }: { user: UserRow; shared: SharedUserQueries }) {
+export function OverviewSection({ user, shared, onOpenGroup }: {
+    user: UserRow;
+    shared: SharedUserQueries;
+    onOpenGroup?: (groupId: number) => void;
+}) {
     const deviceTotal = (shared.devices.data?.count ?? 0) + (shared.pushDevices.data?.count ?? 0);
     const sessionCount = shared.devices.data?.count ?? 0;
     const groupCount = shared.members.data?.count ?? 0;
@@ -90,13 +93,14 @@ export function OverviewSection({ user, shared }: { user: UserRow; shared: Share
                 {user.phone_number ? <code>{user.phone_number}</code> : <span className="dim">—</span>}
             </FlatRow>
             <FlatRow label="Account type">{accountType(user)}</FlatRow>
-            {org && (
+            {org && onOpenGroup && (
                 <FlatRow label="Organization">
-                    <a href="#" onClick={(e) => { e.preventDefault(); openGroupDetail(org.id); }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); onOpenGroup(org.id); }}>
                         <i className="bi bi-buildings" /> {org.name}
                     </a>
                 </FlatRow>
             )}
+            {org && !onOpenGroup && <FlatRow label="Organization"><i className="bi bi-buildings" /> {org.name}</FlatRow>}
 
             <Eyebrow>Recent activity</Eyebrow>
             <Timeline items={feed} emptyText="No recent activity yet." />

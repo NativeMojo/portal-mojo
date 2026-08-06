@@ -6,12 +6,11 @@
 // Wire: GET /api/account/oauth_connection?user=<id> → rows
 // {id, provider, email, is_active, created} (default graph, measured in
 // django-mojo oauth.py); DELETE /api/account/oauth_connection/<id> unlinks.
-import { modal, toast, fmt } from 'portal-mojo/ui';
-import { Eyebrow } from 'portal-mojo/ui';
-import { OAuthConnectionModel, type UserRow } from '../../models';
+import { modal, toast, fmt, Eyebrow } from '../../../../ui';
+import { OAuthConnectionModel, type UserRow } from '../models';
 import { providerIcon } from './shared';
 
-export function OAuthConnectionList({ userId }: { userId: number }) {
+export function OAuthConnectionList({ userId, canManage = true }: { userId: number; canManage?: boolean }) {
     const { data, isPending } = OAuthConnectionModel.useList({ user: userId, size: 25, sort: '-created' });
     const del = OAuthConnectionModel.useDelete();
     const rows = data?.rows ?? [];
@@ -52,22 +51,22 @@ export function OAuthConnectionList({ userId }: { userId: number }) {
                             {c.email ?? <span className="dim-italic">no email</span>} · Connected {fmt.relative(c.created)}
                         </div>
                     </div>
-                    <div className="us-row-actions">
+                    {canManage && <div className="us-row-actions">
                         <button className="btn btn-compact us-danger" onClick={() => void unlink(c.id, c.provider)}>
                             <i className="bi bi-x-lg" /> Unlink
                         </button>
-                    </div>
+                    </div>}
                 </div>
             ))}
         </>
     );
 }
 
-export function OAuthSection({ user }: { user: UserRow }) {
+export function OAuthSection({ user, canManage }: { user: UserRow; canManage: boolean }) {
     return (
         <>
             <Eyebrow>Linked accounts</Eyebrow>
-            <OAuthConnectionList userId={user.id} />
+            <OAuthConnectionList userId={user.id} canManage={canManage} />
         </>
     );
 }

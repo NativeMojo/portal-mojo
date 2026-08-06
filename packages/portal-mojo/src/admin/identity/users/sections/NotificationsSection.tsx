@@ -1,17 +1,17 @@
 // Notifications — AdminNotificationsSection port (read in full 2026-08-05):
 // the per-kind × per-channel (In-App / Email / Push) toggle grid over
 // /api/account/notification/preferences. A toggle POSTs the PARTIAL update
-// {user, preferences: {kind: {channel: bool}}} optimistically and reverts on
+// {preferences: {kind: {channel: bool}}} optimistically and reverts on
 // failure (source semantics; absent channels read as ON — `!== false`).
 //
 // LIVE-SCOPE NOTE (django-mojo notification_prefs.py, read 2026-08-05): the
 // real handler reads request.user and IGNORES the user param — the
-// admin-views-another-user path is not yet a backend surface. The mock
-// honors the param so the grid is real now; the report carries the gap.
+// admin-views-another-user path is not a backend surface. Other-user detail
+// therefore stays explicitly unavailable and never issues this query.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { mojoCall } from 'portal-mojo/client';
-import { Eyebrow, toast } from 'portal-mojo/ui';
-import type { UserRow } from '../../models';
+import { mojoCall, useMe } from '../../../../client';
+import { Eyebrow, toast } from '../../../../ui';
+import type { UserRow } from '../models';
 
 const CHANNELS = ['in_app', 'email', 'push'] as const;
 const CHANNEL_LABELS: Record<string, string> = {
@@ -26,13 +26,16 @@ const prefsKey = (userId: number) => ['/api/account/notification/preferences', u
 
 export function NotificationsSection({ user }: { user: UserRow }) {
     const qc = useQueryClient();
+    const { data: me } = useMe();
+    const isSelf = me?.id === user.id;
     const { data: prefs, isPending, isError, error } = useQuery<Preferences>({
         queryKey: prefsKey(user.id),
         queryFn: async () => {
-            const body = await mojoCall('/api/account/notification/preferences', { params: { user: user.id } });
+            const body = await mojoCall('/api/account/notification/preferences');
             const data = body.data as { preferences?: Preferences } | undefined;
             return data?.preferences ?? {};
         },
+        enabled: isSelf,
     });
 
     const toggle = async (kind: string, channel: string, next: boolean) => {
@@ -45,7 +48,7 @@ export function NotificationsSection({ user }: { user: UserRow }) {
         try {
             await mojoCall('/api/account/notification/preferences', {
                 method: 'POST',
-                body: { user: user.id, preferences: { [kind]: { [channel]: next } } },
+                body: { preferences: { [kind]: { [channel]: next } } },
             });
         } catch (err) {
             qc.setQueryData(prefsKey(user.id), prev);
@@ -60,6 +63,13 @@ export function NotificationsSection({ user }: { user: UserRow }) {
     return (
         <>
             <Eyebrow>Notification preferences</Eyebrow>
+            {!isSelf && (
+                <div className="us-empty">
+                    <i className="bi bi-lock" />
+                    <div>Notification preferences are caller-only and cannot be administered for another user.</div>
+                </div>
+            )}
+            {isSelf && <>
             {isPending && <p className="dim">Loading…</p>}
             {isError && <p className="dim">{error instanceof Error ? error.message : 'Failed to load preferences.'}</p>}
             {!isPending && !isError && kinds.length === 0 && (
@@ -101,6 +111,7 @@ export function NotificationsSection({ user }: { user: UserRow }) {
                     </tbody>
                 </table>
             )}
+            </>}
         </>
     );
 }

@@ -50,6 +50,8 @@ interface BatchActionBase<T> {
     label: string;
     icon?: string;
     danger?: boolean;
+    /** Row-state eligibility. Ineligible selected rows are never submitted. */
+    eligible?: (row: T) => boolean;
     /** Confirm copy; false skips the prompt. Default: "<label> N item(s)?" */
     confirm?: string | false;
     /**
@@ -380,7 +382,7 @@ export function ModelTable<T extends { id: number }>({
 
     /** TablePage.batchAction port: allSettled + partial-result toasts. */
     const runBatch = async (action: BatchAction<T>) => {
-        const targets = rows.filter((r) => selected.has(r.id));
+        const targets = rows.filter((r) => selected.has(r.id) && (!action.eligible || action.eligible(r)));
         if (targets.length === 0) return;
         if (action.confirm !== false) {
             const ok = await modal.confirm({

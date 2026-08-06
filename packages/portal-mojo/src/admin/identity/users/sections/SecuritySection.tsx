@@ -14,20 +14,26 @@
 //   · Recovery codes: the source's GET /api/user/<id>/totp/recovery-codes
 //     route does not exist (codes are self-only at /api/account/totp/…) —
 //     row omitted rather than shipped against a phantom endpoint.
-import { Badge, Eyebrow, SecurityItem, ArmedButton, fmt } from 'portal-mojo/ui';
-import { PasskeyModel, type UserRow } from '../../models';
+import { Badge, Eyebrow, SecurityItem, ArmedButton, fmt } from '../../../../ui';
+import { PasskeyModel, type UserRow } from '../models';
 import type { UserAdminActions } from './actions';
-import { useAdminCaller } from './shared';
 
 /** has_totp / totp_enabled ride no current graph — optional by design. */
 type UserSecurityRow = UserRow & { has_totp?: boolean; totp_enabled?: boolean };
 
-export function SecuritySection({ user, actions }: { user: UserRow; actions: UserAdminActions }) {
-    const isAdmin = useAdminCaller();
+export function SecuritySection({ user, actions, canManage, canPasskeys }: {
+    user: UserRow;
+    actions: UserAdminActions;
+    canManage: boolean;
+    canPasskeys: boolean;
+}) {
     const su = user as UserSecurityRow;
     const totpEnabled = Boolean(su.has_totp || su.totp_enabled);
     const smsEligible = Boolean(user.phone_number && user.is_phone_verified);
-    const { data: passkeys } = PasskeyModel.useList({ user: user.id, size: 25, sort: '-created' });
+    const { data: passkeys } = PasskeyModel.useList(
+        { user: user.id, size: 25, sort: '-created' },
+        { enabled: canPasskeys },
+    );
     const passkeyCount = passkeys?.count ?? 0;
     const hasPasskey = user.has_passkey === true || passkeyCount > 0;
 
@@ -35,15 +41,15 @@ export function SecuritySection({ user, actions }: { user: UserRow; actions: Use
         <>
             <Eyebrow>Authentication</Eyebrow>
 
-            <SecurityItem icon="bi-envelope" title="Send password reset" desc={`Send a reset link or code to ${user.email || user.phone_number || 'this user'}`}>
+            {canManage && <SecurityItem icon="bi-envelope" title="Send password reset" desc={`Send a reset link or code to ${user.email || user.phone_number || 'this user'}`}>
                 <button className="btn btn-compact" onClick={() => void actions.sendPasswordReset()}>Send…</button>
-            </SecurityItem>
+            </SecurityItem>}
 
-            <SecurityItem icon="bi-link-45deg" title="Send magic login link" desc={`Send a one-click login link to ${user.email || user.phone_number || 'this user'}`}>
+            {canManage && <SecurityItem icon="bi-link-45deg" title="Send magic login link" desc={`Send a one-click login link to ${user.email || user.phone_number || 'this user'}`}>
                 <button className="btn btn-compact" onClick={() => void actions.sendMagicLink()}>Send…</button>
-            </SecurityItem>
+            </SecurityItem>}
 
-            {isAdmin && (
+            {canManage && (
                 <SecurityItem icon="bi-key" title="Set password" desc="Set a new password directly for this user">
                     <button className="btn btn-compact" onClick={() => void actions.changePassword()}>Set…</button>
                 </SecurityItem>
@@ -51,7 +57,7 @@ export function SecuritySection({ user, actions }: { user: UserRow; actions: Use
 
             <Eyebrow>Multi-factor authentication</Eyebrow>
 
-            {isAdmin && (
+            {canManage && (
                 <SecurityItem
                     icon="bi-shield-lock"
                     title="MFA requirement"
@@ -72,7 +78,7 @@ export function SecuritySection({ user, actions }: { user: UserRow; actions: Use
                     : 'No enrolled authenticator on record'}
             >
                 <Badge tone={totpEnabled ? 'success' : 'muted'}>{totpEnabled ? 'Enrolled' : 'Not enrolled'}</Badge>
-                {isAdmin && totpEnabled && (
+                {canManage && totpEnabled && (
                     <button className="btn btn-compact" onClick={() => void actions.disableTotp()}>Disable</button>
                 )}
             </SecurityItem>
@@ -87,14 +93,14 @@ export function SecuritySection({ user, actions }: { user: UserRow; actions: Use
                 <Badge tone={smsEligible ? 'success' : 'muted'}>{smsEligible ? 'Eligible' : 'Unavailable'}</Badge>
             </SecurityItem>
 
-            <SecurityItem icon="bi-fingerprint" title="Passkeys" desc="View and manage registered passkeys">
+            {canPasskeys && <SecurityItem icon="bi-fingerprint" title="Passkeys" desc="View and manage registered passkeys">
                 {hasPasskey && <Badge tone="success">{passkeyCount > 0 ? `${passkeyCount} registered` : 'Registered'}</Badge>}
                 <button className="btn btn-compact" onClick={() => actions.openPasskeysModal()}>
                     Manage <i className="bi bi-chevron-right" />
                 </button>
-            </SecurityItem>
+            </SecurityItem>}
 
-            {isAdmin && (
+            {canManage && (
                 <>
                     <Eyebrow>Sessions</Eyebrow>
                     <SecurityItem
