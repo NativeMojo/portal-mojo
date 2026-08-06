@@ -27,7 +27,11 @@ import {
 import { MONITORING_ADMIN_SECTION } from './monitoring';
 import { SETTINGS_ADMIN_SECTION } from './settings';
 import { BOUNCER_ADMIN_SECTION } from './bouncer';
-import { SECURITY_OPERATIONS_ADMIN_SECTION } from './security';
+import {
+    DEVICE_INTEL_ADMIN_SECTION,
+    GEOIP_ADMIN_SECTION,
+    SECURITY_OPERATIONS_ADMIN_SECTION,
+} from './security';
 import { MEMBERS_ADMIN_SECTION, USERS_ADMIN_SECTION } from './identity';
 
 export * from './credentials';
@@ -125,6 +129,8 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     SETTINGS_ADMIN_SECTION,
     SECURITY_OPERATIONS_ADMIN_SECTION,
     BOUNCER_ADMIN_SECTION,
+    DEVICE_INTEL_ADMIN_SECTION,
+    GEOIP_ADMIN_SECTION,
 ];
 
 function relativePath(...parts: Array<string | undefined>): string {
