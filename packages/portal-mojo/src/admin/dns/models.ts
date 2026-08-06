@@ -3,8 +3,21 @@ import { defineModel, type Params } from '../../client';
 export const DNS_VIEW_PERMISSIONS = ['sys.view_dns', 'sys.manage_dns', 'sys.security'];
 export const DNS_MANAGE_PERMISSIONS = ['sys.manage_dns', 'sys.security'];
 
-export interface DnsGroupChoice { id: number; name: string }
+export interface DnsGroupChoice extends Record<string, unknown> { id: number; name: string }
 export interface DnsGroupBasic extends DnsGroupChoice { is_active?: boolean; kind?: string }
+
+export interface DnsUserBasic {
+    id: number;
+    display_name?: string;
+    username?: string;
+    last_login?: number | null;
+    last_activity?: number | null;
+    is_active?: boolean;
+    is_email_verified?: boolean;
+    is_phone_verified?: boolean;
+    is_dob_verified?: boolean;
+    avatar?: string | null;
+}
 
 export interface DnsProviderCapability {
     name: string;
@@ -64,7 +77,7 @@ export interface DomainRow {
     registered_on?: number | null;
     last_error?: string | null;
     group: DnsGroupBasic | number | null;
-    user?: unknown | null;
+    user?: DnsUserBasic | null;
     credential?: Pick<DnsCredentialRow, 'id' | 'name' | 'provider' | 'is_active' | 'verified'> | number | null;
 }
 
@@ -83,7 +96,7 @@ export interface DomainPurchaseRow {
     operation_id: string | null;
     error: string | null;
     group: DnsGroupBasic | number | null;
-    user: unknown | null;
+    user: DnsUserBasic | null;
 }
 
 export interface CertificateRow {
@@ -142,6 +155,26 @@ export interface RegistrarQuote {
     privacy_supported: boolean;
 }
 
+export interface RegistrarDiscoveryRow {
+    name: string;
+    registered: boolean;
+    hosted_zone: boolean;
+    hosted_zone_id: string | null;
+    record_count: number | null;
+    expires: number | null;
+    auto_renew: boolean | null;
+    tracked: boolean;
+    domain: number | null;
+    adoptable: boolean;
+    reason: string | null;
+}
+
+export interface RegistrarDiscoveryResponse {
+    count: number;
+    truncated: boolean;
+    domains: RegistrarDiscoveryRow[];
+}
+
 export interface RegistrantContact {
     [field: string]: string | undefined;
 }
@@ -174,38 +207,130 @@ export interface WhoisResponse {
     privacy_supported: boolean;
 }
 
-const SENSITIVE_KEYS = new Set([
-    'api_key', 'api_secret', 'secrets', 'mojo_secrets', 'token', 'token_hash',
-    'confirm_token', 'confirm_token_hash', 'cert_pem', 'chain_pem',
-    'private_key_pem', 'acme_order_url', 'certificate_material', 'pem',
-]);
-
-function sanitizeValue(value: unknown): unknown {
-    if (Array.isArray(value)) return value.map(sanitizeValue);
-    if (value == null || typeof value !== 'object') return value;
-    const safe: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-        if (SENSITIVE_KEYS.has(key.toLowerCase())) continue;
-        safe[key] = sanitizeValue(item);
-    }
-    return safe;
+function rowObject(value: unknown): Record<string, unknown> {
+    return value != null && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
 }
 
-/** Defense in depth against a malformed graph or mock echo. */
-export function sanitizeDnsCredentialRow(row: DnsCredentialRow): DnsCredentialRow {
-    return sanitizeValue(row) as DnsCredentialRow;
+function projectGroup(value: unknown): DnsGroupBasic | number | null {
+    if (value == null || typeof value === 'number') return value as number | null;
+    const raw = rowObject(value);
+    return {
+        id: raw.id as number,
+        name: raw.name as string,
+        ...(typeof raw.is_active === 'boolean' ? { is_active: raw.is_active } : {}),
+        ...(typeof raw.kind === 'string' ? { kind: raw.kind } : {}),
+    };
 }
 
-export function sanitizeDomainRow(row: DomainRow): DomainRow {
-    return sanitizeValue(row) as DomainRow;
+function projectUser(value: unknown): DnsUserBasic | null {
+    if (value == null) return null;
+    const raw = rowObject(value);
+    return {
+        id: raw.id as number,
+        ...(typeof raw.display_name === 'string' ? { display_name: raw.display_name } : {}),
+        ...(typeof raw.username === 'string' ? { username: raw.username } : {}),
+        ...(typeof raw.last_login === 'number' || raw.last_login === null ? { last_login: raw.last_login } : {}),
+        ...(typeof raw.last_activity === 'number' || raw.last_activity === null ? { last_activity: raw.last_activity } : {}),
+        ...(typeof raw.is_active === 'boolean' ? { is_active: raw.is_active } : {}),
+        ...(typeof raw.is_email_verified === 'boolean' ? { is_email_verified: raw.is_email_verified } : {}),
+        ...(typeof raw.is_phone_verified === 'boolean' ? { is_phone_verified: raw.is_phone_verified } : {}),
+        ...(typeof raw.is_dob_verified === 'boolean' ? { is_dob_verified: raw.is_dob_verified } : {}),
+        ...(typeof raw.avatar === 'string' || raw.avatar === null ? { avatar: raw.avatar } : {}),
+    };
 }
 
-export function sanitizeDomainPurchaseRow(row: DomainPurchaseRow): DomainPurchaseRow {
-    return sanitizeValue(row) as DomainPurchaseRow;
+function projectCredentialRelation(value: unknown): DomainRow['credential'] {
+    if (value == null || typeof value === 'number') return value as number | null;
+    const raw = rowObject(value);
+    return {
+        id: raw.id as number,
+        name: raw.name as string,
+        provider: raw.provider as string,
+        is_active: raw.is_active as boolean,
+        verified: raw.verified as boolean,
+    };
 }
 
-export function sanitizeCertificateRow(row: CertificateRow): CertificateRow {
-    return sanitizeValue(row) as CertificateRow;
+/** Explicit safe graph projectors: unknown/equivalent secret containers drop by default. */
+export function sanitizeDnsCredentialRow(row: unknown): DnsCredentialRow {
+    const raw = rowObject(row);
+    return {
+        id: raw.id as number, created: raw.created as number, modified: raw.modified as number,
+        name: raw.name as string, provider: raw.provider as string,
+        is_active: raw.is_active as boolean, verified: raw.verified as boolean,
+        verified_at: raw.verified_at as number | null, domain_count: raw.domain_count as number,
+        last_error: raw.last_error as string | null,
+        api_key_masked: raw.api_key_masked as string,
+        api_secret_masked: raw.api_secret_masked as string,
+        group: projectGroup(raw.group),
+    };
+}
+
+export function sanitizeDomainRow(row: unknown): DomainRow {
+    const raw = rowObject(row);
+    return {
+        id: raw.id as number, created: raw.created as number,
+        ...(typeof raw.modified === 'number' ? { modified: raw.modified } : {}),
+        name: raw.name as string, provider: raw.provider as string, status: raw.status as string,
+        expires: raw.expires as number | null, group: projectGroup(raw.group),
+        ...(typeof raw.hosted_zone_id === 'string' || raw.hosted_zone_id === null ? { hosted_zone_id: raw.hosted_zone_id } : {}),
+        ...(typeof raw.auto_renew === 'boolean' ? { auto_renew: raw.auto_renew } : {}),
+        ...(typeof raw.privacy === 'boolean' ? { privacy: raw.privacy } : {}),
+        ...(typeof raw.verified === 'boolean' ? { verified: raw.verified } : {}),
+        ...(typeof raw.registered_on === 'number' || raw.registered_on === null ? { registered_on: raw.registered_on } : {}),
+        ...(typeof raw.last_error === 'string' || raw.last_error === null ? { last_error: raw.last_error } : {}),
+        ...('user' in raw ? { user: projectUser(raw.user) } : {}),
+        ...('credential' in raw ? { credential: projectCredentialRelation(raw.credential) } : {}),
+    };
+}
+
+export function sanitizeDomainPurchaseRow(row: unknown): DomainPurchaseRow {
+    const raw = rowObject(row);
+    return {
+        id: raw.id as number, created: raw.created as number, modified: raw.modified as number,
+        domain_name: raw.domain_name as string, kind: raw.kind as string, status: raw.status as string,
+        price: raw.price as string | number | null, cost: raw.cost as string | number | null,
+        currency: raw.currency as string, years: raw.years as number,
+        quote_expires: raw.quote_expires as number | null,
+        operation_id: raw.operation_id as string | null, error: raw.error as string | null,
+        group: projectGroup(raw.group), user: projectUser(raw.user),
+    };
+}
+
+export function sanitizeCertificateRow(row: unknown): CertificateRow {
+    const raw = rowObject(row);
+    const domain = typeof raw.domain === 'number' ? raw.domain : rowObject(raw.domain);
+    return {
+        id: raw.id as number, created: raw.created as number, modified: raw.modified as number,
+        common_name: raw.common_name as string,
+        sans: Array.isArray(raw.sans) ? raw.sans.filter((name): name is string => typeof name === 'string') : [],
+        status: raw.status as string, issuer: raw.issuer as string | null, serial: raw.serial as string | null,
+        not_before: raw.not_before as number | null, not_after: raw.not_after as number | null,
+        renew_after: raw.renew_after as number | null, last_error: raw.last_error as string | null,
+        attempts: raw.attempts as number, days_remaining: raw.days_remaining as number | null,
+        domain: typeof domain === 'number' ? domain : {
+            id: domain.id as number, name: domain.name as string, provider: domain.provider as string,
+            status: domain.status as string, expires: domain.expires as number | null,
+        },
+    };
+}
+
+export function sanitizeRegistrarDiscoveryResponse(value: unknown): RegistrarDiscoveryResponse {
+    const raw = rowObject(value);
+    const domains = Array.isArray(raw.domains) ? raw.domains.map((value): RegistrarDiscoveryRow => {
+        const row = rowObject(value);
+        return {
+            name: row.name as string, registered: row.registered as boolean,
+            hosted_zone: row.hosted_zone as boolean, hosted_zone_id: row.hosted_zone_id as string | null,
+            record_count: row.record_count as number | null, expires: row.expires as number | null,
+            auto_renew: row.auto_renew as boolean | null, tracked: row.tracked as boolean,
+            domain: row.domain as number | null, adoptable: row.adoptable as boolean,
+            reason: row.reason as string | null,
+        };
+    }) : [];
+    return { count: raw.count as number, truncated: raw.truncated as boolean, domains };
 }
 
 const COMMON = new Set(['start', 'size', 'search']);

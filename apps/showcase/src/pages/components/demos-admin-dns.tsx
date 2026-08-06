@@ -1,13 +1,14 @@
 // Global DNS administration foundation (#1429). The live leg below is the
 // shipped page against the central mock; the other two legs document the
 // fail-closed states reviewers need to exercise with the stable identities.
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
-    DNS_MANAGE_PERMISSIONS,
-    DNS_VIEW_PERMISSIONS,
     ProviderCredentialsPage,
-    parseDnsCapabilities,
 } from 'portal-mojo/admin';
+import {
+    getAuthSnapshot, login, mojoGet, setMockDnsConfigMalformed, type Me,
+} from 'portal-mojo/client';
 
 type Leg = 'manager' | 'viewer' | 'unavailable';
 
@@ -19,13 +20,39 @@ const LEGS: Array<{ key: Leg; label: string }> = [
 
 export function AdminDnsDemo() {
     const [leg, setLeg] = useState<Leg>('manager');
-    const malformedMessage = useMemo(() => {
-        try {
-            parseDnsCapabilities({ providers: [] });
-            return 'Unexpectedly accepted';
-        } catch (reason) {
-            return reason instanceof Error ? reason.message : 'DNS administration unavailable';
-        }
+    const [switching, setSwitching] = useState(true);
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        let active = true;
+        const selectIdentity = async () => {
+            setSwitching(true);
+            setMockDnsConfigMalformed(false);
+            const email = leg === 'viewer'
+                ? 'dns.viewer@nativemojo.com'
+                : leg === 'unavailable' ? 'dns.manager@nativemojo.com' : 'showcase.operator@nativemojo.com';
+            await login(email, 'mojo');
+            if (!active) return;
+            queryClient.removeQueries({ queryKey: ['me'] });
+            const uid = getAuthSnapshot().uid;
+            if (uid) {
+                await queryClient.fetchQuery({
+                    queryKey: ['me', uid],
+                    queryFn: () => mojoGet<Me>('/api/user', 'me'),
+                });
+            }
+            setMockDnsConfigMalformed(leg === 'unavailable');
+            queryClient.removeQueries({ queryKey: ['dnsman'] });
+            queryClient.removeQueries({ queryKey: ['/api/dnsman/credential'] });
+            if (active) setSwitching(false);
+        };
+        void selectIdentity();
+        return () => { active = false; };
+    }, [leg, queryClient]);
+
+    useEffect(() => () => {
+        setMockDnsConfigMalformed(false);
+        void login('showcase.operator@nativemojo.com', 'mojo');
     }, []);
 
     return (
@@ -35,6 +62,7 @@ export function AdminDnsDemo() {
                     <button
                         key={entry.key}
                         type="button"
+                        disabled={switching}
                         className={`seg-btn${leg === entry.key ? ' seg-active' : ''}`}
                         onClick={() => setLeg(entry.key)}
                     >
@@ -43,7 +71,9 @@ export function AdminDnsDemo() {
                 ))}
             </div>
 
-            {leg === 'manager' && (
+            {switching && <div className="panel panel-pad dim">Switching controlled DNS identity…</div>}
+
+            {!switching && leg === 'manager' && (
                 <>
                     <div className="panel panel-pad">
                         <div className="eyebrow">Executable manager leg</div>
@@ -57,28 +87,30 @@ export function AdminDnsDemo() {
                 </>
             )}
 
-            {leg === 'viewer' && (
-                <div className="panel panel-pad">
-                    <div className="eyebrow">Read-only contract</div>
-                    <h3>Viewer sees safe rows and masked detail</h3>
-                    <p className="dim">
-                        Sign in as <code>dns.viewer@nativemojo.com</code> (password <code>mojo</code>).
-                        The table and KISS detail modal remain available; link, rotation, state changes,
-                        and deletion do not render. View gate: <code>{DNS_VIEW_PERMISSIONS.join(' | ')}</code>.
-                    </p>
-                </div>
+            {!switching && leg === 'viewer' && (
+                <>
+                    <div className="panel panel-pad">
+                        <div className="eyebrow">Executable viewer leg</div>
+                        <p className="dim" style={{ marginBottom: 0 }}>
+                            The real page is signed in as the stable DNS viewer. Safe rows and masked
+                            detail remain available; every mutation control is absent.
+                        </p>
+                    </div>
+                    <ProviderCredentialsPage />
+                </>
             )}
 
-            {leg === 'unavailable' && (
-                <div className="panel panel-pad">
-                    <div className="eyebrow">Fail-closed capability leg</div>
-                    <h3>DNS administration unavailable</h3>
-                    <p className="text-bad">{malformedMessage}</p>
-                    <p className="dim">
-                        Missing or malformed fields never receive client defaults. Management remains
-                        system-pinned to <code>{DNS_MANAGE_PERMISSIONS.join(' | ')}</code>.
-                    </p>
-                </div>
+            {!switching && leg === 'unavailable' && (
+                <>
+                    <div className="panel panel-pad">
+                        <div className="eyebrow">Executable fail-closed leg</div>
+                        <p className="dim" style={{ marginBottom: 0 }}>
+                            The real manager page receives a deliberately malformed config response;
+                            no provider defaults or dependent controls may render.
+                        </p>
+                    </div>
+                    <ProviderCredentialsPage />
+                </>
             )}
         </div>
     );

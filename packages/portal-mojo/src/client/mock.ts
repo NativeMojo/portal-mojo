@@ -2449,6 +2449,13 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     dnsManager.email = 'dns.manager@nativemojo.com';
     dnsManager.display_name = 'DNS Manager';
     dnsManager.permissions = { view_dns: true, manage_dns: true };
+    const dnsPlatform = at(22);
+    dnsPlatform.is_active = true;
+    dnsPlatform.is_superuser = true;
+    dnsPlatform.username = 'dns.platform';
+    dnsPlatform.email = 'dns.platform@nativemojo.com';
+    dnsPlatform.display_name = 'DNS Platform Operator';
+    dnsPlatform.permissions = {};
 
     // Auth-config inheritance fixtures: defaults -> deployment -> root -> child.
     groups[0]!.metadata = mergeDicts(groups[0]!.metadata, {
@@ -4121,6 +4128,14 @@ function isDnsCredentialChoiceEligible(group: MockGroup): boolean {
     return true;
 }
 
+function mockGroupChoiceInteger(value: unknown, fallback: number, minimum: number, maximum: number): number | null {
+    const input = value == null ? fallback : value;
+    if (typeof input === 'boolean' || (typeof input !== 'string' && typeof input !== 'number')) return null;
+    if (typeof input === 'string' && !/^[0-9]+$/.test(input)) return null;
+    const parsed = typeof input === 'number' ? input : Number(input);
+    return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+}
+
 function resolveAuthConfig(group?: MockGroup): Record<string, unknown> {
     let config = mergeDicts(DEFAULT_AUTH_CONFIG, DEPLOYMENT_AUTH_CONFIG);
     if (group) {
@@ -4800,6 +4815,23 @@ function authFetch(path: string, body: Record<string, unknown>, params: Params =
 // (e.g. three concurrent refreshes must produce ONE '/api/token/refresh').
 const callCounts = new Map<string, number>();
 
+export interface MockRequestHistoryEntry {
+    method: string;
+    path: string;
+    /** Only non-sensitive DNS query values needed by contract verification. */
+    params?: Params;
+}
+
+const requestHistory: MockRequestHistoryEntry[] = [];
+
+export function getMockRequestHistory(): MockRequestHistoryEntry[] {
+    return requestHistory.map((entry) => ({ ...entry, ...(entry.params ? { params: { ...entry.params } } : {}) }));
+}
+
+export function clearMockRequestHistory(): void {
+    requestHistory.length = 0;
+}
+
 export function getMockCallCounts(): Record<string, number> {
     return Object.fromEntries(callCounts);
 }
@@ -4809,6 +4841,13 @@ let armedReauth: { method: string; path: string } | null = null;
 /** Mock-only one-shot fresh-auth challenge, matched by BOTH method and path. */
 export function armMockReauth(method: string, path: string): void {
     armedReauth = { method: method.toUpperCase(), path };
+}
+
+let dnsConfigMalformed = false;
+
+/** Showcase-only fail-closed state; production transports never call this. */
+export function setMockDnsConfigMalformed(value: boolean): void {
+    dnsConfigMalformed = value;
 }
 
 const LATENCY_MS = 220;
@@ -6027,6 +6066,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     const method = (opts.method ?? 'GET').toUpperCase();
     const key = `${method} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
+    const safeDnsParams = path === '/api/dnsman/credential/group-choice'
+        || path === '/api/dnsman/registrar/discover'
+        ? { ...(opts.params ?? {}) }
+        : undefined;
+    requestHistory.push({ method, path, ...(safeDnsParams ? { params: safeDnsParams } : {}) });
     await new Promise((r) => setTimeout(r, LATENCY_MS));
     if (armedReauth?.method === method && armedReauth.path === path) {
         // The real @requires_fresh_auth runs after authentication. An armed
@@ -6342,6 +6386,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (groupId > 0 && !db.groups.some((group) => group.id === groupId && group.is_active)) {
             return { status: false, error: 'The requested group does not exist or is not active', error_code: 400 };
         }
+        if (dnsConfigMalformed) return { status: true, data: { providers: [] } };
         return {
             status: true,
             data: {
@@ -6370,26 +6415,29 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (!hasGlobalPermission(caller, DNS_MANAGE_GRANTS)) return permissionDenied();
         if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
         const params = opts.params ?? {};
-        const keys = Object.keys(params).filter((name) => params[name] != null && params[name] !== '');
+        const keys = Object.keys(params).filter((name) => params[name] != null);
         if (keys.some((name) => !['id', 'search', 'start', 'size'].includes(name))) {
             return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
         }
         let eligible = db.groups.filter((group) => isDnsCredentialChoiceEligible(group));
         if (keys.includes('id')) {
             if (keys.length !== 1) return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
-            const idText = String(params.id);
-            if (!/^[0-9]+$/.test(idText) || BigInt(idText) < 1n || BigInt(idText) > 9223372036854775807n) {
+            const idInput = params.id;
+            if (typeof idInput === 'boolean' || (typeof idInput !== 'string' && typeof idInput !== 'number')) {
                 return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
             }
+            const idText = String(idInput);
+            if (!/^[0-9]+$/.test(idText) || BigInt(idText) < 1n || BigInt(idText) > 9223372036854775807n) return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
             const id = Number(idText);
             const row = eligible.find((group) => group.id === id);
             return { status: true, data: row ? [{ id: row.id, name: row.name }] : [], start: 0, size: 1, count: row ? 1 : 0 };
         }
-        const search = String(params.search ?? '').trim();
-        const start = Number(params.start ?? 0);
-        const size = Number(params.size ?? 25);
-        if (search.length > 100 || !Number.isInteger(start) || start < 0 || start > 100000
-            || !Number.isInteger(size) || size < 1 || size > 50) {
+        const searchInput = params.search;
+        if (searchInput != null && typeof searchInput !== 'string') return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
+        const search = (searchInput ?? '').trim();
+        const start = mockGroupChoiceInteger(params.start, 0, 0, 100000);
+        const size = mockGroupChoiceInteger(params.size, 25, 1, 50);
+        if (search.length > 100 || start == null || size == null) {
             return { status: false, error: 'Invalid credential group-choice query', error_code: 400 };
         }
         if (search) eligible = eligible.filter((group) => group.name.toLowerCase().includes(search.toLowerCase()));
@@ -6667,7 +6715,30 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             db.dnsDomains.push(domain); db.dnsRecords.set(domain.id, []);
             return { status: true, data: serializeDnsDomain(domain) };
         }
-        if (action === 'discover') return { status: true, data: db.dnsDomains.filter((domain) => domain.provider === 'route53').map((domain) => ({ name: domain.name, hosted_zone_id: domain.hosted_zone_id, tracked: true, domain: domain.id, group: domain.group })) };
+        if (action === 'discover') {
+            const untrackedValue = opts.params?.untracked ?? false;
+            const untrackedOnly = typeof untrackedValue === 'string'
+                ? ['1', 'true', 'yes'].includes(untrackedValue.toLowerCase())
+                : Boolean(untrackedValue);
+            const domains = [
+                ...db.dnsDomains.filter((domain) => domain.provider === 'route53').map((domain) => ({
+                    name: domain.name, registered: domain.registered_on != null,
+                    hosted_zone: domain.hosted_zone_id != null, hosted_zone_id: domain.hosted_zone_id,
+                    record_count: (db.dnsRecords.get(domain.id) ?? []).length,
+                    expires: domain.expires, auto_renew: domain.auto_renew,
+                    tracked: true, domain: domain.id, adoptable: false,
+                    reason: 'already tracked by this system',
+                })),
+                ...(!db.dnsDomains.some((domain) => domain.name === 'untracked-house.example') ? [{
+                    name: 'untracked-house.example', registered: false, hosted_zone: true,
+                    hosted_zone_id: 'ZUNTRACKEDHOUSE', record_count: 3,
+                    expires: null, auto_renew: null, tracked: false, domain: null,
+                    adoptable: true, reason: null,
+                }] : []),
+            ].filter((row) => !untrackedOnly || !row.tracked)
+                .sort((left, right) => left.name.localeCompare(right.name));
+            return { status: true, data: { count: domains.length, truncated: false, domains } };
+        }
         if (action === 'adopt') {
             const now = Math.floor(Date.now() / 1000);
             const groupId = body.group == null ? null : Number(body.group);

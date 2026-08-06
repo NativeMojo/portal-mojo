@@ -23,13 +23,19 @@ for credential linking only when it reports `requires_credential: true`.
 The package defines `DomainModel`, `DnsCredentialModel`,
 `DomainPurchaseModel`, and `CertificateModel`. Their endpoints and graphs are
 pinned and list params are allowlisted; export params are not accepted.
-Defence-in-depth sanitizers recursively remove raw keys, secrets, tokens,
-confirmation tokens, ACME URLs, PEM, and private material before data reaches
-TanStack Query.
+Defence-in-depth sanitizers are explicit safe-graph projectors. Only approved
+scalar fields and approved sub-fields of group, user, credential, and domain
+relations survive; unknown or equivalent secret containers drop by default
+before data reaches TanStack Query.
 
 DNS records, registrar search/suggest/quote/purchase, house-domain adoption,
 registrant contact, WHOIS, and certificate request/revoke use typed imperative
 helpers. There is deliberately no certificate-material helper.
+
+House discovery returns the live `{count,truncated,domains}` contract. Each
+domain includes registration/hosted-zone presence, safe zone metadata,
+tracking/adoption state, and a reason. `untracked=true` returns only untracked
+rows; discovery and assignment remain interactive-superuser operations.
 
 These responses require local call-flow handling and must never enter Query or
 Mutation cache, logs, URL state, or mock state:

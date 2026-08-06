@@ -3,7 +3,7 @@
 Reference docs for every export, written to be loaded into an AI coding
 context. Each page states the import path, the API surface, the wire
 contract it speaks, and the invariants that must hold. Live demos for
-everything: run the portal (`npm run dev`) → **Develop → Components**.
+everything: run the showcase (`npm run dev:showcase`) → **Develop → Components**.
 
 | Page | Covers |
 |---|---|

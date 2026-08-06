@@ -3,11 +3,12 @@ import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
 } from '../../client';
 import {
-    DnsCredentialModel, sanitizeCertificateRow, sanitizeDnsCredentialRow,
+    DnsCredentialModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
+    sanitizeRegistrarDiscoveryResponse,
     type CertificateRow, type DnsCapabilities, type DnsCredentialRow,
     type DnsGroupChoice, type DnsProviderCapability, type DnsRecordRow,
     type DnsRecordSetResponse, type DomainRow, type RegistrarQuote,
-    type RegistrarSearchRow, type RegistrantContact, type RegistrantContactResponse,
+    type RegistrarDiscoveryResponse, type RegistrarSearchRow, type RegistrantContact, type RegistrantContactResponse,
     type WhoisResponse,
 } from './models';
 import { dnsRecordKey } from './data';
@@ -107,22 +108,40 @@ export function useDnsCapabilities(group?: number | null, opts: { enabled?: bool
     });
 }
 
-function normalizeGroupChoiceParams(params: Params): Params {
-    const keys = Object.keys(params).filter((key) => params[key] != null && params[key] !== '');
+function groupChoiceInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
+    const input = value == null ? fallback : value;
+    if (typeof input === 'boolean' || (typeof input !== 'string' && typeof input !== 'number')) {
+        throw new Error('Invalid credential group-choice query');
+    }
+    if (typeof input === 'string' && !/^[0-9]+$/.test(input)) {
+        throw new Error('Invalid credential group-choice query');
+    }
+    const parsed = typeof input === 'number' ? input : Number(input);
+    if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+        throw new Error('Invalid credential group-choice query');
+    }
+    return parsed;
+}
+
+export function normalizeGroupChoiceParams(params: Params): Params {
+    const keys = Object.keys(params).filter((key) => params[key] != null);
     if (keys.some((key) => !['id', 'search', 'start', 'size'].includes(key))) throw new Error('Invalid credential group-choice query');
     if (keys.includes('id')) {
         if (keys.length !== 1) throw new Error('Invalid credential group-choice query');
-        const text = String(params.id);
-        if (!/^[0-9]+$/.test(text) || BigInt(text) < 1n || BigInt(text) > 9223372036854775807n) {
+        const input = params.id;
+        if (typeof input === 'boolean' || (typeof input !== 'string' && typeof input !== 'number')) {
             throw new Error('Invalid credential group-choice query');
         }
+        const text = String(input);
+        if (!/^[0-9]+$/.test(text) || BigInt(text) < 1n || BigInt(text) > 9223372036854775807n) throw new Error('Invalid credential group-choice query');
         return { id: text };
     }
-    const search = String(params.search ?? '').trim();
-    const start = Number(params.start ?? 0);
-    const size = Number(params.size ?? 25);
-    if (search.length > 100 || !Number.isInteger(start) || start < 0 || start > 100000
-        || !Number.isInteger(size) || size < 1 || size > 50) {
+    const searchInput = params.search;
+    if (searchInput != null && typeof searchInput !== 'string') throw new Error('Invalid credential group-choice query');
+    const search = (searchInput ?? '').trim();
+    const start = groupChoiceInteger(params.start, 0, 0, 100000);
+    const size = groupChoiceInteger(params.size, 25, 1, 50);
+    if (search.length > 100) {
         throw new Error('Invalid credential group-choice query');
     }
     return { ...(search ? { search } : {}), start, size };
@@ -199,25 +218,25 @@ export function quoteDomain(input: { group: number; domain: string; years?: numb
     return postData('/api/dnsman/registrar/quote', input);
 }
 
-export function purchaseDomain(input: { group: number; purchase: number; confirm_token: string }): Promise<DomainRow> {
-    return postData('/api/dnsman/registrar/purchase', input);
+export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string }): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/purchase', input));
 }
 
-export function registerExistingDomain(input: { group: number; domain: string; credential: number }): Promise<DomainRow> {
-    return postData('/api/dnsman/registrar/register-existing', input);
+export async function registerExistingDomain(input: { group: number; domain: string; credential: number }): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/register-existing', input));
 }
 
-export async function discoverHouseDomains(untracked = false): Promise<unknown[]> {
+export async function discoverHouseDomains(untracked = false): Promise<RegistrarDiscoveryResponse> {
     const response = await mojoCall('/api/dnsman/registrar/discover', { params: { untracked } });
-    return response.data as unknown[];
+    return sanitizeRegistrarDiscoveryResponse(response.data);
 }
 
-export function adoptHouseDomain(input: { domain: string; group?: number; create_zone?: boolean }): Promise<DomainRow> {
-    return postData('/api/dnsman/registrar/adopt', input);
+export async function adoptHouseDomain(input: { domain: string; group?: number; create_zone?: boolean }): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/adopt', input));
 }
 
-export function assignHouseDomain(input: { domain: number; group: number }): Promise<DomainRow> {
-    return postData('/api/dnsman/registrar/assign-group', input);
+export async function assignHouseDomain(input: { domain: number; group: number }): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/assign-group', input));
 }
 
 export async function listDnsRecords(domain: number): Promise<DnsRecordSetResponse> {

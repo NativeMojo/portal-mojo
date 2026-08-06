@@ -151,7 +151,6 @@ async function showCredentialEditor(caps: DnsCapabilities, row?: DnsCredentialRo
 }
 
 function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabilities; close: () => void }) {
-    const queryClient = useQueryClient();
     const { data: row, isPending, error } = DnsCredentialModel.useOne(id);
     const { can: canManage } = useCan(DNS_MANAGE_PERMISSIONS);
     const save = DnsCredentialModel.useSave();
