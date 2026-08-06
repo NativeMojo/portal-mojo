@@ -269,6 +269,21 @@ is `npm run verify:admin-storage`; the showcase exposes all three pages plus
 playable/unsafe/rendition and cancellable destructive modal evidence for the
 central light/dark browser close.
 
+**2026-08-06, wave 8 Communications Admin (#1290):** the global/no-group
+Communications workspace now contributes Email Domains, Mailboxes, Sent
+Messages, Email Templates, and Contact Messages. Email administration uses the
+existing django-mojo SES contracts, with write-only credentials, explicit
+armed/confirmed side effects, exact DNSMan-domain resolution through #1430's
+optional adapter, complete manual DNS results, and authoritative refetches
+after provider actions. Message and template detail stay in KISS modals; HTML
+previews use a parsed, stripped, bare-sandbox iframe with a deny-all CSP.
+Contact Messages preserve independent support view/manage/delete gates and
+bounded PII projections. Mock coverage includes success, provider drift,
+2xx persisted send failures, default-mailbox uniqueness, cascades, and
+permission personas. SES quota remains a documented non-blocking backend gap
+(#1310); no quota surface is fabricated. The executable contract is
+`npm run verify:admin-messaging`.
+
 **2026-08-05, wave 7a residual (Groups Admin #1410):** the app-local Groups
 surface now carries system-pinned route, menu, section, and action gates;
 restores the useful legacy column inventory; and offers real, reason-aware
