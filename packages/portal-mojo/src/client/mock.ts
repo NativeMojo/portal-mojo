@@ -1445,7 +1445,31 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         groups: true,
         manage_users: true,
         users: true,
+        // The jobs catch-all grant (view + manage + scheduled tasks in one).
+        jobs: true,
     };
+    // Jobs identities — the view/manage split for the jobs control plane.
+    // jobs.viewer must be able to read every jobs surface and issue ZERO
+    // denied requests; jobs.operator additionally holds the write grants.
+    const jobsViewer = at(17);
+    jobsViewer.is_active = true;
+    jobsViewer.is_superuser = false;
+    jobsViewer.username = 'jobs.viewer';
+    jobsViewer.email = 'jobs.viewer@nativemojo.com';
+    jobsViewer.display_name = 'Jobs Viewer';
+    jobsViewer.permissions = { view_jobs: true };
+    const jobsOperator = at(18);
+    jobsOperator.is_active = true;
+    jobsOperator.is_superuser = false;
+    jobsOperator.username = 'jobs.operator';
+    jobsOperator.email = 'jobs.operator@nativemojo.com';
+    jobsOperator.display_name = 'Jobs Operator';
+    // NOTE the pair: ScheduledTask.VIEW_PERMS is ["jobs","view_scheduled_tasks",
+    // "owner"] — `manage_scheduled_tasks` does NOT imply view, and neither does
+    // `manage_jobs`. An operator holding only the manage grant falls through to
+    // the OWNER branch and sees just their own tasks, so a real jobs operator
+    // needs the view grant explicitly.
+    jobsOperator.permissions = { manage_jobs: true, view_scheduled_tasks: true, manage_scheduled_tasks: true };
     const securityManageOnly = at(15);
     securityManageOnly.is_active = true;
     securityManageOnly.is_superuser = false;
@@ -1477,9 +1501,483 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     }
 }
 
+// ══ Jobs engine fixtures (mojo/apps/jobs) ════════════════════════════
+// Everything between this banner and the closing one is the jobs domain's
+// fixture layer. The wire it feeds is documented at the endpoint block below.
+//
+// Two backend behaviors are baked into the SHAPE of these rows:
+//   · model rows carry epoch-SECOND datetimes (the mojo serializer), runner
+//     heartbeats carry ISO strings (raw Redis JSON, never serialized);
+//   · a runner's `alive` flag is derived at request time from the heartbeat
+//     AGE, so the fixtures store offsets rather than timestamps — a showcase
+//     session left open for an hour must not turn the whole fleet red.
+
+/** settings.JOBS_CHANNELS for this deployment. */
+const JOBS_CHANNELS = ['default', 'email', 'webhooks', 'priority'];
+
+/**
+ * settings.JOBS_RUNNER_HEARTBEAT_SEC. manager.get_runners treats a runner as
+ * alive while its heartbeat is younger than 3× this, and JobEngine writes the
+ * heartbeat key with the same value as its TTL. 60s (a deliberately
+ * conservative deployment) is what makes the slow/stale heartbeat tiers
+ * reachable at all — under the 5s default the 180s window collapses to 15s.
+ */
+const JOBS_HEARTBEAT_SEC = 60;
+
+const JOB_FUNCS = [
+    'mojo.apps.jobs.examples.sample_jobs.send_email',
+    'mojo.apps.jobs.examples.sample_jobs.process_file_upload',
+    'mojo.apps.jobs.examples.sample_jobs.generate_report',
+    'mojo.apps.jobs.examples.sample_jobs.fetch_external_api',
+    'mojo.apps.jobs.examples.sample_jobs.simulate_long_job',
+];
+
+type MockJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'canceled' | 'expired';
+
+interface MockJob {
+    id: string;
+    channel: string;
+    func: string;
+    payload: Record<string, unknown>;
+    status: MockJobStatus;
+    run_at: number | null;
+    expires_at: number | null;
+    attempt: number;
+    max_retries: number;
+    backoff_base: number;
+    backoff_max_sec: number;
+    broadcast: boolean;
+    cancel_requested: boolean;
+    max_exec_seconds: number | null;
+    runner_id: string | null;
+    last_error: string;
+    stack_trace: string;
+    metadata: Record<string, unknown>;
+    created: number;
+    modified: number;
+    started_at: number | null;
+    finished_at: number | null;
+    idempotency_key: string | null;
+}
+
+interface MockJobEvent {
+    id: number;
+    /** The RELATION name — `?job=` filters on this; `?job_id=` does not exist. */
+    job: string;
+    channel: string;
+    event: string;
+    at: number;
+    runner_id: string | null;
+    attempt: number;
+    details: Record<string, unknown>;
+    created: number;
+    modified: number;
+}
+
+interface MockJobLog {
+    id: number;
+    job: string;
+    channel: string;
+    created: number;
+    modified: number;
+    kind: string;
+    message: string;
+    meta: Record<string, unknown>;
+}
+
+interface MockRunner {
+    runner_id: string;
+    hostname: string;
+    channels: string[];
+    jobs_processed: number;
+    jobs_failed: number;
+    /** Seconds since the process started — resolved to an ISO `started`. */
+    uptime_sec: number;
+    /** Seconds since the last heartbeat — resolved to ISO + the alive flag. */
+    heartbeat_age_sec: number;
+}
+
+interface MockScheduledTask {
+    id: string;
+    /** OWNER_FIELD. A caller without a global grant sees only their own rows. */
+    user: number;
+    name: string;
+    description: string;
+    enabled: boolean;
+    run_once: boolean;
+    task_type: string;
+    run_times: string[];
+    run_days: number[];
+    job_config: Record<string, unknown>;
+    notify: string[];
+    channel: string;
+    max_retries: number;
+    last_run: number | null;
+    run_count: number;
+    last_error: string;
+    created: number;
+    modified: number;
+}
+
+interface MockTaskResult {
+    id: string;
+    task: string;
+    user: number;
+    job: string | null;
+    status: 'success' | 'error';
+    output: string;
+    error: string;
+    created: number;
+}
+
+const JOBS_NOW = Math.floor(Date.now() / 1000);
+
+function makeJob(rand: () => number, over: Partial<MockJob> & { channel: string; status: MockJobStatus }): MockJob {
+    const created = over.created ?? JOBS_NOW - Math.floor(rand() * 6 * 3600);
+    return {
+        id: mockHex32(rand),
+        func: JOB_FUNCS[Math.floor(rand() * JOB_FUNCS.length)]!,
+        payload: { source: 'fixture' },
+        run_at: null,
+        expires_at: created + 900,
+        attempt: 0,
+        max_retries: 3,
+        backoff_base: 2,
+        backoff_max_sec: 3600,
+        broadcast: false,
+        cancel_requested: false,
+        max_exec_seconds: null,
+        runner_id: null,
+        last_error: '',
+        stack_trace: '',
+        metadata: {},
+        modified: created,
+        started_at: null,
+        finished_at: null,
+        idempotency_key: null,
+        ...over,
+        created,
+    };
+}
+
+/** The multi-line traceback-style error the failed-job fixture carries. */
+const FAILED_JOB_ERROR = [
+    'SMTPRecipientsRefused: {\'ops@partner.example.com\': (550, b\'5.1.1 User unknown\')}',
+    '  while sending batch 3/7 (142 recipients)',
+    '  retry 3 of 3 exhausted — giving up',
+].join('\n');
+
+function buildJobs(): MockJob[] {
+    const rand = mulberry32(20260806);
+    const jobs: MockJob[] = [];
+
+    // ── Named fixtures — one per state the UI has to render distinctly ──
+    // Running on a LIVE runner: cancel is cooperative (cancel_requested).
+    jobs.push(makeJob(rand, {
+        channel: 'default', status: 'running',
+        func: 'mojo.apps.jobs.examples.sample_jobs.simulate_long_job',
+        payload: { delay: 240 },
+        runner_id: 'runner-mojo-web-01-engine',
+        created: JOBS_NOW - 96, started_at: JOBS_NOW - 42, attempt: 1,
+    }));
+    // Running on a DEAD runner: cancel force-cancels and reports forced:true.
+    // This is also what makes totals.running_stale non-zero.
+    jobs.push(makeJob(rand, {
+        channel: 'priority', status: 'running',
+        func: 'mojo.apps.jobs.examples.sample_jobs.process_file_upload',
+        payload: { file_path: '/mnt/uploads/2026-08/ledger.csv' },
+        runner_id: 'runner-mojo-batch-01-engine',
+        created: JOBS_NOW - 3600, started_at: JOBS_NOW - 3480, attempt: 1,
+    }));
+    // Failed with a multi-line error and its retries exhausted.
+    jobs.push(makeJob(rand, {
+        channel: 'email', status: 'failed',
+        func: 'mojo.apps.jobs.examples.sample_jobs.send_email',
+        payload: { recipients: ['ops@partner.example.com'], subject: 'Weekly digest' },
+        runner_id: 'runner-mojo-web-02-engine',
+        attempt: 3, max_retries: 3,
+        last_error: FAILED_JOB_ERROR,
+        stack_trace: 'Traceback (most recent call last):\n  ...',
+        created: JOBS_NOW - 5400, started_at: JOBS_NOW - 5390, finished_at: JOBS_NOW - 5370,
+        metadata: { batch: 3, recipients: 142 },
+    }));
+    // Scheduled for the future.
+    jobs.push(makeJob(rand, {
+        channel: 'webhooks', status: 'pending',
+        func: 'mojo.apps.jobs.examples.sample_jobs.fetch_external_api',
+        payload: { url: 'https://nativemojo.com/' },
+        run_at: JOBS_NOW + 7200, created: JOBS_NOW - 600,
+    }));
+    // Scheduled and OVERDUE — pending with a run_at in the past. The true
+    // state, which is why the segments split on run_at__isnull rather than on
+    // comparing a datetime.
+    jobs.push(makeJob(rand, {
+        channel: 'default', status: 'pending',
+        func: 'mojo.apps.jobs.examples.sample_jobs.generate_report',
+        payload: { report_type: 'daily' },
+        run_at: JOBS_NOW - 1500, created: JOBS_NOW - 7200,
+    }));
+    jobs.push(makeJob(rand, {
+        channel: 'default', status: 'canceled',
+        created: JOBS_NOW - 9000, finished_at: JOBS_NOW - 8990, cancel_requested: true,
+    }));
+    jobs.push(makeJob(rand, {
+        channel: 'priority', status: 'expired',
+        created: JOBS_NOW - 12000, expires_at: JOBS_NOW - 11100,
+        last_error: 'Job expired before a runner claimed it',
+    }));
+
+    // ── Backlogs that drive the channel severity thresholds ──────────
+    // email: 62 queued + 1 alive runner → over the >50 WARNING threshold.
+    for (let i = 0; i < 62; i++) {
+        jobs.push(makeJob(rand, {
+            channel: 'email', status: 'pending',
+            func: 'mojo.apps.jobs.examples.sample_jobs.send_email',
+            payload: { recipients: [`user${i}@example.com`], subject: 'Notification' },
+            created: JOBS_NOW - Math.floor(rand() * 1800),
+        }));
+    }
+    // webhooks: queued work and ZERO alive runners → CRITICAL regardless of
+    // depth, because nothing will ever drain it.
+    for (let i = 0; i < 3; i++) {
+        jobs.push(makeJob(rand, { channel: 'webhooks', status: 'pending', created: JOBS_NOW - 400 * i }));
+    }
+    for (let i = 0; i < 4; i++) {
+        jobs.push(makeJob(rand, { channel: 'default', status: 'pending', created: JOBS_NOW - 220 * i }));
+    }
+    for (let i = 0; i < 2; i++) {
+        jobs.push(makeJob(rand, { channel: 'priority', status: 'pending', created: JOBS_NOW - 340 * i }));
+    }
+
+    // ── History: recent completions feed the per-channel metrics block ──
+    for (let i = 0; i < 24; i++) {
+        const channel = JOBS_CHANNELS[Math.floor(rand() * JOBS_CHANNELS.length)]!;
+        const finished = JOBS_NOW - Math.floor(rand() * 3400);
+        const duration = 400 + Math.floor(rand() * 9000);
+        jobs.push(makeJob(rand, {
+            channel, status: 'completed',
+            created: finished - 30,
+            started_at: finished - Math.ceil(duration / 1000) - 1,
+            finished_at: finished,
+            runner_id: rand() > 0.5 ? 'runner-mojo-web-01-engine' : 'runner-mojo-web-02-engine',
+            attempt: 1,
+            metadata: { duration_ms: duration },
+        }));
+    }
+    for (let i = 0; i < 6; i++) {
+        const finished = JOBS_NOW - Math.floor(rand() * 3400);
+        jobs.push(makeJob(rand, {
+            channel: JOBS_CHANNELS[Math.floor(rand() * JOBS_CHANNELS.length)]!,
+            status: 'failed',
+            created: finished - 40, started_at: finished - 12, finished_at: finished,
+            runner_id: 'runner-mojo-web-02-engine',
+            attempt: 3, max_retries: 3,
+            last_error: 'ConnectionResetError: [Errno 104] Connection reset by peer',
+        }));
+    }
+    return jobs;
+}
+
+let jobEventSequence = 0;
+
+function jobEvent(job: MockJob, event: string, atOffsetSec: number, details: Record<string, unknown> = {}, runnerId?: string | null): MockJobEvent {
+    const at = JOBS_NOW - atOffsetSec;
+    jobEventSequence += 1;
+    return {
+        id: jobEventSequence,
+        job: job.id,
+        channel: job.channel,
+        event,
+        at,
+        runner_id: runnerId === undefined ? job.runner_id : runnerId,
+        attempt: job.attempt,
+        details,
+        created: at,
+        modified: at,
+    };
+}
+
+/** A lifecycle trail for every job whose detail view is worth opening. */
+function buildJobEvents(jobs: MockJob[]): MockJobEvent[] {
+    const events: MockJobEvent[] = [];
+    for (const job of jobs) {
+        const age = JOBS_NOW - job.created;
+        events.push(jobEvent(job, 'created', age, {}, null));
+        if (job.run_at != null) {
+            events.push(jobEvent(job, 'scheduled', age - 1, { run_at: job.run_at }, null));
+        } else {
+            events.push(jobEvent(job, 'queued', age - 1, {}, null));
+        }
+        if (job.started_at != null) {
+            events.push(jobEvent(job, 'claimed', JOBS_NOW - job.started_at, {}));
+            events.push(jobEvent(job, 'running', JOBS_NOW - job.started_at, { attempt: job.attempt }));
+        }
+        if (job.status === 'failed') {
+            events.push(jobEvent(job, 'retry', JOBS_NOW - (job.finished_at ?? job.created) + 20, { attempt: 2 }));
+            events.push(jobEvent(job, 'failed', JOBS_NOW - (job.finished_at ?? job.created), { error: job.last_error.split('\n')[0] }));
+        } else if (job.status === 'completed') {
+            events.push(jobEvent(job, 'completed', JOBS_NOW - (job.finished_at ?? job.created), { duration_ms: job.metadata.duration_ms ?? 0 }));
+        } else if (job.status === 'canceled') {
+            events.push(jobEvent(job, 'canceled', JOBS_NOW - (job.finished_at ?? job.created), { forced: false, previous_status: 'pending' }, null));
+        } else if (job.status === 'expired') {
+            events.push(jobEvent(job, 'expired', JOBS_NOW - (job.expires_at ?? job.created), {}, null));
+        }
+    }
+    return events;
+}
+
+function buildJobLogs(jobs: MockJob[]): MockJobLog[] {
+    const logs: MockJobLog[] = [];
+    let id = 0;
+    const push = (job: MockJob, kind: string, message: string, offset: number, meta: Record<string, unknown> = {}) => {
+        id += 1;
+        const created = JOBS_NOW - offset;
+        logs.push({ id, job: job.id, channel: job.channel, created, modified: created, kind, message, meta });
+    };
+    const running = jobs.find((job) => job.status === 'running' && job.runner_id === 'runner-mojo-web-01-engine');
+    if (running) {
+        push(running, 'info', 'Claimed by runner-mojo-web-01-engine', 42);
+        push(running, 'info', 'Sleeping for 240s to simulate a long job', 41);
+        push(running, 'debug', 'Heartbeat touch — visibility timeout extended', 12, { visibility_ms: 60000 });
+    }
+    const failed = jobs.find((job) => job.last_error === FAILED_JOB_ERROR);
+    if (failed) {
+        push(failed, 'info', 'Sending batch 1/7 (142 recipients)', 5390);
+        push(failed, 'warn', 'Batch 2/7 partially delivered — 3 soft bounces', 5385, { soft_bounces: 3 });
+        push(failed, 'error', '550 5.1.1 User unknown: ops@partner.example.com', 5372, { code: 550 });
+        push(failed, 'error', 'Retry 3 of 3 exhausted — marking job failed', 5370);
+    }
+    return logs;
+}
+
+/**
+ * Three runners covering the three states the fleet UI must distinguish. The
+ * batch runner is `alive: false` — in a healthy deployment Redis usually
+ * expires the heartbeat key at the same moment the aliveness window closes, so
+ * a dead runner more often VANISHES from the list than shows up dead; a
+ * lingering key (clock skew, an older engine build with a longer TTL) is what
+ * produces this row, and `manager.get_runners` emits it verbatim.
+ */
+function buildJobRunners(): MockRunner[] {
+    return [
+        {
+            runner_id: 'runner-mojo-web-01-engine',
+            hostname: 'mojo-web-01.internal',
+            channels: ['default', 'email', 'priority'],
+            jobs_processed: 4821, jobs_failed: 12,
+            uptime_sec: Math.floor(3.2 * 86400), heartbeat_age_sec: 6,
+        },
+        {
+            runner_id: 'runner-mojo-web-02-engine',
+            hostname: 'mojo-web-02.internal',
+            channels: ['default', 'email'],
+            jobs_processed: 1290, jobs_failed: 47,
+            uptime_sec: Math.floor(1.1 * 86400), heartbeat_age_sec: 142,
+        },
+        {
+            runner_id: 'runner-mojo-batch-01-engine',
+            hostname: 'mojo-batch-01.internal',
+            channels: ['webhooks', 'priority'],
+            jobs_processed: 88231, jobs_failed: 210,
+            uptime_sec: 9 * 86400, heartbeat_age_sec: 1900,
+        },
+    ];
+}
+
+function buildScheduledTasks(): MockScheduledTask[] {
+    const day = 86400;
+    return [
+        {
+            id: 'a1c4f0b28e5d4f7c9b2a6e08d31f5a44', user: 1,
+            name: 'Daily revenue digest', description: 'Summarize yesterday’s revenue and email the finance list.',
+            enabled: true, run_once: false, task_type: 'llm',
+            run_times: ['07:30'], run_days: [0, 1, 2, 3, 4],
+            job_config: {
+                system_prompt: 'You are a concise financial analyst.',
+                user_prompt: 'Summarize yesterday’s revenue by product line in under 200 words.',
+            },
+            notify: ['email'], channel: 'default', max_retries: 1,
+            last_run: JOBS_NOW - 20 * 3600, run_count: 128, last_error: '',
+            created: JOBS_NOW - 190 * day, modified: JOBS_NOW - 20 * 3600,
+        },
+        {
+            id: 'b7e2d9134a6b48c1ae03f5c7d2901b6e', user: 14,
+            name: 'Nightly ledger export', description: 'Publish the export job twice a day, every day.',
+            enabled: true, run_once: false, task_type: 'job',
+            run_times: ['02:00', '14:00'], run_days: [],
+            job_config: {
+                func: 'mojo.apps.jobs.examples.sample_jobs.generate_report',
+                payload: { report_type: 'ledger', format: 'csv' },
+            },
+            notify: ['in_app'], channel: 'priority', max_retries: 2,
+            last_run: JOBS_NOW - 7 * 3600, run_count: 402, last_error: '',
+            created: JOBS_NOW - 320 * day, modified: JOBS_NOW - 7 * 3600,
+        },
+        {
+            id: 'c3f81a6d5b7e42908c14de6b7a2f0359', user: 18,
+            name: 'Partner webhook ping', description: 'Health-check the partner integration.',
+            enabled: false, run_once: false, task_type: 'webhook',
+            run_times: ['09:00'], run_days: [0, 2, 4],
+            job_config: { url: 'https://partner.example.com/hooks/mojo', data: { probe: true } },
+            notify: [], channel: 'webhooks', max_retries: 0,
+            last_run: JOBS_NOW - 4 * day, run_count: 61,
+            last_error: 'HTTP 503 from https://partner.example.com/hooks/mojo',
+            created: JOBS_NOW - 95 * day, modified: JOBS_NOW - 4 * day,
+        },
+        {
+            id: 'd5904be71c2f4a6db83e07f1c65a2b38', user: 1,
+            name: 'One-off migration kick', description: 'Runs once, then disables itself.',
+            enabled: true, run_once: true, task_type: 'job',
+            run_times: ['23:15'], run_days: [6],
+            job_config: { func: 'mojo.apps.jobs.examples.sample_jobs.process_file_upload', payload: {} },
+            notify: ['email', 'in_app'], channel: 'default', max_retries: 0,
+            last_run: null, run_count: 0, last_error: '',
+            created: JOBS_NOW - 2 * day, modified: JOBS_NOW - 2 * day,
+        },
+    ];
+}
+
+function buildTaskResults(): MockTaskResult[] {
+    const hour = 3600;
+    return [
+        {
+            id: 'e10a3c5f7b9d42e8a6c04b1f3d78e502', task: 'a1c4f0b28e5d4f7c9b2a6e08d31f5a44', user: 1, job: null,
+            status: 'success',
+            output: 'Revenue rose 4.2% day over day, led by the Pro tier (+9.1%). Enterprise renewals were flat.',
+            error: '', created: JOBS_NOW - 20 * hour,
+        },
+        {
+            id: 'f27b4d6a8c0e41f9b7d15c2a4e89f613', task: 'a1c4f0b28e5d4f7c9b2a6e08d31f5a44', user: 1, job: null,
+            status: 'success',
+            output: 'Revenue fell 1.8% day over day; the drop is concentrated in trial conversions.',
+            error: '', created: JOBS_NOW - 44 * hour,
+        },
+        {
+            id: '0a3c5e7f9b1d43a8c6e02f4b8d17e924', task: 'a1c4f0b28e5d4f7c9b2a6e08d31f5a44', user: 1, job: null,
+            status: 'error', output: '',
+            error: 'LLM request timed out after 60s', created: JOBS_NOW - 68 * hour,
+        },
+        {
+            id: '1b4d6f8a0c2e45b9d7f13a5c9e28f035', task: 'b7e2d9134a6b48c1ae03f5c7d2901b6e', user: 14,
+            job: null, status: 'success',
+            output: 'Published job for report_type=ledger', error: '', created: JOBS_NOW - 7 * hour,
+        },
+        {
+            id: '2c5e7a9b1d3f46c0e8a24b6d0f39a146', task: 'c3f81a6d5b7e42908c14de6b7a2f0359', user: 18,
+            job: null, status: 'error', output: '',
+            error: 'HTTP 503 from https://partner.example.com/hooks/mojo', created: JOBS_NOW - 4 * 86400,
+        },
+    ];
+}
+
+// ══ end jobs engine fixtures ═════════════════════════════════════════
+
 const users = buildUsers();
 const groups = buildGroups();
 decorateUsers(users, groups);
+// Events and logs are keyed off the job rows, so the seed is built once here
+// and shared rather than rebuilt per db field.
+const jobsSeed = buildJobs();
 const db = {
     users,
     groups,
@@ -1514,6 +2012,16 @@ const db = {
     bouncerDevices: buildBouncerDevices(),
     bouncerSignals: buildBouncerSignals(),
     botSignatures: buildBotSignatures(),
+    // ── Jobs engine ───────────────────────────────────────────────────
+    jobs: jobsSeed,
+    jobEvents: buildJobEvents(jobsSeed),
+    jobLogs: buildJobLogs(jobsSeed),
+    jobRunners: buildJobRunners(),
+    scheduledTasks: buildScheduledTasks(),
+    taskResults: buildTaskResults(),
+    // The scheduler lock, as `control/force-scheduler-lead` sees it: a Redis
+    // string key whose VALUE is the holder. Deleting it is the whole control.
+    jobsSchedulerLock: 'runner-mojo-web-01-engine' as string | null,
     // Per-user login throttle counters (auth/manage/throttle shape). u3 is
     // mid-lockout so the header badge + Clear Rate Limit are demoable.
     throttle: new Map<number, { count: number; limit: number; window: number; retry_after_seconds: number }>([
@@ -2112,10 +2620,37 @@ const BUCKET_MS: Record<string, number> = {
     years: 365 * 864e5,
 };
 
+/**
+ * Jobs metric slugs, exactly as `mojo/apps/jobs` records them. The per-channel
+ * naming is ASYMMETRIC and that asymmetry is deliberate here: publishing is
+ * counted as `jobs.published.<channel>`, while terminal outcomes are counted
+ * as `jobs.channel.<channel>.completed` / `.failed`. A chart that assumes one
+ * pattern for both silently plots nothing for half its series.
+ */
+const JOBS_METRIC_SERIES: { slug: string; label: string; base: number; spread: number }[] = [
+    { slug: 'jobs.published', label: 'Jobs Published', base: 180, spread: 70 },
+    { slug: 'jobs.completed', label: 'Jobs Completed', base: 168, spread: 66 },
+    { slug: 'jobs.failed', label: 'Jobs Failed', base: 9, spread: 8 },
+    { slug: 'jobs.retried', label: 'Jobs Retried', base: 5, spread: 5 },
+    { slug: 'jobs.expired', label: 'Jobs Expired', base: 2, spread: 3 },
+    { slug: 'jobs.local.completed', label: 'Local Completed', base: 22, spread: 12 },
+    { slug: 'jobs.local.failed', label: 'Local Failed', base: 3, spread: 3 },
+    { slug: 'jobs.local.duration_ms', label: 'Local Duration (ms)', base: 1400, spread: 700 },
+    ...JOBS_CHANNELS.flatMap((channel, index) => {
+        const weight = [1, 0.7, 0.25, 0.4][index] ?? 0.5;
+        return [
+            { slug: `jobs.published.${channel}`, label: `Published · ${channel}`, base: Math.round(180 * weight), spread: Math.round(60 * weight) },
+            { slug: `jobs.channel.${channel}.completed`, label: `Completed · ${channel}`, base: Math.round(168 * weight), spread: Math.round(56 * weight) },
+            { slug: `jobs.channel.${channel}.failed`, label: `Failed · ${channel}`, base: Math.max(1, Math.round(9 * weight)), spread: Math.max(1, Math.round(7 * weight)) },
+        ];
+    }),
+];
+
 const SERIES: { slug: string; label: string; base: number; spread: number }[] = [
     { slug: 'api_calls', label: 'API Calls', base: 240, spread: 90 },
     { slug: 'logins', label: 'Logins', base: 70, spread: 34 },
     { slug: 'errors', label: 'Errors', base: 12, spread: 10 },
+    ...JOBS_METRIC_SERIES,
 ];
 
 function bucketLabel(d: Date, granularity: string): string {
@@ -2610,6 +3145,1116 @@ function requestGroupId(opts: MockFetchOpts): number {
 function permissionDenied(code = 403): Record<string, unknown> {
     return { status: false, error: 'permission denied', error_code: code };
 }
+
+// ══ Jobs engine — wire implementation ════════════════════════════════
+
+/** `requires_global_perms('view_jobs','manage_jobs','jobs')`. */
+const JOBS_VIEW_GRANTS = ['view_jobs', 'manage_jobs', 'jobs'];
+/** `requires_global_perms('manage_jobs','jobs')` — every write control. */
+const JOBS_MANAGE_GRANTS = ['manage_jobs', 'jobs'];
+/** ScheduledTask/TaskResult VIEW_PERMS minus the `owner` fallback. */
+const SCHEDULED_TASK_VIEW_GRANTS = ['jobs', 'view_scheduled_tasks'];
+/** ScheduledTask SAVE/DELETE_PERMS minus `owner`. */
+const SCHEDULED_TASK_MANAGE_GRANTS = ['jobs', 'manage_scheduled_tasks'];
+
+/** `missing required parameters: …` — decorators/validate.py, code+status 400. */
+function missingParams(...names: string[]): Record<string, unknown> {
+    return { status: false, error: `missing required parameters: ${names.join(', ')}`, error_code: 400 };
+}
+
+function jobsBadRequest(error: string): Record<string, unknown> {
+    return { status: false, error, error_code: 400 };
+}
+
+/**
+ * Python truthiness, which is NOT JavaScript's. `{}` and `[]` are falsy in
+ * Python — that is precisely why `POST /api/jobs/job/<id>` with
+ * `{cancel_request: {}}` answers "cancel_request must be true" while the same
+ * body looks like a valid request from JS.
+ */
+function pyTruthy(value: unknown): boolean {
+    if (value == null || value === false || value === 0 || value === '') return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+    return Boolean(value);
+}
+
+type JobsFilterParse = { ok: true; params: Params } | { ok: false; error: Record<string, unknown> };
+
+const JOBS_FILTER_RESERVED = new Set([
+    'start', 'size', 'sort', 'search', 'graph', 'dr_field', 'dr_start', 'dr_end',
+    'download_format', 'filename', 'limit', 'offset',
+]);
+
+/**
+ * Reproduce `mojo/models/rest.py build_rest_filters` field resolution, which
+ * has THREE outcomes and only one of them is "filter":
+ *
+ *   · the key names a model field           → it filters;
+ *   · the key names a Django FK ATTNAME
+ *     (`job_id` for a `job` FK)             → `hasattr(cls, 'job_id')` is
+ *     True, so the parser accepts it, but `get_model_field('job_id')` returns
+ *     None and `normalize_rest_value` immediately dereferences it →
+ *     AttributeError. NOT a benign unfiltered list: a server error;
+ *   · anything else (e.g. `runner_id` on
+ *     JobLog, which has no such field)      → SILENTLY DROPPED, so the
+ *     response is the UNFILTERED list. web-mojo shipped
+ *     `/api/jobs/logs?runner_id=…` and presented the whole log table as one
+ *     runner's logs.
+ *
+ * Encoding all three is the point of the mock: a caller cannot discover the
+ * difference from a summary.
+ */
+function jobsFilterParams(params: Params, fields: Set<string>, attnames: Set<string>): JobsFilterParse {
+    const out: Params = {};
+    for (const [key, value] of Object.entries(params)) {
+        if (JOBS_FILTER_RESERVED.has(key)) { out[key] = value; continue; }
+        if (key.startsWith('_')) continue;
+        const field = key.split('__')[0]!;
+        if (fields.has(field)) { out[key] = value; continue; }
+        if (attnames.has(field)) {
+            return {
+                ok: false,
+                error: {
+                    status: false,
+                    error: "'NoneType' object has no attribute 'get_internal_type'",
+                    error_code: 500,
+                },
+            };
+        }
+        // hasattr(cls, field) is False → the key never becomes a filter.
+    }
+    return { ok: true, params: out };
+}
+
+const JOB_FIELDS = new Set([
+    'id', 'channel', 'func', 'payload', 'status', 'run_at', 'expires_at', 'attempt',
+    'max_retries', 'backoff_base', 'backoff_max_sec', 'broadcast', 'cancel_requested',
+    'max_exec_seconds', 'runner_id', 'last_error', 'stack_trace', 'metadata',
+    'created', 'modified', 'started_at', 'finished_at', 'idempotency_key',
+    'events', 'logs', 'task_results',
+]);
+const JOB_EVENT_FIELDS = new Set(['id', 'job', 'channel', 'event', 'at', 'runner_id', 'attempt', 'details', 'created', 'modified']);
+const JOB_EVENT_ATTNAMES = new Set(['job_id']);
+const JOB_LOG_FIELDS = new Set(['id', 'job', 'channel', 'created', 'modified', 'kind', 'message', 'meta']);
+const JOB_LOG_ATTNAMES = new Set(['job_id']);
+const SCHEDULED_TASK_FIELDS = new Set([
+    'id', 'user', 'name', 'description', 'enabled', 'run_once', 'task_type', 'run_times',
+    'run_days', 'job_config', 'notify', 'channel', 'max_retries', 'last_run', 'run_count',
+    'last_error', 'created', 'modified', 'results',
+]);
+const SCHEDULED_TASK_ATTNAMES = new Set(['user_id']);
+const TASK_RESULT_FIELDS = new Set(['id', 'task', 'user', 'job', 'status', 'output', 'error', 'created']);
+const TASK_RESULT_ATTNAMES = new Set(['task_id', 'user_id', 'job_id']);
+
+// ── Serializers ───────────────────────────────────────────────────────
+
+const JOB_DEFAULT_FIELDS = [
+    'id', 'channel', 'func', 'payload', 'status', 'run_at', 'expires_at', 'attempt',
+    'max_retries', 'broadcast', 'cancel_requested', 'max_exec_seconds', 'runner_id',
+    'last_error', 'metadata', 'created', 'modified', 'started_at', 'finished_at',
+];
+const JOB_STATUS_GRAPH_FIELDS = ['id', 'status', 'runner_id', 'attempt', 'started_at', 'finished_at', 'last_error'];
+
+/** Job.duration_ms — 0 unless BOTH start and finish are recorded. */
+function jobDurationMs(job: MockJob): number {
+    if (job.started_at != null && job.finished_at != null) {
+        return Math.max(0, (job.finished_at - job.started_at) * 1000);
+    }
+    return 0;
+}
+
+function serializeJob(job: MockJob, graph: string): Record<string, unknown> {
+    const source = job as unknown as Record<string, unknown>;
+    if (graph === 'status') {
+        return Object.fromEntries(JOB_STATUS_GRAPH_FIELDS.map((field) => [field, source[field]]));
+    }
+    if (graph === 'admin') {
+        // `__all__` MINUS stack_trace, and no duration_ms — the admin graph
+        // declares no `extra`. There is no `is_retriable` in any graph either;
+        // retriability is computed client-side from the service rule.
+        const { stack_trace: _omitted, ...rest } = job;
+        return { ...rest };
+    }
+    return {
+        ...Object.fromEntries(JOB_DEFAULT_FIELDS.map((field) => [field, source[field]])),
+        duration_ms: jobDurationMs(job),
+    };
+}
+
+function serializeJobEvent(row: MockJobEvent, graph: string): Record<string, unknown> {
+    // The `timeline` graph carries NO id — the field list is exactly
+    // {event, at, runner_id, details}.
+    if (graph === 'timeline') {
+        return { event: row.event, at: row.at, runner_id: row.runner_id, details: row.details };
+    }
+    if (graph === 'detail') {
+        return {
+            id: row.id, job_id: row.job, channel: row.channel, event: row.event,
+            at: row.at, runner_id: row.runner_id, attempt: row.attempt, details: row.details,
+        };
+    }
+    return {
+        id: row.id, event: row.event, at: row.at,
+        runner_id: row.runner_id, attempt: row.attempt, details: row.details,
+    };
+}
+
+function serializeJobLog(row: MockJobLog, graph: string): Record<string, unknown> {
+    if (graph === 'detail') {
+        return {
+            id: row.id, job_id: row.job, channel: row.channel, created: row.created,
+            kind: row.kind, message: row.message, meta: row.meta,
+        };
+    }
+    return { id: row.id, job_id: row.job, created: row.created, kind: row.kind, message: row.message };
+}
+
+const TASK_DEFAULT_FIELDS = [
+    'id', 'name', 'description', 'enabled', 'run_once', 'task_type', 'run_times',
+    'run_days', 'job_config', 'notify', 'channel', 'max_retries', 'last_run',
+    'run_count', 'last_error', 'created', 'modified',
+];
+const TASK_LIST_FIELDS = [
+    'id', 'name', 'enabled', 'run_once', 'task_type', 'run_times', 'run_days',
+    'last_run', 'run_count', 'created',
+];
+
+function serializeScheduledTask(row: MockScheduledTask, graph: string): Record<string, unknown> {
+    const source = row as unknown as Record<string, unknown>;
+    const fields = graph === 'list' ? TASK_LIST_FIELDS : TASK_DEFAULT_FIELDS;
+    return Object.fromEntries(fields.map((field) => [field, source[field]]));
+}
+
+function serializeTaskResult(row: MockTaskResult, graph: string): Record<string, unknown> {
+    if (graph === 'list') return { id: row.id, task_id: row.task, status: row.status, created: row.created };
+    return {
+        id: row.id, task_id: row.task, job_id: row.job, status: row.status,
+        output: row.output, error: row.error, created: row.created,
+    };
+}
+
+// ── Runners ───────────────────────────────────────────────────────────
+
+/**
+ * One heartbeat row. `alive` is derived from the heartbeat AGE exactly as
+ * manager.get_runners does (`age < JOBS_RUNNER_HEARTBEAT_SEC * 3`), and the
+ * timestamps are ISO strings because this payload is raw Redis JSON that
+ * never passes through the mojo serializer.
+ */
+function serializeRunner(runner: MockRunner, nowMs: number): Record<string, unknown> {
+    return {
+        runner_id: runner.runner_id,
+        hostname: runner.hostname,
+        channels: [...runner.channels],
+        jobs_processed: runner.jobs_processed,
+        jobs_failed: runner.jobs_failed,
+        started: new Date(nowMs - runner.uptime_sec * 1000).toISOString(),
+        last_heartbeat: new Date(nowMs - runner.heartbeat_age_sec * 1000).toISOString(),
+        alive: runner.heartbeat_age_sec < JOBS_HEARTBEAT_SEC * 3,
+    };
+}
+
+function jobsRunnerList(channel: string | null, nowMs: number): Record<string, unknown>[] {
+    return db.jobRunners
+        .filter((runner) => !channel || runner.channels.includes(channel))
+        .map((runner) => serializeRunner(runner, nowMs))
+        .sort((a, b) => String(a.runner_id).localeCompare(String(b.runner_id)));
+}
+
+function aliveRunnerIds(nowMs: number): Set<string> {
+    return new Set(
+        jobsRunnerList(null, nowMs)
+            .filter((runner) => runner.alive === true)
+            .map((runner) => String(runner.runner_id)),
+    );
+}
+
+/**
+ * Sysinfo replies, one per state the System section must render distinctly:
+ * a healthy host, a runner whose collector FAILED (inner `status: 'error'`
+ * inside a successful envelope), and a runner that never answers at all
+ * (`get_sysinfo` returns [] → the single-runner route 404s).
+ */
+function runnerSysinfoReply(runnerId: string): Record<string, unknown> | null {
+    const func = 'mojo.apps.jobs.services.sysinfo_task.collect_sysinfo';
+    const timestamp = new Date().toISOString();
+    if (runnerId === 'runner-mojo-web-01-engine') {
+        return {
+            runner_id: runnerId,
+            func,
+            status: 'success',
+            timestamp,
+            result: {
+                time: Date.now() / 1000,
+                datetime: timestamp,
+                os: {
+                    system: 'Linux', version: '#1 SMP Debian 6.1.99-1', hostname: 'mojo-web-01.internal',
+                    release: '6.1.0-23-amd64', processor: '', machine: 'x86_64',
+                },
+                boot_time: Math.floor(Date.now() / 1000) - 9 * 86400,
+                cpu_load: 37.4,
+                cpus_load: [41.2, 33.8, 39.1, 35.5],
+                memory: { total: 16_777_216_000, used: 9_965_666_304, available: 6_811_549_696, percent: 59.4 },
+                disk: { total: 214_748_364_800, used: 178_257_920_000, free: 36_490_444_800, percent: 83.0 },
+                cpu: { count: 4, freq: { current: 2400, min: 800, max: 3600 } },
+                network: {
+                    tcp_cons: 184, bytes_sent: 88_231_997_440, bytes_recv: 145_009_213_440,
+                    packets_sent: 412_884_101, packets_recv: 508_112_774,
+                    errin: 0, errout: 0, dropin: 0, dropout: 0,
+                },
+                users: [],
+            },
+        };
+    }
+    if (runnerId === 'runner-mojo-web-02-engine') {
+        // get_host_info raises when psutil is missing; broadcast_execute turns
+        // the raise into an error REPLY, not an HTTP failure.
+        return {
+            runner_id: runnerId,
+            func,
+            status: 'error',
+            timestamp,
+            error: 'psutil is not installed. Install it with: pip install psutil',
+        };
+    }
+    return null;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────
+
+/**
+ * `GET /api/jobs/stats`, derived live from the fixture rows so a cancel, retry
+ * or purge moves the dashboard. Redis counts have DB analogues here: queued =
+ * pending with no run_at, in-flight = running, scheduled = pending with a
+ * run_at.
+ */
+function jobsStats(): Record<string, unknown> {
+    const nowMs = Date.now();
+    const nowSec = Math.floor(nowMs / 1000);
+    const lastHour = nowSec - 3600;
+    const alive = aliveRunnerIds(nowMs);
+    const channels: Record<string, unknown> = {};
+    const totals = {
+        pending: 0, queued: 0, inflight: 0, running: 0, running_active: 0, running_stale: 0,
+        completed: 0, failed: 0, scheduled: 0, runners_active: alive.size,
+    };
+
+    for (const channel of JOBS_CHANNELS) {
+        const rows = db.jobs.filter((job) => job.channel === channel);
+        const queued = rows.filter((job) => job.status === 'pending' && job.run_at == null).length;
+        const scheduled = rows.filter((job) => job.status === 'pending' && job.run_at != null).length;
+        const inflight = rows.filter((job) => job.status === 'running').length;
+        const completedHour = rows.filter((job) => job.status === 'completed' && (job.finished_at ?? 0) >= lastHour);
+        const failedHour = rows.filter((job) => job.status === 'failed' && (job.finished_at ?? 0) >= lastHour);
+        const finished = completedHour.length + failedHour.length;
+        const durations = completedHour.map((job) => jobDurationMs(job)).filter((ms) => ms > 0);
+        channels[channel] = {
+            channel,
+            queued_count: queued,
+            inflight_count: inflight,
+            scheduled_count: scheduled,
+            runners: jobsRunnerList(channel, nowMs).filter((runner) => runner.alive === true).length,
+            metrics: {
+                jobs_per_minute: finished > 0 ? Math.round((finished / 60) * 100) / 100 : 0,
+                success_rate: finished > 0 ? Math.round((completedHour.length / finished) * 1000) / 10 : 0,
+                avg_duration_ms: durations.length > 0
+                    ? Math.round(durations.reduce((sum, ms) => sum + ms, 0) / durations.length)
+                    : 0,
+            },
+            db_running: inflight,
+        };
+        totals.queued += queued;
+        // The backend keeps `pending` as a backwards-compatible alias of
+        // `queued` — not a DB count of status='pending'.
+        totals.pending += queued;
+        totals.inflight += inflight;
+        totals.scheduled += scheduled;
+    }
+
+    const running = db.jobs.filter((job) => job.status === 'running');
+    totals.running = running.length;
+    totals.running_active = running.filter((job) => job.runner_id != null && alive.has(job.runner_id)).length;
+    totals.running_stale = Math.max(0, totals.running - totals.running_active);
+    totals.completed = db.jobs.filter((job) => job.status === 'completed').length;
+    totals.failed = db.jobs.filter((job) => job.status === 'failed').length;
+
+    return {
+        channels,
+        // NOTE the asymmetry with GET /api/jobs/runners: get_stats returns
+        // manager.get_runners() verbatim, WITHOUT the `id` the list view
+        // stamps on. Consumers must key these rows on runner_id.
+        runners: jobsRunnerList(null, nowMs),
+        totals,
+        scheduler: {
+            active: db.jobsSchedulerLock != null,
+            lock_holder: db.jobsSchedulerLock,
+        },
+    };
+}
+
+// ── Job POST_SAVE_ACTIONS ─────────────────────────────────────────────
+
+const JOB_ACTIONS = new Set(['cancel_request', 'retry_request', 'get_status', 'publish_job']);
+const JOB_SAVE_FIELDS = new Set([
+    'channel', 'func', 'payload', 'status', 'run_at', 'expires_at', 'max_retries',
+    'broadcast', 'cancel_requested', 'max_exec_seconds', 'metadata',
+]);
+
+function appendJobEvent(job: MockJob, event: string, details: Record<string, unknown>, runnerId: string | null): void {
+    jobEventSequence += 1;
+    const at = Math.floor(Date.now() / 1000);
+    db.jobEvents.unshift({
+        id: jobEventSequence, job: job.id, channel: job.channel, event, at,
+        runner_id: runnerId, attempt: job.attempt, details, created: at, modified: at,
+    });
+}
+
+/**
+ * JobActionsService.cancel_job. The forced branch keys on whether the runner's
+ * heartbeat key still exists — approximated here as "the runner is absent from
+ * the fleet, or present but not alive".
+ */
+function runJobCancel(job: MockJob, value: unknown): Record<string, unknown> {
+    if (!pyTruthy(value)) return { status: false, error: 'cancel_request must be true' };
+    if (job.status === 'completed' || job.status === 'failed' || job.status === 'canceled' || job.status === 'expired') {
+        return { status: false, error: `Cannot cancel job in ${job.status} state` };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const previous = job.status;
+    const alive = aliveRunnerIds(Date.now());
+    let forced = false;
+    if (job.status === 'running' && job.runner_id != null && alive.has(job.runner_id)) {
+        // Cooperative cancel — the runner polls check_cancel_requested().
+        job.cancel_requested = true;
+        job.modified = now;
+    } else {
+        job.status = 'canceled';
+        job.finished_at = now;
+        job.cancel_requested = true;
+        job.runner_id = null;
+        job.modified = now;
+        forced = previous === 'running';
+    }
+    appendJobEvent(job, 'canceled', { requested_at: new Date(now * 1000).toISOString(), forced, previous_status: previous }, null);
+    return {
+        status: true,
+        message: `Job ${job.id} ${job.status === 'canceled' ? 'canceled' : 'cancellation requested'}`,
+        job_id: job.id,
+        forced,
+    };
+}
+
+/**
+ * JobActionsService.retry_job. It ALWAYS republishes: the original row is
+ * reset to pending AND a brand-new job id is created. Nothing "resumes".
+ */
+function runJobRetry(job: MockJob, value: unknown): Record<string, unknown> {
+    let delay: number | null = null;
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+        const dict = value as Record<string, unknown>;
+        if (!pyTruthy(dict.retry)) {
+            return { status: false, error: 'retry_request must be true or {retry: true, delay: N}' };
+        }
+        delay = dict.delay == null ? null : Number(dict.delay);
+    } else if (!pyTruthy(value)) {
+        return { status: false, error: 'retry_request must be true or {retry: true, delay: N}' };
+    }
+    if (job.status !== 'failed' && job.status !== 'canceled' && job.status !== 'expired') {
+        return { status: false, error: `Cannot retry job in ${job.status} state` };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    job.status = 'pending';
+    job.attempt = 0;
+    job.last_error = '';
+    job.stack_trace = '';
+    job.cancel_requested = false;
+    job.runner_id = null;
+    job.started_at = null;
+    job.finished_at = null;
+    job.run_at = delay ? now + delay : null;
+    job.modified = now;
+
+    const newJob: MockJob = {
+        ...job,
+        id: mockHex32(Math.random),
+        created: now,
+        modified: now,
+        metadata: { ...job.metadata, retry_of: job.id },
+    };
+    db.jobs.unshift(newJob);
+    appendJobEvent(job, 'retry', { retry_requested: true, new_job_id: newJob.id, delay }, null);
+    appendJobEvent(newJob, 'created', { retry_of: job.id }, null);
+    return {
+        status: true,
+        message: 'Job retry scheduled',
+        original_job_id: job.id,
+        new_job_id: newJob.id,
+        delayed: delay != null,
+    };
+}
+
+/**
+ * JobActionsService.get_job_status — the ONLY place `recent_events` exists.
+ * No graph carries it, which is why the lifecycle timeline is a separate
+ * /api/jobs/event query rather than a field on the job row.
+ */
+function runJobGetStatus(job: MockJob, value: unknown): Record<string, unknown> {
+    if (!pyTruthy(value)) return { status: false, error: 'get_status must be true' };
+    const iso = (seconds: number | null) => (seconds == null ? null : new Date(seconds * 1000).toISOString());
+    const events = db.jobEvents
+        .filter((event) => event.job === job.id)
+        .sort((a, b) => b.at - a.at)
+        .slice(0, 10)
+        .map((event) => ({
+            event: event.event, at: iso(event.at), runner_id: event.runner_id, details: event.details,
+        }));
+    return {
+        status: true,
+        data: {
+            id: job.id, status: job.status, channel: job.channel, func: job.func,
+            created: iso(job.created), started_at: iso(job.started_at), finished_at: iso(job.finished_at),
+            attempt: job.attempt, max_retries: job.max_retries, last_error: job.last_error,
+            metadata: job.metadata, runner_id: job.runner_id, cancel_requested: job.cancel_requested,
+            duration_ms: jobDurationMs(job),
+            is_terminal: ['completed', 'failed', 'canceled', 'expired'].includes(job.status),
+            // The MODEL property, which is narrower than the service rule the
+            // retry endpoint actually enforces.
+            is_retriable: job.status === 'failed' && job.attempt < job.max_retries,
+            recent_events: events,
+        },
+    };
+}
+
+/** JobActionsService.publish_job_from_template. */
+function runJobPublish(job: MockJob, value: unknown): Record<string, unknown> {
+    if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+        return { status: false, error: 'publish_job must be a dict with job parameters' };
+    }
+    const overrides = value as Record<string, unknown>;
+    const now = Math.floor(Date.now() / 1000);
+    const delay = overrides.delay == null ? null : Number(overrides.delay);
+    const newJob: MockJob = {
+        ...job,
+        id: mockHex32(Math.random),
+        func: String(overrides.func ?? job.func),
+        payload: (overrides.payload as Record<string, unknown>) ?? job.payload,
+        channel: String(overrides.channel ?? job.channel),
+        status: 'pending',
+        attempt: 0,
+        runner_id: null,
+        last_error: '',
+        stack_trace: '',
+        cancel_requested: false,
+        started_at: null,
+        finished_at: null,
+        run_at: delay ? now + delay : (overrides.run_at == null ? null : Number(overrides.run_at)),
+        created: now,
+        modified: now,
+    };
+    db.jobs.unshift(newJob);
+    appendJobEvent(newJob, 'created', { template_job_id: job.id }, null);
+    return { status: true, message: 'Job published successfully', job_id: newJob.id, template_job_id: job.id };
+}
+
+// ── ScheduledTask validation (model._validate) ────────────────────────
+
+const SCHEDULED_TASK_TYPES = new Set(['job', 'webhook', 'llm']);
+const SCHEDULED_TASK_NOTIFY = new Set(['email', 'in_app', 'sms', 'push']);
+const SCHEDULED_TASK_MAX_PER_USER = 10;
+
+/** The exact ValueError messages ScheduledTask._validate raises, in order. */
+function validateScheduledTask(row: MockScheduledTask): string | null {
+    if (!Array.isArray(row.run_times)) return 'run_times must be a list';
+    if (row.run_times.length > 2) return 'run_times cannot have more than 2 entries';
+    for (const time of row.run_times) {
+        if (typeof time !== 'string' || time.length !== 5 || time[2] !== ':') {
+            return `Invalid time format: ${time}. Use HH:MM`;
+        }
+        const hour = Number(time.slice(0, 2));
+        const minute = Number(time.slice(3));
+        if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+            return `Invalid time value: ${time}`;
+        }
+    }
+    if (!Array.isArray(row.run_days)) return 'run_days must be a list';
+    for (const day of row.run_days) {
+        if (!Number.isInteger(day) || day < 0 || day > 6) return `Invalid weekday: ${day}. Must be 0-6 (Mon=0)`;
+    }
+    if (!SCHEDULED_TASK_TYPES.has(row.task_type)) return `Invalid task_type: ${row.task_type}`;
+    if (!row.channel) return 'Invalid channel name';
+    if (!Array.isArray(row.notify)) return 'notify must be a list';
+    for (const channel of row.notify) {
+        if (!SCHEDULED_TASK_NOTIFY.has(channel)) return `Invalid notify channel: ${channel}`;
+    }
+    return null;
+}
+
+// ── The endpoint chain ────────────────────────────────────────────────
+
+/**
+ * Every `/api/jobs/*` route. Returns `undefined` for an unrecognized path so
+ * the caller falls through to the transport's 404.
+ */
+function jobsFetch(path: string, opts: MockFetchOpts): unknown {
+    const method = (opts.method ?? 'GET').toUpperCase();
+    const params = opts.params ?? {};
+    const body = opts.body ?? {};
+    const caller = userFromBearer(opts.headers);
+    if (!caller) return permissionDenied(401);
+    const canView = hasGlobalPermission(caller, JOBS_VIEW_GRANTS);
+    const canManage = hasGlobalPermission(caller, JOBS_MANAGE_GRANTS);
+    const nowMs = Date.now();
+    const graphOf = (fallback: string) => String(params.graph ?? fallback);
+
+    // ── Control plane: reads ──────────────────────────────────────────
+    if (path === '/api/jobs/stats') {
+        if (!canView) return permissionDenied();
+        return { status: true, data: jobsStats() };
+    }
+    if (path === '/api/jobs/runners') {
+        if (!canView) return permissionDenied();
+        // Paging/sort/search are IGNORED — on_list_runners reads only
+        // `channel` and always returns the complete list with a `count`.
+        const channel = params.channel ? String(params.channel) : null;
+        const rows = jobsRunnerList(channel, nowMs).map((runner) => ({ ...runner, id: runner.runner_id }));
+        return { status: true, count: rows.length, data: rows };
+    }
+    if (path === '/api/jobs/runners/sysinfo') {
+        if (!canView) return permissionDenied();
+        const replies = db.jobRunners
+            .map((runner) => runnerSysinfoReply(runner.runner_id))
+            .filter((reply): reply is Record<string, unknown> => reply != null);
+        return { status: true, count: replies.length, data: replies };
+    }
+    const sysinfoMatch = path.match(/^\/api\/jobs\/runners\/sysinfo\/(.+)$/);
+    if (sysinfoMatch) {
+        if (!canView) return permissionDenied();
+        const runnerId = decodeURIComponent(sysinfoMatch[1]!);
+        const reply = runnerSysinfoReply(runnerId);
+        // A runner that never answers: get_sysinfo returns [] → 404.
+        if (!reply) return { status: false, error: `Runner ${runnerId} did not respond`, error_code: 404 };
+        return { status: true, data: reply };
+    }
+    if (path === '/api/jobs/control/channels') {
+        if (!canView) return permissionDenied();
+        // Discovered by scanning Redis for stream keys — the channels that
+        // actually exist, which is not necessarily settings.JOBS_CHANNELS.
+        const discovered = [...new Set(db.jobs.map((job) => job.channel))].sort((a, b) => a.localeCompare(b));
+        return { status: true, data: discovered };
+    }
+    if (path === '/api/jobs/control/queue-sizes') {
+        if (!canView) return permissionDenied();
+        const sizes: Record<string, unknown> = {};
+        for (const channel of JOBS_CHANNELS) {
+            const rows = db.jobs.filter((job) => job.channel === channel);
+            const count = (status: MockJobStatus) => rows.filter((job) => job.status === status).length;
+            sizes[channel] = {
+                stream: rows.filter((job) => job.status === 'pending' && job.run_at == null).length,
+                scheduled: rows.filter((job) => job.status === 'pending' && job.run_at != null).length,
+                db_pending: count('pending'),
+                db_running: count('running'),
+                db_completed: count('completed'),
+                db_failed: count('failed'),
+                db_canceled: count('canceled'),
+                db_expired: count('expired'),
+            };
+        }
+        return { status: true, data: sizes };
+    }
+    if (path === '/api/jobs/control/config') {
+        // The one READ in this domain gated on manage, not view.
+        if (!canManage) return permissionDenied();
+        return {
+            status: true,
+            data: {
+                redis_url: 'redis://localhost:6379/0',
+                redis_prefix: 'mojo:jobs',
+                engine: { max_workers: 10, claim_buffer: 2, claim_batch: 5, read_timeout: 100 },
+                defaults: { channel: 'default', expires_sec: 900, max_retries: 3, backoff_base: 2.0, backoff_max: 3600 },
+                limits: { payload_max_bytes: 1048576, stream_maxlen: 100000, local_queue_maxsize: 1000 },
+                timeouts: {
+                    idle_timeout_ms: 60000, xpending_idle_ms: 60000,
+                    runner_heartbeat_sec: JOBS_HEARTBEAT_SEC, scheduler_lock_ttl_ms: 5000,
+                },
+                channels: [...JOBS_CHANNELS],
+                allowed_channels: [],
+            },
+        };
+    }
+
+    // ── Control plane: writes (all manage-gated) ──────────────────────
+    if (path === '/api/jobs/runners/ping') {
+        if (!canManage) return permissionDenied();
+        if (body.runner_id == null) return missingParams('runner_id');
+        const runnerId = String(body.runner_id);
+        const alive = aliveRunnerIds(nowMs);
+        // Top-level fields, not a `data` block.
+        return { status: true, runner_id: runnerId, responsive: alive.has(runnerId) };
+    }
+    if (path === '/api/jobs/runners/shutdown') {
+        if (!canManage) return permissionDenied();
+        if (body.runner_id == null) return missingParams('runner_id');
+        const runnerId = String(body.runner_id);
+        // Fire-and-forget: the command is pushed to the runner's control
+        // channel and the response says nothing about compliance. The mock
+        // ages the heartbeat so the fleet reflects a runner on its way out.
+        const runner = db.jobRunners.find((row) => row.runner_id === runnerId);
+        if (runner) runner.heartbeat_age_sec = JOBS_HEARTBEAT_SEC * 3 + 60;
+        return { status: true, message: `Shutdown command sent to runner ${runnerId}` };
+    }
+    if (path === '/api/jobs/runners/broadcast') {
+        if (!canManage) return permissionDenied();
+        if (body.command == null) return missingParams('command');
+        const command = String(body.command);
+        if (!['status', 'shutdown', 'pause', 'resume', 'reload'].includes(command)) {
+            return jobsBadRequest('Invalid command. Must be one of: status, shutdown, pause, resume, reload');
+        }
+        const alive = jobsRunnerList(null, nowMs).filter((runner) => runner.alive === true);
+        const responses = alive.map((runner) => ({
+            runner_id: runner.runner_id,
+            command,
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+        }));
+        return { status: true, command, responses_count: responses.length, responses };
+    }
+    if (path === '/api/jobs/control/clear-stuck' || path === '/api/jobs/control/manual-reclaim') {
+        if (!canManage) return permissionDenied();
+        // @requires_params('channel') — there is NO all-channel form. Sending
+        // channel:null (web-mojo's "All Channels") is an instant 400.
+        if (body.channel == null || body.channel === '') return missingParams('channel');
+        const channel = String(body.channel);
+        const reclaimAll = path.endsWith('manual-reclaim');
+        const idleThresholdMs = reclaimAll ? 0 : Number(body.idle_threshold_ms ?? 60000);
+        const cutoff = Math.floor(nowMs / 1000) - idleThresholdMs / 1000;
+        const stuck = db.jobs.filter((job) => job.status === 'running' && job.channel === channel
+            && (reclaimAll || (job.started_at ?? 0) <= cutoff));
+        const details: { job_id: string; requeued: boolean }[] = [];
+        for (const job of stuck) {
+            job.status = 'pending';
+            job.runner_id = null;
+            job.started_at = null;
+            job.modified = Math.floor(nowMs / 1000);
+            appendJobEvent(job, 'retry', { reason: 'manual_clear_stuck' }, null);
+            details.push({ job_id: job.id, requeued: true });
+        }
+        // The result key is `cleared`. There is no `count` — web-mojo read one
+        // and always reported 0.
+        const result = {
+            channel,
+            cleared: details.length,
+            details,
+            errors: [] as string[],
+            message: details.length === 0
+                ? `No in-flight jobs found in ${channel} matching threshold`
+                : `Requeued ${details.length} in-flight jobs from ${channel}`,
+        };
+        return { status: true, message: result.message, data: result };
+    }
+    if (path === '/api/jobs/control/purge') {
+        if (!canManage) return permissionDenied();
+        if (body.days_old == null) return missingParams('days_old');
+        const daysOld = Number(body.days_old);
+        if (!Number.isFinite(daysOld)) return jobsBadRequest(`invalid literal for int() with base 10: '${String(body.days_old)}'`);
+        const statusFilter = body.status == null ? null : String(body.status);
+        const cutoffSec = Math.floor(nowMs / 1000) - daysOld * 86400;
+        const doomed = db.jobs.filter((job) => job.created < cutoffSec && (!statusFilter || job.status === statusFilter));
+        const cutoff = new Date(cutoffSec * 1000).toISOString();
+        if (pyTruthy(body.dry_run)) {
+            // A DRY RUN reports `count`…
+            return { status: true, data: { status: true, dry_run: true, count: doomed.length, cutoff, status_filter: statusFilter } };
+        }
+        const doomedIds = new Set(doomed.map((job) => job.id));
+        db.jobs = db.jobs.filter((job) => !doomedIds.has(job.id));
+        // …and cascades to events and logs, exactly as qs.delete() does.
+        const events = db.jobEvents.filter((event) => doomedIds.has(event.job)).length;
+        const logs = db.jobLogs.filter((log) => doomedIds.has(log.job)).length;
+        db.jobEvents = db.jobEvents.filter((event) => !doomedIds.has(event.job));
+        db.jobLogs = db.jobLogs.filter((log) => !doomedIds.has(log.job));
+        // …while a REAL run reports `deleted`. Different key, same endpoint.
+        return {
+            status: true,
+            data: {
+                status: true,
+                deleted: doomed.length + events + logs,
+                details: { 'jobs.Job': doomed.length, 'jobs.JobEvent': events, 'jobs.JobLog': logs },
+                cutoff,
+                status_filter: statusFilter,
+            },
+        };
+    }
+    if (path === '/api/jobs/control/reset-failed') {
+        if (!canManage) return permissionDenied();
+        // Unlike clear-stuck, this DOES have an all-channel form.
+        const channel = body.channel == null || body.channel === '' ? null : String(body.channel);
+        const limit = Number(body.limit ?? 100);
+        const failed = db.jobs
+            .filter((job) => job.status === 'failed' && (!channel || job.channel === channel))
+            .sort((a, b) => b.created - a.created)
+            .slice(0, Number.isFinite(limit) ? limit : 100);
+        const affected = new Set(failed.map((job) => job.channel));
+        for (const job of failed) {
+            job.status = 'pending';
+            job.attempt = 0;
+            job.last_error = '';
+            job.stack_trace = '';
+            job.run_at = null;
+            job.modified = Math.floor(nowMs / 1000);
+            appendJobEvent(job, 'queued', { requeued: true }, null);
+        }
+        // Top-level keys, not a data block.
+        return {
+            status: true,
+            message: `Reset ${failed.length} failed jobs to pending`,
+            reset_count: failed.length,
+            requeue: [...affected].map((name) => ({
+                status: true,
+                requeued: failed.filter((job) => job.channel === name).length,
+                channel: name,
+            })),
+        };
+    }
+    if (path === '/api/jobs/control/clear-queue') {
+        if (!canManage) return permissionDenied();
+        if (body.channel == null || body.channel === '') return missingParams('channel');
+        // The confirm token is a SERVER gate. A client that pre-satisfies it
+        // (web-mojo always sent confirm:"yes") has removed the safety, not
+        // honored it — this one is sent only after the armed confirmation.
+        if (body.confirm !== 'yes') return jobsBadRequest('Must confirm with confirm="yes"');
+        const channel = String(body.channel);
+        const pending = db.jobs.filter((job) => job.channel === channel && job.status === 'pending');
+        const finishedAt = Math.floor(nowMs / 1000);
+        for (const job of pending) {
+            job.status = 'canceled';
+            job.finished_at = finishedAt;
+            job.modified = finishedAt;
+        }
+        return {
+            status: true,
+            message: `Cleared queue for channel ${channel}`,
+            data: {
+                channel,
+                deleted: { stream: true, broadcast: false, scheduled: true, scheduled_broadcast: false, queue: true, processing: true },
+                db_pending_canceled: pending.length,
+                status: true,
+                errors: [],
+            },
+        };
+    }
+    if (path === '/api/jobs/control/cleanup-consumers') {
+        if (!canManage) return permissionDenied();
+        const channel = body.channel == null || body.channel === '' ? null : String(body.channel);
+        const targets = channel ? [channel] : [...JOBS_CHANNELS];
+        return {
+            status: true,
+            data: {
+                status: true,
+                channels: targets,
+                consumers_removed: targets.length,
+                groups_destroyed: 0,
+                errors: [],
+            },
+        };
+    }
+    if (path === '/api/jobs/control/rebuild-scheduled') {
+        if (!canManage) return permissionDenied();
+        const channel = body.channel == null || body.channel === '' ? null : String(body.channel);
+        const targets = channel ? [channel] : [...JOBS_CHANNELS];
+        const rebuilt = db.jobs.filter((job) => job.status === 'pending' && job.run_at != null && targets.includes(job.channel)).length;
+        return { status: true, data: { status: true, channels: targets, rebuilt, errors: [] } };
+    }
+    if (path === '/api/jobs/control/force-scheduler-lead') {
+        if (!canManage) return permissionDenied();
+        const previous = db.jobsSchedulerLock;
+        if (previous == null) {
+            return { status: true, message: 'No scheduler lock exists', previous_holder: null };
+        }
+        db.jobsSchedulerLock = null;
+        return { status: true, message: 'Scheduler lock released', previous_holder: previous };
+    }
+    if (path === '/api/jobs/control/test') {
+        if (!canManage) return permissionDenied();
+        const channel = String(body.channel ?? 'default');
+        const delay = body.delay == null ? null : Number(body.delay);
+        const now = Math.floor(nowMs / 1000);
+        const job: MockJob = {
+            id: mockHex32(Math.random),
+            channel,
+            func: 'mojo.apps.jobs.examples.sample_jobs.generate_report',
+            payload: { test: true, timestamp: new Date().toISOString(), channel, report_type: 'test', format: 'pdf' },
+            status: 'pending',
+            run_at: delay ? now + delay : null,
+            expires_at: now + 900,
+            attempt: 0, max_retries: 3, backoff_base: 2, backoff_max_sec: 3600,
+            broadcast: false, cancel_requested: false, max_exec_seconds: null,
+            runner_id: null, last_error: '', stack_trace: '', metadata: {},
+            created: now, modified: now, started_at: null, finished_at: null, idempotency_key: null,
+        };
+        db.jobs.unshift(job);
+        appendJobEvent(job, 'created', { test: true }, null);
+        return { status: true, message: 'Test job published', job_id: job.id, channel, delayed: Boolean(delay) };
+    }
+    if (path === '/api/jobs/test' || path === '/api/jobs/tests') {
+        if (!canManage) return permissionDenied();
+        const now = Math.floor(nowMs / 1000);
+        const suite = path === '/api/jobs/tests';
+        const count = suite ? 12 : 2;
+        for (let i = 0; i < count; i++) {
+            const channel = JOBS_CHANNELS[i % JOBS_CHANNELS.length]!;
+            const job: MockJob = {
+                id: mockHex32(Math.random),
+                channel,
+                func: JOB_FUNCS[i % JOB_FUNCS.length]!,
+                payload: { test: true },
+                status: 'pending',
+                run_at: suite && i % 4 === 0 ? now + 60 * (i + 1) : null,
+                expires_at: now + 900,
+                attempt: 0, max_retries: 3, backoff_base: 2, backoff_max_sec: 3600,
+                broadcast: false, cancel_requested: false, max_exec_seconds: null,
+                runner_id: null, last_error: '', stack_trace: '', metadata: {},
+                created: now, modified: now, started_at: null, finished_at: null, idempotency_key: null,
+            };
+            db.jobs.unshift(job);
+            appendJobEvent(job, 'created', { test: true }, null);
+        }
+        return { status: true, message: 'Test job should be running.' };
+    }
+
+    // ── Model endpoints ───────────────────────────────────────────────
+    const oneJob = path.match(/^\/api\/jobs\/job\/([0-9a-fA-F]{32})$/);
+    if (oneJob) {
+        const job = db.jobs.find((row) => row.id === oneJob[1]);
+        if (!job) return { status: false, error: 'Job not found', error_code: 404 };
+        if (method === 'DELETE') {
+            if (!canManage) return permissionDenied();
+            db.jobs = db.jobs.filter((row) => row.id !== job.id);
+            db.jobEvents = db.jobEvents.filter((event) => event.job !== job.id);
+            db.jobLogs = db.jobLogs.filter((log) => log.job !== job.id);
+            return { status: 'deleted' };
+        }
+        if (method === 'POST') {
+            if (!canManage) return permissionDenied();
+            const actionKey = Object.keys(body).find((key) => JOB_ACTIONS.has(key));
+            // Plain fields save FIRST, then the action handler runs; when a
+            // handler returns a payload, THAT payload is the whole response
+            // body — verbatim, at HTTP 200, even for a refusal. The client's
+            // `status === false` unwrap is what turns it into a rejection.
+            for (const [key, value] of Object.entries(body)) {
+                if (JOB_ACTIONS.has(key) || !JOB_SAVE_FIELDS.has(key)) continue;
+                (job as unknown as Record<string, unknown>)[key] = value;
+            }
+            job.modified = Math.floor(nowMs / 1000);
+            if (actionKey === 'cancel_request') return runJobCancel(job, body[actionKey]);
+            if (actionKey === 'retry_request') return runJobRetry(job, body[actionKey]);
+            if (actionKey === 'get_status') return runJobGetStatus(job, body[actionKey]);
+            if (actionKey === 'publish_job') return runJobPublish(job, body[actionKey]);
+        }
+        if (!canView) return permissionDenied();
+        const graph = graphOf('default');
+        return { status: true, data: serializeJob(job, graph), graph };
+    }
+    if (path === '/api/jobs/job') {
+        if (!canView) return permissionDenied();
+        const parsed = jobsFilterParams(params, JOB_FIELDS, new Set());
+        if (!parsed.ok) return parsed.error;
+        const graph = graphOf('default');
+        // Job declares no SEARCH_FIELDS, so the backend falls back to every
+        // CharField/TextField on the model.
+        const search = (row: Record<string, unknown>) =>
+            `${row.id} ${row.channel} ${row.func} ${row.status} ${row.runner_id ?? ''} ${row.last_error}`;
+        if (params.download_format) {
+            const full = listRows(db.jobs as unknown as Record<string, unknown>[], { ...parsed.params, start: 0, size: db.jobs.length }, search, '-id');
+            return exportRows((full.data as unknown as MockJob[]).map((job) => serializeJob(job, graph)), params, 'Job');
+        }
+        // The model default sort is `-id` over 32-char uuid hex — lexicographic
+        // noise. Every caller is expected to send an explicit sort.
+        const result = listRows(db.jobs as unknown as Record<string, unknown>[], parsed.params, search, '-id');
+        return {
+            ...result,
+            graph: params.graph ? graph : 'list',
+            data: (result.data as unknown as MockJob[]).map((job) => serializeJob(job, graph)),
+        };
+    }
+    const oneEvent = path.match(/^\/api\/jobs\/event\/(\d+)$/);
+    if (oneEvent) {
+        if (!canView) return permissionDenied();
+        const event = db.jobEvents.find((row) => row.id === Number(oneEvent[1]));
+        if (!event) return { status: false, error: 'JobEvent not found', error_code: 404 };
+        const graph = graphOf('default');
+        return { status: true, data: serializeJobEvent(event, graph), graph };
+    }
+    if (path === '/api/jobs/event') {
+        if (!canView) return permissionDenied();
+        if (method === 'POST') return { status: false, error: 'permission denied', error_code: 403 };
+        const parsed = jobsFilterParams(params, JOB_EVENT_FIELDS, JOB_EVENT_ATTNAMES);
+        if (!parsed.ok) return parsed.error;
+        const graph = graphOf('default');
+        const result = listRows(
+            db.jobEvents as unknown as Record<string, unknown>[],
+            parsed.params,
+            (row) => `${row.channel} ${row.event} ${row.runner_id ?? ''}`,
+            '-at',
+        );
+        return {
+            ...result,
+            graph: params.graph ? graph : 'list',
+            data: (result.data as unknown as MockJobEvent[]).map((row) => serializeJobEvent(row, graph)),
+        };
+    }
+    const oneLogRow = path.match(/^\/api\/jobs\/logs\/(\d+)$/);
+    if (oneLogRow) {
+        if (!canView) return permissionDenied();
+        const log = db.jobLogs.find((row) => row.id === Number(oneLogRow[1]));
+        if (!log) return { status: false, error: 'JobLog not found', error_code: 404 };
+        const graph = graphOf('default');
+        return { status: true, data: serializeJobLog(log, graph), graph };
+    }
+    if (path === '/api/jobs/logs') {
+        if (!canView) return permissionDenied();
+        if (method === 'POST') return { status: false, error: 'permission denied', error_code: 403 };
+        // `?job=` filters. `?runner_id=` is silently dropped (JobLog has no
+        // such field) and returns the UNFILTERED table. `?job_id=` is a server
+        // error. See jobsFilterParams.
+        const parsed = jobsFilterParams(params, JOB_LOG_FIELDS, JOB_LOG_ATTNAMES);
+        if (!parsed.ok) return parsed.error;
+        const graph = graphOf('default');
+        const result = listRows(
+            db.jobLogs as unknown as Record<string, unknown>[],
+            parsed.params,
+            (row) => `${row.channel} ${row.kind} ${row.message}`,
+            '-created',
+        );
+        return {
+            ...result,
+            graph: params.graph ? graph : 'list',
+            data: (result.data as unknown as MockJobLog[]).map((row) => serializeJobLog(row, graph)),
+        };
+    }
+
+    // ── Scheduled tasks (OWNER fallback) ──────────────────────────────
+    // VIEW_PERMS includes `owner`, so a caller with NO global jobs grant still
+    // gets HTTP 200 — with only their own rows. An admin page that does not
+    // gate on the global grant silently renders a personal list as if it were
+    // the system's; that is the hole SCHEDULED_TASK_VIEW_PERMS closes.
+    const canViewTasks = hasGlobalPermission(caller, SCHEDULED_TASK_VIEW_GRANTS);
+    const canManageTasks = hasGlobalPermission(caller, SCHEDULED_TASK_MANAGE_GRANTS);
+    const visibleTasks = () => (canViewTasks ? db.scheduledTasks : db.scheduledTasks.filter((row) => row.user === caller.id));
+
+    const oneTask = path.match(/^\/api\/jobs\/scheduled_task\/([0-9a-fA-F]{32})$/);
+    if (oneTask) {
+        const task = db.scheduledTasks.find((row) => row.id === oneTask[1]);
+        if (!task) return { status: false, error: 'ScheduledTask not found', error_code: 404 };
+        const owns = task.user === caller.id;
+        if (method === 'DELETE') {
+            if (!canManageTasks && !owns) return permissionDenied();
+            db.scheduledTasks = db.scheduledTasks.filter((row) => row.id !== task.id);
+            db.taskResults = db.taskResults.filter((row) => row.task !== task.id);
+            return { status: 'deleted' };
+        }
+        if (method === 'POST') {
+            if (!canManageTasks && !owns) return permissionDenied();
+            const draft: MockScheduledTask = { ...task };
+            for (const [key, value] of Object.entries(body)) {
+                if (key === 'id' || key === 'user' || key === 'created' || key === 'run_count' || key === 'last_run') continue;
+                (draft as unknown as Record<string, unknown>)[key] = value;
+            }
+            const invalid = validateScheduledTask(draft);
+            // A model-level ValueError surfaces as a 400 with the raw message.
+            if (invalid) return jobsBadRequest(invalid);
+            Object.assign(task, draft, { modified: Math.floor(nowMs / 1000) });
+            return { status: true, data: serializeScheduledTask(task, 'default'), graph: 'default' };
+        }
+        if (!canViewTasks && !owns) return permissionDenied();
+        const graph = graphOf('default');
+        return { status: true, data: serializeScheduledTask(task, graph), graph };
+    }
+    if (path === '/api/jobs/scheduled_task') {
+        const parsed = jobsFilterParams(params, SCHEDULED_TASK_FIELDS, SCHEDULED_TASK_ATTNAMES);
+        if (!parsed.ok) return parsed.error;
+        if (method === 'POST') {
+            if (!canManageTasks && !caller) return permissionDenied();
+            const now = Math.floor(nowMs / 1000);
+            const draft: MockScheduledTask = {
+                id: mockHex32(Math.random),
+                // CREATED_BY_OWNER_FIELD auto-stamp: the row is ALWAYS the
+                // caller's. There is no arbitrary-owner write.
+                user: caller.id,
+                name: String(body.name ?? ''),
+                description: String(body.description ?? ''),
+                enabled: body.enabled == null ? true : Boolean(body.enabled),
+                run_once: Boolean(body.run_once),
+                task_type: String(body.task_type ?? ''),
+                run_times: Array.isArray(body.run_times) ? (body.run_times as string[]) : [],
+                run_days: Array.isArray(body.run_days) ? (body.run_days as number[]) : [],
+                job_config: (body.job_config as Record<string, unknown>) ?? {},
+                notify: Array.isArray(body.notify) ? (body.notify as string[]) : [],
+                channel: String(body.channel ?? 'default'),
+                max_retries: Number(body.max_retries ?? 0),
+                last_run: null, run_count: 0, last_error: '',
+                created: now, modified: now,
+            };
+            const owned = db.scheduledTasks.filter((row) => row.user === caller.id).length;
+            if (owned >= SCHEDULED_TASK_MAX_PER_USER) {
+                return jobsBadRequest(`Maximum of ${SCHEDULED_TASK_MAX_PER_USER} scheduled tasks per user`);
+            }
+            const invalid = validateScheduledTask(draft);
+            if (invalid) return jobsBadRequest(invalid);
+            db.scheduledTasks.unshift(draft);
+            return { status: true, data: serializeScheduledTask(draft, 'default'), graph: 'default' };
+        }
+        const graph = graphOf('list');
+        const rows = visibleTasks();
+        const search = (row: Record<string, unknown>) =>
+            `${row.id} ${row.name} ${row.description} ${row.task_type} ${row.channel} ${row.last_error}`;
+        if (params.download_format) {
+            const full = listRows(rows as unknown as Record<string, unknown>[], { ...parsed.params, start: 0, size: rows.length }, search, '-created');
+            return exportRows((full.data as unknown as MockScheduledTask[]).map((row) => serializeScheduledTask(row, graph)), params, 'ScheduledTask');
+        }
+        const result = listRows(rows as unknown as Record<string, unknown>[], parsed.params, search, '-created');
+        return {
+            ...result,
+            graph: params.graph ? graph : 'list',
+            data: (result.data as unknown as MockScheduledTask[]).map((row) => serializeScheduledTask(row, graph)),
+        };
+    }
+    const oneResult = path.match(/^\/api\/jobs\/task_result\/([0-9a-fA-F]{32})$/);
+    if (oneResult) {
+        const row = db.taskResults.find((candidate) => candidate.id === oneResult[1]);
+        if (!row) return { status: false, error: 'TaskResult not found', error_code: 404 };
+        if (method === 'POST') return { status: false, error: 'permission denied', error_code: 403 };
+        if (method === 'DELETE') {
+            // DELETE_PERMS drops `owner` — global grant only.
+            if (!canManageTasks) return permissionDenied();
+            db.taskResults = db.taskResults.filter((candidate) => candidate.id !== row.id);
+            return { status: 'deleted' };
+        }
+        if (!canViewTasks && row.user !== caller.id) return permissionDenied();
+        const graph = graphOf('default');
+        return { status: true, data: serializeTaskResult(row, graph), graph };
+    }
+    if (path === '/api/jobs/task_result') {
+        if (method === 'POST') return { status: false, error: 'permission denied', error_code: 403 };
+        const parsed = jobsFilterParams(params, TASK_RESULT_FIELDS, TASK_RESULT_ATTNAMES);
+        if (!parsed.ok) return parsed.error;
+        const graph = graphOf('list');
+        const rows = canViewTasks ? db.taskResults : db.taskResults.filter((row) => row.user === caller.id);
+        const result = listRows(
+            rows as unknown as Record<string, unknown>[],
+            parsed.params,
+            (row) => `${row.id} ${row.status} ${row.output} ${row.error}`,
+            '-created',
+        );
+        return {
+            ...result,
+            graph: params.graph ? graph : 'list',
+            data: (result.data as unknown as MockTaskResult[]).map((row) => serializeTaskResult(row, graph)),
+        };
+    }
+    return undefined;
+}
+
+// ══ end jobs engine wire ═════════════════════════════════════════════
 
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
@@ -3759,6 +5404,22 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const result = listRows(db.apiKeys as unknown as Record<string, unknown>[], params, search, '-id');
         return { ...result, data: (result.data as unknown as MockApiKey[]).map(serializeApiKey) };
     }
+    // ══ Jobs engine — /api/jobs/* (mojo/apps/jobs) ═══════════════════
+    // Every endpoint below is the executable spec for one django-mojo route.
+    // Gates are `requires_global_perms`, never member grants: view is
+    // view_jobs|manage_jobs|jobs, write is manage_jobs|jobs, and the
+    // scheduled-task pair adds the OWNER fallback the model declares.
+    //
+    // Deliberately ABSENT: `GET /api/jobs/health` and `health/<channel>`.
+    // JobManager.get_channel_health reads state['stream_length'] /
+    // state['pending_count'], which the Plan-B get_queue_state no longer
+    // returns → KeyError → HTTP 400. Mocking a working /health would make the
+    // spec lie about a route that cannot be called.
+    if (path.startsWith('/api/jobs/')) {
+        const jobsResult = jobsFetch(path, opts);
+        if (jobsResult !== undefined) return jobsResult;
+    }
+    // ══ end jobs engine ══════════════════════════════════════════════
     // Logs — /api/logs (mojo/apps/logit). Read surface only from the portal;
     // default sort is -id (rest.py pops sort with that default), graph=basic
     // narrows the row, and search sweeps the text columns.
