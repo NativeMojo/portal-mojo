@@ -3,17 +3,43 @@ import {
     defineModel, mojoCall, withFreshAuth,
     type User,
 } from '../../../client';
+// ONE defineModel per endpoint (#1291). The device / device-location /
+// login-event models are DEFINED in admin/security/devices/models.ts — the
+// fleet-wide owner of those three endpoints — and re-exported here so
+// UserDetail's sections keep their existing import surface. Two definitions
+// would mean two cache keys and therefore a double fetch of the same rows.
+import {
+    LoginEventModel, UserDeviceLocationModel, UserDeviceModel,
+    USER_DEVICE_VIEW_PERMS, LOGIN_EVENT_VIEW_PERMS,
+} from '../../security/devices/models';
+
+export {
+    LoginEventModel,
+    UserDeviceLocationModel,
+    UserDeviceModel,
+    /** Historical alias — UserDetail's Devices section imports `DeviceModel`. */
+    UserDeviceModel as DeviceModel,
+};
+export type {
+    LoginEventRow,
+    UAInfo,
+    UserBasicRef,
+    UserDeviceLocationRow,
+    UserDeviceRow,
+    /** Historical alias for the row type. */
+    UserDeviceRow as DeviceRow,
+} from '../../security/devices/models';
 
 /** Global Admin gates. `sys.` prevents active-member authority leaking in. */
 export const USER_VIEW_PERMISSIONS = ['sys.users', 'sys.view_users', 'sys.manage_users'];
 export const USER_MANAGE_PERMISSIONS = ['sys.users', 'sys.manage_users'];
-export const USER_DEVICE_PERMISSIONS = USER_MANAGE_PERMISSIONS;
+/** Same clause as the canonical `USER_DEVICE_VIEW_PERMS`, kept as the name
+ *  UserDetail already imports. Both derive from `UserDevice.VIEW_PERMS`. */
+export const USER_DEVICE_PERMISSIONS = USER_DEVICE_VIEW_PERMS;
 export const USER_PUSH_DEVICE_PERMISSIONS = [
     'sys.view_devices', 'sys.manage_devices', 'sys.comms', 'sys.manage_users', 'sys.users',
 ];
-export const USER_LOGIN_PERMISSIONS = [
-    'sys.manage_users', 'sys.security', 'sys.users',
-];
+export const USER_LOGIN_PERMISSIONS = LOGIN_EVENT_VIEW_PERMS;
 export const USER_LOG_PERMISSIONS = ['sys.view_logs', 'sys.manage_logs', 'sys.security'];
 export const USER_EVENT_PERMISSIONS = ['sys.view_security', 'sys.security'];
 
@@ -164,40 +190,7 @@ export function useGenerateUserApiKey() {
     });
 }
 
-export interface UAInfo {
-    os: { major: string | null; minor: string | null; patch: string | null; family: string; patch_minor: string | null };
-    device: { brand: string | null; model: string | null; family: string };
-    user_agent: { major: string | null; minor: string | null; patch: string | null; family: string };
-    string: string;
-}
-
-export interface UserBasicRef {
-    id: number;
-    display_name: string | null;
-    username: string;
-    last_login: number | null;
-    last_activity: number | null;
-    is_active: boolean;
-    is_email_verified: boolean;
-    is_phone_verified: boolean;
-    is_dob_verified: boolean;
-    avatar: unknown;
-}
-
-export interface DeviceRow {
-    id: number;
-    user: UserBasicRef | null;
-    muid: string | null;
-    duid: string;
-    device_info: UAInfo | null;
-    user_agent_hash: string | null;
-    last_ip: string | null;
-    first_seen: number;
-    last_seen: number;
-}
-export const DeviceModel = defineModel<DeviceRow>({
-    name: 'device', endpoint: '/api/user/device', permissions: { view: USER_DEVICE_PERMISSIONS },
-});
+import type { UserBasicRef } from '../../security/devices/models';
 
 export interface PushDeviceRow {
     id: number;
@@ -215,25 +208,9 @@ export const PushDeviceModel = defineModel<PushDeviceRow>({
     name: 'push_device', endpoint: '/api/account/devices/push', permissions: { view: USER_PUSH_DEVICE_PERMISSIONS },
 });
 
-export interface LoginEventRow {
-    id: number;
-    ip_address: string | null;
-    country_code: string | null;
-    region: string | null;
-    region_code: string | null;
-    city: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    source: string | null;
-    is_new_country: boolean;
-    is_new_region: boolean;
-    created: number;
-    user: UserBasicRef | null;
-    event_type?: string;
-}
-export const LoginEventModel = defineModel<LoginEventRow>({
-    name: 'login_event', endpoint: '/api/account/logins', permissions: { view: USER_LOGIN_PERMISSIONS },
-});
+// LoginEventRow / LoginEventModel are re-exported from the canonical module
+// above. The local copy carried a phantom `event_type?: string` field that
+// `UserLoginEvent` has never had — see docs/admin-devices-geoip.md.
 
 export interface PasskeyRow {
     id: number;

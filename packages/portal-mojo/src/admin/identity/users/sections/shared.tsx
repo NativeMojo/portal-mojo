@@ -114,27 +114,11 @@ export const LOG_LEVEL_ICON: Record<string, string> = {
     info: 'bi-pencil-square',
 };
 
-/**
- * LoginEvent tone. The live wire serializes NO event_type (measured
- * 2026-08-05) — the lookup falls through to 'muted' exactly like web-mojo's
- * `loginTone` formatter fell through to secondary, so the dots stay neutral
- * until the backend ships a signal field.
- */
-export const LOGIN_TONE: Record<string, Tone> = {
-    success_login: 'success',
-    success: 'success',
-    login: 'success',
-    failed_login: 'danger',
-    failure: 'danger',
-    failed: 'danger',
-    suspicious: 'warning',
-    mfa_required: 'warning',
-    mfa: 'warning',
-};
-
-export function loginTone(eventType: string | undefined | null): Tone {
-    return LOGIN_TONE[String(eventType ?? '').toLowerCase()] ?? 'muted';
-}
+// `LOGIN_TONE` / `loginTone(event_type)` were DELETED in #1291. They keyed on
+// a field `UserLoginEvent` has never had, so every dot fell through to muted;
+// their one consumer (LoginsSection) now uses `loginRiskTone(row)` from
+// admin/security/devices/models, which reads `is_new_country` /
+// `is_new_region` — fields the wire actually sends.
 
 export const PROVIDER_ICONS: Record<string, string> = {
     google: 'bi-google',
