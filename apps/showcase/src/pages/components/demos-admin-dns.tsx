@@ -9,6 +9,7 @@ import {
 import {
     getAuthSnapshot, login, mojoGet, setMockDnsConfigMalformed, type Me,
 } from 'portal-mojo/client';
+import { AdminDnsRecordsDemo } from './demos-admin-dns-records';
 
 type Leg = 'manager' | 'viewer' | 'unavailable';
 
@@ -84,6 +85,7 @@ export function AdminDnsDemo() {
                         </p>
                     </div>
                     <ProviderCredentialsPage />
+                    <AdminDnsRecordsDemo />
                 </>
             )}
 
@@ -97,6 +99,7 @@ export function AdminDnsDemo() {
                         </p>
                     </div>
                     <ProviderCredentialsPage />
+                    <AdminDnsRecordsDemo />
                 </>
             )}
 

@@ -26,6 +26,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-jobs.md](admin-jobs.md) | Jobs engine — runner fleet, per-channel queue depth, the segmented job table with armed cancel and republishing retry, the dry-run-first control plane, scheduled tasks with a global-only gate, and the thirteen backend corrections the port encodes |
 | [admin-network-security.md](admin-network-security.md) | Perimeter control — blocked IPs, the firewall log, kernel IP sets and the geofencing page (posture, rules, simulator, evidence, exemptions), with the DSL projection and every backend correction the port encodes |
 | [admin-dns.md](admin-dns.md) | Global DNS foundation — capability gates, safe typed resources, provider credential lifecycle, and secret/PII/material boundaries |
+| [admin-dns-records.md](admin-dns-records.md) | Domain inventory/KISS detail and id-less live DNS records — complete-set writes, explicit corrections, stale preflight, and provider behavior |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |
