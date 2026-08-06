@@ -33,6 +33,7 @@ import {
     SECURITY_OPERATIONS_ADMIN_SECTION,
 } from './security';
 import { MEMBERS_ADMIN_SECTION, USERS_ADMIN_SECTION } from './identity';
+import { NETWORK_SECURITY_ADMIN_SECTION } from './network';
 
 export * from './credentials';
 export * from './monitoring';
@@ -43,6 +44,7 @@ export * from './security';
 export * from './incidents';
 export * from './rules';
 export * from './identity';
+export * from './network';
 
 export type AdminNavigationGroup =
     | 'identity-access'
@@ -131,6 +133,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     BOUNCER_ADMIN_SECTION,
     DEVICE_INTEL_ADMIN_SECTION,
     GEOIP_ADMIN_SECTION,
+    NETWORK_SECURITY_ADMIN_SECTION,
 ];
 
 function relativePath(...parts: Array<string | undefined>): string {

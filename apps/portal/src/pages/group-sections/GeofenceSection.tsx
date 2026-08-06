@@ -19,17 +19,19 @@
 // with a human-readable message, surfaced inline + toast.
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-    Eyebrow, MultiSelectDropdown,
-    toast,
-} from 'portal-mojo/ui';
+import { Eyebrow, toast } from 'portal-mojo/ui';
 import { mojoCall, useCan } from 'portal-mojo/client';
+// ONE editor, ONE projection, two scopes (#1287): the platform page and this
+// group panel now render the same `GeofenceRuleEditor` — including its
+// guided↔JSON toggle, which this file's private FriendlyEditor never had.
+import {
+    GeofenceRuleEditor, makeRuleEditorValue, ruleFromEditorValue,
+    type RuleEditorValue,
+} from 'portal-mojo/admin';
 import { GroupModel, type GroupRow } from '../../models';
 import {
-    ABUSE_FLAGS, COUNTRY_MODE_OPTS, COUNTRY_OPTIONS, GROUP_GEOFENCE_EDIT_PERMS,
-    US_STATES, buildGroupRulePayload, coerceRuleInput, describeRule, formToRule,
-    isAdvancedRule, ruleToForm,
-    type GeoRulesConfig, type GeofenceRule, type RuleClause, type RuleForm,
+    GROUP_GEOFENCE_EDIT_PERMS, buildGroupRulePayload, describeRule, isAdvancedRule,
+    type GeoRulesConfig, type GeofenceRule, type RuleClause,
 } from './geofence-data';
 
 const CLAUSE_ICONS: Record<RuleClause['tone'], string> = {
@@ -48,62 +50,6 @@ function ClauseRow({ clause, source }: { clause: RuleClause; source?: 'platform'
                     {source === 'platform' ? 'Platform' : 'This group'}
                 </span>
             )}
-        </div>
-    );
-}
-
-/** The friendly editor over the RuleForm projection. */
-function FriendlyEditor({ form, onChange }: { form: RuleForm; onChange: (next: RuleForm) => void }) {
-    return (
-        <div className="ga-geo-form">
-            <label className="field">
-                <span className="field-label">Country policy</span>
-                <select
-                    className="input"
-                    value={form.country_mode}
-                    onChange={(e) => onChange({ ...form, country_mode: e.target.value as RuleForm['country_mode'] })}
-                >
-                    {COUNTRY_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-            </label>
-            {form.country_mode !== '' && (
-                <MultiSelectDropdown
-                    label="Countries"
-                    help="Countries are matched by ISO code; pick them by name."
-                    options={COUNTRY_OPTIONS}
-                    value={form.countries}
-                    onChange={(values) => onChange({ ...form, countries: values.map(String) })}
-                    placeholder="Pick countries…"
-                />
-            )}
-            <MultiSelectDropdown
-                label="Blocked US states"
-                help="States are matched by region code (Washington → US-WA)."
-                options={US_STATES}
-                value={form.blocked_states}
-                onChange={(values) => onChange({ ...form, blocked_states: values.map(String) })}
-                placeholder="No blocked states"
-            />
-            <div className="ga-geo-flags">
-                <div className="field-label">Anonymized connections</div>
-                {ABUSE_FLAGS.map((f) => (
-                    // A settings LIST (label + help per row, one toggle each):
-                    // label left, control right, bounded — see .switch-setting.
-                    <label key={f.key} className="switch-setting">
-                        <span className="field-label">
-                            Block {f.label.toLowerCase()}
-                            <span className="field-help" style={{ display: 'block' }}>{f.help}</span>
-                        </span>
-                        <input
-                            type="checkbox"
-                            role="switch"
-                            className="switch"
-                            checked={form[`block_${f.key}`]}
-                            onChange={(e) => onChange({ ...form, [`block_${f.key}`]: e.target.checked })}
-                        />
-                    </label>
-                ))}
-            </div>
         </div>
     );
 }
@@ -142,13 +88,12 @@ export function GeofenceSection({ group }: { group: GroupRow }) {
     // the baseline key ties state to the stored snapshot (source
     // _onModelChange no-op semantics).
     const baselineKey = JSON.stringify(groupRuleStored);
-    const [editorState, setEditorState] = useState<{ key: string; form: RuleForm; json: string }>(() => ({
+    const [editorState, setEditorState] = useState<{ key: string; value: RuleEditorValue }>(() => ({
         key: baselineKey,
-        form: ruleToForm(groupRuleStored),
-        json: JSON.stringify(groupRuleStored, null, 2),
+        value: makeRuleEditorValue(groupRuleStored),
     }));
     if (editorState.key !== baselineKey) {
-        setEditorState({ key: baselineKey, form: ruleToForm(groupRuleStored), json: JSON.stringify(groupRuleStored, null, 2) });
+        setEditorState({ key: baselineKey, value: makeRuleEditorValue(groupRuleStored) });
     }
     const [status, setStatus] = useState<{ text: string; tone: 'muted' | 'ok' | 'bad' }>({ text: '', tone: 'muted' });
 
@@ -161,17 +106,11 @@ export function GeofenceSection({ group }: { group: GroupRow }) {
             : 'No platform rules — the floor allows all locations.';
 
     const saveRules = async () => {
-        let newRule: GeofenceRule;
-        if (advancedForced) {
-            const coerced = coerceRuleInput(editorState.json);
-            if (coerced === null) {
-                setStatus({ text: 'Not saved — the rule must be a valid JSON object.', tone: 'bad' });
-                toast.error('Not saved — the rule must be a valid JSON object.');
-                return;
-            }
-            newRule = coerced;
-        } else {
-            newRule = formToRule(editorState.form);
+        const newRule: GeofenceRule | null = ruleFromEditorValue(editorState.value);
+        if (newRule === null) {
+            setStatus({ text: 'Not saved — the rule must be a valid JSON object.', tone: 'bad' });
+            toast.error('Not saved — the rule must be a valid JSON object.');
+            return;
         }
 
         const payload = buildGroupRulePayload(groupRuleStored, newRule);
@@ -214,29 +153,12 @@ export function GeofenceSection({ group }: { group: GroupRow }) {
                 <div className="ga-geo-card">
                     <div className="ga-geo-card-head">This group's additional rules</div>
                     <div className="ga-geo-card-body">
-                        {advancedForced ? (
-                            <>
-                                <div className="ga-geo-advanced-note">
-                                    <i className="bi bi-braces" /> This group's rule uses options the guided editor
-                                    can't represent, so it's shown as JSON. Edits are still validated by the server on save.
-                                </div>
-                                <label className="field">
-                                    <span className="field-label">Group rule (JSON)</span>
-                                    <textarea
-                                        className="input ga-geo-json"
-                                        rows={8}
-                                        value={editorState.json}
-                                        onChange={(e) => setEditorState({ ...editorState, json: e.target.value })}
-                                    />
-                                    <span className="field-help">Top-level keys: country, region, abuse. Operators: in, not_in, eq.</span>
-                                </label>
-                            </>
-                        ) : (
-                            <FriendlyEditor
-                                form={editorState.form}
-                                onChange={(next) => setEditorState({ ...editorState, form: next })}
-                            />
-                        )}
+                        <GeofenceRuleEditor
+                            value={editorState.value}
+                            onChange={(value) => setEditorState({ key: baselineKey, value })}
+                            advancedForced={advancedForced}
+                            disabled={save.isPending}
+                        />
                         <div className="ga-geo-save-row">
                             <span className={`ga-geo-status ${status.tone === 'bad' ? 'ga-status-bad' : status.tone === 'ok' ? 'ga-status-ok' : 'dim'}`}>
                                 {status.text}
