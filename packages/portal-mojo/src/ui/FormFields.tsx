@@ -39,7 +39,7 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
     return (
         <form onSubmit={submit} noValidate>
             {form.formError && <div className="form-alert">{form.formError}</div>}
-            <SchemaFieldGrid fields={fields} state={form} disabled={busy} />
+            <SchemaFieldGrid fields={fields} state={form} />
             <div className="modal-actions">
                 {onCancel && <button type="button" className="btn" onClick={onCancel}>Cancel</button>}
                 <button type="submit" className="btn btn-primary" disabled={busy}>

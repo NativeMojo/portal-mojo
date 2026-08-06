@@ -52,7 +52,7 @@ export function validateSchemaFields(fields: Field[], values: FormData, profile:
             continue;
         }
         if (profile === 'wizard') {
-            const issue = validateFieldValue(field, value);
+            const issue = validateFieldValue(field, value ?? emptyFieldValue(field));
             if (issue) errors[field.name] = issue;
         }
     }

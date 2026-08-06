@@ -116,6 +116,7 @@ export function Tabs({ items, activeKey, defaultActiveKey, onActiveKeyChange, va
                             role="tab"
                             aria-label={item.ariaLabel}
                             aria-selected={selected}
+                            aria-disabled={item.disabled || undefined}
                             aria-controls={panelId}
                             tabIndex={selected ? 0 : -1}
                             disabled={item.disabled}

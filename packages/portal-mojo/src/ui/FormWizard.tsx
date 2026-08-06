@@ -71,6 +71,22 @@ export function healWizardSection(activeKey: string | null, sections: FormWizard
     return sections.some((section) => section.key === activeKey) ? activeKey : sections[0]?.key ?? null;
 }
 
+export function createWizardSingleFlight() {
+    let pending = false;
+    return {
+        get pending() { return pending; },
+        async run<T>(task: () => T | Promise<T>): Promise<T | undefined> {
+            if (pending) return undefined;
+            pending = true;
+            try {
+                return await task();
+            } finally {
+                pending = false;
+            }
+        },
+    };
+}
+
 export function FormWizard(props: FormWizardProps) {
     const {
         sections: rawSections,
@@ -87,7 +103,7 @@ export function FormWizard(props: FormWizardProps) {
     const mode = normalizeWizardMode(props.mode as string);
     const [activeKey, setActiveKey] = useState<string | null>(() => sections[0]?.key ?? null);
     const [busy, setBusy] = useState(false);
-    const finishRef = useRef(false);
+    const finishFlight = useRef(createWizardSingleFlight());
     const resetRef = useRef(resetKey);
     const form = useSchemaFormState({ fields, initial, profile: 'wizard', reconcile: true, resetKey, deferReconcile: busy });
 
@@ -128,7 +144,7 @@ export function FormWizard(props: FormWizardProps) {
     };
 
     const finish = async () => {
-        if (finishRef.current || !activeSection) return;
+        if (finishFlight.current.pending || !activeSection) return;
         const validationSections = props.validateAllOnFinish === false ? [activeSection] : sections;
         const validationFields = validationSections.flatMap((section) => section.fields);
         if (!validateAndFocus(validationFields, validationSections)) return;
@@ -136,15 +152,13 @@ export function FormWizard(props: FormWizardProps) {
         // Capture the accepted roster and payload before any parent update.
         const acceptedFields = [...fields];
         const payload = form.payload(acceptedFields);
-        finishRef.current = true;
         setBusy(true);
         form.setFormError('');
         try {
-            await onFinish(payload);
+            await finishFlight.current.run(() => onFinish(payload));
         } catch (error) {
             form.setFormError(error instanceof Error ? error.message : 'Save failed');
         } finally {
-            finishRef.current = false;
             setBusy(false);
         }
     };

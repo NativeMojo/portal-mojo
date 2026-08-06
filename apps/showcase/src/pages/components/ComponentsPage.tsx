@@ -52,6 +52,7 @@ import { AdminMembersDemo } from './demos-admin-members';
 import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
+import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
 
 interface DemoSection {
     key: string;
@@ -95,6 +96,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Forms',
         sections: [
+            {
+                key: 'form-wizard', title: 'FormWizard', icon: 'bi-signpost-split',
+                blurb: 'One shared schema across ordered wizard and tab modes: cross-step visibility, validation focus, retained drafts, async finish, and awaitable modal.',
+                render: () => <FormWizardDemo />,
+            },
             {
                 key: 'kitchen-sink', title: 'Kitchen sink form', icon: 'bi-grid-3x3-gap',
                 blurb: 'ONE schema rendering every registered field type through the registry — state vs wire shapes live, on both SchemaForm and FormView autosave.',
@@ -185,6 +191,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Overlays',
         sections: [
+            {
+                key: 'tabs', title: 'Tabs', icon: 'bi-segmented-nav',
+                blurb: 'Accessible controlled/uncontrolled tabs with eight token-only variants, disabled-key navigation, aliases, and a loud fallback.',
+                render: () => <TabsDemo />,
+            },
             {
                 key: 'popover', title: 'Popover', icon: 'bi-front',
                 blurb: 'Anchored top-layer primitive every dropdown control mounts in — stacks above native-<dialog> modals via the HTML Popover API.',
