@@ -24,7 +24,7 @@
 //     manage_users|manage_members|manage_group|manage_groups on the group.
 //   · /api/incident/event 200 (empty on the instance) — columns per the
 //     django model: created/category/title (+ level/details/model_*).
-import { defineModel, mojoCall } from 'portal-mojo/client';
+import { defineModel } from 'portal-mojo/client';
 
 // ── Permission tiers (GroupView.js:1357-1359) ─────────────────────────
 /** Admin tier — offer group-management flows. */
@@ -33,8 +33,6 @@ export const GROUP_ADMIN_PERMS = ['groups', 'manage_groups'];
 export const GROUP_DESTRUCTIVE_PERMS = 'manage_groups';
 /** Configure Auth — system-level only (sys. pins to the global dict). */
 export const GROUP_AUTH_PERMS = ['sys.groups', 'sys.manage_groups'];
-/** Member invite/add threshold (rest/group.py on_group_invite_member). */
-export const MEMBER_MANAGE_PERMS = ['manage_users', 'manage_members', 'manage_group', 'manage_groups'];
 
 // ── Group kinds (Group.js GroupKinds — the FULL known-kind catalog) ───
 export const GROUP_KINDS: Record<string, string> = {
@@ -95,18 +93,6 @@ export const EOD_HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
     else label = `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`;
     return { value: h, label };
 });
-
-// ── Member invite — POST /api/group/member/invite ─────────────────────
-/**
- * Email-invite flow (GroupView.js:1599-1620). The backend sends the invite
- * mail and creates the pending Member row. Rejects on failure.
- */
-export async function inviteMemberByEmail(groupId: number, email: string): Promise<void> {
-    await mojoCall('/api/group/member/invite', {
-        method: 'POST',
-        body: { group: groupId, email },
-    });
-}
 
 // ── Incident events — /api/incident/event ─────────────────────────────
 /** Row typed from django-mojo incident/models/event.py (live table empty). */

@@ -17,8 +17,8 @@
 //   · The header aux meta line ("Last activity 50m ago" under the toggle)
 //     folds into the chips row — DetailView has no right-gutter meta slot;
 //     Overview's KPI carries the same fact.
-//   · Member row click opens the member's UserDetail (no MemberView in the
-//     portal yet — the admin program owns it).
+//   · Member rows use the packaged MemberDetail; optional callbacks keep the
+//     package decoupled while this app still opens UserDetail/GroupDetail.
 //   · Deactivate collects the REQUIRED reason (admin | abuse | archived —
 //     django-mojo services/disable.py GROUP_REST_REASONS); web-mojo's bare
 //     confirm predates that backend rule.
@@ -31,6 +31,8 @@ import { mojoList, useCan, type Params } from 'portal-mojo/client';
 import {
     GROUP_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
     LogModel, WebhookSubscriptionModel, WebhookSubscriptionsSection,
+    MEMBER_INVITE_PERMISSIONS, MEMBER_SAVE_PERMISSIONS, MEMBER_USER_DIRECTORY_PERMISSIONS,
+    openMemberAdmissionDialog,
 } from 'portal-mojo/admin';
 import { GroupModel, MemberModel, type GroupRow } from '../models';
 import {
@@ -42,7 +44,7 @@ import { groupAuditParams } from './group-sections/shared';
 import { openAuthConfigDialog } from './group-sections/AuthConfigDialog';
 import { OverviewSection } from './group-sections/OverviewSection';
 import { IdentitySection } from './group-sections/IdentitySection';
-import { MembersSection, runInviteMemberFlow } from './group-sections/MembersSection';
+import { MembersSection } from './group-sections/MembersSection';
 import { SubGroupsSection, runAddSubGroupFlow } from './group-sections/SubGroupsSection';
 import { GeofenceSection } from './group-sections/GeofenceSection';
 import { EventsSection } from './group-sections/EventsSection';
@@ -79,6 +81,9 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
     const { can: canDestroy } = useCan(GROUP_DESTRUCTIVE_PERMS);
     const { can: canAccessManage } = useCan(GROUP_CREDENTIAL_PERMS);
     const { can: canViewAudit } = useCan(['view_logs', 'manage_logs', 'security']);
+    const { can: canInviteMember } = useCan(MEMBER_INVITE_PERMISSIONS);
+    const { can: canCreateMember } = useCan(MEMBER_SAVE_PERMISSIONS);
+    const { can: canReadUsers } = useCan(MEMBER_USER_DIRECTORY_PERMISSIONS);
 
     // Rail count badges (source setBadge wiring, as controlled props). The
     // member/apikey peeks share Overview's keys and dedupe; the gated ones
@@ -126,9 +131,17 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
     // {Noun}" (Identity autosave replaces it — see the header comment).
     const MENU: DetailMenuEntry<GroupRow>[] = [
         {
-            label: 'Invite Member', icon: 'bi-person-plus',
-            permissions: GROUP_ADMIN_PERMS,
-            onSelect: () => { void runInviteMemberFlow(group, qc); },
+            label: 'Add or Invite Member', icon: 'bi-person-plus',
+            permissions: MEMBER_INVITE_PERMISSIONS,
+            onSelect: () => {
+                void openMemberAdmissionDialog({
+                    group,
+                    canInvite: canInviteMember,
+                    canCreate: canCreateMember,
+                    canReadUsers,
+                    queryClient: qc,
+                });
+            },
         },
         {
             label: `Add Sub-${noun}`, icon: 'bi-diagram-3',
@@ -193,7 +206,7 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
                 { key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <OverviewSection group={group} openGroup={openGroupById} /> },
                 { key: 'Identity', label: 'Identity', icon: 'bi-card-text', render: () => <IdentitySection group={group} /> },
                 { divider: 'Membership' },
-                { key: 'Members', label: 'Members', icon: 'bi-people', render: () => <MembersSection group={group} /> },
+                { key: 'Members', label: 'Members', icon: 'bi-people', render: () => <MembersSection group={group} openGroup={openGroupById} /> },
                 { key: 'SubGroups', label: 'Sub-Groups', icon: 'bi-diagram-3', render: () => <SubGroupsSection group={group} openGroup={openGroupById} /> },
                 { divider: 'Access' },
                 {

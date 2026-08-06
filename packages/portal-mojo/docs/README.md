@@ -19,6 +19,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [admin-security-tickets.md](admin-security-tickets.md) | Ticket queue, workflow panel, notes, approvals, and Maestro sync contract |
 | [admin-incidents.md](admin-incidents.md) | Incident/event triage, forensic detail, merge semantics, and sanitized export boundary |
 | [admin-rules.md](admin-rules.md) | Always-inactive RuleSet authoring and the lossless, runtime-effective handler-chain builder |
+| [admin-members.md](admin-members.md) | Global membership table/detail, no-oracle admission, extensible grants, Group-detail composition, and unsupported-operation boundaries |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |

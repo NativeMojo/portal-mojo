@@ -7,7 +7,7 @@
 // C4 (board #1281): ApiKey / Log / Member joined, shapes measured against
 // the LIVE backend (mverify @9009, 2026-08-05) — see each row type for the
 // endpoint + graph facts.
-import { defineModel, type Group, type Params, type User } from 'portal-mojo/client';
+import { defineModel, type Group, type User } from 'portal-mojo/client';
 
 // Canonical monitoring models live with their reusable admin package.
 export {
@@ -15,6 +15,7 @@ export {
     LOG_LEVEL_OPTIONS,
     type LogRow,
 } from 'portal-mojo/admin';
+export { MemberModel, type MemberRow } from 'portal-mojo/admin';
 
 /**
  * The user row as the DEFAULT (one-record) graph serializes it — measured in
@@ -159,34 +160,6 @@ export const GroupModel = defineModel<GroupRow>({
 });
 
 /**
- * /api/group/member row (measured live 2026-08-05): membership + permission
- * dict, with `user` embedded as the me-graph dict and `group` as the basic
- * graph. SEARCH_FIELDS sweep user__username/email/display_name server-side.
- */
-export interface MemberRow {
-    id: number;
-    created: number;
-    modified: number;
-    is_active: boolean;
-    permissions: Record<string, unknown>;
-    metadata: Record<string, unknown>;
-    user: (User & { requires_mfa?: boolean; has_passkey?: boolean }) | null;
-    group: { id: number; name: string; kind: string } | null;
-}
-
-export const MemberModel = defineModel<MemberRow>({
-    name: 'member',
-    endpoint: '/api/group/member',
-    permissions: {
-        view: ['view_members', 'view_groups', 'manage_groups', 'manage_group', 'groups'],
-        manage: ['manage_groups', 'manage_group', 'groups'],
-    },
-    actions: {
-        resend_invite: {},
-    },
-});
-
-/**
  * /api/account/api_keys row — the live UserAPIKey default graph, measured
  * 2026-08-05: {id, label, allowed_ips, expires, is_active, last_used,
  * created}. The owner FK (`user`) filters (?user=<id>) but never serializes.
@@ -244,13 +217,6 @@ export const ApiKeyModel = defineModel<ApiKeyRow>({
         revoke: { response: 'payload' },
     },
 });
-
-/** Query params helper: the member list for one group (GroupDetail). */
-export function memberParamsFor(groupId: number, search: string): Params {
-    const params: Params = { group: groupId, size: 8, sort: '-id' };
-    if (search) params.search = search;
-    return params;
-}
 
 // ── UserView-parity models (wave: port/user-view-parity) ──────────────
 // Shapes below are the LIVE graphs, measured against mverify @9009 and

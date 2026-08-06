@@ -46,6 +46,7 @@ import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
+import { AdminMembersDemo } from './demos-admin-members';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 
 interface DemoSection {
@@ -290,6 +291,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Admin',
         sections: [
+            {
+                key: 'admin-members', title: 'Members', icon: 'bi-person-badge',
+                blurb: 'Global membership table/detail, explicit no-oracle invitation versus authorized directory add, safe grants, and fixed-group composition.',
+                render: () => <AdminMembersDemo />,
+            },
             {
                 key: 'admin-credentials', title: 'Credentials', icon: 'bi-key',
                 blurb: 'Reusable group API-key and webhook administration, including one-shot token handling, explicit audited reveals, and permission-aware controls.',
