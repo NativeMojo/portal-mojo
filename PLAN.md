@@ -188,6 +188,71 @@ wiring and record-detail routes, and retained RightPanel only as an explicit
 opt-in primitive. Top-level Admin resources remain global no-group pages in the
 single Admin sidenav; focused editors and confirmations stack as native dialogs.
 
+**2026-08-06, wave 8 (GeoIP · Jobs · Network security, map-first):** four items
+built in isolated worktrees and merged individually. Ian's sequencing call — build
+the shared map dependency FIRST, then the domains on top of it — drove the order:
+**#1426 WorldMap** → **#1288 Jobs** (independent, parallel) → **#1291 devices/GeoIP**
+→ **#1287 Network security**. All DONE.
+
+The map turned out to be a **rebuild, not a port**. web-mojo's `MetricsCountryMapView`
+and `LoginLocationMapView` both render through `MapLibreView`, which injects
+`unpkg.com/maplibre-gl@4.7.1` as a runtime `<script>` and draws on
+`demotiles.maplibre.org` — MapLibre's explicitly-*demo* tile server; maplibre is not
+in web-mojo's `package.json` at all, and `map/countries.geojson` is centroid **points**,
+not outlines, imported by nothing. A verbatim port would make every admin deployment
+fetch two third-party hosts at page load, which the IP-restricted admin deployment
+model forbids independent of the no-library rule. `WorldMap` ships dependency-free in
+`portal-mojo/charts`: equirectangular projection + inverse, antimeridian splitting,
+value-scaled tone markers, intensity-ramped routes, legend toggle, pan/zoom, and an
+ocean/graticule fallback with an injectable `land` prop. **Coastline geometry is an
+open decision reserved for Ian** (embed public-domain Natural Earth 110m as a static
+asset, vs sanction a maplibre peer-dep like zod's) — either drops in through `land`
+with no API change.
+
+The wave's recurring find: **web-mojo UI reading fields the backend never writes.**
+`countryCentroids.js` has 249 rows but 244 unique ISO2 keys, so last-write-wins made
+`ES` resolve to *Canarias* rather than Spain (deduped to primary territory; duplicate
+keys are also TS1117). `UserLoginEvent` has no `event_type`, so every login marker on
+the old map fell through to grey — recoloured on `is_new_country`/`is_new_region` via
+`loginRiskTone`. Six GeoIPView/DeviceView KPI fields, plus `reverse_dns`/`ip_version`
+and both `metadata` reads, exist on no model and rendered "—" forever. The geofence
+simulator's "enforcement is off" notice read `decision.posture.enabled`, a key the
+decision never carries, so it never once fired; the blocks log read `metadata.scope`
+(reporter writes `geofence_scope`) and the posture header read `metadata.username`
+(reporter writes `changed_by`/`user_name`), so both rendered blank. `GET /api/jobs/health`
+is dead server-side (`get_channel_health` reads `state['stream_length']` that Plan-B
+`get_queue_state` stopped returning → 400), so the dashboard is built on `/stats`;
+`/api/jobs/logs?job_id=` returns **HTTP 500** (Django sets the FK attname descriptor,
+so the key is accepted then dies in `normalize_rest_value`) while `?runner_id=` is
+silently dropped and returns the whole log table. `IPSet.set_data` does
+`"\n".join(value)`, so posting the raw textarea **string** (as web-mojo did) interleaves
+a newline between every *character* and sets `cidr_count` to the character count — the
+port posts a list.
+
+Structural work: `ModelTable` widened to `T extends { id: number | string }` (Jobs and
+ScheduledTasks are the toolkit's first string-primary-key tables); `geofenceData.js`
+promoted ONCE into the package (wave 4 had already half-lifted it into an app file)
+and the rule editor now shared between the global page and GroupView's section;
+`GeoLocatedIPModel` defined once in #1291 and imported by #1287; `.text-bad`/`.text-warn`
+defined for the first time (only `.text-ok` existed, so ~30 call sites across bouncer,
+incidents, rules and monitoring had been rendering error text in the body colour).
+**ScheduledTask ported** — the backend is complete and the page never shipped only for
+a missing `registerPage`; gating it on `SCHEDULED_TASK_VIEW_PERMS` closes a real hole,
+since `VIEW_PERMS` carries `owner` but neither manage grant, so an ungated admin page
+silently degrades into the operator's *personal* task list. Deliberately absent: Run Now
+(no REST route — django-mojo #1309), batch IP-set delete, creating a block from the
+table, geofence posture editing, bypass grant/revoke, device trust toggles, and every
+DELETE the four device/GeoIP models refuse.
+
+Verification: `npm run typecheck` (three workspaces), both production builds, `git diff
+--check`, and **eleven** verifier contracts — the seven prior plus new
+`verify:worldmap`, `verify:admin-devices`, `verify:admin-jobs`, `verify:admin-network`.
+Browser-verified on the mock in BOTH themes with clean consoles and no horizontal
+overflow, across showcase and the real portal shell; fail-closed gating confirmed live
+(Firewall Log correctly hidden from a `view_security` persona, since the category perm
+expands one-way). `dev:live` @9009 remains blocked for agents by the mverify bouncer
+interstitial.
+
 **2026-08-05, wave 7a residual (Groups Admin #1410):** the app-local Groups
 surface now carries system-pinned route, menu, section, and action gates;
 restores the useful legacy column inventory; and offers real, reason-aware
