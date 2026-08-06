@@ -30,7 +30,6 @@ import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { GroupOverviewPage } from './pages/GroupOverviewPage';
-import { ComponentsPage } from './pages/components/ComponentsPage';
 
 // Hash routing so the built dist works from any static mount (including
 // served by django-mojo) with zero server rewrite config. The auth pages are
@@ -46,7 +45,6 @@ const router = createHashRouter([
             { path: 'users', element: <UsersPage /> },
             { path: 'settings', element: <SettingsPage /> },
             { path: 'group', element: <GroupOverviewPage /> },
-            { path: 'components', element: <ComponentsPage /> },
             ...adminRoutes,
         ],
     },

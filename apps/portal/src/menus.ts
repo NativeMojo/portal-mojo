@@ -19,8 +19,6 @@ registerMenus([
             // the client-side gate mirrors it (admin/superuser pass any).
             { label: 'Logs', icon: 'bi-journal-text', route: '/logs', permissions: ['view_logs', 'manage_logs', 'security'] },
             { label: 'Settings', icon: 'bi-gear', route: '/settings', permissions: 'view_admin' },
-            { divider: 'Develop' },
-            { label: 'Components', icon: 'bi-box-seam', route: '/components' },
         ],
     },
     {
