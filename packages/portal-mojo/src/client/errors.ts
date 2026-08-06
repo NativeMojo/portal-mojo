@@ -3,10 +3,16 @@
 
 export class MojoError extends Error {
     status: number;
-    constructor(message: string, status = 0) {
+    /** Semantic django-mojo error code (`s3_operation_incomplete`, etc.). */
+    errorCode: string | number | undefined;
+    /** Structured, server-sanitized failure evidence. Never log indiscriminately. */
+    data: unknown;
+    constructor(message: string, status = 0, errorCode?: string | number, data?: unknown) {
         super(message);
         this.name = 'MojoError';
         this.status = status;
+        this.errorCode = errorCode;
+        this.data = data;
     }
 }
 

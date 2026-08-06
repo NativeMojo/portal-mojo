@@ -22,9 +22,16 @@ import {
 
 django-mojo wraps everything: `{status, data, …}`. `status: false` (or a
 non-2xx with an envelope body) becomes a **thrown `MojoError(message,
-status)`** carrying the server's real message. Nothing outside `client.ts`
+status, errorCode, data)`** carrying the server's real message, numeric HTTP
+status, semantic `error_code`, and structured safe failure evidence. Nothing outside `client.ts`
 parses envelopes; `mojoCall(path, {method, params, body})` is the typed
 escape hatch for protocol modules and returns the unwrapped `Envelope`.
+
+Live non-2xx responses and mock `status:false` envelopes preserve the same
+shape. Modern envelopes use numeric top-level `code` plus a string semantic
+`error_code`; numeric legacy `error_code` remains a status fallback. Failed
+envelopes always reject. Structured `data` can contain deliberately safe
+recovery evidence, but callers must still avoid logging it indiscriminately.
 
 ## Functions
 
@@ -136,7 +143,8 @@ fetches).
 
 ## Errors
 
-- `MojoError{message, status}` — server-reported failure; `message` is the
-  server's text (show it verbatim in toasts).
+- `MojoError{message, status, errorCode, data}` — server-reported failure;
+  `message` is the server's text, `status` is numeric, `errorCode` preserves
+  the semantic wire code, and `data` preserves safe structured evidence.
 - `AuthRequiredError` — thrown by the pre-request gate when a request needs
   a session that doesn't exist (synthetic 401; no network was touched).

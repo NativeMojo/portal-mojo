@@ -78,9 +78,10 @@ export interface FetchOpts {
 
 export interface Envelope {
     status: boolean;
+    code?: number;
     data?: unknown;
     error?: string;
-    error_code?: number;
+    error_code?: number | string;
     message?: string;
     count?: number;
     size?: number;
@@ -126,13 +127,17 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
         // django-mojo sends its envelope on error responses too — surface the
         // real message ("Invalid username or password"), not "HTTP 401".
         let detail = `HTTP ${res.status}`;
+        let errorCode: string | number | undefined;
+        let data: unknown;
         try {
             const body = (await res.json()) as Envelope;
             detail = body.error ?? body.message ?? detail;
+            errorCode = body.error_code;
+            data = body.data;
         } catch {
             // Non-JSON error body — keep the status text.
         }
-        throw new MojoError(detail, res.status);
+        throw new MojoError(detail, res.status, errorCode, data);
     }
     return (await res.json()) as Envelope;
 }
@@ -141,7 +146,13 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
 async function unwrap(path: string, opts: FetchOpts): Promise<Envelope> {
     const body = await transport(path, opts);
     if (body.status === false) {
-        throw new MojoError(body.error ?? body.message ?? 'Request failed', body.error_code ?? 0);
+        const legacyStatus = typeof body.error_code === 'number' ? body.error_code : 0;
+        throw new MojoError(
+            body.error ?? body.message ?? 'Request failed',
+            body.code ?? legacyStatus,
+            body.error_code,
+            body.data,
+        );
     }
     return body;
 }
@@ -240,7 +251,10 @@ export async function mojoDownload(endpoint: string, params: Params, format: 'cs
 
     if (!API_BASE) {
         const body = (await mockFetch(endpoint, { params: withFormat, headers })) as Envelope;
-        if (body.status === false) throw new MojoError(body.error ?? 'Export failed', body.error_code ?? 0);
+        if (body.status === false) {
+            const legacyStatus = typeof body.error_code === 'number' ? body.error_code : 0;
+            throw new MojoError(body.error ?? 'Export failed', body.code ?? legacyStatus, body.error_code, body.data);
+        }
         const file = body.data as { filename: string; content: string; mime: string };
         downloadBlob(new Blob([file.content], { type: file.mime }), file.filename);
         return;
