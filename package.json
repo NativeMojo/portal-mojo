@@ -16,6 +16,7 @@
         "verify:admin-navigation": "node scripts/verify-admin-navigation.mjs",
         "verify:admin-security-tickets": "node scripts/verify-admin-security-tickets.mjs",
         "verify:admin-incidents": "node scripts/verify-admin-incidents.mjs",
-        "verify:admin-rules": "node scripts/verify-admin-rules.mjs"
+        "verify:admin-rules": "node scripts/verify-admin-rules.mjs",
+        "verify:admin-members": "node scripts/verify-admin-members.mjs"
     }
 }

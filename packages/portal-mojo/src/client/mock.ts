@@ -906,6 +906,22 @@ function buildLogs(users: MockUser[], groups: MockGroup[]): MockLog[] {
         // Walk backwards 10min–4h per row → ~14 days of history.
         created -= 600 + Math.floor(rand() * 13800);
     }
+    logs.unshift(
+        {
+            id: 100101, created: nowSec - 90, level: 'info', kind: 'model_change',
+            method: 'POST', path: '/api/group/member/100', payload: null,
+            ip: '127.0.0.1', duid: null, uid: 13, gid: 1,
+            username: 'groups.manager', user_agent: 'mock-verifier',
+            log: 'Membership role label updated', model_name: 'account.GroupMember', model_id: 100,
+        },
+        {
+            id: 100102, created: nowSec - 180, level: 'info', kind: 'member:invited',
+            method: 'POST', path: '/api/group/member/invite', payload: null,
+            ip: '127.0.0.1', duid: null, uid: 13, gid: 1,
+            username: 'groups.manager', user_agent: 'mock-verifier',
+            log: 'Membership invitation sent', model_name: 'account.GroupMember', model_id: 100,
+        },
+    );
     return logs;
 }
 
@@ -1637,11 +1653,11 @@ function listRows<T extends Record<string, unknown>>(
     };
 }
 
-function listUsers(params: Params) {
+function listUsers(params: Params, users: MockUser[] = db.users) {
     // Search matches the model's real SEARCH_FIELDS: username, email,
     // display_name, phone_number (account/models/user.py RestMeta).
     const result = listRows(
-        db.users as unknown as Record<string, unknown>[],
+        users as unknown as Record<string, unknown>[],
         params,
         (u) => `${u.username} ${u.email} ${u.display_name} ${u.phone_number ?? ''}`,
     );
@@ -1669,8 +1685,8 @@ function exportRows(rows: Record<string, unknown>[], params: Params, modelName: 
     return { status: true, data: { filename, content: JSON.stringify(rows, null, 2), mime: 'application/json' } };
 }
 
-function exportUsers(params: Params) {
-    const full = listUsers({ ...params, start: 0, size: db.users.length });
+function exportUsers(params: Params, users: MockUser[] = db.users) {
+    const full = listUsers({ ...params, start: 0, size: users.length }, users);
     return exportRows(full.data as unknown as Record<string, unknown>[], params, 'User');
 }
 
@@ -2511,6 +2527,27 @@ function groupCanManage(user: MockUser | undefined, groupId: number): boolean {
     if (member && ['admin', 'manage_group', 'manage_members'].some((permission) => Boolean(member.permissions[permission]))) return true;
     // Same deterministic group-context identity as /api/group/<id>/member.
     return user.id === 1 && groupId % 2 === 1;
+}
+
+function groupCanInvite(user: MockUser | undefined, groupId: number): boolean {
+    return hasGlobalPermission(user, ['manage_users', 'manage_members', 'manage_group', 'manage_groups'])
+        || groupCanManage(user, groupId);
+}
+
+function groupCanReadMembers(user: MockUser | undefined, groupId: number): boolean {
+    if (!user) return false;
+    if (hasGlobalPermission(user, ['view_members', 'view_groups', 'manage_groups', 'manage_group', 'groups'])) return true;
+    const member = db.members.find((row) => row.group === groupId && row.user === user.id && row.is_active);
+    if (member && ['admin', 'view_members', 'manage_group', 'manage_members', 'groups'].some((permission) => Boolean(member.permissions[permission]))) return true;
+    return user.id === 1 && groupId % 2 === 1;
+}
+
+function canReadGlobalMembers(user: MockUser | undefined): boolean {
+    return hasGlobalPermission(user, ['view_members', 'view_groups', 'manage_groups', 'manage_group', 'groups']);
+}
+
+function canReadUserDirectory(user: MockUser | undefined): boolean {
+    return hasGlobalPermission(user, ['view_users', 'manage_users', 'users']);
 }
 
 function requestGroupId(opts: MockFetchOpts): number {
@@ -3507,7 +3544,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
         const groupId = requestGroupId(opts);
-        if (!groupCanManage(caller, groupId)) return permissionDenied();
+        const group = db.groups.find((candidate) => candidate.id === groupId && candidate.is_active);
+        // Inactive, nonexistent, and unauthorized groups share one denial.
+        if (!group) return permissionDenied();
+        if (!groupCanInvite(caller, groupId)) return permissionDenied();
         const email = String(opts.body?.email ?? '').trim().toLowerCase();
         if (!email) return { status: false, error: 'email is required', error_code: 400 };
         let user = findByEmail(email);
@@ -3520,8 +3560,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const existing = db.members.find((candidate) => candidate.group === groupId && candidate.user === user!.id);
         if (existing) return { status: true, data: serializeMember(existing), graph: 'default' };
         const now = Math.floor(Date.now() / 1000);
-        const member: MockMember = { id: Math.max(...db.members.map((candidate) => candidate.id)) + 1, created: now, modified: now, is_active: true, permissions: isPlainObject(opts.body?.permissions) ? opts.body!.permissions as Record<string, unknown> : {}, metadata: {}, user: user.id, group: groupId };
+        const member: MockMember = { id: Math.max(0, ...db.members.map((candidate) => candidate.id)) + 1, created: now, modified: now, is_active: true, permissions: isPlainObject(opts.body?.permissions) ? opts.body!.permissions as Record<string, unknown> : {}, metadata: {}, user: user.id, group: groupId };
         db.members.push(member);
+        group.member_count += 1;
         return { status: true, data: serializeMember(member), graph: 'default' };
     }
     // Members list/detail — /api/group/member (admin listing; the group-
@@ -3530,11 +3571,16 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     // user__display_name.
     const oneMember = path.match(/^\/api\/group\/member\/(\d+)$/);
     if (oneMember) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
         const m = db.members.find((x) => x.id === Number(oneMember[1]));
         if (!m) return { status: false, error: 'Member not found', error_code: 404 };
+        if (!groupCanReadMembers(caller, m.group)) return permissionDenied();
+        if (opts.method === 'DELETE') {
+            return { status: false, error: 'DELETE not allowed: GroupMember', error_code: 403 };
+        }
         if (opts.method === 'POST' && opts.body) {
-            const caller = userFromBearer(opts.headers);
-            if (!groupCanManage(caller, m.group)) return permissionDenied(caller ? 403 : 401);
+            if (!groupCanManage(caller, m.group)) return permissionDenied();
             if ('is_active' in opts.body) m.is_active = Boolean(opts.body.is_active);
             if (isPlainObject(opts.body.permissions)) {
                 for (const [permission, value] of Object.entries(opts.body.permissions)) {
@@ -3549,12 +3595,47 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: serializeMember(m), graph: 'default' };
     }
     if (path === '/api/group/member') {
-        const memberSearch = (m: Record<string, unknown>) => {
-            const u = db.users.find((x) => x.id === Number(m.user));
-            return u ? `${u.username} ${u.email} ${u.display_name}` : '';
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (opts.method === 'DELETE') return { status: false, error: 'DELETE not allowed: GroupMember', error_code: 403 };
+        if (opts.method === 'POST' && opts.body) {
+            const groupId = Number(opts.body.group ?? 0);
+            const userId = Number(opts.body.user ?? 0);
+            const group = db.groups.find((candidate) => candidate.id === groupId && candidate.is_active);
+            if (!group || !groupCanManage(caller, groupId)) return permissionDenied();
+            const user = db.users.find((candidate) => candidate.id === userId);
+            if (!user) return { status: false, error: 'User not found', error_code: 404 };
+            if (db.members.some((candidate) => candidate.group === groupId && candidate.user === userId)) {
+                return { status: false, error: 'Membership already exists', error_code: 400 };
+            }
+            const now = Math.floor(Date.now() / 1000);
+            const member: MockMember = {
+                id: Math.max(0, ...db.members.map((candidate) => candidate.id)) + 1,
+                created: now,
+                modified: now,
+                is_active: opts.body.is_active == null ? true : Boolean(opts.body.is_active),
+                permissions: isPlainObject(opts.body.permissions) ? { ...opts.body.permissions } : {},
+                metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
+                user: userId,
+                group: groupId,
+            };
+            db.members.push(member);
+            group.member_count += 1;
+            return { status: true, data: serializeMember(member), graph: 'default' };
+        }
+        const groupId = Number(opts.params?.group ?? 0);
+        if (groupId > 0 ? !groupCanReadMembers(caller, groupId) : !canReadGlobalMembers(caller)) return permissionDenied();
+        const hydrated = db.members.map((member) => serializeMember(member));
+        const memberSearch = (member: Record<string, unknown>) => {
+            const user = member.user as Record<string, unknown> | null;
+            return user ? `${user.username ?? ''} ${user.email ?? ''} ${user.display_name ?? ''}` : '';
         };
-        const result = listRows(db.members as unknown as Record<string, unknown>[], opts.params ?? {}, memberSearch, '-id');
-        return { ...result, data: (result.data as unknown as MockMember[]).map(serializeMember) };
+        const params = opts.params ?? {};
+        if (params.download_format) {
+            const full = listRows(hydrated, { ...params, start: 0, size: hydrated.length }, memberSearch, '-id');
+            return exportRows(full.data as Record<string, unknown>[], params, 'GroupMember');
+        }
+        return listRows(hydrated, params, memberSearch, '-id');
     }
     const oneGroup = path.match(/^\/api\/group\/(\d+)$/);
     if (oneGroup) {
@@ -3682,6 +3763,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     const one = path.match(/^\/api\/user\/(\d+)$/);
     if (one) {
         const id = Number(one[1]);
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (opts.method !== 'POST' && opts.method !== 'DELETE'
+            && caller.id !== id && !canReadUserDirectory(caller)) return permissionDenied();
         const user = db.users.find((u) => u.id === id);
         if (!user) return { status: false, error: 'User not found', error_code: 404 };
         if (opts.method === 'DELETE') {
@@ -3696,7 +3781,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: serializeUser(user, 'default'), graph: 'default' };
     }
     if (path === '/api/user') {
-        if (opts.params?.download_format) return exportUsers(opts.params);
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const visibleUsers = canReadUserDirectory(caller) ? db.users : [caller];
+        if (opts.params?.download_format) return exportUsers(opts.params, visibleUsers);
         if (opts.method === 'POST' && opts.body) {
             const id = Math.max(...db.users.map((u) => u.id)) + 1;
             const email = String(opts.body.email ?? `user${id}@nativemojo.com`);
@@ -3730,7 +3818,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             db.users.unshift(user);
             return { status: true, data: serializeUser(user, 'default') };
         }
-        return listUsers(opts.params ?? {});
+        return listUsers(opts.params ?? {}, visibleUsers);
     }
     return { status: false, error: `No mock for ${path}`, error_code: 404 };
 }

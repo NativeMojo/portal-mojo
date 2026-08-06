@@ -28,6 +28,7 @@ import { MONITORING_ADMIN_SECTION } from './monitoring';
 import { SETTINGS_ADMIN_SECTION } from './settings';
 import { BOUNCER_ADMIN_SECTION } from './bouncer';
 import { SECURITY_OPERATIONS_ADMIN_SECTION } from './security';
+import { MEMBERS_ADMIN_SECTION } from './identity/members';
 
 export * from './credentials';
 export * from './monitoring';
@@ -37,6 +38,7 @@ export * from './security-permissions';
 export * from './security';
 export * from './incidents';
 export * from './rules';
+export * from './identity/members';
 
 export type AdminNavigationGroup =
     | 'identity-access'
@@ -99,6 +101,7 @@ export interface AdminRoute {
 
 /** Registry of every shipped admin section. */
 export const ADMIN_SECTIONS: readonly AdminSection[] = [
+    MEMBERS_ADMIN_SECTION,
     {
         id: 'credentials',
         basePath: '',

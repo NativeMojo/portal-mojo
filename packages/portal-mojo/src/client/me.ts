@@ -105,10 +105,15 @@ function dictHasPermission(dict: PermissionsDict | null | undefined, name: strin
 export function memberHasPermission(member: MemberLike | null | undefined, permission: string | string[]): boolean {
     if (!member) return false;
     if (Array.isArray(permission)) return permission.some((p) => memberHasPermission(member, p));
+    // A member dictionary is never a system authority. Fail before the direct
+    // lookup too: malformed/stale rows containing a literal `sys.*` key must
+    // not satisfy an Admin gate. User.hasPermission still resolves sys.* from
+    // the user's global dictionary in hasPermission() below.
+    if (permission.startsWith('sys.')) return false;
     const dict = member.permissions;
     if (!dict) return false;
     if (granted(dict, permission)) return true;
-    return !permission.startsWith('sys.') && granted(dict, 'admin');
+    return granted(dict, 'admin');
 }
 
 /** User.hasPermission, full semantics. `member` is the active-group membership. */
