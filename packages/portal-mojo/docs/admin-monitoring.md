@@ -43,12 +43,20 @@ row-click inspector. The table is read-only because log rows are immutable
 records. The chevron cell stops propagation in `ModelTable`, so expanding a
 quick look does not also open the inspector.
 
+`LogModel` therefore publishes only its exact view gate. Although the backend
+has separate `security|admin` save and `admin` delete gates, this immutable
+package surface advertises no `manage` contract or mutation control. The
+client's normal admin/superuser wildcard remains separate from `sys.security`.
+
 The inspector recognizes explicit request and response `kind` tokens. All
-other kinds are messages. It renders `log`, `payload`, request context, user,
-device, IP, related model, and user agent. Valid JSON goes through `JsonBlock`;
-everything else is a React text child in a `<pre>`. HTML-looking stored data is
-never an HTML rendering boundary. Clipboard absence and rejected writes surface
-an error toast instead of reporting false success.
+other kinds are messages. The `log` field is the primary stored content and is
+labelled “Stored request content,” “Stored response content,” or “Message” from
+that kind. `payload` is always labelled “Auxiliary payload”; it is never
+presented as the response body. The inspector also renders request context,
+user, device, IP, related model, and user agent. Valid JSON goes through
+`JsonBlock`; everything else is a React text child in a `<pre>`. HTML-looking
+stored data is never an HTML rendering boundary. Clipboard absence and rejected
+writes surface an error toast instead of reporting false success.
 
 A response row is only a stored response row. `/api/logs` exposes no request
 correlation key, so the inspector never searches for or claims a paired request.

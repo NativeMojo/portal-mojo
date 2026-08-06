@@ -37,9 +37,10 @@ export interface LogRow {
 export const LogModel = defineModel<LogRow>({
     name: 'log',
     endpoint: '/api/logs',
+    // This package exposes no save/delete controls. RestMeta's save gate is
+    // security|admin; the admin wildcard is handled by hasPermission.
     permissions: {
         view: LOGS_ADMIN_PERMISSIONS,
-        manage: ['sys.manage_logs'],
     },
 });
 

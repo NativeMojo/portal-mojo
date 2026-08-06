@@ -2,7 +2,7 @@ import {
     Badge, JsonBlock, ModelTable, fmt, groupByDay, modal,
     type Column, type FilterDef, type Tone,
 } from '../../ui';
-import { LogInspector } from './LogInspector';
+import { LogInspector, storedLogContentLabel, storedLogKind } from './LogInspector';
 import { LOG_LEVEL_OPTIONS, LogModel, type LogRow } from './models';
 
 const LEVEL_TONE: Record<string, Tone> = {
@@ -65,6 +65,7 @@ export const LOG_FILTERS: FilterDef[] = [
 
 /** Chevron quick-look. Row click opens the full inspector independently. */
 export function LogQuickLook({ log }: { log: LogRow }) {
+    const contentLabel = storedLogContentLabel(storedLogKind(log));
     let payload: unknown = null;
     if (log.payload) {
         try { payload = JSON.parse(log.payload) as unknown; } catch { payload = log.payload; }
@@ -72,7 +73,7 @@ export function LogQuickLook({ log }: { log: LogRow }) {
     return (
         <div className="expand-grid">
             <div>
-                <div className="eyebrow">Message</div>
+                <div className="eyebrow">{contentLabel}</div>
                 <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                     {log.log ?? <span className="dim">—</span>}
                 </div>
@@ -91,7 +92,7 @@ export function LogQuickLook({ log }: { log: LogRow }) {
                 <div className="dim">uid {log.uid || '—'} · gid {log.gid || '—'} · <code>#{log.id}</code> · {fmt.datetime(log.created)}</div>
             </div>
             <div>
-                <div className="eyebrow">Payload</div>
+                <div className="eyebrow">Auxiliary payload</div>
                 {payload != null
                     ? <JsonBlock value={payload} defaultOpen />
                     : <span className="dim">No payload</span>}

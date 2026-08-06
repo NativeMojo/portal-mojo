@@ -13,9 +13,10 @@ const EXAMPLES: Array<{ label: string; row: LogRow }> = [
         label: 'Request JSON',
         row: {
             id: 8101, created: NOW - 75, level: 'info', kind: 'request', method: 'POST',
-            path: '/api/incident/ticket/501', payload: '{"title":"Latency <script>alert(1)</script>","severity":3}',
+            path: '/api/incident/ticket/501', payload: '{"source":"showcase","attempt":1}',
             ip: '203.0.113.22', duid: 'browser-demo-8a9e', uid: 42, gid: 7, username: 'operator@example.com',
-            user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', log: 'Incoming API request',
+            user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+            log: '{"title":"Latency <script>alert(1)</script>","severity":3}',
             model_name: 'incident.Ticket', model_id: 501,
         },
     },
@@ -23,9 +24,10 @@ const EXAMPLES: Array<{ label: string; row: LogRow }> = [
         label: 'Response JSON',
         row: {
             id: 8102, created: NOW - 74, level: 'warning', kind: 'http:response', method: 'POST',
-            path: '/api/incident/ticket/501', payload: '{"status":false,"error":"Validation failed","fields":{"title":["Required"]}}',
+            path: '/api/incident/ticket/501', payload: '{"elapsed_ms":184,"worker":"api-2"}',
             ip: '203.0.113.22', duid: 'browser-demo-8a9e', uid: 42, gid: 7, username: 'operator@example.com',
-            user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', log: 'HTTP 400 response stored independently',
+            user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+            log: '{"status":false,"error":"Validation failed","fields":{"title":["Required"]}}',
             model_name: 'incident.Ticket', model_id: 501,
         },
     },
@@ -48,7 +50,8 @@ export function AdminMonitoringDemo() {
             <div className="panel panel-pad">
                 <div className="eyebrow">Static safety cases</div>
                 <p className="dim" style={{ margin: '3px 0 10px' }}>
-                    Switch among request, response, and HTML-looking plain text. Response records state that no paired request is known.
+                    Switch among request, response, and HTML-looking plain text. The primary <code>log</code> content and
+                    auxiliary <code>payload</code> stay visibly distinct, and response records claim no paired request.
                 </p>
                 <div className="seg" aria-label="Inspector record">
                     {EXAMPLES.map((example, index) => (

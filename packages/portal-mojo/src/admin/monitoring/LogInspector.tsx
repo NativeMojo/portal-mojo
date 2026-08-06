@@ -19,6 +19,12 @@ export function storedLogKind(row: Pick<LogRow, 'kind'>): StoredLogKind {
     return 'message';
 }
 
+export function storedLogContentLabel(kind: StoredLogKind): string {
+    if (kind === 'request') return 'Stored request content';
+    if (kind === 'response') return 'Stored response content';
+    return 'Message';
+}
+
 interface StoredContent {
     raw: string;
     json: unknown | null;
@@ -131,8 +137,8 @@ export function LogInspector({ log, onClose }: { log: LogRow; onClose?: () => vo
                 <Fact label="Related record">{log.model_name ? `${log.model_name}#${log.model_id}` : '—'}</Fact>
             </div>
 
-            <ContentBlock label={recordKind === 'message' ? 'Message' : 'Stored log'} content={message} />
-            <ContentBlock label={recordKind === 'response' ? 'Stored response payload' : 'Stored payload'} content={payload} />
+            <ContentBlock label={storedLogContentLabel(recordKind)} content={message} />
+            <ContentBlock label="Auxiliary payload" content={payload} />
 
             {log.user_agent && (
                 <section className="monitoring-inspector-block">
