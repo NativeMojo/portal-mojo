@@ -50,7 +50,8 @@ export interface DomainActionResult {
 }
 export interface DomainAuditResult {
     domain: string; region: string; status: string; audit_pass: boolean; checks: Record<string, boolean>;
-    items: Array<{ resource: string; status: string }>; recommendations: string[];
+    items: Array<{ resource: string; status: string }>;
+    recommendations: Array<{ resource: string; severity: string; action: string; explanation: string }>;
 }
 export interface SendEmailInput {
     from_email: string; to: string[]; cc?: string[]; bcc?: string[]; reply_to?: string;
