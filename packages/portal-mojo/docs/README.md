@@ -22,6 +22,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [admin-members.md](admin-members.md) | Global membership table/detail, no-oracle admission, extensible grants, Group-detail composition, and unsupported-operation boundaries |
 | [admin-identity-users.md](admin-identity-users.md) | Global Users table and 14-section detail, system gates, action contracts, and one-time credential invariants |
 | [admin-devices-geoip.md](admin-devices-geoip.md) | Fleet device triage, the login-location world map with country drill-down, and the GeoIP dossier — expiry-aware enforcement, the never-cached raw provider record, and the backend traps the port encodes |
+| [admin-jobs.md](admin-jobs.md) | Jobs engine — runner fleet, per-channel queue depth, the segmented job table with armed cancel and republishing retry, the dry-run-first control plane, scheduled tasks with a global-only gate, and the thirteen backend corrections the port encodes |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |

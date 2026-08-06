@@ -21,6 +21,7 @@
         "verify:admin-members": "node scripts/verify-admin-members.mjs",
         "verify:admin-users": "node scripts/verify-admin-users.mjs",
         "verify:admin-devices": "node scripts/verify-admin-devices.mjs",
+        "verify:admin-jobs": "node scripts/verify-admin-jobs.mjs",
         "verify:worldmap": "node scripts/verify-worldmap.mjs"
     }
 }

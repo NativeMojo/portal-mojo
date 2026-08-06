@@ -47,6 +47,7 @@ import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
+import { AdminJobsDemo } from './demos-admin-jobs';
 import { AdminMembersDemo } from './demos-admin-members';
 import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
@@ -348,6 +349,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-rules', title: 'Rule Engine', icon: 'bi-diagram-3',
                 blurb: 'Always-inactive rule creation and a lossless, runtime-aware ordered handler DSL editor with explicit legacy warnings.',
                 render: () => <AdminRulesDemo />,
+            },
+            {
+                key: 'admin-jobs', title: 'Jobs engine', icon: 'bi-cpu',
+                blurb: 'Runner fleet triage, per-channel queue depth, the segmented job table with an armed cancel and a republishing retry, dry-run-first purge, and scheduled tasks with a global-only gate that closes the owner fallback.',
+                render: () => <AdminJobsDemo />,
             },
         ],
     },
