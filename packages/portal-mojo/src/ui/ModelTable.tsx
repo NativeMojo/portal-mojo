@@ -257,7 +257,16 @@ export function ModelTable<T extends { id: number }>({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot mount restore
     }, []);
 
-    const listParams = model?.normalizeListParams ? model.normalizeListParams(p.wire) : p.wire;
+    // A stale URL/persisted `search` must not become a hidden request when a
+    // table declares that its backend has no search contract. Strip it before
+    // model normalization so neither the normalizer, query key, nor wire sees
+    // the raw value.
+    const tableParams = searchable
+        ? p.wire
+        : Object.fromEntries(Object.entries(p.wire).filter(([key]) => key !== 'search'));
+    const listParams = model?.normalizeListParams
+        ? model.normalizeListParams(tableParams)
+        : tableParams;
     const query = useModelList<T>(resolvedEndpoint, listParams, {
         enabled: hydrated,
         sanitizeRow: model?.sanitizeRow,
@@ -279,7 +288,7 @@ export function ModelTable<T extends { id: number }>({
         if (searchable && p.search) state.search = p.search;
         const rawFilters: Record<string, string> = {};
         for (const [key, value] of Object.entries(p.wire)) {
-            if (key === 'start' || key === 'size' || key === 'sort' || key === 'search') continue;
+            if (key === 'start' || key === 'size' || key === 'sort' || key === 'search' || key === 'graph') continue;
             if (value == null || value === '') continue;
             rawFilters[key] = String(value);
         }

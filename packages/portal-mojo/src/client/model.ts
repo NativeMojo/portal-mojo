@@ -197,7 +197,14 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
                         body: { [bodyKey]: payload },
                     }));
                     const row = returnsRow ? (body.data as T) : null;
-                    return { row: row && sanitizeRow ? sanitizeRow(row) : row, body };
+                    const safeRow = row && sanitizeRow ? sanitizeRow(row) : row;
+                    // MutationCache retains the entire outcome. Keep its two
+                    // row representations consistent so body.data cannot hold
+                    // the original unsanitized record beside `row`.
+                    const safeBody = safeRow && sanitizeRow
+                        ? { ...body, data: safeRow }
+                        : body;
+                    return { row: safeRow, body: safeBody };
                 },
                 onSuccess: (outcome, { id }) => {
                     if (outcome.row) qc.setQueryData(keys.one(id), outcome.row);
