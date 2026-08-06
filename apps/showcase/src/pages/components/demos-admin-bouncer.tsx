@@ -25,7 +25,7 @@ export function AdminBouncerDemo() {
                 </button>
             </div>
             <p className="dim bouncer-demo-hint">
-                Open a signal or device row for the investigation view. Signatures exercise ordinary create, edit, enable/disable, and delete mutations.
+                Open a signal or device row for the investigation view. Signatures exercise supported create, edit, enable, and disable saves.
             </p>
             {surface === 'signals' && <BouncerSignalsPage />}
             {surface === 'devices' && <BouncerDevicesPage />}

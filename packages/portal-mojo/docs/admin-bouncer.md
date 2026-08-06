@@ -63,6 +63,12 @@ or detail data can enter TanStack Query. Portal types and renderers do not
 declare or display that field. django-mojo cleanup is tracked separately; it is
 not a portal dependency.
 
+`ModelTable` also passes the model-normalized list parameters to exports, not
+the raw URL parameters. Consequently a persisted or hand-edited
+`graph=detail` is removed and replaced by `graph=list` before a signal JSON or
+CSV export reaches the server; the detail-only field cannot bypass the Query
+sanitizer through the download path.
+
 Signal decisions include all live enum values: `allow`, `monitor`, `block`, and
 `log`. Detail shows identity layers, triggered rules, the nested default device
 and GeoIP graphs, and client/server JSON through the escaped `JsonBlock`
@@ -77,9 +83,11 @@ component state, not the URL parameter store, and they do not nest
 colliding with the parent page's table URL.
 
 Related signals query the signal endpoint by MUID. Related incidents query
-`/api/incident/incident` using the Bouncer category prefix and the concrete
-`account.BouncerDevice` model binding. Incident rows are typed independently
-from incident events.
+`/api/incident/incident` with `category__startswith=security:bouncer` and
+`search=<device muid>`, matching web-mojo and the model's `details` search
+contract. The reporter does not populate Incident `model_name`/`model_id`, so
+those fields must not be used as a relationship filter. Incident rows remain
+typed independently from incident events.
 
 ## Signature writes
 
@@ -91,9 +99,11 @@ ip | subnet_24 | subnet_16 | user_agent | fingerprint | signal_set
 
 Create always sends `source: 'manual'`; edit never rewrites the source. The
 confidence parser accepts the full inclusive `0..100` range and preserves
-numeric zero. Enable, disable, and delete batches call the ordinary per-record
-POST/DELETE model operations. No batch or action endpoints are invented, so
-partial failures use `ModelTable`'s normal `Promise.allSettled` reporting.
+numeric zero. Enable and disable batches call ordinary per-record saves. Delete
+is intentionally absent: django-mojo's `BotSignature.RestMeta` does not declare
+`CAN_DELETE`, and the live endpoint rejects DELETE even though the mock once
+accepted it. No batch or action endpoints are invented, so partial failures use
+`ModelTable`'s normal `Promise.allSettled` reporting.
 
 ## Styling and showcase
 

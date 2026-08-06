@@ -89,8 +89,7 @@ function RelatedIncidents({ device }: { device: BouncerDeviceRow }) {
         start,
         sort: '-created',
         category__startswith: 'security:bouncer',
-        model_name: 'account.BouncerDevice',
-        model_id: device.id,
+        search: device.muid,
     });
     const rows: BouncerIncidentRow[] = query.data?.rows ?? [];
     if (query.isPending) return <p className="dim">Loading related incidents…</p>;

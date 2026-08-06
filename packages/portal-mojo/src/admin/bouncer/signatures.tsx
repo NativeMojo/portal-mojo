@@ -168,7 +168,6 @@ const SIGNATURE_FILTERS: FilterDef[] = [
 export function BotSignaturesPage() {
     const queryClient = useQueryClient();
     const save = BotSignatureModel.useSave();
-    const destroy = BotSignatureModel.useDelete();
     const { can: canManage } = useCan(BOUNCER_MANAGE_PERMS);
 
     const batchActions: BatchAction<BotSignatureRow>[] = canManage ? [
@@ -179,11 +178,6 @@ export function BotSignaturesPage() {
         {
             key: 'disable', label: 'Disable', icon: 'bi-pause-circle',
             run: (row) => save.mutateAsync({ id: row.id, changes: { is_active: false } }),
-        },
-        {
-            key: 'delete', label: 'Delete', icon: 'bi-trash', danger: true,
-            confirm: 'Delete the selected bot signatures? This cannot be undone.',
-            run: (row) => destroy.mutateAsync({ id: row.id }),
         },
     ] : [];
 

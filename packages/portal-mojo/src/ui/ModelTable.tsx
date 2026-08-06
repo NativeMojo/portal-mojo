@@ -428,6 +428,11 @@ export function ModelTable<T extends { id: number }>({
     }, [autoRefreshMs]);
 
     // ── Export ───────────────────────────────────────────────────────────
+    // Export must use the SAME model-normalized params as the visible query.
+    // Besides keeping filters aligned, this closes a security boundary:
+    // models may force a safe graph or discard attacker-controlled graph
+    // params before sensitive fields can enter a JSON/CSV export.
+    //
     // The one table action with NO feedback: the menu closes and the browser
     // download appears whenever the server finishes building the whole
     // filtered result set (seconds on a six-figure Logs table). busyWhile
@@ -437,12 +442,12 @@ export function ModelTable<T extends { id: number }>({
         try {
             await busyWhile(
                 `Preparing ${format.toUpperCase()} export…`,
-                () => mojoDownload(resolvedEndpoint, p.wire, format),
+                () => mojoDownload(resolvedEndpoint, listParams, format),
             );
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Export failed');
         }
-    }, [resolvedEndpoint, p.wire]);
+    }, [resolvedEndpoint, listParams]);
 
     const leadCols = (expandEnabled ? 1 : 0) + (selectable ? 1 : 0);
     const totalCols = leadCols + visibleColumns.length;
