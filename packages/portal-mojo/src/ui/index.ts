@@ -21,6 +21,7 @@ export * from './date/PresetRail';
 export * from './date/TimePicker';
 export * from './date/TimezoneSelect';
 export * from './MarkdownView';
+export * from './RecordFeed';
 export * from './MultiSelectDropdown';
 // Date math shares fmt's namespace pattern — collision-prone names stay scoped.
 export * as dateFns from './date/fns';

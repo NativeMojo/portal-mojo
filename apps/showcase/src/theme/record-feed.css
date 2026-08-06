@@ -1,0 +1,147 @@
+/* RecordFeed — record-scoped notes + system history, compact or bubbles. */
+.record-feed {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: var(--record-feed-height, min(580px, 72vh));
+    min-height: 280px;
+    overflow: hidden;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+.record-feed .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.record-feed-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.record-feed-list { list-style: none; margin: 0; padding: 0; }
+.record-feed-earlier {
+    padding: 7px 14px; text-align: center; font-size: 11.5px; color: var(--mute);
+    background: var(--surface2); border-bottom: 1px solid var(--line-soft);
+}
+.record-feed-state {
+    min-height: 160px; display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 24px; color: var(--mute); text-align: center;
+}
+.record-feed-state.record-feed-error { color: var(--bad); flex-direction: column; }
+
+/* Human and assistant content. */
+.record-feed-message {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 11px;
+    padding: 13px 15px; border-bottom: 1px solid var(--line-soft);
+    transition: background-color 120ms ease;
+}
+.record-feed-message:hover { background: var(--surface2); }
+.record-feed-message:last-child { border-bottom: 0; }
+.record-feed-message-pending { opacity: 0.66; }
+.record-feed-avatar {
+    width: 34px; height: 34px; border-radius: 999px; object-fit: cover;
+    display: grid; place-items: center; flex: none;
+    background: var(--surface2); color: var(--mute); border: 1px solid var(--line);
+    font-size: 10.5px; font-weight: 750; letter-spacing: 0.02em;
+}
+.record-feed-avatar-mine { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.record-feed-avatar-assistant { color: var(--info); background: var(--info-soft); border-color: transparent; font-size: 15px; }
+.record-feed-message-main { min-width: 0; }
+.record-feed-message-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; min-width: 0; }
+.record-feed-message-meta strong { color: var(--ink-strong); font-size: 13px; font-weight: 700; }
+.record-feed-message-meta time { margin-left: auto; color: var(--mute); font-size: 11.5px; white-space: nowrap; }
+.record-feed-you, .record-feed-pending-label {
+    padding: 1px 6px; border-radius: 999px; font-size: 9.5px; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+}
+.record-feed-you { color: var(--accent); background: var(--accent-soft); }
+.record-feed-pending-label { color: var(--warn); background: var(--warn-soft); }
+.record-feed-message-body { min-width: 0; font-size: 13.5px; }
+.record-feed-message-body .md { font-size: inherit; line-height: 1.52; }
+.record-feed-message-body .md p { margin-bottom: 6px; }
+.record-feed-addon { margin-top: 9px; }
+
+/* Structured events never enter the markdown/HTML path. */
+.record-feed-event { list-style: none; padding: 8px 15px; border-bottom: 1px solid var(--line-soft); }
+.record-feed-event-content {
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+    gap: 6px; min-width: 0; color: var(--mute); font-size: 11.5px;
+}
+.record-feed-event-content > i:first-child { color: var(--info); }
+.record-feed-event-content time { margin-left: 4px; white-space: nowrap; }
+.record-feed-event-kind {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 9.5px;
+    letter-spacing: 0.07em; text-transform: uppercase; color: var(--info);
+}
+.record-feed-event-note { color: var(--ink); overflow-wrap: anywhere; }
+.record-feed-status {
+    padding: 2px 7px; border-radius: 999px; color: var(--mute); background: var(--surface2);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+}
+.record-feed-status-to { color: var(--ok); background: var(--ok-soft); }
+.record-feed-thinking {
+    margin: 10px 15px 14px 60px; color: var(--mute); font-size: 12.5px;
+    animation: record-feed-pulse 1.4s ease-in-out infinite;
+}
+
+/* Bubble variant. Assistant and other users stay left; current-user comments right. */
+.record-feed-bubbles .record-feed-scroll { padding: 14px; background: var(--bg); }
+.record-feed-bubbles .record-feed-list { display: flex; flex-direction: column; gap: 14px; }
+.record-feed-bubbles .record-feed-message {
+    width: min(82%, 660px); padding: 0; border: 0; background: transparent;
+}
+.record-feed-bubbles .record-feed-message:hover { background: transparent; }
+.record-feed-bubbles .record-feed-message-main { padding: 10px 13px; border-radius: 5px 15px 15px; background: var(--surface2); }
+.record-feed-bubbles .record-feed-message-mine {
+    align-self: flex-end; grid-template-columns: minmax(0, 1fr) 34px;
+}
+.record-feed-bubbles .record-feed-message-mine .record-feed-avatar { grid-column: 2; grid-row: 1; }
+.record-feed-bubbles .record-feed-message-mine .record-feed-message-main {
+    grid-column: 1; grid-row: 1; color: var(--ink-strong);
+    background: var(--accent-soft); border-radius: 15px 5px 15px 15px;
+}
+.record-feed-bubbles .record-feed-event { border: 0; padding: 2px 8px; }
+.record-feed-bubbles .record-feed-event-content { padding: 5px 10px; border-radius: 999px; background: var(--surface); }
+.record-feed-bubbles .record-feed-thinking { margin-left: 48px; }
+
+/* Composer: one pipeline, no attachment affordance. */
+.record-feed-composer {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px; padding: 12px 13px 24px; background: var(--surface2); border-top: 1px solid var(--line);
+}
+.record-feed-input {
+    width: 100%; min-height: 38px; max-height: 144px; resize: none; box-sizing: border-box;
+    padding: 8px 10px; color: var(--ink-strong); background: var(--field-bg);
+    border: 1px solid var(--field-line); border-radius: 9px; line-height: 1.45;
+}
+.record-feed-input:hover:not(:disabled) { border-color: var(--field-line-hover); }
+.record-feed-input:disabled { opacity: 0.62; cursor: wait; }
+.record-feed-send {
+    align-self: end; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 7px 13px; border: 1px solid var(--accent); border-radius: 9px;
+    color: #fff; background: var(--accent); cursor: pointer; font-weight: 650;
+}
+.record-feed-send:disabled { opacity: 0.48; cursor: not-allowed; }
+.record-feed-composer-hint { position: absolute; left: 14px; bottom: 5px; color: var(--mute); font-size: 10.5px; }
+.record-feed-mutation-error {
+    padding: 7px 13px; color: var(--bad); background: var(--bad-soft);
+    border-top: 1px solid color-mix(in srgb, var(--bad) 22%, transparent); font-size: 12px;
+}
+.record-feed-spin { display: inline-block; animation: record-feed-spin 0.8s linear infinite; }
+@keyframes record-feed-spin { to { transform: rotate(360deg); } }
+@keyframes record-feed-pulse { 50% { opacity: 0.5; } }
+
+@media (max-width: 560px) {
+    .record-feed { height: var(--record-feed-height, min(520px, 76vh)); }
+    .record-feed-message { grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding-inline: 10px; }
+    .record-feed-avatar { width: 30px; height: 30px; }
+    .record-feed-message-meta { flex-wrap: wrap; }
+    .record-feed-message-meta time { width: 100%; margin-left: 0; }
+    .record-feed-bubbles .record-feed-message { width: 94%; padding: 0; }
+    .record-feed-bubbles .record-feed-message-mine { grid-template-columns: minmax(0, 1fr) 30px; }
+    .record-feed-send span { display: none; }
+    .record-feed-send { width: 40px; padding: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .record-feed-spin, .record-feed-thinking { animation: none; }
+}
