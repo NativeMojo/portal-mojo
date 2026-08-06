@@ -45,6 +45,7 @@ everything: run the portal (`npm run dev`) → **Develop → Components**.
 | [record-feed.md](record-feed.md) | RecordFeed — ticket/incident adapters, chronological latest-window normalization, optimistic sends, controlled mode |
 | [right-panel.md](right-panel.md) | Explicit opt-in persistent shell slot — provider state, focus/Escape semantics, route preservation, responsive layout |
 | [charts.md](charts.md) | `SeriesChart`, `MetricsChart` (+stats/data dialogs, custom `dt_*` range), `MetricsMiniWidget`, `KPITile/KPIStrip`, `CircularProgress`, `PieChart`, `exportChartPng`, the metrics wire shape |
+| [worldmap.md](worldmap.md) | `WorldMap` — dependency-free geo map (no tiles/CDN/network), the projection math, `COUNTRY_CENTROIDS`/`COUNTRY_OPTIONS`, metrics-slug→country binding, and the injectable `land` seam |
 | [menus-and-access.md](menus-and-access.md) | Menu registry + SidebarNav; `useMe`/`useCan`/`Guarded`; group context |
 | [grouping-and-fmt.md](grouping-and-fmt.md) | `groupBy*` helpers, `fmt.*` formatters |
 

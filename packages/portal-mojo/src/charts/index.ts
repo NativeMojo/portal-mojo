@@ -17,3 +17,7 @@ export * from './pie-math';
 export * from './chart-dialogs';
 export * from './exportChart';
 export * from './stats';
+export * from './worldmap/WorldMap';
+export * from './worldmap/countryCentroids';
+export * from './worldmap/geo';
+export * from './worldmap/worldmap-data';
