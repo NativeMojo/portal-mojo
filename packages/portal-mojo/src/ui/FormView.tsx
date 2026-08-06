@@ -11,13 +11,14 @@
 //     rebuildPermissions), per the do-not-recreate list.
 //
 // The machine itself lives in form-autosave.ts; this file renders it.
-import { useMemo, useState, useSyncExternalStore, useContext } from 'react';
+import { useMemo, useSyncExternalStore, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { hasPermission, useMe } from '../client/me';
 import { GroupContext } from '../client/group-context';
 import type { PermSpec, ModelDef, SaveVars } from '../client/model';
 import type { Field } from '../client/types';
 import { SchemaSelect } from './FormFields';
+import { Tabs } from './Tabs';
 import { emptyFieldValue, resolveFieldRenderer } from './field-registry';
 import { toast } from './toast';
 import {
@@ -36,7 +37,7 @@ import {
 
 export interface FormTab {
     key: string;
-    label: string;
+    label: ReactNode;
     /** useCan-style gate (any-of array). Fail-closed like <Guarded>. */
     permissions?: PermSpec;
     fields: Field[];
@@ -147,12 +148,6 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
         },
     });
 
-    // Active tab: self-heals to the first visible tab when the current one
-    // disappears (permission change, registry update) — fail-closed, never
-    // a blank pane.
-    const [activeKey, setActiveKey] = useState<string | null>(null);
-    const activeTab = visibleTabs.find((t) => t.key === activeKey) ?? visibleTabs[0] ?? null;
-
     return (
         <div className={className ? `form-view ${className}` : 'form-view'}>
             {fields && fields.length > 0 && (
@@ -162,34 +157,27 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
             )}
 
             {visibleTabs.length > 0 && (
-                <>
-                    <div className="fv-tabs" role="tablist">
-                        {visibleTabs.map((t) => {
-                            const hasError = t.fields.some((f) => form.status[f.name]?.status === 'error');
-                            const active = activeTab?.key === t.key;
-                            return (
-                                <button
-                                    key={t.key}
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={active}
-                                    className={`fv-tab${active ? ' fv-tab-active' : ''}`}
-                                    onClick={() => setActiveKey(t.key)}
-                                >
-                                    {t.label}
-                                    {hasError && <span className="fv-tab-err" aria-label="Tab has an error" />}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    {activeTab && (
-                        <div className="form-grid" role="tabpanel">
-                            {activeTab.fields.filter(form.visible).map((f) => (
-                                <FieldRow key={f.name} field={f} form={form} />
-                            ))}
-                        </div>
-                    )}
-                </>
+                <Tabs
+                    className="fv-tabs-shell"
+                    variant="underline-all"
+                    ariaLabel="Form sections"
+                    items={visibleTabs.map((tab) => ({
+                        key: tab.key,
+                        label: (
+                            <>
+                                {tab.label}
+                                {tab.fields.some((field) => form.status[field.name]?.status === 'error') && (
+                                    <span className="fv-tab-err" aria-label="Tab has an error" />
+                                )}
+                            </>
+                        ),
+                        panel: (
+                            <div className="form-grid">
+                                {tab.fields.filter(form.visible).map((field) => <FieldRow key={field.name} field={field} form={form} />)}
+                            </div>
+                        ),
+                    }))}
+                />
             )}
         </div>
     );

@@ -35,6 +35,8 @@ export * from './toast';
 export * from './ui';
 export * from './FormFields';
 export * from './FormView';
+export * from './Tabs';
+export * from './FormWizard';
 export * from './form-autosave';
 export * from './field-registry';
 export * from './field-wire';

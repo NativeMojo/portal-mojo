@@ -20,6 +20,8 @@
 @import "./theme/multiselect-dropdown.css";
 @import "./theme/datepicker.css";
 @import "./theme/formview.css";
+@import "./theme/tabs.css";
+@import "./theme/form-wizard.css";
 @import "./theme/dataview.css";
 @import "./theme/detailview.css";
 @import "./theme/timepicker.css";
