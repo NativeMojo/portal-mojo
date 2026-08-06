@@ -54,6 +54,8 @@ export const GRANULAR_PERMISSION_TABS: { label: string; permissions: CatalogPerm
     {
         label: 'Communication',
         permissions: [
+            { name: 'view_support', label: 'View Support Messages' },
+            { name: 'manage_support', label: 'Manage Support Messages' },
             { name: 'manage_chat', label: 'Manage Chat' },
             { name: 'manage_aws', label: 'Manage Email (AWS)' },
             { name: 'view_notifications', label: 'View Notifications' },

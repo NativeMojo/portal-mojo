@@ -19,6 +19,7 @@
 @import "./theme/admin-network.css";
 @import "./theme/admin-dns.css";
 @import "./theme/admin-storage.css";
+@import "./theme/admin-messaging.css";
 @import "./theme/multiselect-dropdown.css";
 @import "./theme/datepicker.css";
 @import "./theme/formview.css";
