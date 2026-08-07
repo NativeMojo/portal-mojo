@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import {
-    FileDropZone, FilePicker, UploadQueue, toast, useUploadQueue, type FileSelectionResult,
+    FileDropZone, FilePicker, ImageField, UploadQueue, toast, useUploadQueue,
+    type FileFieldOwnerResult, type FileSelectionResult,
 } from 'portal-mojo/ui';
 import type { FileUploadOutcome, FileUploadSnapshot, FileUploadTask } from 'portal-mojo/client';
 
@@ -96,6 +97,9 @@ function fixture(name: string, size = 240_000): File {
 export function FileUploadDemo() {
     const callbackFailures = useRef(new Set<string>());
     const [selectionMessage, setSelectionMessage] = useState('Drop real local files above; this Showcase uses an in-memory transport fixture.');
+    const [relation, setRelation] = useState<number | null>(null);
+    const [relationResult, setRelationResult] = useState<FileFieldOwnerResult>();
+    const relationGeneration = useRef(0);
     const queue = useUploadQueue({
         consumerKey: 'showcase-file-upload', destination: { use: 'showcase', groupId: 1 }, startTask: demoUploadTask,
         onComplete: async (file) => {
@@ -114,6 +118,11 @@ export function FileUploadDemo() {
         result.rejected.forEach((rejection) => toast.warning(rejection.message));
     };
     const add = (...files: File[]) => queue.add(files);
+    const attach = (value: number | null) => {
+        setRelation(value);
+        const generation = ++relationGeneration.current;
+        window.setTimeout(() => setRelationResult({ generation, status: 'success', requestedValue: value, authoritativeValue: value }), 450);
+    };
     return (
         <div className="demo-stack">
             <section className="panel panel-pad">
@@ -136,6 +145,12 @@ export function FileUploadDemo() {
                     <button type="button" className="btn" onClick={() => add(fixture('partial-ok.pdf'), fixture('partial-followup.txt'))}>Partial follow-up</button>
                 </div>
                 <UploadQueue queue={queue} empty={<p className="dim">Choose a scenario to populate the queue.</p>} />
+            </section>
+            <section className="panel panel-pad">
+                <div className="eyebrow">Controlled ImageField</div>
+                <p className="dim">Uses the real shared mock upload client. Completed ids wait for this demo owner’s authoritative save acknowledgement; clear and replacement never delete File rows.</p>
+                <ImageField value={relation} onChange={attach} ownerResult={relationResult} accept="image/*" onOrphan={(id) => toast.warning(`Demo File #${id} remains uploaded and unattached.`)} />
+                <p className="dim">Controlled relation value: {relation ?? 'null'}</p>
             </section>
         </div>
     );

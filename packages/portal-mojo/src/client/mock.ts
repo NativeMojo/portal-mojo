@@ -2352,10 +2352,9 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     maya.is_phone_verified = true;
     maya.is_email_verified = true;
     maya.org = { id: groups[1]?.id ?? groups[0]!.id, name: groups[1]?.name ?? groups[0]!.name };
-    maya.avatar = {
-        url: 'data:image/svg+xml,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#2f6bdf"/><text x="32" y="41" font-family="sans-serif" font-size="26" fill="#fff" text-anchor="middle">MC</text></svg>'),
-    };
+    // The wire graph deliberately carries a capability; UserModel/useMe must
+    // reduce it to {id} before either Query cache can observe it.
+    maya.avatar = { id: 5109, url: '/mock-storage/files/5109', thumbnail: '/mock-storage/renditions/6104' } as unknown as User['avatar'];
 
     // u3 — login-throttled (see db.throttle) but ACTIVE; unverified email.
     const throttled = at(3);
@@ -4092,6 +4091,8 @@ function buildFileManagers(): MockFileManager[] {
         { id: 4103, created: now - 70 * 86400, name: 'Local archive', use: 'archive', backend_type: 'file', backend_url: '/srv/mojo/archive', is_active: false, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: 2, user: null, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
         { id: 4104, created: now - 30 * 86400, name: 'System uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/uploads', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: null, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
         { id: 4105, created: now - 20 * 86400, name: 'Ian uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/users/1', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: 1, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
+        { id: 4106, created: now - 19 * 86400, name: 'Groups Manager uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/users/13', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: 13, max_file_size: 0, allowed_extensions: [], allowed_mime_types: ['image/*'], supports_direct_upload: false },
+        { id: 4107, created: now - 18 * 86400, name: 'Maya uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/users/2', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: 2, max_file_size: 0, allowed_extensions: [], allowed_mime_types: ['image/*'], supports_direct_upload: false },
     ];
 }
 
@@ -4106,6 +4107,7 @@ function buildStorageFiles(): MockStorageFile[] {
         { id: 5106, created: now - 600, modified: now - 600, filename: 'rendering-slides.pptx', file_size: 802114, content_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', category: 'presentation', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5106', rendition_demo: 'initial' },
         { id: 5107, created: now - 500, modified: now - 500, filename: 'renderer-failure.pdf', file_size: 402114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5107', rendition_demo: 'failed' },
         { id: 5108, created: now - 400, modified: now - 400, filename: 'renderer-expired.pdf', file_size: 302114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5108', rendition_demo: 'expired' },
+        { id: 5109, created: now - 300, modified: now - 300, filename: 'maya-avatar.png', file_size: 48122, content_type: 'image/png', category: 'image', upload_status: 'completed', is_active: true, is_public: false, group: null, user: 2, file_manager: 4107, metadata: { width: 512, height: 512 }, url: '/mock-storage/files/5109' },
     ];
 }
 
@@ -4115,6 +4117,7 @@ function buildStorageRenditions(): MockStorageRendition[] {
         { id: 6101, original_file: 5101, created: now - 3500, modified: now - 3500, filename: 'launch-photo-thumb.jpg', file_size: 42811, content_type: 'image/jpeg', category: 'image', role: 'thumbnail', upload_status: 'completed', width: 320, height: 213, url: '/mock-storage/renditions/6101' },
         { id: 6102, original_file: 5101, created: now - 3400, modified: now - 3400, filename: 'launch-photo-preview.jpg', file_size: 284001, content_type: 'image/jpeg', category: 'image', role: 'preview', upload_status: 'completed', width: 1280, height: 853, url: '/mock-storage/renditions/6102' },
         { id: 6103, original_file: 5102, created: now - 3100, modified: now - 3100, filename: 'briefing-poster.jpg', file_size: 94411, content_type: 'image/jpeg', category: 'image', role: 'poster', upload_status: 'completed', width: 1280, height: 720, url: '/mock-storage/renditions/6103' },
+        { id: 6104, original_file: 5109, created: now - 290, modified: now - 290, filename: 'maya-avatar-thumb.png', file_size: 12111, content_type: 'image/png', category: 'image', role: 'thumbnail', upload_status: 'completed', width: 320, height: 320, url: '/mock-storage/renditions/6104' },
     ];
 }
 
@@ -4722,6 +4725,25 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
                 return { status: false, error: `Invalid phone number: ${String(raw)}`, error_code: 400 };
             }
             fields.phone_number = normalized;
+        }
+    }
+    // django-mojo #1488 avatar relation semantics: JSON positive integer or
+    // null only; the completed personal image must belong to the acting
+    // uploader. Admin-on-behalf never transfers ownership to the target.
+    if ('avatar' in fields) {
+        const raw = fields.avatar;
+        if (raw === null) {
+            fields.avatar = null;
+        } else if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw <= 0) {
+            return { status: false, error: 'avatar must be a positive File id or null', error_code: 400 };
+        } else {
+            const file = db.storageFiles.find((candidate) => candidate.id === raw);
+            const available = file && caller && file.is_active && file.upload_status === 'completed'
+                && file.group == null && file.category === 'image'
+                && file.content_type.startsWith('image/') && file.user === caller.id;
+            if (!available) return { status: false, error: 'File unavailable', error_code: 403 };
+            const rendition = db.fileRenditions.find((candidate) => candidate.original_file === file.id && candidate.role === 'thumbnail');
+            fields.avatar = { id: file.id, url: file.url, thumbnail: rendition?.url ?? null };
         }
     }
     // JSONField parity (rest.py on_rest_update_jsonfield): a dict body MERGES

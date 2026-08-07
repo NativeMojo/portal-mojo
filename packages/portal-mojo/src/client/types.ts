@@ -53,6 +53,7 @@ export type ShowWhen = ShowWhenRule | ((values: FieldValues) => boolean);
  */
 export type FieldType =
     | 'text' | 'email' | 'tel' | 'select' | 'switch' | 'textarea'
+    | 'file' | 'image'
     | 'tag' | 'tags'
     | 'multiselect'
     | 'collection' | 'collectionmultiselect' | 'collection-multiselect'
@@ -107,6 +108,16 @@ export interface Field {
     schema?: ZodType;
     /** Locks the control (registry types; builtins ignore it today). */
     disabled?: boolean;
+
+    // file / image — one completed django-mojo File relation id or null.
+    /** Picker accept grammar (MIME values, wildcards, or .extensions). */
+    accept?: string | string[];
+    /** Local selection guard. Server policy remains authoritative. */
+    maxFileSize?: number;
+    /** Explicit upload destination. Omitted keys use the caller's personal scope. */
+    uploadDestination?: { fileManagerId?: number; groupId?: number; use?: string };
+    /** Called once when a completed upload is abandoned without authoritative attachment. */
+    onUploadOrphan?: (fileId: number) => void;
 
     // ── Registry-type props (B4 #1278) — see docs/forms.md value table ──
     /** date/range pickers: grid precision. EXPLICIT value beats the
@@ -230,6 +241,17 @@ export interface User {
     permissions: Record<string, unknown>;
     metadata: Record<string, unknown>;
     dob?: string | null;
-    avatar?: { url?: string } | string | null;
+    /** Capability-free relation shape retained in Query caches. */
+    avatar?: { id: number } | null;
     org?: { id: number; name: string } | number | null;
+}
+
+/** Strip avatar URLs/thumbnails/capabilities before a User-shaped row enters a cache. */
+export function sanitizeAvatarRelation(value: unknown): { id: number } | null {
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return { id: value };
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+        const id = (value as Record<string, unknown>).id;
+        if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) return { id };
+    }
+    return null;
 }

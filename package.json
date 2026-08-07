@@ -41,6 +41,7 @@
         "verify:form-wizard": "node scripts/verify-form-wizard.mjs",
         "verify:location-address": "node scripts/verify-location-address.mjs",
         "verify:file-upload": "node scripts/verify-file-upload.mjs",
-        "verify:upload-ux": "node scripts/verify-upload-ux.mjs"
+        "verify:upload-ux": "node scripts/verify-upload-ux.mjs",
+        "verify:form-uploads": "node scripts/verify-form-uploads.mjs"
     }
 }

@@ -1,5 +1,5 @@
 // Mini FormBuilder — the field-definition language ported as data → JSX.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Field, FormData } from '../client/types';
 import { modal } from './modal';
 import { SchemaFieldGrid, useSchemaFormState } from './schema-form-core';
@@ -7,15 +7,18 @@ import { SchemaFieldGrid, useSchemaFormState } from './schema-form-core';
 export type { Field, FormData } from '../client/types';
 export { SchemaSelect } from './schema-form-core';
 
-export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit, onCancel }: {
+export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit, onCancel, onBusyChange }: {
     fields: Field[];
     initial?: FormData;
     submitText?: string;
-    onSubmit: (data: FormData) => void | Promise<void>;
+    /** Return the authoritative saved owner row when the form contains File relations. */
+    onSubmit: (data: FormData) => unknown | Promise<unknown>;
     onCancel?: () => void;
+    onBusyChange?: (busy: boolean) => void;
 }) {
     const form = useSchemaFormState({ fields, initial, profile: 'schema-form' });
     const [busy, setBusy] = useState(false);
+    useEffect(() => onBusyChange?.(busy || form.uploadPending), [busy, form.uploadPending, onBusyChange]);
 
     const submit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -25,11 +28,15 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
             if (first) form.focusField(first.name);
             return;
         }
+        if (form.uploadPending) return;
         setBusy(true);
         form.setFormError('');
+        const requested = form.payload();
         try {
-            await onSubmit(form.payload());
+            const row = await onSubmit(form.payload());
+            form.settleOwnerSave(row, false, requested);
         } catch (error) {
+            form.settleOwnerSave(undefined, true, requested);
             form.setFormError(error instanceof Error ? error.message : 'Save failed');
         } finally {
             setBusy(false);
@@ -39,10 +46,10 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
     return (
         <form onSubmit={submit} noValidate>
             {form.formError && <div className="form-alert">{form.formError}</div>}
-            <SchemaFieldGrid fields={fields} state={form} />
+            <SchemaFieldGrid fields={fields} state={form} disabled={busy} />
             <div className="modal-actions">
-                {onCancel && <button type="button" className="btn" onClick={onCancel}>Cancel</button>}
-                <button type="submit" className="btn btn-primary" disabled={busy}>
+                {onCancel && <button type="button" className="btn" disabled={busy || form.uploadPending} onClick={onCancel}>Cancel</button>}
+                <button type="submit" className="btn btn-primary" disabled={busy || form.uploadPending}>
                     {busy ? 'Saving…' : submitText}
                 </button>
             </div>
@@ -52,6 +59,7 @@ export function SchemaForm({ fields, initial = {}, submitText = 'Save', onSubmit
 
 /** Awaitable form dialog: resolves the submitted data, or null on cancel. */
 export function formModal(opts: { title: string; fields: Field[]; initial?: FormData; submitText?: string; intro?: ReactNode }): Promise<FormData | null> {
+    let pending = false;
     return modal.open<FormData>((close) => (
         <div className="modal-pad">
             <h2 className="modal-title">{opts.title}</h2>
@@ -60,9 +68,10 @@ export function formModal(opts: { title: string; fields: Field[]; initial?: Form
                 fields={opts.fields}
                 initial={opts.initial}
                 submitText={opts.submitText}
+                onBusyChange={(busy) => { pending = busy; }}
                 onCancel={() => close(null as unknown as FormData)}
                 onSubmit={(data) => close(data)}
             />
         </div>
-    ));
+    ), { canDismiss: () => !pending });
 }

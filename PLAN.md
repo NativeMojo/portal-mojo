@@ -285,11 +285,15 @@ duplicate suppression, and truthful partial-batch outcomes; reference docs and
 Showcase scenarios ship with it. Focused contracts are `verify:file-upload` and
 `verify:upload-ux`.
 
-Admin Files #1469 now consumes completed django-mojo #1485. The remaining
-children stay intentionally **not shipped** pending measured django-mojo
-contracts: forms/profile #1471 depends on relation clear/string
-ID/admin-on-behalf ownership semantics #1488; record and conversation
-attachments #1472 depends on completed/scoped File relation enforcement #1487,
+Admin Files #1469 now consumes completed django-mojo #1485. Forms/profile
+#1471 now consumes completed django-mojo #1488: reusable controlled FileField
+and ImageField bindings keep positive numeric id/null wire values, preserve the
+stored relation through upload + authoritative owner attachment, retain
+completed candidates for retry/orphan reporting without deleting File, and
+sanitize avatar capabilities independently before UserModel and Me caches.
+The remaining children stay intentionally **not shipped** pending measured
+django-mojo contracts: record and conversation attachments #1472 depends on
+completed/scoped File relation enforcement #1487,
 while Assistant's optional attachment shape is separately tracked in #1486.
 No attachment field or unsafe client-side authorization workaround is
 fabricated, and the parent epic #1467 remains open until those dependencies land.

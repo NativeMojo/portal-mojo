@@ -9,14 +9,15 @@
 // surfaces via the error toast like any failure. auth/email/verify/send is
 // the public, admin-targetable verification sender (NOT the JWT-scoped
 // auth/verify/email/send).
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { mojoCall, withFreshAuth, type Field } from '../../../../client';
 import {
-    Badge, PasswordStrengthMeter, fmt, formModal, modal, toast,
+    Badge, ImageField, PasswordStrengthMeter, fmt, formModal, modal, toast,
+    type FileFieldOwnerResult,
 } from '../../../../ui';
 import { PasskeyModel, UserModel, type UserRow } from '../models';
-import { openGroupDetail } from './shared';
+import { openGroupDetail, useAdminCaller } from './shared';
 import { OAuthConnectionList } from './OAuthSection';
 
 /** One-field prompt modal (the source's Modal.prompt pencils). */
@@ -480,7 +481,8 @@ export function useUserAdminActions(
     // ── Avatar / passkeys / linked accounts / org ─────────────────────
 
     const openAvatarModal = () => {
-        void modal.open((close) => <AvatarModal user={user} onClose={() => close(null)} />);
+        let pending = false;
+        void modal.open((close) => <AvatarModal user={user} onClose={() => close(null)} onPendingChange={(next) => { pending = next; }} />, { canDismiss: () => !pending });
     };
 
     const openPasskeysModal = () => {
@@ -587,32 +589,34 @@ function ChangePasswordModal({ user, onClose }: { user: UserRow; onClose: () => 
     );
 }
 
-/**
- * Avatar management. Clearing works today (`save({avatar: null})`); the
- * UPLOAD path is a documented seam — the real flow is a multipart POST to
- * fileman (/api/fileman upload, 'file' field) then `save({avatar: <fileId>})`,
- * and portal-mojo's JSON-only client grows multipart with the fileman wave.
- */
-function AvatarModal({ user, onClose }: { user: UserRow; onClose: () => void }) {
+/** Personal-scope upload followed by strict backend #1488 id/null attachment. */
+function AvatarModal({ user, onClose, onPendingChange }: { user: UserRow; onClose: () => void; onPendingChange: (pending: boolean) => void }) {
     const save = UserModel.useSave();
     const [busy, setBusy] = useState(false);
-    const url = typeof user.avatar === 'object' && user.avatar ? user.avatar.url : typeof user.avatar === 'string' ? user.avatar : null;
+    const [uploadPending, setUploadPending] = useState(false);
+    const canManage = useAdminCaller();
+    const [ownerResult, setOwnerResult] = useState<FileFieldOwnerResult>();
+    const relationId = user.avatar?.id ?? null;
+    const resultGeneration = useState(() => ({ current: 0 }))[0];
 
-    const clear = async () => {
-        const ok = await modal.confirm({
-            title: 'Clear avatar',
-            message: "Remove this user's avatar? They will see the default placeholder.",
-            confirmText: 'Clear',
-            danger: true,
-        });
-        if (!ok) return;
+    useEffect(() => {
+        onPendingChange(uploadPending || busy);
+    }, [busy, onPendingChange, uploadPending]);
+    useEffect(() => {
+        if (!canManage) onClose();
+    }, [canManage, onClose]);
+
+    const attach = async (avatar: number | null) => {
         setBusy(true);
         try {
-            await save.mutateAsync({ id: user.id, changes: { avatar: null } });
-            toast.success('Avatar cleared');
-            onClose();
+            const saved = await save.mutateAsync({ id: user.id, changes: { avatar } });
+            setOwnerResult({ generation: ++resultGeneration.current, status: 'success', requestedValue: avatar, authoritativeValue: saved.avatar });
+            const authoritative = saved.avatar?.id ?? null;
+            if (authoritative !== avatar) throw new Error('The saved user did not confirm the requested avatar relation');
+            toast.success(avatar == null ? 'Avatar cleared' : 'Avatar updated');
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to clear avatar');
+            setOwnerResult({ generation: ++resultGeneration.current, status: 'failed', requestedValue: avatar });
+            toast.error(err instanceof Error ? err.message : 'Failed to update avatar');
         } finally {
             setBusy(false);
         }
@@ -621,18 +625,18 @@ function AvatarModal({ user, onClose }: { user: UserRow; onClose: () => void }) 
     return (
         <div className="modal-pad">
             <h2 className="modal-title">Avatar</h2>
-            <div className="ua-avatar-preview">
-                {url
-                    ? <img src={url} alt="Current avatar" />
-                    : <span className="dim-italic">No avatar set — the initials placeholder shows.</span>}
-            </div>
+            <p className="dim">Upload an image in your personal File scope, then attach its completed numeric File id to this user.</p>
+            <ImageField
+                value={relationId}
+                onChange={(value) => { void attach(value); }}
+                disabled={busy || !canManage}
+                accept="image/*"
+                ownerResult={ownerResult}
+                onPendingChange={setUploadPending}
+                onOrphan={(fileId) => toast.warning(`File #${fileId} remains uploaded but is not attached to this user.`)}
+            />
             <div className="modal-actions">
                 <button className="btn" onClick={onClose} disabled={busy}>Close</button>
-                {url && (
-                    <button className="btn btn-danger" onClick={() => void clear()} disabled={busy}>
-                        <i className="bi bi-person-x" /> Clear avatar
-                    </button>
-                )}
             </div>
         </div>
     );

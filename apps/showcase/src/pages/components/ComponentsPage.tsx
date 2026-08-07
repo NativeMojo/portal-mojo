@@ -178,7 +178,7 @@ const GROUPS: DemoGroup[] = [
         sections: [
             {
                 key: 'file-upload', title: 'File upload', icon: 'bi-cloud-arrow-up',
-                blurb: 'Accessible picker and guarded drop zone feeding a lazy, bounded upload queue with truthful cancel, retry, recovery, and post-upload warning states.',
+                blurb: 'Accessible picker/drop queue plus controlled FileField/ImageField relation attachment with truthful upload, retry, recovery, clear, orphan, and awaiting-save states.',
                 render: () => <FileUploadDemo />,
             },
             {

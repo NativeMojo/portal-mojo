@@ -127,9 +127,12 @@ Run the focused executable contract:
 
 ```bash
 npm run verify:upload-ux
+npm run verify:form-uploads
 ```
 
 It covers pure validation, lazy concurrency, capacity, stable/safe snapshots,
 consumer/destination dedupe, real progress updates, callback-only retry,
 truthful cancellation, known-id recovery, and byte-identical Portal/Showcase
-token CSS.
+token CSS. The form contract adds strict relation normalization, explicit
+attach states, owner-response reconciliation, orphan retention, safe previews,
+avatar #1488 semantics, and cache-boundary sanitization.

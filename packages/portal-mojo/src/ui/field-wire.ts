@@ -45,6 +45,22 @@ import type { Field, FieldValue } from '../client/types';
 const DATE_TYPES = new Set(['datepicker', 'monthpicker', 'yearpicker']);
 const RANGE_TYPES = new Set(['daterange', 'monthrange', 'yearrange']);
 const LIST_TYPES = new Set(['multiselect', 'collectionmultiselect', 'collection-multiselect']);
+const FILE_TYPES = new Set(['file', 'image']);
+
+/** File relations are deliberately narrower than other collection values:
+ * only a positive JSON integer (or an expanded row carrying one) survives. */
+export function fileRelationId(raw: unknown): number | null {
+    if (typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0) return raw;
+    if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
+        const id = (raw as Record<string, unknown>).id;
+        return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : null;
+    }
+    return null;
+}
+
+export function isFileRelationField(field: Pick<Field, 'type'>): boolean {
+    return FILE_TYPES.has(field.type);
+}
 
 /** The monthpicker/yearpicker/monthrange/yearrange alias → precision map
  *  (web-mojo inputs/index.js PRECISION_ALIASES + FormBuilder cases). */
@@ -74,7 +90,7 @@ export function emptyFieldValue(field: Field): FieldValue {
     if (field.type === 'switch') return false;
     if (LIST_TYPES.has(field.type)) return [];
     if (DATE_TYPES.has(field.type) || RANGE_TYPES.has(field.type)) return null;
-    if (field.type === 'datetimepicker' || field.type === 'collection') return null;
+    if (field.type === 'datetimepicker' || field.type === 'collection' || FILE_TYPES.has(field.type)) return null;
     return '';
 }
 
@@ -269,6 +285,7 @@ export function fieldToWire(field: Field, value: FieldValue): FieldValue {
  * 'YYYY-MM-DD HH:MM' for datetimepicker. Other types pass through.
  */
 export function wireToField(field: Field, raw: FieldValue): FieldValue {
+    if (FILE_TYPES.has(field.type)) return fileRelationId(raw);
     if (DATE_TYPES.has(field.type)) {
         rememberKind(field, raw);
         return rawToCanonical(field, raw, fieldPrecision(field));

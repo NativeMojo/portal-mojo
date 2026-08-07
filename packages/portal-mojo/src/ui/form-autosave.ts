@@ -27,6 +27,7 @@
 // and the saved flash — live in refs and only ever dispatch.
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { Field, FieldValue, FieldValues, ShowWhen } from '../client/types';
+import { fileRelationId, isFileRelationField } from './field-wire';
 
 /**
  * Public per-field indicator state. The reducer stores five states plus the
@@ -71,6 +72,7 @@ export function resolveShowWhen(show: ShowWhen | undefined, values: FieldValues)
  *  Arrays survive as string lists (B4 #1278: multiselect ids, daterange pairs) —
  *  String() would flatten them to 'a,b' and lose comma-carrying items. */
 export function toDisplay(field: Field, raw: unknown): FieldValue {
+    if (isFileRelationField(field)) return fileRelationId(raw);
     if (field.type === 'switch') return raw === true || raw === 1;
     if (Array.isArray(raw)) return raw.map((x) => String(x));
     if (raw == null) return '';
@@ -91,6 +93,7 @@ export function serverValuesFor(fields: Field[], row: unknown): FieldValues {
  */
 export function valueChanged(field: Field, next: FieldValue, server: FieldValue | undefined): boolean {
     if (field.type === 'switch') return next !== (server === true);
+    if (isFileRelationField(field)) return fileRelationId(next) !== fileRelationId(server);
     return String(next ?? '').trim() !== String(server ?? '').trim();
 }
 

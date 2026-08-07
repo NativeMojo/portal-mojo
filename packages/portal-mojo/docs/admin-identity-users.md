@@ -70,10 +70,26 @@ per endpoint, so `UserDetail` and the fleet-wide tables share one cache.
   django-mojo ignores a target `user` parameter. Other-user details render an
   explicit unavailable state and make no request.
 
+## Avatar uploads
+
+Manage avatar uses the shared `ImageField`: it uploads into the acting admin's
+personal File scope, then saves that completed positive numeric File id (or
+null to clear) on the target User. This matches django-mojo #1488's
+admin-on-behalf rule: the File remains owned by the uploader, and replace/clear
+detach without deleting it. Success requires the authoritative returned avatar
+relation to match the requested id/null exactly. A failed or mismatched owner
+save retains the uploaded candidate for attachment-only retry and reports an
+abandoned candidate without deleting it.
+
+UserModel and `useMe` independently reduce expanded avatar relations to `{id}`
+before their separate Query caches. The modal resolves a stored preview only
+imperatively while mounted; capability URLs do not enter Query/Mutation cache,
+storage, logs, or errors. Transfer and attach-save intervals both block modal
+dismissal, while auth/permission loss closes the modal and cancels its queue.
+
 ## Known seams
 
-Avatar clear is supported; upload awaits multipart/fileman support. The login
-map and the richer device/GeoIP dossiers SHIPPED with #1291 and are documented
+The login map and the richer device/GeoIP dossiers SHIPPED with #1291 and are documented
 in [admin-devices-geoip.md](admin-devices-geoip.md). Arbitrary-user key
 creation, arbitrary-user notification administration, and active-user
 inactivity-warning clear require new backend contracts and are intentionally

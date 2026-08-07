@@ -17,8 +17,8 @@
 // Header deviations forced by DetailView's prop surface (read-only this
 // wave — MERGE-WIRE notes filed): chips are not clickable, so the org chip's
 // click-through lives in the kebab ("Open organization") and as an Overview
-// row link; the avatar slot renders initials (no image/click slot), so
-// avatar clearing hangs off the kebab; upload awaits the multipart seam;
+// row link; the avatar slot renders initials (no image/click slot), so the
+// shared ImageField avatar manager hangs off the kebab;
 // presence/status/locked/warning render as chips instead of a two-row aux.
 import { useSyncExternalStore } from 'react';
 import { useCan, useMe } from '../../../client';
@@ -146,8 +146,8 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
     const MENU: DetailMenuEntry<UserRow>[] = [
         { label: 'Edit user', icon: 'bi-pencil', permissions: ADMIN, onSelect: () => void actions.editUser() },
         {
-            label: 'Clear avatar…', icon: 'bi-image', permissions: ADMIN,
-            when: (u) => Boolean(u?.avatar), onSelect: () => actions.openAvatarModal(),
+            label: 'Manage avatar…', icon: 'bi-image', permissions: ADMIN,
+            onSelect: () => actions.openAvatarModal(),
         },
         {
             label: 'Open organization', icon: 'bi-buildings',

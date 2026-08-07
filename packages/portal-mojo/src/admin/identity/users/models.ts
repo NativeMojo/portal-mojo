@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     defineModel, mojoCall, withFreshAuth,
-    type User,
+    sanitizeAvatarRelation, type User,
 } from '../../../client';
 // ONE defineModel per endpoint (#1291). The device / device-location /
 // login-event models are DEFINED in admin/security/devices/models.ts — the
@@ -51,9 +51,15 @@ export type UserRow = User & {
     has_passkey?: boolean;
 };
 
+/** UserModel's independent cache boundary (lists, detail, saves, actions). */
+export function sanitizeUserRow(row: UserRow): UserRow {
+    return { ...row, avatar: sanitizeAvatarRelation(row.avatar) };
+}
+
 export const UserModel = defineModel<UserRow>({
     name: 'user',
     endpoint: '/api/user',
+    sanitizeRow: sanitizeUserRow,
     permissions: {
         view: USER_VIEW_PERMISSIONS,
         manage: USER_MANAGE_PERMISSIONS,

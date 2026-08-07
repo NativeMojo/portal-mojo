@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { Field, FieldValue, FormData } from '../client/types';
-import { declaredFieldPatch, resolveShowWhen, validateFieldValue } from './form-autosave';
+import { declaredFieldPatch, getPath, resolveShowWhen, validateFieldValue } from './form-autosave';
 import { emptyFieldValue, resolveFieldRenderer, warnUnknownFieldType } from './field-registry';
+import { toDisplay } from './form-autosave';
+import type { FileFieldOwnerResult } from './FileField';
 
 export type ValidationProfile = 'schema-form' | 'wizard';
 
@@ -15,7 +17,9 @@ export function isEmptyFieldValue(value: FieldValue | undefined): boolean {
 
 export function seedFormValues(fields: Field[], initial: FormData = {}): FormData {
     const values: FormData = {};
-    for (const field of fields) values[field.name] = initial[field.name] ?? emptyFieldValue(field);
+    for (const field of fields) values[field.name] = field.name in initial
+        ? toDisplay(field, initial[field.name])
+        : emptyFieldValue(field);
     return values;
 }
 
@@ -35,7 +39,7 @@ export function reconcileFormValues(previous: FormData, fields: Field[], initial
     const next: FormData = {};
     for (const field of fields) next[field.name] = field.name in previous
         ? previous[field.name]!
-        : initial[field.name] ?? emptyFieldValue(field);
+        : field.name in initial ? toDisplay(field, initial[field.name]) : emptyFieldValue(field);
     return next;
 }
 
@@ -72,6 +76,10 @@ export interface SchemaFormState {
     payload: (fields?: Field[]) => FormData;
     registerFocusTarget: (name: string) => (node: HTMLElement | null) => void;
     focusField: (name: string) => void;
+    uploadPending: boolean;
+    setUploadPending: (name: string, pending: boolean) => void;
+    ownerResults: Record<string, FileFieldOwnerResult>;
+    settleOwnerSave: (row: unknown, failed?: boolean, requested?: FormData) => void;
 }
 
 export function useSchemaFormState({ fields, initial = {}, profile, reconcile = false, resetKey, deferReconcile = false }: {
@@ -89,6 +97,10 @@ export function useSchemaFormState({ fields, initial = {}, profile, reconcile = 
     const resetRef = useRef(resetKey);
     const mountedRef = useRef(false);
     const focusTargets = useRef(new Map<string, HTMLElement>());
+    const pendingUploads = useRef(new Set<string>());
+    const [uploadPending, setUploadPendingState] = useState(false);
+    const [ownerResults, setOwnerResults] = useState<Record<string, FileFieldOwnerResult>>({});
+    const ownerGeneration = useRef(0);
     initialRef.current = initial;
 
     useEffect(() => {
@@ -163,6 +175,24 @@ export function useSchemaFormState({ fields, initial = {}, profile, reconcile = 
         window.setTimeout(() => focusTargets.current.get(name)?.focus(), 0);
     }, []);
 
+    const setUploadPending = useCallback((name: string, pending: boolean) => {
+        if (pending) pendingUploads.current.add(name);
+        else pendingUploads.current.delete(name);
+        setUploadPendingState(pendingUploads.current.size > 0);
+    }, []);
+
+    const settleOwnerSave = useCallback((row: unknown, failed = false, requested: FormData = values) => {
+        const generation = ++ownerGeneration.current;
+        setOwnerResults(Object.fromEntries(fields
+            .filter((field) => field.type === 'file' || field.type === 'image')
+            .map((field) => [field.name, {
+                generation,
+                status: failed ? 'failed' as const : 'success' as const,
+                requestedValue: requested[field.name],
+                ...(failed ? {} : { authoritativeValue: getPath(row, field.name) }),
+            }])));
+    }, [fields, values]);
+
     return {
         values,
         errors,
@@ -176,6 +206,10 @@ export function useSchemaFormState({ fields, initial = {}, profile, reconcile = 
         payload: (subset = fields) => schemaPayload(subset, values),
         registerFocusTarget,
         focusField,
+        uploadPending,
+        setUploadPending,
+        ownerResults,
+        settleOwnerSave,
     };
 }
 
@@ -237,7 +271,7 @@ function SchemaField({ field, state, disabled = false }: { field: Field; state: 
             <div className="field">
                 <span id={labelId} className="field-label">{field.label}{field.required && <em> *</em>}</span>
                 <div ref={state.registerFocusTarget(field.name)} tabIndex={-1} aria-labelledby={labelId} aria-describedby={describedBy} aria-invalid={!!error || undefined}>
-                    <Registered field={field} value={value} invalid={!!error} disabled={disabled} controlId={controlId} ariaDescribedBy={describedBy} focusTarget={state.registerFocusTarget(field.name)} commit={set} commitPatch={state.patchValues} />
+                    <Registered field={field} value={value} invalid={!!error} disabled={disabled} controlId={controlId} ariaDescribedBy={describedBy} focusTarget={state.registerFocusTarget(field.name)} commit={set} commitPatch={state.patchValues} onPendingChange={(pending) => state.setUploadPending(field.name, pending)} ownerResult={state.ownerResults[field.name]} />
                 </div>
                 {error && <span id={errorId} className="field-error">{error}</span>}
                 {field.help && !error && <span id={helpId} className="field-help">{field.help}</span>}

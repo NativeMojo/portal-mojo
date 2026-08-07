@@ -3,7 +3,7 @@
 ```ts
 import {
     SchemaForm, SchemaSelect, formModal,
-    FormView, registerFormTabs, getFormTabs,
+    FormView, FileField, ImageField, registerFormTabs, getFormTabs,
     type Field, type FormData, type FormTab,
 } from 'portal-mojo/ui';
 import { useFormAutosave, resolveShowWhen } from 'portal-mojo/ui'; // the machine, standalone
@@ -32,6 +32,9 @@ interface Field {
     showWhen?: ShowWhen;       // conditional visibility (both surfaces)
     schema?: ZodType;          // per-field zod validation (FormView commits)
     disabled?: boolean;        // registry types
+    accept?: string | string[]; maxFileSize?: number; // file/image selection UX
+    uploadDestination?: { fileManagerId?; groupId?; use? };
+    onUploadOrphan?: (fileId: number) => void;
     // …plus the registry-type props (precision, outputFormat, presets,
     // model/endpoint, timezone, maxTags, …) — see "Field-type registry".
 }
@@ -71,6 +74,12 @@ controlled; validates required + email format on visible fields; async
 showWhen-hidden fields don't render, don't validate, and are stripped from
 the submitted payload.
 
+When file/image fields are present, submit, cancel, wizard steps/tabs, and
+modal dismissal lock while bytes are active. `onSubmit`/`onFinish` must return
+the authoritative saved owner row so the field can compare its returned
+relation to the requested id/null. A rejection or mismatch keeps the completed
+candidate available for attachment-only retry; it never replays bytes.
+
 **Select semantics (the rule-4 fix):** display always equals state. While
 the value is `''` (unset) the select shows a real disabled placeholder; an
 initial value not among the options warns once and shows the placeholder.
@@ -96,6 +105,7 @@ if (!data) return;   // cancelled → null
     savedFlashMs={1500}        // saved-check duration (default 1500)
     onSaved={({ changes, fields, row }) => …}
     onSaveError={({ changes, fields, error }) => …}
+    onPendingChange={(uploading) => setDetailDismissLocked(uploading)}
 />
 ```
 
@@ -124,6 +134,33 @@ if (!data) return;   // cancelled → null
    another form's save) becomes the new snapshot; untouched fields follow it.
    Server normalization is visible: save `555 010 0142`, the field comes back
    `+15550100142`.
+
+### `file` / `image` relations
+
+Both registry bindings use the exported controlled `FileField`/`ImageField`
+over the one shared `UploadQueue` + client transport. Their public value is
+only a positive numeric File id or `null`; expanded relation objects normalize
+to their positive numeric id before generic string coercion, while booleans,
+numeric strings, non-positive numbers, and ambiguous objects normalize to
+null and are never posted as File ids.
+
+The explicit UI states are keep, clear, replacement-in-progress,
+replacement-failed, completed-awaiting-attach, and attach-failed. The stored
+relation remains the visible/revert baseline until upload completion and an
+authoritative owner save both succeed. FormView receives the exact sent File
+value plus saved row from its autosave mutation and reconciles only that File
+field: a result for an older candidate is ignored, while an exact returned
+id/null means attached; reject or mismatch restores the prior server value but
+retains the completed candidate for “Retry attachment.” Remove reports the
+candidate once through `onUploadOrphan`; Clear posts null. Neither action
+deletes File.
+
+ImageField previews a newly selected image with a component-local object URL
+and revokes it on replace/settle/unmount. Stored preview URLs are resolved by
+an imperative mounted File detail read, scheme-checked, rendered with
+`referrerPolicy="no-referrer"`, and never cached, persisted, logged, or copied
+into errors. Queue work is generation-guarded, cancelled on unmount/auth loss,
+and an active task is cancelled before removal.
 
 All machine state lives in one reducer (draft, server snapshot, per-field
 status, pending batch, in-flight flag); the two timers only dispatch.
@@ -349,8 +386,8 @@ orchestrator files follow-ups.
 | `date` (native input) | — | — | superseded by `datepicker` (registry) — native input not carried |
 | `datetime` (native) | — | — | superseded by `datetimepicker` |
 | `time` (native) | — | — | superseded by `timepicker` |
-| `file` | — | — | **GAP** — 3-stage fileman uploads are board #1264; FileView #1298 |
-| `image` | — | — | **GAP** — same upload dependency (#1264); renditions ride the avatar pattern |
+| `file` | — | FileField | OK — positive File id/null; shared 3-stage queue; authoritative owner attach |
+| `image` | — | ImageField | OK — FileField foundation + safe local/stored image preview |
 | `color` | — | — | **GAP** — native `<input type=color>` wrapper unfiled |
 | `range` | — | — | **GAP** — native `<input type=range>` wrapper unfiled |
 | `hidden` | — | — | N/A by design — controlled forms post state, not hidden DOM inputs |

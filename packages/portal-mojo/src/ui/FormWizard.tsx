@@ -43,7 +43,8 @@ export interface FormWizardProps {
     onStepChange?: (sectionKey: string) => void;
     onBusyChange?: (busy: boolean) => void;
     onCancel?: () => void;
-    onFinish: (data: FormData) => void | Promise<void>;
+    /** Return the authoritative owner row when a section contains File relations. */
+    onFinish: (data: FormData) => unknown | Promise<unknown>;
     className?: string;
 }
 
@@ -132,6 +133,9 @@ export function FormWizard(props: FormWizardProps) {
     const resetRef = useRef(resetKey);
     const form = useSchemaFormState({ fields, initial, profile: 'wizard', reconcile: true, resetKey, deferReconcile: busy });
     const sections = normalizedSections.filter((section) => section.eligible?.(form.values) !== false);
+    const locked = busy || form.uploadPending;
+
+    useEffect(() => props.onBusyChange?.(locked), [locked, props.onBusyChange]);
 
     useEffect(() => {
         generation.current += 1;
@@ -162,7 +166,7 @@ export function FormWizard(props: FormWizardProps) {
     const activeSection = sections[activeIndex] ?? null;
 
     const go = (key: string) => {
-        if (busy || key === activeKeyRef.current || !sections.some((section) => section.key === key)) return;
+        if (locked || key === activeKeyRef.current || !sections.some((section) => section.key === key)) return;
         activeKeyRef.current = key;
         setActiveKey(key);
         onStepChange?.(key);
@@ -179,6 +183,7 @@ export function FormWizard(props: FormWizardProps) {
     };
 
     const next = async () => {
+        if (form.uploadPending) return;
         if (transitionFlight.current.pending) return;
         if (!activeSection || !validateAndFocus(activeSection.fields, [activeSection])) return;
         const following = sections[activeIndex + 1];
@@ -203,6 +208,7 @@ export function FormWizard(props: FormWizardProps) {
     };
 
     const finish = async () => {
+        if (form.uploadPending) return;
         if (finishFlight.current.pending || !activeSection) return;
         const validationSections = props.validateAllOnFinish === false ? [activeSection] : sections;
         const validationFields = validationSections.flatMap((section) => section.fields);
@@ -215,8 +221,10 @@ export function FormWizard(props: FormWizardProps) {
         setWizardBusy(true);
         form.setFormError('');
         try {
-            await finishFlight.current.run(() => onFinish(payload));
+            const row = await finishFlight.current.run(() => onFinish(payload));
+            form.settleOwnerSave(row, false, payload);
         } catch (error) {
+            form.settleOwnerSave(undefined, true, payload);
             if (mounted.current && generation.current === acceptedGeneration) form.setFormError(error instanceof Error ? error.message : 'Save failed');
         } finally {
             if (mounted.current && generation.current === acceptedGeneration) setWizardBusy(false);
@@ -232,13 +240,13 @@ export function FormWizard(props: FormWizardProps) {
             {section.description && <div className="form-wizard-description">{section.description}</div>}
             <SchemaFieldGrid fields={section.fields} state={form} disabled={busy} />
             {typeof section.content === 'function' ? section.content({
-                data: form.values, busy, setValue: form.setValue, patchValues: form.patchValues,
+                data: form.values, busy: locked, setValue: form.setValue, patchValues: form.patchValues,
             }) : section.content}
         </div>
     );
 
     return (
-        <div className={className ? `form-wizard ${className}` : 'form-wizard'} aria-busy={busy || undefined}>
+        <div className={className ? `form-wizard ${className}` : 'form-wizard'} aria-busy={locked || undefined}>
             {form.formError && <div className="form-alert" role="alert">{form.formError}</div>}
             {mode === 'tabs' ? (
                 <Tabs
@@ -249,7 +257,7 @@ export function FormWizard(props: FormWizardProps) {
                     items={sections.map((section) => ({
                         key: section.key,
                         label: <>{section.label}{section.optional && <span className="form-wizard-optional"> Optional</span>}</>,
-                        disabled: busy,
+                        disabled: busy || form.uploadPending,
                         panel: sectionPanel(section),
                     }))}
                 />
@@ -267,14 +275,14 @@ export function FormWizard(props: FormWizardProps) {
                 </>
             )}
             {!activeSection?.terminal && <div className="modal-actions form-wizard-actions">
-                {onCancel && <button type="button" className="btn" disabled={busy} onClick={onCancel}>{props.cancelText ?? 'Cancel'}</button>}
+                {onCancel && <button type="button" className="btn" disabled={locked} onClick={onCancel}>{props.cancelText ?? 'Cancel'}</button>}
                 {mode === 'wizard' && activeIndex > 0 && (
-                    <button type="button" className="btn" disabled={busy} onClick={() => go(sections[activeIndex - 1]!.key)}>{props.backText ?? 'Back'}</button>
+                    <button type="button" className="btn" disabled={locked} onClick={() => go(sections[activeIndex - 1]!.key)}>{props.backText ?? 'Back'}</button>
                 )}
                 {mode === 'wizard' && activeIndex < sections.length - 1 ? (
-                    <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void next()}>{props.nextText ?? 'Next'}</button>
+                    <button type="button" className="btn btn-primary" disabled={locked} onClick={() => void next()}>{props.nextText ?? 'Next'}</button>
                 ) : (
-                    <button type="button" className="btn btn-primary" disabled={busy} onClick={finish}>
+                    <button type="button" className="btn btn-primary" disabled={locked} onClick={finish}>
                         {busy ? props.busyText ?? 'Saving…' : mode === 'tabs' ? props.saveText ?? 'Save' : props.finishText ?? 'Finish'}
                     </button>
                 )}
@@ -308,11 +316,12 @@ export function formWizardModal(options: FormWizardModalOptions): Promise<FormDa
                     finishing = true;
                     pending = true;
                     try {
-                        await options.onFinish(data);
+                        const row = await options.onFinish(data);
                         if (live) {
                             live = false;
                             close(data);
                         }
+                        return row;
                     } finally {
                         finishing = false;
                         pending = false;

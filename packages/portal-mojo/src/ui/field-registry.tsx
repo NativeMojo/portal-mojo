@@ -33,6 +33,7 @@ import { DateRangePicker } from './date/DateRangePicker';
 import { DateTimePicker } from './date/DateTimePicker';
 import { TimePicker, type TimeValue } from './date/TimePicker';
 import { TimezoneSelect } from './date/TimezoneSelect';
+import { FileField, ImageField, type FileFieldOwnerResult } from './FileField';
 import {
     emptyFieldValue,
     fieldPrecision,
@@ -60,6 +61,10 @@ export interface RegistryFieldProps {
     commit: (value: FieldValue) => void;
     /** Atomic multi-field commit, filtered to fields declared by the surface. */
     commitPatch: (patch: FieldValues) => void;
+    /** Active transfer reporting lets the owning form block submit/navigation/dismiss. */
+    onPendingChange?: (pending: boolean) => void;
+    /** Authoritative owner-save reconciliation for relation attachment. */
+    ownerResult?: FileFieldOwnerResult;
 }
 
 /** A renderer is a function component over RegistryFieldProps. */
@@ -163,6 +168,14 @@ function FallbackTextInput({ field, value, invalid, disabled, commit }: Pick<
 }
 
 // ── Standard bindings (web-mojo INPUT_TYPES + FormBuilder aliases) ────
+
+registerFieldType('file', function FileRegistryField({ field, value, invalid, disabled, controlId, ariaDescribedBy, commit, onPendingChange, ownerResult }) {
+    return <FileField value={value} onChange={commit} accept={field.accept} maxFileSize={field.maxFileSize} destination={field.uploadDestination} disabled={disabled || field.disabled} invalid={invalid} controlId={controlId} ariaDescribedBy={ariaDescribedBy} onPendingChange={onPendingChange} ownerResult={ownerResult} onOrphan={field.onUploadOrphan} />;
+});
+
+registerFieldType('image', function ImageRegistryField({ field, value, invalid, disabled, controlId, ariaDescribedBy, commit, onPendingChange, ownerResult }) {
+    return <ImageField value={value} onChange={commit} accept={field.accept} maxFileSize={field.maxFileSize} destination={field.uploadDestination} disabled={disabled || field.disabled} invalid={invalid} controlId={controlId} ariaDescribedBy={ariaDescribedBy} onPendingChange={onPendingChange} ownerResult={ownerResult} onOrphan={field.onUploadOrphan} />;
+});
 
 // tag | tags → TagInput. State/wire: CSV string (the load-bearing shape —
 // django-mojo models split the stored string).

@@ -11,7 +11,7 @@
 //     rebuildPermissions), per the do-not-recreate list.
 //
 // The machine itself lives in form-autosave.ts; this file renders it.
-import { useMemo, useSyncExternalStore, useContext } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { hasPermission, useMe } from '../client/me';
 import { GroupContext } from '../client/group-context';
@@ -20,6 +20,8 @@ import type { Field } from '../client/types';
 import { SchemaSelect } from './FormFields';
 import { Tabs } from './Tabs';
 import { emptyFieldValue, resolveFieldRenderer } from './field-registry';
+import { getPath } from './form-autosave';
+import type { FileFieldOwnerResult } from './FileField';
 import { toast } from './toast';
 import {
     useFormAutosave,
@@ -102,6 +104,8 @@ export interface FormViewProps<T extends { id: number | string }> {
     savedFlashMs?: number;
     onSaved?: (info: AutosaveBatchInfo & { row: T }) => void;
     onSaveError?: (info: AutosaveBatchInfo & { error: Error }) => void;
+    /** True while any FileField transfer is active. Owners can block dismissal. */
+    onPendingChange?: (pending: boolean) => void;
     className?: string;
 }
 
@@ -133,6 +137,26 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
         () => [...(fields ?? []), ...allTabs.flatMap((t) => t.fields)],
         [fields, allTabs],
     );
+    const pendingFields = useRef(new Set<string>());
+    const [ownerResults, setOwnerResults] = useState<Record<string, FileFieldOwnerResult>>({});
+    const ownerGeneration = useRef(0);
+    const setUploadPending = useCallback((name: string, pending: boolean) => {
+        if (pending) pendingFields.current.add(name);
+        else pendingFields.current.delete(name);
+        props.onPendingChange?.(pendingFields.current.size > 0);
+    }, [props.onPendingChange]);
+    const publishOwnerResult = useCallback((names: string[], status: FileFieldOwnerResult['status'], changes: Record<string, unknown>, savedRow?: T) => {
+        const generation = ++ownerGeneration.current;
+        setOwnerResults((current) => ({
+            ...current,
+            ...Object.fromEntries(names.map((name) => [name, {
+                generation,
+                status,
+                requestedValue: getPath(changes, name),
+                ...(status === 'success' ? { authoritativeValue: getPath(savedRow, name) } : {}),
+            }])),
+        }));
+    }, []);
 
     const form = useFormAutosave<T>({
         fields: allFields,
@@ -140,8 +164,12 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
         save: (changes) => save.mutateAsync({ id: row.id, changes } satisfies SaveVars),
         debounceMs,
         savedFlashMs,
-        onSaved,
+        onSaved: (info) => {
+            publishOwnerResult(info.fields, 'success', info.changes, info.row);
+            onSaved?.(info);
+        },
         onSaveError: (info) => {
+            publishOwnerResult(info.fields, 'failed', info.changes);
             // Unmissable failure (workspec): pinned field error + toast.
             toast.error(info.error.message);
             onSaveError?.(info);
@@ -152,7 +180,7 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
         <div className={className ? `form-view ${className}` : 'form-view'}>
             {fields && fields.length > 0 && (
                 <div className="form-grid">
-                    {fields.filter(form.visible).map((f) => <FieldRow key={f.name} field={f} form={form} />)}
+                    {fields.filter(form.visible).map((f) => <FieldRow key={f.name} field={f} form={form} ownerResult={ownerResults[f.name]} onPendingChange={setUploadPending} />)}
                 </div>
             )}
 
@@ -173,7 +201,7 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
                         ),
                         panel: (
                             <div className="form-grid">
-                                {tab.fields.filter(form.visible).map((field) => <FieldRow key={field.name} field={field} form={form} />)}
+                                {tab.fields.filter(form.visible).map((field) => <FieldRow key={field.name} field={field} form={form} ownerResult={ownerResults[field.name]} onPendingChange={setUploadPending} />)}
                             </div>
                         ),
                     }))}
@@ -202,7 +230,7 @@ function StatusIcon({ st }: { st: FieldStatus | undefined }) {
     }
 }
 
-function FieldRow({ field, form }: { field: Field; form: FormAutosaveApi }) {
+function FieldRow({ field, form, ownerResult, onPendingChange }: { field: Field; form: FormAutosaveApi; ownerResult?: FileFieldOwnerResult; onPendingChange: (name: string, pending: boolean) => void }) {
     const st = form.status[field.name];
     const error = st?.status === 'error' ? st.error : undefined;
     const value = form.values[field.name];
@@ -256,6 +284,8 @@ function FieldRow({ field, form }: { field: Field; form: FormAutosaveApi }) {
                             invalid={!!error}
                             commit={(v) => form.commit(field.name, v)}
                             commitPatch={form.commitPatch}
+                            onPendingChange={(pending) => onPendingChange(field.name, pending)}
+                            ownerResult={ownerResult}
                         />
                         {footSlot}
                     </div>

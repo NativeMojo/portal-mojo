@@ -20,6 +20,7 @@ import { useContext, useSyncExternalStore } from 'react';
 import { mojoGet } from './client';
 import { getAuthSnapshot, subscribeAuth, type AuthSnapshot } from './auth';
 import { GroupContext } from './group-context';
+import { sanitizeAvatarRelation } from './types';
 
 /** Server permission dicts use true AND 1 as granted (web-mojo checked `== true`). */
 export type PermissionsDict = Record<string, unknown>;
@@ -30,7 +31,13 @@ export interface Me {
     email?: string;
     is_superuser?: boolean;
     permissions?: PermissionsDict | null;
+    avatar?: { id: number } | null;
     [field: string]: unknown;
+}
+
+/** `me` has its own query key and therefore its own mandatory sanitizer. */
+export function sanitizeMe(row: Me): Me {
+    return { ...row, avatar: sanitizeAvatarRelation(row.avatar) };
 }
 
 /** Active-group membership context — provided by the A3 GroupProvider. */
@@ -154,7 +161,7 @@ export function useMe() {
     const auth = useAuthSnapshot();
     return useQuery<Me>({
         queryKey: ['me', auth.uid],
-        queryFn: () => mojoGet<Me>('/api/user', 'me'),
+        queryFn: async () => sanitizeMe(await mojoGet<Me>('/api/user', 'me')),
         enabled: auth.authenticated,
         staleTime: 5 * 60_000,
     });
