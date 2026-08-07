@@ -9,6 +9,7 @@ export * from './AssistantFeed';
 export * from './AssistantPanel';
 export * from './launchers';
 export * from './pages';
+export * from './streaming';
 
 export const ASSISTANT_ADMIN_SECTION: AdminSection = {
     id: 'assistant', basePath: 'assistant', title: 'Assistant', icon: 'bi-stars', navigationGroup: 'assistant', permissions: ASSISTANT_PERMISSIONS,

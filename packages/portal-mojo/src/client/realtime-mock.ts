@@ -9,6 +9,7 @@ export interface RealtimeMockOptions {
     authMode?: RealtimeMockAuthMode;
     deniedTopics?: readonly string[];
     userId?: number;
+    autoAssistant?: boolean;
 }
 
 export interface RealtimeMockObservation {
@@ -66,6 +67,7 @@ export class RealtimeMockServer {
     private readonly autoOpen: boolean;
     private readonly autoAuthRequired: boolean;
     private readonly userId: number;
+    private readonly autoAssistant: boolean;
 
     constructor(options: RealtimeMockOptions = {}) {
         this.autoOpen = options.autoOpen !== false;
@@ -74,6 +76,7 @@ export class RealtimeMockServer {
         this.authMode = options.authMode ?? 'success';
         this.deniedTopics = new Set(options.deniedTopics ?? []);
         this.userId = options.userId ?? 14;
+        this.autoAssistant = options.autoAssistant !== false;
         this.factory = (_url) => {
             const socket = new MemoryRealtimeSocket(this.sockets.length + 1, this);
             this.sockets.push(socket);
@@ -143,6 +146,16 @@ export class RealtimeMockServer {
         this.direct({ type: 'assistant_error', conversation_id: conversationId, error: 'Deterministic Assistant failure' }, connection);
     }
 
+    assistantLifecycle(conversationId: number, connection?: number, wrapped = false): void {
+        const deliver = (event: Record<string, unknown>) => wrapped ? this.wrapped(event, undefined, connection) : this.direct(event, connection);
+        deliver({ type: 'assistant_thinking', conversation_id: conversationId });
+        deliver({ type: 'assistant_text', conversation_id: conversationId, text: 'Checking the bounded mock plan.', blocks: null });
+        deliver({ type: 'assistant_tool_call', conversation_id: conversationId, tool: 'query_health', input: { private: 'never observed or projected' } });
+        deliver({ type: 'assistant_plan', conversation_id: conversationId, plan: { plan_id: 'mock-plan', title: 'Health check', steps: [{ id: 1, description: 'Check health', status: 'pending', parallel: false, tool: 'query_health', tool_input: { private: true } }] } });
+        deliver({ type: 'assistant_plan_update', conversation_id: conversationId, plan_id: 'mock-plan', step_id: 1, status: 'done', summary: 'Healthy' });
+        deliver({ type: 'assistant_response', conversation_id: conversationId, message_id: ++this.nextMessageId, created: new Date(this.timestamp * 1000).toISOString(), response: 'The deterministic realtime response is ready.', blocks: null, tool_calls_made: [{ tool: 'query_health', input: { private: true } }], duration_ms: 250 });
+    }
+
     clearObservations(): void {
         this.observations.length = 0;
     }
@@ -185,6 +198,7 @@ export class RealtimeMockServer {
                 conversationId: typeof message.conversation_id === 'number' ? message.conversation_id : null,
                 messageLength: typeof text === 'string' ? text.length : 0,
             });
+            if (!this.autoAssistant) return;
             socket.frame({ type: 'assistant_thinking', conversation_id: conversationId });
             queueMicrotask(() => this.finishAssistant(conversationId, undefined, socket.id));
         }

@@ -106,7 +106,26 @@ try {
 
     const source = await (await import('node:fs/promises')).readFile(new URL('../packages/portal-mojo/src/client/realtime.ts', import.meta.url), 'utf8');
     assert.match(source, /useEffect\(\(\) => \{ owned\.setToken\(token\); \}, \[owned, token\]\)/);
+    assert.equal((source.match(/owned\.setToken\(token\)/g) ?? []).length, 1, 'refresh and cross-tab replacement share one token-value comparison path');
     assert.match(source, /return \(\) => owned\.setEnabled\(false\)/, 'StrictMode cleanup must close the owned socket');
+
+    const strictMock = createRealtimeMock({ autoOpen: false });
+    const strictClient = new RealtimeClient({ socketFactory: strictMock.factory, clock: new FakeClock() });
+    strictClient.setToken('strict-token'); strictClient.setEnabled(true);
+    strictClient.setEnabled(false); strictClient.setEnabled(true);
+    strictMock.sockets[0].onopen?.({});
+    assert.notEqual(strictClient.getStatus().status, 'ready', 'stale StrictMode callbacks cannot ready the replacement generation');
+    strictMock.open(2); strictMock.authRequired(2);
+    assert.equal(strictClient.getStatus().status, 'ready', 'StrictMode remount owns exactly the replacement socket');
+
+    const multi = createRealtimeMock({ autoOpen: false });
+    const multiOne = new RealtimeClient({ socketFactory: multi.factory, clock: new FakeClock() });
+    const multiTwo = new RealtimeClient({ socketFactory: multi.factory, clock: new FakeClock() });
+    multiOne.connect('one'); multiTwo.connect('two');
+    multi.open(1); multi.authRequired(1); multi.open(2); multi.authRequired(2);
+    assert.equal(multi.activeConnections, 2);
+    multi.sockets[0].close(1000, 'one closed');
+    assert.equal(multi.activeConnections, 1, 'mock connections have independent lifecycle state');
     console.log('realtime behavioral contract verified');
 } finally {
     await vite.close();

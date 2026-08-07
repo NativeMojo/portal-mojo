@@ -505,12 +505,12 @@ export class RealtimeClient {
 
 const RealtimeContext = createContext<RealtimeClient | null>(null);
 
-export interface RealtimeProviderProps extends PropsWithChildren {
+export type RealtimeProviderProps = PropsWithChildren<{
     enabled?: boolean;
     client?: RealtimeClient;
     socketFactory?: RealtimeSocketFactory;
     origin?: string;
-}
+}>;
 
 export function RealtimeProvider({ children, enabled = true, client, socketFactory, origin }: RealtimeProviderProps) {
     const owned = useMemo(() => client ?? new RealtimeClient({ socketFactory, origin }), [client, socketFactory, origin]);

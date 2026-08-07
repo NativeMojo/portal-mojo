@@ -4,9 +4,37 @@ Import from `portal-mojo/admin`.
 
 `ASSISTANT_ADMIN_SECTION` registers Conversations, Skills, and Memory beneath the Assistant navigation group. Its section clause is global-only ANY-of `sys.view_admin` or `sys.assistant`; Memory narrows its route to `sys.assistant`, matching the backend. Active-group grants never reveal it. `AssistantLauncher` uses the section gate. `AssistantContextLauncher` additionally requires `sys.view_security` or `sys.security` and only accepts `incident.Incident` or `incident.Ticket`.
 
-## REST contract
+## Conversation transport
 
-- `POST /api/assistant` sends `{message, conversation_id?, attachments?}`. `attachments` is omitted for text-only sends or contains 1–5 unique positive ids from completed authoritative queue references. The controlled `AssistantFeed` permits one request at a time, shows only the generic “Responding…” state, and consumes the final response. There is no polling, tool trace, websocket, or streaming path.
+- An owned, text-only conversation uses realtime only when the shared transport
+  is authenticated and the caller locally has `sys.view_admin`, matching the
+  WebSocket handler's narrower server check. The client sends exactly
+  `{type:'assistant_message',message,conversation_id?}`. A caller with only
+  `sys.assistant`, any send with attachments, an unavailable socket, and a
+  foreign inspect-only conversation stay on REST. Messages are never
+  auto-resubmitted across paths.
+- `POST /api/assistant` sends `{message, conversation_id?, attachments?}`.
+  `attachments` is omitted for text-only sends or contains 1–5 unique positive
+  ids from completed authoritative queue references.
+- Realtime positively projects only `assistant_thinking`, `assistant_text`,
+  `assistant_tool_call`, `assistant_plan`, `assistant_plan_update`,
+  `assistant_response`, and `assistant_error`, whether they arrive directly or
+  through the transport's one wrapper boundary. Every event correlates by
+  `conversation_id`. Tool state retains bounded name/status/count only; raw
+  input and the terminal `tool_calls_made` list never enter UI state, caches,
+  logs, or mock observations. Plans omit tool inputs. Terminal duplication is
+  checked only with the backend's authoritative `message_id` (never a guessed
+  local id).
+- A disconnect for a known conversation waits for reauthentication, then
+  reconciles from `/api/assistant/conversation/<id>?graph=detail`. A disconnect
+  during the first send before `assistant_thinking` supplies a conversation id
+  is explicitly **outcome unknown**: conversation history is refreshed, the
+  optimistic message remains visibly uncertain, and the client never resends
+  or guesses a conversation. Server-side permission revocation remains
+  authoritative but can only be observed by the socket on a handled request or
+  reconnect; locally observed permission loss immediately clears this
+  consumer's transient stream/subscriptions without disabling the shared
+  provider.
 - `POST /api/assistant/context` sends only `{model, pk}`. The returned conversation id is immediately fetched from `/api/assistant/conversation/<id>?graph=detail`; the client never synthesizes or reposts context text.
 - Conversation and Skill lists/details/deletes are imperative and component-local. They do not use `defineModel`, Query cache, `ModelTable`, a `RecordFeed` adapter, persistence, or exports.
 - A foreign conversation visible to an administrator is inspect-only. Only `conversation.user.id === me.id` enables continuation.
@@ -34,4 +62,9 @@ Global and user tiers require the global Assistant grant. Group memory first cho
 
 ## Shell ownership
 
-The production Admin shell mounts exactly one `RightPanelProvider` and one `RightPanelSlot`. Permission loss or logout closes and unmounts Assistant content. Incident and Ticket record details remain KISS modals; their Assistant buttons only create the separate Assistant panel session.
+The production Admin and showcase auth roots each mount one generic
+`RealtimeProvider`; it is auth-owned, not `sys.view_admin`-owned. The production
+Admin shell still mounts exactly one `RightPanelProvider` and one
+`RightPanelSlot`. Permission loss or logout closes and unmounts Assistant
+content. Incident and Ticket record details remain KISS modals; their Assistant
+buttons only create the separate Assistant panel session.
