@@ -1,0 +1,28 @@
+/* DNSMan certificate/ACME lifecycle (#1431). Token-only, both themes. */
+.dns-certificates-page { display: grid; gap: 12px; min-width: 0; }
+.dns-cert-banner { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--warn); border-radius: 8px; padding: 11px 13px; color: var(--warn); background: var(--warn-soft); }
+.dns-cert-banner.is-blocked { color: var(--bad); border-color: var(--bad); background: var(--bad-soft); }
+.dns-cert-banner i { margin-top: 2px; }
+.dns-cert-request { display: grid; gap: 14px; }
+.dns-cert-request .field { margin: 0; }
+.dns-cert-readiness { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface2); }
+.dns-cert-readiness.is-ready { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
+.dns-cert-readiness.is-blocked { color: var(--bad); border-color: var(--bad); background: var(--bad-soft); }
+.dns-cert-detail-section { padding-bottom: 18px; }
+.dns-cert-detail-section .dns-errors, .dns-cert-detail-section .dns-provider-note { margin-top: 12px; }
+.dns-cert-names { list-style: none; display: grid; gap: 7px; margin: 8px 0 0; padding: 0; }
+.dns-cert-names li { overflow-wrap: anywhere; border-bottom: 1px solid var(--line-soft); padding-bottom: 7px; }
+.dns-domain-certificates { display: grid; gap: 12px; }
+.dns-cert-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.dns-cert-section-head p { margin: 3px 0 0; }
+.dns-cert-list { display: grid; gap: 8px; }
+.dns-cert-card { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; background: var(--surface); color: var(--ink); }
+.dns-cert-card:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dns-cert-card > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.dns-cert-card code, .dns-cert-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dns-cert-card small { color: var(--mute); }
+@media (max-width: 640px) {
+    .dns-cert-section-head, .dns-cert-card { align-items: stretch; flex-direction: column; }
+    .dns-cert-card .badge { align-self: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .dns-cert-readiness .spin { animation: none; } }

@@ -21,7 +21,7 @@ try {
     const reverse = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/domain-links.ts');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
 
-    assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'credentials']);
+    assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'credentials']);
     assert.equal(dns.DNS_ADMIN_SECTION.basePath, 'dns');
     assert(dns.DNS_ADMIN_SECTION.routes.every((route) => route.permissions === dns.DNS_VIEW_PERMISSIONS));
     assert.deepEqual(dns.DNS_MANAGE_PERMISSIONS, ['sys.manage_dns', 'sys.security']);
@@ -141,7 +141,7 @@ try {
     const disposeLink = reverse.registerDnsDomainLinks({ key: 'test', label: 'Test', icon: 'bi-test', route: 'test' });
     reverse.registerDnsDomainLinks({ key: 'test', label: 'Replacement', icon: 'bi-test', route: 'replacement' });
     assert.equal(reverse.getDnsDomainLinks().filter((link) => link.key === 'test').length, 1);
-    assert.equal(reverse.getDnsDomainLinks()[0].label, 'Replacement');
+    assert.equal(reverse.getDnsDomainLinks().find((link) => link.key === 'test').label, 'Replacement');
     disposeLink();
 
     const login = async (email) => {

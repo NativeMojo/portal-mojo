@@ -2,8 +2,8 @@
 
 Import from `portal-mojo/admin`.
 
-`DNS_ADMIN_SECTION` mounts at `dns/credentials` in the standalone admin and
-`system/dns/credentials` when embedded. Its global view gate is the ANY-of
+`DNS_ADMIN_SECTION` mounts Domains, DNS Records, Certificates, and Provider
+Credentials under `dns/` (or `system/dns/` embedded). Its global view gate is the ANY-of
 clause `sys.view_dns | sys.manage_dns | sys.security`; mutations use
 `sys.manage_dns | sys.security`. Member grants cannot satisfy either clause.
 

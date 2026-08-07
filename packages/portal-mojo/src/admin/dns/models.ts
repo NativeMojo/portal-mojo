@@ -1,4 +1,7 @@
 import { defineModel, type Params } from '../../client';
+import { sanitizeCertificateRow } from './certificate-data';
+
+export { sanitizeCertificateRow } from './certificate-data';
 
 export const DNS_VIEW_PERMISSIONS = ['sys.view_dns', 'sys.manage_dns', 'sys.security'];
 export const DNS_MANAGE_PERMISSIONS = ['sys.manage_dns', 'sys.security'];
@@ -298,24 +301,6 @@ export function sanitizeDomainPurchaseRow(row: unknown): DomainPurchaseRow {
     };
 }
 
-export function sanitizeCertificateRow(row: unknown): CertificateRow {
-    const raw = rowObject(row);
-    const domain = typeof raw.domain === 'number' ? raw.domain : rowObject(raw.domain);
-    return {
-        id: raw.id as number, created: raw.created as number, modified: raw.modified as number,
-        common_name: raw.common_name as string,
-        sans: Array.isArray(raw.sans) ? raw.sans.filter((name): name is string => typeof name === 'string') : [],
-        status: raw.status as string, issuer: raw.issuer as string | null, serial: raw.serial as string | null,
-        not_before: raw.not_before as number | null, not_after: raw.not_after as number | null,
-        renew_after: raw.renew_after as number | null, last_error: raw.last_error as string | null,
-        attempts: raw.attempts as number, days_remaining: raw.days_remaining as number | null,
-        domain: typeof domain === 'number' ? domain : {
-            id: domain.id as number, name: domain.name as string, provider: domain.provider as string,
-            status: domain.status as string, expires: domain.expires as number | null,
-        },
-    };
-}
-
 export function sanitizeRegistrarDiscoveryResponse(value: unknown): RegistrarDiscoveryResponse {
     const raw = rowObject(value);
     const domains = Array.isArray(raw.domains) ? raw.domains.map((value): RegistrarDiscoveryRow => {
@@ -372,9 +357,15 @@ export function normalizePurchaseListParams(params: Params): Params {
 }
 
 export function normalizeCertificateListParams(params: Params): Params {
+    if (params.graph != null && params.graph !== '' && params.graph !== 'default') {
+        throw new Error('Certificate lists support only graph=default');
+    }
+    for (const key of ['download_format', 'filename', 'export', 'download']) {
+        if (params[key] != null && params[key] !== '') throw new Error('Certificate export and download are not available');
+    }
     return normalizeListParams(
         params,
-        new Set(['domain', 'domain__group', 'status', 'status__in', 'not_after__gte', 'not_after__lte']),
+        new Set(['domain', 'domain__exact', 'domain__group', 'status', 'status__in', 'not_after__gte', 'not_after__lte']),
         new Set(['common_name', 'status', 'not_after', 'renew_after', 'created']),
         'default',
     );

@@ -454,7 +454,27 @@ interface MockDnsCertificate {
     renew_after: number | null;
     last_error: string | null;
     attempts: number;
+    /** Mock-private custody signal. Never serialized; no PEM exists here. */
+    material_present: boolean;
+    lifecycle_demo?: 'issuance' | 'renewal';
+    lifecycle_reads?: number;
     [field: string]: unknown;
+}
+
+interface MockAcmeDelegation {
+    id: number;
+    created: string | null;
+    modified: string | null;
+    domain: number | null;
+    domain_name: string;
+    source: string | null;
+    target: string | null;
+    state: 'pending' | 'verified' | 'broken' | 'retired';
+    verified_at: string | null;
+    last_error_code: string | null;
+    /** Never serialized: exact private ownership/cleanup canaries. */
+    tenant_uuid: string;
+    cleanup_challenge_ref: string | null;
 }
 
 interface MockDnsRecord {
@@ -661,6 +681,8 @@ function buildDnsDomains(): MockDnsDomain[] {
         { id: 8205, created: now - 80 * 86400, modified: now - 3600, group: 2, user: 2, name: 'bad-credential.example', provider: 'godaddy', credential: 8102, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: false, registered_on: now - 80 * 86400, expires: now + 285 * 86400, last_error: 'Provider verification failed', metadata: {} },
         { id: 8206, created: now - 1800, modified: now - 900, group: 1, user: 1, name: 'registering-acme.example', provider: 'route53', credential: null, status: 'registering', hosted_zone_id: null, auto_renew: true, privacy: true, verified: false, registered_on: null, expires: null, last_error: null, metadata: {} },
         { id: 8207, created: now - 200 * 86400, modified: now - 86400, group: 1, user: 1, name: 'unknown-provider.example', provider: 'otherdns', credential: null, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: 'Provider adapter is unavailable', metadata: {} },
+        { id: 8208, created: now - 150 * 86400, modified: now - 1800, group: 1, user: 1, name: 'broken-delegation.example', provider: 'mojo', credential: null, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} },
+        { id: 8209, created: now - 400 * 86400, modified: now - 86400, group: null, user: 22, name: 'house.example', provider: 'route53', credential: null, status: 'active', hosted_zone_id: 'ZHOUSEMOCK', auto_renew: true, privacy: true, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} },
     ];
 }
 
@@ -675,7 +697,25 @@ function buildDomainPurchases(): MockDomainPurchase[] {
 function buildDnsCertificates(): MockDnsCertificate[] {
     const now = Math.floor(Date.now() / 1000);
     return [
-        { id: 8401, created: now - 60 * 86400, modified: now - 2 * 86400, domain: 8201, common_name: 'acme.example', sans: ['acme.example', '*.acme.example'], status: 'active', issuer: "Let's Encrypt", serial: 'mock-8401', not_before: now - 60 * 86400, not_after: now + 30 * 86400, renew_after: now + 5 * 86400, last_error: null, attempts: 1 },
+        { id: 8401, created: now - 60 * 86400, modified: now - 2 * 86400, domain: 8201, common_name: 'acme.example', sans: ['acme.example', '*.acme.example'], status: 'active', issuer: "Let's Encrypt", serial: 'mock-8401', not_before: now - 60 * 86400, not_after: now + 30 * 86400, renew_after: now + 5 * 86400, last_error: null, attempts: 1, material_present: true },
+        { id: 8402, created: now - 90, modified: now - 90, domain: 8202, common_name: 'acme-byo.example', sans: ['acme-byo.example'], status: 'pending', issuer: null, serial: null, not_before: null, not_after: null, renew_after: null, last_error: null, attempts: 0, material_present: false },
+        { id: 8403, created: now - 180, modified: now - 30, domain: 8204, common_name: 'cert-only.example', sans: ['cert-only.example', '*.cert-only.example'], status: 'issuing', issuer: null, serial: null, not_before: null, not_after: null, renew_after: null, last_error: null, attempts: 1, material_present: false },
+        { id: 8404, created: now - 90 * 86400, modified: now - 31 * 86400, domain: 8201, common_name: 'renewing.acme.example', sans: ['renewing.acme.example'], status: 'active', issuer: "Let's Encrypt", serial: 'mock-8404-old', not_before: now - 90 * 86400, not_after: now + 3 * 86400, renew_after: now - 3600, last_error: null, attempts: 1, material_present: true, lifecycle_demo: 'renewal', lifecycle_reads: 0 },
+        { id: 8405, created: now - 90 * 86400, modified: now - 600, domain: 8201, common_name: 'renewal-error.acme.example', sans: ['renewal-error.acme.example'], status: 'active', issuer: "Let's Encrypt", serial: 'mock-8405', not_before: now - 90 * 86400, not_after: now + 3 * 86400, renew_after: now - 7200, last_error: 'ACME token=private-canary was rejected', attempts: 4, material_present: true },
+        { id: 8406, created: now - 86400, modified: now - 86000, domain: 8205, common_name: 'bad-credential.example', sans: ['bad-credential.example'], status: 'failed', issuer: null, serial: null, not_before: null, not_after: null, renew_after: null, last_error: 'Provider credential failed', attempts: 1, material_present: false },
+        { id: 8407, created: now - 200 * 86400, modified: now - 30 * 86400, domain: 8202, common_name: 'retired.acme-byo.example', sans: ['retired.acme-byo.example'], status: 'revoked', issuer: "Let's Encrypt", serial: 'mock-8407', not_before: now - 200 * 86400, not_after: now - 110 * 86400, renew_after: null, last_error: null, attempts: 1, material_present: true },
+        { id: 8408, created: now - 20 * 86400, modified: now - 20 * 86400, domain: 8209, common_name: 'house.example', sans: ['house.example', '*.house.example'], status: 'active', issuer: "Let's Encrypt", serial: 'mock-8408', not_before: now - 20 * 86400, not_after: now + 70 * 86400, renew_after: now + 40 * 86400, last_error: null, attempts: 1, material_present: true },
+        { id: 8409, created: now - 300, modified: now - 300, domain: 8201, common_name: ' MALFORMED.ACME.EXAMPLE. ', sans: [' malformed.acme.example. ', 'malformed.acme.example.', ''], status: 'mystery', issuer: null, serial: null, not_before: null, not_after: null, renew_after: null, last_error: 'Bearer should-not-cache and token=should-not-cache', attempts: -2, material_present: false },
+    ];
+}
+
+function buildAcmeDelegations(): MockAcmeDelegation[] {
+    const now = new Date();
+    const iso = (offsetSeconds: number) => new Date(now.getTime() + offsetSeconds * 1000).toISOString();
+    return [
+        { id: 8501, created: iso(-30 * 86400), modified: iso(-29 * 86400), domain: 8204, domain_name: 'cert-only.example', source: '_acme-challenge.cert-only.example', target: 'mock-8501.acme-hub.example', state: 'verified', verified_at: iso(-29 * 86400), last_error_code: null, tenant_uuid: 'private-tenant-canary', cleanup_challenge_ref: null },
+        { id: 8502, created: iso(-60 * 86400), modified: iso(-1800), domain: 8208, domain_name: 'broken-delegation.example', source: '_acme-challenge.broken-delegation.example', target: 'mock-8502.acme-hub.example', state: 'broken', verified_at: iso(-59 * 86400), last_error_code: 'dns_target_missing', tenant_uuid: 'private-broken-tenant', cleanup_challenge_ref: 'private-cleanup-canary' },
+        { id: 8503, created: iso(-600), modified: iso(-600), domain: 8201, domain_name: 'acme.example', source: '_acme-challenge.acme.example', target: 'mock-8503.acme-hub.example', state: 'pending', verified_at: null, last_error_code: null, tenant_uuid: 'private-pending-tenant', cleanup_challenge_ref: null },
     ];
 }
 
@@ -925,6 +965,39 @@ function serializeDnsCertificate(row: MockDnsCertificate): Record<string, unknow
             status: domain.status, expires: domain.expires,
         } : null,
     };
+}
+
+function serializeAcmeDelegation(row: MockAcmeDelegation): Record<string, unknown> {
+    return {
+        id: row.id, created: row.created, modified: row.modified,
+        domain: row.domain, domain_name: row.domain_name,
+        source: row.source, target: row.target, state: row.state,
+        verified_at: row.verified_at, last_error_code: row.last_error_code,
+    };
+}
+
+function advanceMockCertificate(row: MockDnsCertificate): void {
+    if (!row.lifecycle_demo) return;
+    row.lifecycle_reads = (row.lifecycle_reads ?? 0) + 1;
+    const now = Math.floor(Date.now() / 1000);
+    if (row.lifecycle_demo === 'issuance') {
+        if (row.lifecycle_reads === 1) {
+            row.status = 'issuing'; row.attempts = Math.max(1, row.attempts); row.modified = now;
+        } else if (row.lifecycle_reads >= 2) {
+            row.status = 'active'; row.issuer = "Let's Encrypt"; row.serial = `mock-${row.id}`;
+            row.not_before = now; row.not_after = now + 90 * 86400; row.renew_after = now + 60 * 86400;
+            row.last_error = null; row.material_present = true; row.modified = now; delete row.lifecycle_demo;
+        }
+        return;
+    }
+    if (row.lifecycle_reads === 1) return; // the accepted due-active baseline
+    if (row.lifecycle_reads === 2) {
+        row.status = 'issuing'; row.attempts += 1; row.modified = now;
+    } else if (row.lifecycle_reads >= 3) {
+        row.status = 'active'; row.serial = `mock-${row.id}-renewed`; row.not_before = now;
+        row.not_after = now + 90 * 86400; row.renew_after = now + 60 * 86400;
+        row.last_error = null; row.material_present = true; row.modified = now; delete row.lifecycle_demo;
+    }
 }
 
 function serializeFeedUser(userId: number | null): Record<string, unknown> | null {
@@ -3895,6 +3968,7 @@ const db = {
     dnsDomains: buildDnsDomains(),
     domainPurchases: buildDomainPurchases(),
     dnsCertificates: buildDnsCertificates(),
+    acmeDelegations: buildAcmeDelegations(),
     dnsRecords: buildDnsRecords(),
     metricPermissions: new Map<string, { view_permissions: string | string[] | null; write_permissions: string | string[] | null }>([
         ['global', { view_permissions: 'view_metrics', write_permissions: ['write_metrics', 'metrics'] }],
@@ -5208,12 +5282,18 @@ export function armMockReauth(method: string, path: string): void {
 }
 
 let dnsConfigMalformed = false;
+let dnsAcmeMode: 'production' | 'staging' | 'unconfigured' = 'staging';
 let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
 let dnsFailNextRead = false;
 
 /** Showcase-only fail-closed state; production transports never call this. */
 export function setMockDnsConfigMalformed(value: boolean): void {
     dnsConfigMalformed = value;
+}
+
+/** Showcase/verifier ACME deployment state. It is current config, never certificate provenance. */
+export function setMockDnsAcmeMode(value: 'production' | 'staging' | 'unconfigured'): void {
+    dnsAcmeMode = value;
 }
 
 /** Verifier-only one-shot DNS transport outcomes; all state still lives in db.dnsRecords. */
@@ -6864,6 +6944,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     const safeDnsParams = path === '/api/dnsman/credential/group-choice'
         || path === '/api/dnsman/registrar/discover'
+        || path === '/api/dnsman/delegation'
         || path.startsWith('/api/metrics/')
         ? { ...(opts.params ?? {}) }
         : undefined;
@@ -7254,7 +7335,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                     { name: 'route53', purchase: true, requires_credential: false },
                     { name: 'godaddy', purchase: false, requires_credential: true },
                 ],
-                acme: { configured: true, staging: true },
+                acme: { configured: dnsAcmeMode !== 'unconfigured', staging: dnsAcmeMode === 'staging' },
                 delegated_acme: {
                     available: true, record_type: 'CNAME', target_suffix: null,
                     profile: 'apex_wildcard', requires_provider_credentials: false,
@@ -7390,7 +7471,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (id != null) {
             const row = db.dnsDomains.find((candidate) => candidate.id === id);
             if (!row) return { status: false, error: 'Domain not found', error_code: 404 };
-            if (row.group == null ? !caller.is_superuser : !dnsMemberCan(caller, row.group, method !== 'GET')) return permissionDenied();
+            if (row.group == null
+                ? !hasGlobalPermission(caller, method === 'GET' ? DNS_VIEW_GRANTS : DNS_MANAGE_GRANTS)
+                : !dnsMemberCan(caller, row.group, method !== 'GET')) return permissionDenied();
             if (method === 'DELETE') {
                 db.dnsDomains = db.dnsDomains.filter((candidate) => candidate.id !== row.id);
                 db.dnsRecords.delete(row.id);
@@ -7434,6 +7517,25 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { ...result, graph: 'default', data: (result.data as unknown as MockDomainPurchase[]).map(serializeDomainPurchase) };
     }
 
+    const delegationMatch = path.match(/^\/api\/dnsman\/delegation(?:\/(\d+))?$/);
+    if (delegationMatch) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        if (method !== 'GET') return { status: false, error: 'Delegation writes use explicit actions', error_code: 405 };
+        const id = delegationMatch[1] ? Number(delegationMatch[1]) : null;
+        if (id != null) {
+            const row = db.acmeDelegations.find((candidate) => candidate.id === id && candidate.state !== 'retired');
+            if (!row) return { status: false, error: 'ACME delegation not found', error_code: 404 };
+            const domain = row.domain == null ? null : db.dnsDomains.find((candidate) => candidate.id === row.domain);
+            if (!domain || domain.group == null || !dnsMemberCan(caller, domain.group, false)) return { status: false, error: 'ACME delegation not found', error_code: 404 };
+            return { status: true, data: serializeAcmeDelegation(row) };
+        }
+        const domain = db.dnsDomains.find((candidate) => candidate.id === Number(opts.params?.domain));
+        if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
+        if (domain.group == null || !dnsMemberCan(caller, domain.group, false)) return permissionDenied();
+        return { status: true, data: db.acmeDelegations.filter((row) => row.domain === domain.id && row.state !== 'retired').slice(0, 100).map(serializeAcmeDelegation) };
+    }
+
     const certificateMatch = path.match(/^\/api\/dnsman\/certificate(?:\/(\d+))?$/);
     if (certificateMatch) {
         const caller = userFromBearer(opts.headers);
@@ -7445,12 +7547,18 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             if (!row) return { status: false, error: 'Certificate not found', error_code: 404 };
             const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
             if (!domain || (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, false))) return permissionDenied();
+            advanceMockCertificate(row);
             return { status: true, data: serializeDnsCertificate(row), graph: 'default' };
         }
         if (!dnsCollectionCan(caller, opts)) return permissionDenied();
-        if (opts.params?.download_format || opts.params?.filename) return { status: false, error: 'Certificate export is not available', error_code: 400 };
+        const certificateParams = opts.params ?? {};
+        if ((certificateParams.graph != null && certificateParams.graph !== '' && certificateParams.graph !== 'default')
+            || certificateParams.download_format || certificateParams.filename || certificateParams.export || certificateParams.download) {
+            return { status: false, error: 'Certificate graph/export/download is not available', error_code: 400 };
+        }
         const groupId = requestGroupId(opts);
         const rows = groupId > 0 ? db.dnsCertificates.filter((row) => db.dnsDomains.find((domain) => domain.id === row.domain)?.group === groupId) : db.dnsCertificates;
+        rows.forEach(advanceMockCertificate);
         const result = listRows(rows as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.common_name} ${row.status}`, '-created');
         return { ...result, graph: 'default', data: (result.data as unknown as MockDnsCertificate[]).map(serializeDnsCertificate) };
     }
@@ -7517,14 +7625,30 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (path.endsWith('/request')) {
             const domain = db.dnsDomains.find((candidate) => candidate.id === Number(body.domain));
             if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
-            if (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, true)) return permissionDenied();
+            if (domain.group == null ? !hasGlobalPermission(caller, DNS_MANAGE_GRANTS) : !dnsMemberCan(caller, domain.group, true)) return permissionDenied();
+            if (dnsAcmeMode === 'unconfigured') return { status: false, error: 'ACME is not configured', error_code: 400 };
+            if (domain.status !== 'active') return { status: false, error: 'Certificates require an active domain', error_code: 400 };
+            const sticky = db.acmeDelegations.find((candidate) => candidate.domain === domain.id && candidate.verified_at != null && candidate.state !== 'retired');
+            if (sticky && sticky.state !== 'verified') return { status: false, error: 'The sticky ACME delegation is not healthy', error_code: 400 };
+            if (domain.provider === 'mojo' && sticky?.state !== 'verified') return { status: false, error: 'A verified ACME delegation is required', error_code: 400 };
+            if (domain.provider === 'godaddy') {
+                const credential = db.dnsCredentials.find((candidate) => candidate.id === domain.credential);
+                if (!credential?.is_active || !credential.verified) return { status: false, error: 'An active, verified provider credential is required', error_code: 400 };
+            } else if (!['route53', 'mojo'].includes(domain.provider)) return { status: false, error: 'Unsupported DNS provider', error_code: 400 };
+            const normalizeName = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/\.+$/, '');
+            const names = Array.isArray(body.names) ? [...new Set(body.names.map(normalizeName).filter(Boolean))] : [domain.name, `*.${domain.name}`];
+            if (!names.length || names.some((name) => {
+                const host = name.startsWith('*.') ? name.slice(2) : name;
+                return !/^\*?\.?[a-z0-9.-]+$/i.test(name) || (host !== domain.name && !host.endsWith(`.${domain.name}`));
+            })) return { status: false, error: `Every certificate name must be inside ${domain.name}`, error_code: 400 };
             const now = Math.floor(Date.now() / 1000);
             const row: MockDnsCertificate = {
                 id: Math.max(8400, ...db.dnsCertificates.map((candidate) => candidate.id)) + 1,
                 created: now, modified: now, domain: domain.id, common_name: domain.name,
-                sans: Array.isArray(body.names) ? body.names.map(String) : [domain.name, `*.${domain.name}`],
+                sans: names,
                 status: 'pending', issuer: null, serial: null, not_before: null,
                 not_after: null, renew_after: null, last_error: null, attempts: 0,
+                material_present: false, lifecycle_demo: 'issuance', lifecycle_reads: 0,
             };
             db.dnsCertificates.unshift(row);
             return { status: true, data: serializeDnsCertificate(row) };
@@ -7533,6 +7657,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (!row) return { status: false, error: 'Certificate not found', error_code: 404 };
         const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
         if (!domain || (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, true))) return permissionDenied();
+        if (row.status !== 'active') return { status: false, error: `Certificate is ${row.status}, not active`, error_code: 400 };
         row.status = 'revoked'; row.modified = Math.floor(Date.now() / 1000);
         return { status: true, data: serializeDnsCertificate(row) };
     }
