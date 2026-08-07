@@ -631,12 +631,18 @@ function AvatarModal({ user, onClose, onPendingChange }: { user: UserRow; onClos
                 onChange={(value) => { void attach(value); }}
                 disabled={busy || !canManage}
                 accept="image/*"
+                edit={{
+                    title: 'Edit avatar',
+                    startMode: 'crop',
+                    crop: { aspectRatio: 1, cropAndScale: { width: 200, height: 200 } },
+                }}
+                requireEdit
                 ownerResult={ownerResult}
                 onPendingChange={setUploadPending}
                 onOrphan={(fileId) => toast.warning(`File #${fileId} remains uploaded but is not attached to this user.`)}
             />
             <div className="modal-actions">
-                <button className="btn" onClick={onClose} disabled={busy}>Close</button>
+                <button className="btn" onClick={onClose} disabled={busy || uploadPending}>Close</button>
             </div>
         </div>
     );

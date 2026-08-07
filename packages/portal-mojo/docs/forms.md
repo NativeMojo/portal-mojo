@@ -162,6 +162,28 @@ an imperative mounted File detail read, scheme-checked, rendered with
 into errors. Queue work is generation-guarded, cancelled on unmount/auth loss,
 and an active task is cancelled before removal.
 
+Image editing is opt-in. Direct use passes `edit` to `ImageField`; schema data
+passes `imageEdit` on an `image` field. The value is `true` for defaults or the
+`imageEditorModal` options (`startMode`, `modes`, `crop`, `maxHistory`, and
+labels). `requireEdit` (schema: `imageEditRequired`) removes the Use original
+escape hatch while still retaining the selection for retry/discard. The editor opens before upload initiation. Cancel and decode/encode
+failure retain the selected original locally with Edit/Use original/Discard
+choices; no File row, relation id, or owner save exists yet. Save converts the
+explicit PNG Blob into the exact File fed to the existing queue. Editing joins
+transfer in `onPendingChange`, so owning forms and dialogs keep their existing
+dismiss/submit lock.
+
+```ts
+{
+  name: 'avatar', type: 'image', label: 'Avatar',
+  imageEdit: {
+    startMode: 'crop',
+    crop: { aspectRatio: 1, cropAndScale: { width: 200, height: 200 } },
+  },
+  imageEditRequired: true,
+}
+```
+
 All machine state lives in one reducer (draft, server snapshot, per-field
 status, pending batch, in-flight flag); the two timers only dispatch.
 

@@ -35,6 +35,7 @@ export * from './TagInput';
 export * from './toast';
 export * from './FileDrop';
 export * from './FileField';
+export * from './image-editor';
 export * from './UploadQueue';
 export * from './AttachmentQueue';
 export * from './ui';

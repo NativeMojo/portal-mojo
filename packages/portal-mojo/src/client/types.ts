@@ -74,6 +74,23 @@ export interface FieldOption {
     disabled?: boolean;
 }
 
+/** Structural image-editor options kept client-side so model field data never imports ui. */
+export interface FieldImageEditOptions {
+    filename?: string;
+    title?: string;
+    size?: 'sm' | 'md' | 'lg';
+    startMode?: string;
+    modes?: readonly string[];
+    maxHistory?: number;
+    saveText?: string;
+    crop?: {
+        aspectRatio?: number | null;
+        minCropSize?: number;
+        fixedCropSize?: { width: number; height: number } | null;
+        cropAndScale?: { width: number; height: number } | null;
+    };
+}
+
 // Structural mirrors of ui/date/PresetRail's preset types (client code must
 // not import ui). String-returning `range()` (canonical YYYY-MM-DD strings)
 // is assignable to the rail's ParsedDate|string contract by covariance.
@@ -118,6 +135,10 @@ export interface Field {
     uploadDestination?: { fileManagerId?: number; groupId?: number; use?: string };
     /** Called once when a completed upload is abandoned without authoritative attachment. */
     onUploadOrphan?: (fileId: number) => void;
+    /** Image-only pre-upload edit. Omitted/false preserves the direct upload path. */
+    imageEdit?: boolean | FieldImageEditOptions;
+    /** Require an edited result; Cancel retains the local selection for retry/discard. */
+    imageEditRequired?: boolean;
 
     // ── Registry-type props (B4 #1278) — see docs/forms.md value table ──
     /** date/range pickers: grid precision. EXPLICIT value beats the

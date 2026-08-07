@@ -80,12 +80,16 @@ try {
         readFile(new URL('../apps/portal/src/theme/file-upload.css', import.meta.url), 'utf8'),
         readFile(new URL('../apps/showcase/src/theme/file-upload.css', import.meta.url), 'utf8'),
     ]);
-    for (const state of ['keep', 'clear', 'replacement-in-progress', 'replacement-failed', 'completed-awaiting-attach', 'attach-failed']) assert(fieldSource.includes(`'${state}'`), `explicit field state: ${state}`);
+    for (const state of ['keep', 'clear', 'replacement-in-progress', 'replacement-failed', 'completed-awaiting-attach', 'attach-failed', 'edit-pending', 'edit-ready', 'edit-failed']) assert(fieldSource.includes(`'${state}'`), `explicit field state: ${state}`);
     assert.match(fieldSource, /<FileDropZone/, 'field itself is keyboard-accessible and accepts drop');
     assert.match(fieldSource, /result\.generation <= lastGeneration/, 'stale owner results are generation-guarded');
     assert.match(fieldSource, /requestedMatches/, 'owner results are tied to the exact sent File value');
     assert.match(fieldSource, /referrerPolicy="no-referrer"/, 'stored image capabilities do not leak through referrers');
     assert.match(fieldSource, /URL\.revokeObjectURL/, 'local object previews are revoked');
+    assert.match(fieldSource, /await imageEditorModal\(file/, 'opt-in edit happens against the selected original');
+    assert.match(fieldSource, /new File\(\[result\.blob\], result\.filename, \{ type: 'image\/png'/, 'the returned PNG Blob becomes the exact queued File');
+    assert.match(fieldSource, /if \(!result\) \{\s*setState\('edit-ready'\)/, 'editor cancel preserves the selected original without uploading');
+    assert.match(fieldSource, /enqueueFile\(edited, acceptedGeneration\)/, 'upload starts only after edited File creation');
     assert.match(fieldSource, /if \(item\.canCancel\) queue\.cancel\(item\.id\);\s*queue\.remove\(item\.id\)/, 'active queue work is cancelled before removal');
     assert(!/localStorage|sessionStorage|useQuery|QueryClient|console\.|throw new Error\([^)]*url/i.test(fieldSource), 'capabilities never persist, cache, log, or enter errors');
     assert.match(queueSource, /if \(!next\.authenticated \|\| next\.uid !== authUid\) store\.dispose\(\)/, 'auth loss disposes and cancels the real queue task');
@@ -95,6 +99,9 @@ try {
     assert.match(formViewSource, /publishOwnerResult\(info\.fields, 'success', info\.changes, info\.row\)/);
     assert.match(avatarSource, /onPendingChange\(uploadPending \|\| busy\)/, 'avatar dismissal covers transfer and owner save');
     assert.match(avatarSource, /authoritative !== avatar/, 'avatar success requires exact returned id/null');
+    assert.match(avatarSource, /cropAndScale: \{ width: 200, height: 200 \}/, 'avatar opts into exact 200x200 pre-upload output');
+    assert.match(avatarSource, /requireEdit/, 'avatar cannot bypass its exact edit contract with Use original');
+    assert.match(avatarSource, /disabled=\{busy \|\| uploadPending\}/, 'explicit Close shares the transfer/edit/save dismissal gate');
     assert.equal(portalCss, showcaseCss, 'both themes carry byte-identical upload field styles');
     await stat(new URL('../packages/portal-mojo/docs/forms.md', import.meta.url));
     await stat(new URL('../packages/portal-mojo/docs/admin-identity-users.md', import.meta.url));
