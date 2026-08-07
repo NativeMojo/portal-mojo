@@ -19,6 +19,7 @@ export interface RealtimeMockObservation {
     topic?: string;
     hasToken?: boolean;
     conversationId?: number | null;
+    requestId?: string;
     messageLength?: number;
 }
 
@@ -133,27 +134,28 @@ export class RealtimeMockServer {
         this.wrapped({ type: 'disconnect', reason: 'forced_disconnect' }, undefined, connection);
     }
 
-    finishAssistant(conversationId: number, response = 'The deterministic realtime response is ready.', connection?: number): void {
+    finishAssistant(conversationId: number, requestId: string, response = 'The deterministic realtime response is ready.', connection?: number): void {
         this.direct({
-            type: 'assistant_response', conversation_id: conversationId,
+            type: 'assistant_response', conversation_id: conversationId, request_id: requestId,
             message_id: ++this.nextMessageId, created: new Date(this.timestamp * 1000).toISOString(),
             response, blocks: null, tool_calls_made: [{ tool: 'mock_private_tool', input: { withheld: true } }],
             duration_ms: 250,
         }, connection);
     }
 
-    failAssistant(conversationId: number, connection?: number): void {
-        this.direct({ type: 'assistant_error', conversation_id: conversationId, error: 'Deterministic Assistant failure' }, connection);
+    failAssistant(conversationId: number, requestId: string, connection?: number): void {
+        this.direct({ type: 'assistant_error', conversation_id: conversationId, request_id: requestId, error: 'Deterministic Assistant failure' }, connection);
     }
 
-    assistantLifecycle(conversationId: number, connection?: number, wrapped = false): void {
+    assistantLifecycle(conversationId: number, requestId: string, connection?: number, wrapped = false): void {
         const deliver = (event: Record<string, unknown>) => wrapped ? this.wrapped(event, undefined, connection) : this.direct(event, connection);
-        deliver({ type: 'assistant_thinking', conversation_id: conversationId });
-        deliver({ type: 'assistant_text', conversation_id: conversationId, text: 'Checking the bounded mock plan.', blocks: null });
-        deliver({ type: 'assistant_tool_call', conversation_id: conversationId, tool: 'query_health', input: { private: 'never observed or projected' } });
-        deliver({ type: 'assistant_plan', conversation_id: conversationId, plan: { plan_id: 'mock-plan', title: 'Health check', steps: [{ id: 1, description: 'Check health', status: 'pending', parallel: false, tool: 'query_health', tool_input: { private: true } }] } });
-        deliver({ type: 'assistant_plan_update', conversation_id: conversationId, plan_id: 'mock-plan', step_id: 1, status: 'done', summary: 'Healthy' });
-        deliver({ type: 'assistant_response', conversation_id: conversationId, message_id: ++this.nextMessageId, created: new Date(this.timestamp * 1000).toISOString(), response: 'The deterministic realtime response is ready.', blocks: null, tool_calls_made: [{ tool: 'query_health', input: { private: true } }], duration_ms: 250 });
+        const base = { conversation_id: conversationId, request_id: requestId };
+        deliver({ type: 'assistant_thinking', ...base });
+        deliver({ type: 'assistant_text', ...base, text: 'Checking the bounded mock plan.', blocks: null });
+        deliver({ type: 'assistant_tool_call', ...base, tool: 'query_health', input: { private: 'never observed or projected' } });
+        deliver({ type: 'assistant_plan', ...base, plan: { plan_id: 'mock-plan', title: 'Health check', steps: [{ id: 1, description: 'Check health', status: 'pending', parallel: false, tool: 'query_health', tool_input: { private: true } }] } });
+        deliver({ type: 'assistant_plan_update', ...base, plan_id: 'mock-plan', step_id: 1, status: 'done', summary: 'Healthy' });
+        deliver({ type: 'assistant_response', ...base, message_id: ++this.nextMessageId, created: new Date(this.timestamp * 1000).toISOString(), response: 'The deterministic realtime response is ready.', blocks: null, tool_calls_made: [{ tool: 'query_health', input: { private: true } }], duration_ms: 250 });
     }
 
     clearObservations(): void {
@@ -192,15 +194,17 @@ export class RealtimeMockServer {
         }
         if (type === 'assistant_message' || type === 'assistant_action') {
             const conversationId = typeof message.conversation_id === 'number' ? message.conversation_id : ++this.nextConversationId;
+            const requestId = typeof message.request_id === 'string' ? message.request_id : '';
             const text = type === 'assistant_action' ? message.value : message.message;
             this.observations.push({
                 connection: socket.id, kind: 'assistant', action: type,
                 conversationId: typeof message.conversation_id === 'number' ? message.conversation_id : null,
+                requestId,
                 messageLength: typeof text === 'string' ? text.length : 0,
             });
             if (!this.autoAssistant) return;
-            socket.frame({ type: 'assistant_thinking', conversation_id: conversationId });
-            queueMicrotask(() => this.finishAssistant(conversationId, undefined, socket.id));
+            socket.frame({ type: 'assistant_thinking', conversation_id: conversationId, request_id: requestId });
+            queueMicrotask(() => this.finishAssistant(conversationId, requestId, undefined, socket.id));
         }
     }
 
