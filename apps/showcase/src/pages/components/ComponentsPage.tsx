@@ -373,7 +373,7 @@ const GROUPS: DemoGroup[] = [
             },
             {
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
-                blurb: 'Global S3 buckets, masked storage backends, capability-safe files, sharing and finite rendition convergence — with explicit destructive confirmation and no upload or deletion shortcuts.',
+                blurb: 'Global S3 buckets, masked storage backends, explicit policy-backed file uploads, capability-safe sharing, and finite rendition convergence.',
                 render: () => <AdminStorageDemo />,
             },
             {

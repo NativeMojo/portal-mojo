@@ -6,7 +6,7 @@ type Surface = 'buckets' | 'backends' | 'files' | 'modals';
 export function AdminStorageDemo() {
     const [surface, setSurface] = useState<Surface>('buckets');
     return <div className="flex flex-col gap-3">
-        <div className="panel panel-pad"><div className="eyebrow">Global Admin · no group context</div><h2 className="panel-title">Storage control plane</h2><p className="dim">One live-shaped mock owns the complete S3 inventory, masked backend credentials, files, canonical renditions, and visible shares. Upload, bucket deletion, and backend deletion stay absent.</p><div className="seg-row"><div className="seg">{(['buckets', 'backends', 'files', 'modals'] as Surface[]).map((key) => <button key={key} className={`seg-btn${surface === key ? ' seg-active' : ''}`} onClick={() => setSurface(key)}>{key[0]!.toUpperCase() + key.slice(1)}</button>)}</div></div></div>
+        <div className="panel panel-pad"><div className="eyebrow">Global Admin · no group context</div><h2 className="panel-title">Storage control plane</h2><p className="dim">One live-shaped mock owns the S3 inventory, masked backends, policy-backed uploads, files, renditions, and visible shares. Open Files to exercise Add File, whole-page drop, local/provider progress, cancel, retry, and authoritative refresh.</p><div className="seg-row"><div className="seg">{(['buckets', 'backends', 'files', 'modals'] as Surface[]).map((key) => <button key={key} className={`seg-btn${surface === key ? ' seg-active' : ''}`} onClick={() => setSurface(key)}>{key[0]!.toUpperCase() + key.slice(1)}</button>)}</div></div></div>
         {surface === 'buckets' && <BucketsPage />}
         {surface === 'backends' && <BackendsPage />}
         {surface === 'files' && <FilesPage />}

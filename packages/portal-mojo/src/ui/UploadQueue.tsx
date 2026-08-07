@@ -137,7 +137,7 @@ const SETTLED = new Set<UploadQueueItemStatus>([
 ]);
 
 const cleanInt = (value: number | undefined): number | undefined =>
-    Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : undefined;
+    Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : undefined;
 
 function normalizeDestination(value: StartFileUploadOptions = {}): StartFileUploadOptions {
     const use = value.use?.trim();

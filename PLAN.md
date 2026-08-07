@@ -263,8 +263,11 @@ POST actively refreshes in `finally`. Backends keep credential writes outside
 MutationCache, never prefill secrets, require explicit authorized owner scope,
 and refetch/compare FKs. Files add safe selection batches, modal FileView,
 capability-URL validation, modal-local sharing, playback-stable native media,
-and 5-second/12-attempt rendition convergence. Upload remains parked in #1264;
-bucket deletion and FileManager deletion remain absent. The executable contract
+and 5-second/12-attempt rendition convergence. Admin Files uploads now add an
+explicit safe-policy manager/group chooser, Add File and whole-page drag paths,
+a bounded queue with real progress/cancel/retry/recovery, private idempotent
+attempts, destination verification, and coalesced authoritative refresh. Bucket
+deletion and FileManager deletion remain absent. The executable contract
 is `npm run verify:admin-storage`; the showcase exposes all three pages plus
 playable/unsafe/rendition and cancellable destructive modal evidence for the
 central light/dark browser close.
@@ -282,9 +285,9 @@ duplicate suppression, and truthful partial-batch outcomes; reference docs and
 Showcase scenarios ship with it. Focused contracts are `verify:file-upload` and
 `verify:upload-ux`.
 
-The consuming children remain intentionally **not shipped** pending measured
-django-mojo contracts: Admin Files #1469 depends on manager authorization and
-policy enforcement #1485; forms/profile #1471 depends on relation clear/string
+Admin Files #1469 now consumes completed django-mojo #1485. The remaining
+children stay intentionally **not shipped** pending measured django-mojo
+contracts: forms/profile #1471 depends on relation clear/string
 ID/admin-on-behalf ownership semantics #1488; record and conversation
 attachments #1472 depends on completed/scoped File relation enforcement #1487,
 while Assistant's optional attachment shape is separately tracked in #1486.

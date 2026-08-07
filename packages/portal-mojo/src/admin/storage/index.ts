@@ -11,6 +11,7 @@ export * from './BucketDetail';
 export * from './BackendsPage';
 export * from './FileManagerDetail';
 export * from './FilesPage';
+export * from './FileUploadSurface';
 export * from './FileView';
 export * from './FilePreview';
 export * from './storage-dialogs';

@@ -34,6 +34,18 @@ export interface FileManagerRow {
     user?: RelationRow | number | null;
 }
 
+/** Capability-free projection used only to choose an upload destination. */
+export interface FileManagerUploadPolicyRow {
+    id: number;
+    name: string;
+    use: string | null;
+    is_active: boolean;
+    max_file_size: number;
+    allowed_extensions: string[];
+    allowed_mime_types: string[];
+    supports_direct_upload: boolean;
+}
+
 export interface FileRenditionRow {
     id: number;
     created: number;
@@ -175,6 +187,25 @@ export function sanitizeFileManagerRow(input: FileManagerRow): FileManagerRow {
     };
 }
 
+export function sanitizeFileManagerUploadPolicyRow(input: FileManagerUploadPolicyRow): FileManagerUploadPolicyRow {
+    const raw = input as unknown as Record<string, unknown>;
+    const id = Number(raw.id);
+    const maxFileSize = Number(raw.max_file_size);
+    if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(maxFileSize) || maxFileSize < 0) {
+        throw new TypeError('Invalid FileManager upload policy');
+    }
+    return {
+        id,
+        name: String(raw.name ?? ''),
+        use: raw.use == null ? null : String(raw.use),
+        is_active: Boolean(raw.is_active),
+        max_file_size: maxFileSize,
+        allowed_extensions: Array.isArray(raw.allowed_extensions) ? raw.allowed_extensions.map(String) : [],
+        allowed_mime_types: Array.isArray(raw.allowed_mime_types) ? raw.allowed_mime_types.map(String) : [],
+        supports_direct_upload: Boolean(raw.supports_direct_upload),
+    };
+}
+
 export function sanitizeFileRow(input: FileRow): FileRow {
     const raw = input as unknown as Record<string, unknown>;
     const renditions: Record<string, FileRenditionRow> = {};
@@ -213,6 +244,20 @@ export const FileManagerModel = defineModel<FileManagerRow>({
     permissions: { view: STORAGE_VIEW_PERMS, manage: STORAGE_MANAGE_PERMS },
     normalizeListParams: (params) => allowListParams(params, MANAGER_FILTERS, 'list'),
     sanitizeRow: sanitizeFileManagerRow,
+});
+
+export const FileManagerUploadPolicyModel = defineModel<FileManagerUploadPolicyRow>({
+    name: 'file-manager-upload-policy', endpoint: '/api/fileman/manager',
+    permissions: { view: STORAGE_MANAGE_PERMS },
+    normalizeListParams: (params) => {
+        const safe = allowListParams(params, MANAGER_FILTERS, 'upload_policy');
+        safe.start = 0;
+        safe.size = Math.min(50, Math.max(1, Number(safe.size) || 50));
+        safe.sort = 'name';
+        safe.is_active = true;
+        return safe;
+    },
+    sanitizeRow: sanitizeFileManagerUploadPolicyRow,
 });
 
 export const FileModel = defineModel<FileRow>({

@@ -21,7 +21,7 @@ export interface UploadedFileRef {
 
 export interface FileUploadFailure {
     stage: FileUploadFailureStage;
-    code: 'request_failed' | 'cancelled_after_initiate' | 'remote_state_unknown';
+    code: 'request_failed' | 'cancelled_after_initiate' | 'remote_state_unknown' | 'destination_mismatch';
     message: string;
     retryable: boolean;
 }
@@ -78,7 +78,14 @@ interface WireFile {
     category?: unknown;
     upload_status?: unknown;
     file_manager?: unknown;
+    file_manager_id?: unknown;
     group?: unknown;
+    group_id?: unknown;
+}
+
+function newIdempotencyKey(): string {
+    const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    return `portal-upload:${id}`.slice(0, 128);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -183,6 +190,7 @@ function safeFailure(stage: FileUploadFailureStage, code: FileUploadFailure['cod
         request_failed: 'The upload request failed.',
         cancelled_after_initiate: 'Cancellation was requested after the server created the upload.',
         remote_state_unknown: 'The server could not confirm the upload state.',
+        destination_mismatch: 'The completed file does not match the selected destination.',
     };
     return { stage, code, message: messages[code], retryable };
 }
@@ -200,8 +208,8 @@ function safeCompletedFile(value: unknown): UploadedFileRef {
         contentType: row.content_type,
         size: row.file_size == null ? null : integer(row.file_size),
         category: typeof row.category === 'string' ? row.category : null,
-        fileManagerId: relationId(row.file_manager),
-        groupId: relationId(row.group),
+        fileManagerId: integer(row.file_manager_id) ?? relationId(row.file_manager),
+        groupId: integer(row.group_id) ?? relationId(row.group),
     };
 }
 
@@ -214,6 +222,8 @@ class UploadTask implements FileUploadTask {
     #controller: AbortController | null = null;
     #active: Promise<FileUploadOutcome> | null = null;
     #result: Promise<FileUploadOutcome>;
+    #idempotencyKey = newIdempotencyKey();
+    #authoritativeTerminal = false;
 
     constructor(file: File, options: StartFileUploadOptions) {
         this.#file = file;
@@ -246,6 +256,13 @@ class UploadTask implements FileUploadTask {
         // Recovery is reconciliation-only. Without an id it must not create a
         // possible duplicate; the caller must explicitly choose retry/restart.
         if (mode === 'recover' && !this.#initiated) return this.#result;
+        // A server-proven failed/expired lifecycle is a closed attempt. The
+        // next explicit user retry creates a new File with a fresh key. An
+        // id-less ambiguous initiation retains its key so replay finds the
+        // first committed File instead of creating a duplicate.
+        if (mode === 'retry' && this.#authoritativeTerminal) {
+            this.#resetAttempt();
+        }
         const generation = this.#snapshot.generation + 1;
         this.#snapshot = { phase: this.#initiated ? 'reconciling' : 'initiating', generation, fileId: this.#initiated?.id ?? null, loadedBytes: 0, totalBytes: null, outcome: null };
         this.#controller = new AbortController();
@@ -260,11 +277,24 @@ class UploadTask implements FileUploadTask {
     async #run(generation: number, mode: 'initial' | 'retry' | 'recover', signal: AbortSignal): Promise<FileUploadOutcome> {
         let stage: FileUploadFailureStage = this.#initiated ? 'reconcile' : 'initiate';
         try {
-            if (!this.#initiated) await this.#initiate(generation, signal);
+            if (!this.#initiated) {
+                const row = await this.#initiate(generation, signal);
+                if (row.upload_status === 'completed') return this.#completeOutcome(safeCompletedFile(row), generation);
+                if (row.upload_status === 'failed' || row.upload_status === 'expired') return this.#failOutcome(stage, generation, true);
+            }
             else {
                 const row = await this.#read(generation, signal);
                 if (row.upload_status === 'completed') return this.#completeOutcome(safeCompletedFile(row), generation);
-                if (row.upload_status !== 'uploading') return this.#failOutcome(stage, generation);
+                if (row.upload_status !== 'uploading') {
+                    if (mode !== 'retry') return this.#failOutcome(stage, generation, true);
+                    // The explicit retry that discovers an authoritative
+                    // terminal lifecycle immediately starts its fresh attempt.
+                    this.#resetAttempt();
+                    stage = 'initiate';
+                    const fresh = await this.#initiate(generation, signal);
+                    if (fresh.upload_status === 'completed') return this.#completeOutcome(safeCompletedFile(fresh), generation);
+                    if (fresh.upload_status !== 'uploading') return this.#failOutcome(stage, generation, true);
+                }
                 if (mode === 'recover') return await this.#complete(generation, signal);
             }
             stage = 'transfer';
@@ -272,7 +302,7 @@ class UploadTask implements FileUploadTask {
             stage = 'reconcile';
             const row = await this.#read(generation, signal);
             if (row.upload_status === 'completed') return this.#completeOutcome(safeCompletedFile(row), generation);
-            if (row.upload_status !== 'uploading') return this.#failOutcome(stage, generation);
+            if (row.upload_status !== 'uploading') return this.#failOutcome(stage, generation, true);
             stage = 'complete';
             return await this.#complete(generation, signal);
         } catch (error) {
@@ -304,11 +334,11 @@ class UploadTask implements FileUploadTask {
         }
     }
 
-    async #initiate(generation: number, signal: AbortSignal): Promise<void> {
+    async #initiate(generation: number, signal: AbortSignal): Promise<WireFile> {
         this.#publish({ phase: 'initiating' }, generation);
         const filename = sanitizeUploadBasename(this.#file.name);
         const requestedType = this.#file.type || FALLBACK_MIME;
-        const body: Record<string, unknown> = { filename, content_type: requestedType, file_size: this.#file.size };
+        const body: Record<string, unknown> = { filename, content_type: requestedType, file_size: this.#file.size, idempotency_key: this.#idempotencyKey };
         if (this.#options.fileManagerId != null) body.file_manager = this.#options.fileManagerId;
         if (this.#options.groupId != null) body.group = this.#options.groupId;
         if (this.#options.use?.trim()) body.use = this.#options.use.trim();
@@ -322,7 +352,8 @@ class UploadTask implements FileUploadTask {
         const initiated: InitiatedUpload = { id, filename: serverFilename, contentType, size, capability: null };
         this.#initiated = initiated;
         this.#publish({ fileId: id }, generation);
-        initiated.capability = normalizeUploadCapability(envelope.data.upload_url);
+        if (envelope.data.upload_status === 'uploading') initiated.capability = normalizeUploadCapability(envelope.data);
+        return envelope.data;
     }
 
     async #transfer(generation: number, signal: AbortSignal): Promise<void> {
@@ -353,14 +384,32 @@ class UploadTask implements FileUploadTask {
         return this.#completeOutcome(safeCompletedFile(row), generation);
     }
 
+    #resetAttempt(): void {
+        this.#initiated = null;
+        this.#authoritativeTerminal = false;
+        this.#idempotencyKey = newIdempotencyKey();
+    }
+
     #completeOutcome(file: UploadedFileRef, generation: number): FileUploadOutcome {
+        const expectedManager = this.#options.fileManagerId;
+        const expectedGroup = this.#options.groupId ?? null;
+        if ((expectedManager != null && (file.fileManagerId !== expectedManager || file.groupId !== expectedGroup))
+            || (expectedManager == null && this.#options.groupId != null && file.groupId !== expectedGroup)) {
+            const outcome: FileUploadOutcome = {
+                status: 'uncertain', fileId: file.id,
+                failure: safeFailure('reconcile', 'destination_mismatch', false),
+            };
+            this.#publish({ phase: 'uncertain', outcome }, generation);
+            return outcome;
+        }
         const outcome: FileUploadOutcome = { status: 'completed', file };
         this.#publish({ phase: 'completed', outcome }, generation);
         return outcome;
     }
 
-    #failOutcome(stage: FileUploadFailureStage, generation: number): FileUploadOutcome {
-        const outcome: FileUploadOutcome = { status: 'failed', fileId: this.#initiated?.id ?? null, failure: safeFailure(stage, 'request_failed', false) };
+    #failOutcome(stage: FileUploadFailureStage, generation: number, terminal = false): FileUploadOutcome {
+        this.#authoritativeTerminal = terminal;
+        const outcome: FileUploadOutcome = { status: 'failed', fileId: this.#initiated?.id ?? null, failure: safeFailure(stage, 'request_failed', terminal) };
         this.#publish({ phase: 'failed', outcome }, generation);
         return outcome;
     }

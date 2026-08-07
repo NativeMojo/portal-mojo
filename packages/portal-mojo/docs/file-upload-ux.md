@@ -90,6 +90,11 @@ safe completed File references. It never contains browser `File` objects,
 transport tasks, callbacks, capabilities, abort controllers, toast handles,
 raw errors, or auth data.
 
+Admin Files composes this primitive in `FileUploadSurface`: Add File and a
+drag-only whole-page overlay share an explicit policy-backed destination modal,
+while the queue remains mounted outside it. The surface fabricates neither
+progress nor reconciliation timers.
+
 ## Outcome truth and actions
 
 - **Cancel** is a request. An active item becomes `cancelling`; it becomes

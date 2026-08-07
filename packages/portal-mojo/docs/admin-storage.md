@@ -3,7 +3,7 @@
 ```ts
 import {
     STORAGE_ADMIN_SECTION, BucketsPage, BackendsPage, FilesPage, FileView,
-    FileManagerModel, FileModel,
+    FileUploadSurface, FileManagerModel, FileManagerUploadPolicyModel, FileModel,
 } from 'portal-mojo/admin';
 ```
 
@@ -17,6 +17,8 @@ backends, nested files, and files use `modal.detail`.
 - Buckets: `sys.manage_aws | sys.files`.
 - Backends/Files view: `sys.view_fileman | sys.manage_files | sys.files`.
 - Backend/File mutations: `sys.manage_files | sys.files`.
+- Add File, its whole-page drop surface, and upload destination requests mount
+  only with the File mutation grant.
 - Group and user selectors mount only with their respective system-pinned
   directory grants. Admin never reads an active group.
 
@@ -63,9 +65,32 @@ FileManager DELETE and `check_public_access` are absent.
 `FileModel` forces the list graph and normal saves to `filename`, `is_public`,
 and explicit `group`. Group moves refetch and compare the authoritative FK.
 Selection supports public/private, explicit prepared group move, safe
-same-gesture download, and all-settled confirmed delete. There is no Add File,
-file input, drop/paste target, upload endpoint, or progress UI; upload remains
-parked in #1264.
+same-gesture download, and all-settled confirmed delete. Authorized operators
+also get **Add File** and a drag-only whole-page drop overlay. Both open one
+configuration modal; the bounded queue lives above it, so closing the modal
+does not cancel work or discard outcomes.
+
+Every batch chooses an explicit manager. System choices request only active
+`graph=upload_policy` rows with null group/user owners. Group choices first use
+the independently gated active-group directory, then request null-user policy
+rows for that exact group. User-owned and dual-owned managers never enter these
+Admin lists. The safe policy projection contains only name/use, size,
+extension/MIME guidance, and transfer-route support. A false
+`supports_direct_upload` means a local API target, not an unavailable manager.
+
+The queue caps at six files and three concurrent transfers. It reports actual
+byte progress, truthful cancel/retry/recovery, partial acceptance, and uncertain
+remote state. Permission loss closes the destination modal, stops its queries,
+and best-effort cancels queued transfers. Completion compares authoritative
+scalar `file_manager_id`/`group_id` with the immutable destination. Terminal
+changes coalesce into one authoritative active Files refetch plus one trailing
+pass; refresh failure remains visible and current filters may hide the new row.
+
+Each task owns a private strict `idempotency_key`. A lost initiation response
+reuses it to recover the same File. A server-proven failed/expired lifecycle
+rotates it and creates a fresh attempt on the same Retry click. Keys, browser
+`File` objects, targets/tokens, and completion payloads never enter Query or
+persistent storage.
 
 File, thumbnail, rendition, and share URLs are bearer capabilities. The shared
 validator accepts ordinary relative paths or explicit `http:`/`https:` URLs
@@ -100,14 +125,17 @@ DELETE contract.
 
 ## Mock and verification
 
-The central mock owns bucket, FileManager, File, canonical rendition, and
-shortlink rows. Credential writes derive masks and discard raw values. Stable
+The central mock owns bucket, FileManager, File, upload attempts/byte sessions,
+canonical rendition, and shortlink rows. It implements the safe policy graph,
+flat lifecycle/target response, idempotent replay, terminal retry, and local or
+provider paths. Credential writes derive masks and discard raw values. Stable
 personas are `storage.viewer@nativemojo.com`,
 `storage.manager@nativemojo.com`, `bucket.manager@nativemojo.com`, and
 `storage.member@nativemojo.com` (password `mojo`); the showcase operator has
 the broad demo grants.
 
-Run `npm run verify:admin-storage` for the focused route, permission, wire,
-cache-safety, URL, FK-reconciliation, and bounded-polling contract. Browser
+Run `npm run verify:admin-storage`, `npm run verify:file-upload`, and
+`npm run verify:upload-ux` for the focused route, permission, upload,
+cache-safety, URL, FK-reconciliation, and bounded-polling contracts. Browser
 evidence belongs in the Portal mock for viewer/member gates and in Showcase
 for the exported surface, in both themes.

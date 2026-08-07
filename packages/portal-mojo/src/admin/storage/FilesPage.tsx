@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Badge, CollectionSelect, ModelTable, fmt, modal, type BatchAction, type Column, type FilterDef } from '../../ui';
 import { useCan } from '../../client';
 import { FileView } from './FileView';
+import { FileUploadSurface } from './FileUploadSurface';
 import { FileModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, exportFiles, openCapabilityUrl, saveFileAndReconcileGroup, type FileRow, type RelationRow } from './models';
 
 const COLUMNS: Column<FileRow>[] = [
@@ -44,5 +45,9 @@ export function FilesPage() {
         { key: 'download', label: 'Download selected', confirm: false, run: async (row) => { if (!openCapabilityUrl(row.url ?? '', true)) throw new Error(`${row.filename} has no safe download URL`); } },
         { key: 'delete', label: 'Delete', danger: true, confirm: 'Delete the selected files and their backend objects? This cannot be undone.', run: (row) => remove.mutateAsync({ id: row.id }) },
     ];
-    return <ModelTable model={FileModel} eyebrow="Infrastructure · Storage" title="Files" columns={COLUMNS} filters={FILTERS} presets={[{ key: 'all', label: 'All', params: {} }, { key: 'ready', label: 'Ready', params: { upload_status: 'completed' } }, { key: 'failed', label: 'Failed', params: { upload_status: 'failed' } }, { key: 'public', label: 'Public', params: { is_public: 'true' } }]} defaultSort="-created" searchable searchPlaceholder="Search filename or content type" selectable={canManage} batchActions={canManage ? batches : []} columnChooser persistState persistKey="admin:storage:files" exportFormats={['csv', 'json']} exporter={exportFiles} onRowClick={(row) => showFileView(row.id)} />;
+    const table = (openUpload?: () => void) => <ModelTable model={FileModel} eyebrow="Infrastructure · Storage" title="Files" columns={COLUMNS} filters={FILTERS} presets={[{ key: 'all', label: 'All', params: {} }, { key: 'ready', label: 'Ready', params: { upload_status: 'completed' } }, { key: 'failed', label: 'Failed', params: { upload_status: 'failed' } }, { key: 'public', label: 'Public', params: { is_public: 'true' } }]} defaultSort="-created" searchable searchPlaceholder="Search filename or content type" selectable={canManage} batchActions={canManage ? batches : []} columnChooser persistState persistKey="admin:storage:files" exportFormats={['csv', 'json']} exporter={exportFiles} onAdd={openUpload} addLabel="Add File" onRowClick={(row) => showFileView(row.id)} />;
+    // Do not mount picker/drop/manager queries for view-only operators.
+    return canManage
+        ? <FileUploadSurface canManage canChooseGroup={canChooseGroup}>{(openUpload) => table(openUpload)}</FileUploadSurface>
+        : table();
 }

@@ -11,5 +11,6 @@ try {
     assert.deepEqual(Object.keys(manifest.exports).sort(), ['./admin', './charts', './client', './ui']);
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     for (const name of ['ASSISTANT_ADMIN_SECTION', 'AssistantFeed', 'AssistantPanel', 'AssistantLauncher', 'AssistantContextLauncher', 'ConversationsPage', 'SkillsPage', 'MemoriesPage']) assert(admin[name] !== undefined, `portal-mojo/admin must export ${name}`);
+    for (const name of ['FilesPage', 'FileUploadSurface', 'FileManagerUploadPolicyModel']) assert(admin[name] !== undefined, `portal-mojo/admin must export ${name}`);
     console.log('portal-mojo package exports verified');
 } finally { await server.close(); }

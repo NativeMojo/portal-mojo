@@ -31,7 +31,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-dns-records.md](admin-dns-records.md) | Domain inventory/KISS detail and id-less live DNS records — complete-set writes, explicit corrections, stale preflight, and provider behavior |
 | [admin-dns-certificates.md](admin-dns-certificates.md) | Certificate custody and ACME lifecycle — in-zone requests, delegation readiness, house gates, renewal-aware bounded polling, and the no-material boundary |
 | [admin-dns-registrar.md](admin-dns-registrar.md) | Domain search/quote/purchase, one-use token custody, durable-ledger reconciliation, scoped registrant PII, and manual House adoption |
-| [admin-storage.md](admin-storage.md) | Global S3 buckets, masked storage backends, capability-safe FileView/shares, and finite rendition convergence |
+| [admin-storage.md](admin-storage.md) | Global S3 buckets, masked storage backends, explicit policy-backed File uploads, capability-safe FileView/shares, and finite rendition convergence |
 | [admin-shortlinks.md](admin-shortlinks.md) | Global shortlink operations, destination-free caches, bounded click history, and reconciled one-shot mutations |
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
 | [admin-phonehub.md](admin-phonehub.md) | Global Phone Hub: evidence-backed lookup, sanitized SMS audits, and write-only provider configuration |

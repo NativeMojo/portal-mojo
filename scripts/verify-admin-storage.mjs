@@ -78,6 +78,13 @@ try {
     assert(!JSON.stringify(queryClient.getQueryCache().getAll().map((query) => query.state.data)).includes(canary));
     assert(!JSON.stringify(queryClient.getMutationCache().getAll()).includes(canary));
     assert.deepEqual(models.SUPPORTED_FILE_MANAGER_BACKENDS.map((option) => option.value), ['file', 's3']);
+    assert.deepEqual(models.FileManagerUploadPolicyModel.normalizeListParams({ graph: 'raw', group__isnull: true, user__isnull: true, size: 999, evil: canary }), {
+        graph: 'upload_policy', group__isnull: true, user__isnull: true, size: 50,
+        sort: 'name', start: 0, is_active: true,
+    });
+    const uploadPolicy = models.sanitizeFileManagerUploadPolicyRow({ id: 9, name: 'Safe upload', use: 'files', is_active: true, max_file_size: 0, allowed_extensions: ['pdf'], allowed_mime_types: ['application/pdf'], supports_direct_upload: false, backend_url: canary, group: { secret: canary } });
+    assert.deepEqual(Object.keys(uploadPolicy).sort(), ['allowed_extensions', 'allowed_mime_types', 'id', 'is_active', 'max_file_size', 'name', 'supports_direct_upload', 'use']);
+    assert(!JSON.stringify(uploadPolicy).includes(canary));
 
     // Capability URL refusal and export projections.
     for (const value of ['/safe/path', 'https://example.test/a', 'http://example.test/a']) assert.equal(models.isSafeCapabilityUrl(value), true, value);
@@ -116,6 +123,23 @@ try {
     assert.equal((await mock.mockFetch('/api/aws/s3/bucket', { headers: manager })).error_code, 403);
     assert.equal((await mock.mockFetch('/api/fileman/manager', { headers: bucketManager })).error_code, 403);
     assert.equal((await mock.mockFetch('/api/fileman/file', { headers: member })).error_code, 403);
+    const systemPolicies = await mock.mockFetch('/api/fileman/manager', { headers: manager, params: { graph: 'upload_policy', is_active: true, group__isnull: true, user__isnull: true, start: 0, size: 50, sort: 'name' } });
+    assert.equal(systemPolicies.graph, 'upload_policy');
+    assert(systemPolicies.data.some((row) => row.id === 4104 && row.supports_direct_upload === false), 'local API targets remain eligible');
+    assert(!systemPolicies.data.some((row) => row.id === 4102 || row.id === 4105), 'user-owned managers are excluded from system choices');
+    assert.deepEqual(Object.keys(systemPolicies.data[0]).sort(), ['allowed_extensions', 'allowed_mime_types', 'id', 'is_active', 'max_file_size', 'name', 'supports_direct_upload', 'use']);
+    const groupPolicies = await mock.mockFetch('/api/fileman/manager', { headers: manager, params: { graph: 'upload_policy', is_active: true, group: 1, user__isnull: true, start: 0, size: 50, sort: 'name' } });
+    assert.deepEqual(groupPolicies.data.map((row) => row.id), [4101]);
+    mock.clearMockUploadObservations();
+    const resolvedFingerprintBody = { filename: 'resolved.txt', content_type: 'text/plain', file_size: 1, file_manager: 4104, idempotency_key: 'admin-resolved-fingerprint' };
+    const resolvedFirst = await mock.mockFetch('/api/fileman/upload/initiate', { method: 'POST', headers: manager, body: resolvedFingerprintBody });
+    const resolvedReplay = await mock.mockFetch('/api/fileman/upload/initiate', { method: 'POST', headers: manager, body: { ...resolvedFingerprintBody, use: 'uploads' } });
+    assert.equal(resolvedReplay.data.id, resolvedFirst.data.id, 'fingerprint uses resolved manager use/group, not omitted selectors');
+    mock.clearMockUploadObservations();
+    const resolvedAfterReset = await mock.mockFetch('/api/fileman/upload/initiate', { method: 'POST', headers: manager, body: resolvedFingerprintBody });
+    assert.notEqual(resolvedAfterReset.data.id, resolvedFirst.data.id, 'mock reset clears idempotency attempts');
+    const adminUserOwned = await mock.mockFetch('/api/fileman/upload/initiate', { method: 'POST', headers: manager, body: { filename: 'admin.png', content_type: 'image/png', file_size: 1, file_manager: 4102, use: 'media', idempotency_key: 'admin-user-owned-manager' } });
+    assert.equal(adminUserOwned.status, true, 'global storage admins may explicitly use active user-owned managers');
 
     const inventory = await mock.mockFetch('/api/aws/s3/bucket', { headers: bucketManager });
     assert.equal(inventory.status, true);
@@ -180,14 +204,26 @@ try {
     await mock.mockFetch('/api/fileman/file/5108', { headers: manager });
     assert.equal((await mock.mockFetch('/api/fileman/file/5108', { headers: manager })).data.upload_status, 'expired');
 
-    // Source-level omissions and the imperative secret/capability boundary.
+    // Source-level upload gates and the imperative secret/capability boundary.
     const storageSources = stripComments(await Promise.all([
         'BucketsPage.tsx', 'BucketDetail.tsx', 'BackendsPage.tsx', 'FileManagerDetail.tsx',
-        'FilesPage.tsx', 'FileView.tsx', 'FilePreview.tsx', 'storage-dialogs.tsx', 'models.ts',
+        'FilesPage.tsx', 'FileUploadSurface.tsx', 'FileView.tsx', 'FilePreview.tsx', 'storage-dialogs.tsx', 'models.ts',
     ].map((name) => read(`packages/portal-mojo/src/admin/storage/${name}`))).then((parts) => parts.join('\n')));
-    assert(!storageSources.includes('/api/fileman/upload'));
-    assert(!storageSources.includes('type="file"'));
-    assert(!storageSources.includes('onDrop'));
+    assert.match(storageSources, /addLabel="Add File"/);
+    assert.match(storageSources, /useFileDrop/);
+    assert.match(storageSources, /FileManagerUploadPolicyModel/);
+    assert.match(storageSources, /group__isnull/);
+    assert.match(storageSources, /user__isnull/);
+    assert.match(storageSources, /closeModal\.current\?\.\(\)/);
+    assert.match(storageSources, /cancelDestinationQueries\(\)/);
+    assert.match(storageSources, /cancelQueries/);
+    assert.match(storageSources, /queue\.cancelAll\(\)/);
+    assert.match(storageSources, /files\.slice\(remaining\)\.forEach/);
+    assert.match(storageSources, /was not added because the upload queue can hold/);
+    assert.match(storageSources, /Current filters may hide newly uploaded files/);
+    const uploadSurfaceSource = stripComments(await read('packages/portal-mojo/src/admin/storage/FileUploadSurface.tsx'));
+    assert(!uploadSurfaceSource.includes('setTimeout('), 'Admin upload progress and reconciliation use no timers');
+    assert(!uploadSurfaceSource.includes('setQueryData'), 'upload targets and completion payloads never enter Query cache');
     assert(!/mojoDelete\([^\n]*FileManager/.test(storageSources));
     assert(!/mojoDelete\([^\n]*bucket/i.test(storageSources));
     assert.match(storageSources, /withFreshAuth\(request\)/);
@@ -215,7 +251,8 @@ try {
     assert.match(clientSource, /errorCode = body\.error_code/);
     assert.match(clientSource, /body\.code \?\? legacyStatus/);
     assert.match(await read('apps/showcase/src/pages/components/ComponentsPage.tsx'), /admin-storage/);
-    assert.match(await read('packages/portal-mojo/docs/admin-storage.md'), /five seconds|12 fetch attempts/i);
+    assert.equal(await read('apps/portal/src/theme/admin-storage.css'), await read('apps/showcase/src/theme/admin-storage.css'));
+    assert.match(await read('packages/portal-mojo/docs/admin-storage.md'), /idempotency|whole-page drop/i);
 
     console.log('verify-admin-storage: all assertions passed');
 } finally {

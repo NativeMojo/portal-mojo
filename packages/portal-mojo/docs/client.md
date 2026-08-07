@@ -159,9 +159,10 @@ unsubscribe();
 
 Progress is the count reported by the actual byte transport. Multipart POST
 progress therefore includes wire overhead. Provider fields are appended
-before `file`, and the browser owns the multipart boundary. Plain relative or
-absolute capability strings are raw PUTs; configuration objects support PUT
-and POST only. The server-echoed MIME type governs the byte request.
+before `file`, and the browser owns the multipart boundary. The #1485 response
+keeps `upload_url`, `method`, `fields`, and `headers` flat beside the safe File
+lifecycle fields. PUT and POST are supported only. The server-echoed MIME type
+governs the byte request.
 Root-relative direct-upload paths missing the deployment's `/api` prefix are
 repaired before transfer. API Bearer and DUID headers are never forwarded;
 an unsafe backend-provided Bearer transfer header produces only a fixed safe
@@ -172,17 +173,21 @@ headers, API bearer/DUID values, raw response bodies, or File URLs. A completed
 outcome exposes only an `UploadedFileRef`: authoritative id, name, MIME, size,
 category, manager id, and group id.
 
-`cancel()` aborts current work. Even an initiation abort is `uncertain` with a
+Every task generates one private strict `idempotency_key`. `cancel()` aborts
+current work. Even an initiation abort is `uncertain` with a
 nullable File id: the server may have committed before the response became
 observable. `recover()` cannot act without an id and returns the same outcome;
-calling `retry()` explicitly starts a new initiation. Cancellation after a known initiation, dropped provider responses,
+calling `retry()` replays the same key so a committed-but-lost initiation
+returns the same File. Cancellation after a known initiation, dropped provider responses,
 and ambiguous completion responses are likewise `uncertain`, since remote
 bytes or a completed File may already exist. `recover()` reconciles and
 attempts completion without replaying bytes. `retry()` reconciles first and
 replays the retained private capability only while the File is still
-uploading. Both are single-flight and generation guarded. A successful
+uploading. If reconciliation proves failed/expired, that same Retry rotates to
+a fresh key and attempt; completed replays need no target. Both are single-flight and generation guarded. A successful
 completion POST is never authoritative by itself; a following File GET must
-confirm `completed` before the task returns success.
+confirm `completed` before the task returns success. Completed scalar
+`file_manager_id` and `group_id` must match an explicitly selected destination.
 
 ## `mojoQueryDefaults()`
 

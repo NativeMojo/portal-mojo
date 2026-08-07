@@ -38,6 +38,33 @@ try {
     assert.deepEqual(Object.keys(raw.file).sort(), ['category', 'contentType', 'fileManagerId', 'filename', 'groupId', 'id', 'size']);
     assert.equal(mock.getMockUploadObservations()[0].method, 'PUT');
 
+    mock.clearMockUploadObservations();
+    mock.armMockUploadFault('initiate-ambiguous');
+    const lostInitiate = upload.startFileUpload(new File(['same'], 'same-key.txt', { type: 'text/plain' }));
+    assert.deepEqual(await lostInitiate.result, {
+        status: 'uncertain', fileId: null,
+        failure: { stage: 'initiate', code: 'remote_state_unknown', message: 'The server could not confirm the upload state.', retryable: true },
+    });
+    const lostRecovered = await lostInitiate.retry();
+    assert.equal(lostRecovered.status, 'completed');
+    const lostInitiations = mock.getMockUploadInitiationObservations();
+    assert.equal(lostInitiations.length, 2);
+    assert.equal(lostInitiations[0].keyDigest, lostInitiations[1].keyDigest, 'ambiguous initiation retry retains its private idempotency key');
+    assert.equal(lostInitiations[0].fileId, lostInitiations[1].fileId, 'same-key replay returns the committed File');
+    assert.equal(lostInitiations[1].replay, true);
+
+    mock.clearMockUploadObservations();
+    mock.armMockUploadFault('transfer-failed');
+    const terminalAttempt = upload.startFileUpload(new File(['fresh'], 'fresh-key.txt', { type: 'text/plain' }));
+    const terminalUnknown = await terminalAttempt.result;
+    assert.equal(terminalUnknown.status, 'uncertain');
+    const terminalRetry = await terminalAttempt.retry();
+    assert.equal(terminalRetry.status, 'completed', 'one explicit retry replaces a server-terminal attempt');
+    const terminalInitiations = mock.getMockUploadInitiationObservations();
+    assert.equal(terminalInitiations.length, 2);
+    assert.notEqual(terminalInitiations[0].keyDigest, terminalInitiations[1].keyDigest, 'server-terminal retry rotates the private idempotency key');
+    assert.notEqual(terminalInitiations[0].fileId, terminalInitiations[1].fileId, 'server-terminal retry creates a fresh File');
+
     mock.setMockUploadMode('raw-put-unprefixed');
     const repairedTask = upload.startFileUpload(new File(['repair'], 'repair.txt', { type: 'text/plain' }));
     assert.equal((await repairedTask.result).status, 'completed', 'root-relative direct paths receive the missing /api prefix');

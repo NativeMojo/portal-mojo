@@ -3969,6 +3969,7 @@ interface MockFileManager {
     is_active: boolean; is_default: boolean; is_public: boolean; aws_region: string | null;
     aws_key_masked: string | null; aws_secret_masked: string | null; allowed_origins: string[];
     assume_role_arn: string | null; has_external_id: boolean; group: number | null; user: number | null;
+    max_file_size: number; allowed_extensions: string[]; allowed_mime_types: string[]; supports_direct_upload: boolean;
 }
 
 interface MockStorageFile {
@@ -4086,9 +4087,11 @@ function buildStorageBuckets(): MockStorageBucket[] {
 function buildFileManagers(): MockFileManager[] {
     const now = Math.floor(Date.now() / 1000);
     return [
-        { id: 4101, created: now - 410 * 86400, name: 'Private uploads', use: 'uploads', backend_type: 's3', backend_url: 's3://mojo-private-assets/uploads', is_active: true, is_default: true, is_public: false, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••7D2Q', aws_secret_masked: '••••••••••m9p', allowed_origins: ['https://admin.example.test'], assume_role_arn: null, has_external_id: false, group: 1, user: null },
-        { id: 4102, created: now - 320 * 86400, name: 'Public media', use: 'media', backend_type: 's3', backend_url: 's3://mojo-public-media/media', is_active: true, is_default: false, is_public: true, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••3K8M', aws_secret_masked: '••••••••••r2x', allowed_origins: ['https://example.test'], assume_role_arn: null, has_external_id: false, group: null, user: 14 },
-        { id: 4103, created: now - 70 * 86400, name: 'Local archive', use: 'archive', backend_type: 'file', backend_url: '/srv/mojo/archive', is_active: false, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: 2, user: null },
+        { id: 4101, created: now - 410 * 86400, name: 'Private uploads', use: 'uploads', backend_type: 's3', backend_url: 's3://mojo-private-assets/uploads', is_active: true, is_default: true, is_public: false, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••7D2Q', aws_secret_masked: '••••••••••m9p', allowed_origins: ['https://admin.example.test'], assume_role_arn: null, has_external_id: false, group: 1, user: null, max_file_size: 25_000_000, allowed_extensions: ['jpg', 'png', 'pdf', 'txt'], allowed_mime_types: ['image/*', 'application/pdf', 'text/plain'], supports_direct_upload: true },
+        { id: 4102, created: now - 320 * 86400, name: 'Public media', use: 'media', backend_type: 's3', backend_url: 's3://mojo-public-media/media', is_active: true, is_default: false, is_public: true, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••3K8M', aws_secret_masked: '••••••••••r2x', allowed_origins: ['https://example.test'], assume_role_arn: null, has_external_id: false, group: null, user: 14, max_file_size: 50_000_000, allowed_extensions: [], allowed_mime_types: ['image/*', 'video/*'], supports_direct_upload: true },
+        { id: 4103, created: now - 70 * 86400, name: 'Local archive', use: 'archive', backend_type: 'file', backend_url: '/srv/mojo/archive', is_active: false, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: 2, user: null, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
+        { id: 4104, created: now - 30 * 86400, name: 'System uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/uploads', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: null, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
+        { id: 4105, created: now - 20 * 86400, name: 'Ian uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/users/1', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: 1, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
     ];
 }
 
@@ -5553,7 +5556,7 @@ let dnsFailNextRead = false;
 const mockRegistrantScopeState = new Map<string, 'saved' | 'cleared'>();
 
 export type MockUploadMode = 'raw-put' | 'raw-put-unprefixed' | 'config-put' | 'config-put-bearer' | 'config-post';
-export type MockUploadFault = 'transfer-ambiguous' | 'complete-reject' | 'complete-ambiguous' | 'complete-body-malformed';
+export type MockUploadFault = 'initiate-ambiguous' | 'transfer-ambiguous' | 'transfer-failed' | 'transfer-expired' | 'complete-reject' | 'complete-ambiguous' | 'complete-body-malformed';
 
 interface MockUploadSession {
     token: string;
@@ -5573,8 +5576,17 @@ export interface MockUploadObservation {
     total: number;
 }
 
+export interface MockUploadInitiationObservation {
+    fileId: number;
+    keyDigest: string;
+    replay: boolean;
+    terminal: boolean;
+}
+
 const mockUploadSessions = new Map<string, MockUploadSession>();
+const mockUploadAttempts = new Map<string, { fingerprint: string; fileId: number }>();
 const mockUploadObservations: MockUploadObservation[] = [];
+const mockUploadInitiationObservations: MockUploadInitiationObservation[] = [];
 let mockUploadMode: MockUploadMode = 'raw-put';
 let mockUploadFault: MockUploadFault | null = null;
 
@@ -5585,7 +5597,14 @@ export function armMockUploadFault(fault: MockUploadFault): void { mockUploadFau
 export function getMockUploadObservations(): MockUploadObservation[] {
     return mockUploadObservations.map((row) => ({ ...row, headerNames: [...row.headerNames], fieldOrder: [...row.fieldOrder] }));
 }
-export function clearMockUploadObservations(): void { mockUploadObservations.length = 0; }
+export function getMockUploadInitiationObservations(): MockUploadInitiationObservation[] {
+    return mockUploadInitiationObservations.map((row) => ({ ...row }));
+}
+export function clearMockUploadObservations(): void {
+    mockUploadObservations.length = 0;
+    mockUploadInitiationObservations.length = 0;
+    mockUploadAttempts.clear();
+}
 
 export interface MockByteUploadRequest {
     url: string;
@@ -5628,6 +5647,12 @@ export async function mockUploadBytes(request: MockByteUploadRequest): Promise<v
     if (mockUploadFault === 'transfer-ambiguous') {
         mockUploadFault = null;
         throw new TypeError('Mock provider connection closed after transfer');
+    }
+    if (mockUploadFault === 'transfer-failed' || mockUploadFault === 'transfer-expired') {
+        const file = db.storageFiles.find((row) => row.id === session.fileId);
+        if (file) file.upload_status = mockUploadFault === 'transfer-failed' ? 'failed' : 'expired';
+        mockUploadFault = null;
+        throw new TypeError('Mock backend finalized the upload attempt');
     }
 }
 function mockTokenDigest(value: string): string {
@@ -5738,6 +5763,37 @@ function serializeStorageManager(row: MockFileManager): Record<string, unknown> 
         assume_role_arn: row.assume_role_arn, has_external_id: row.has_external_id,
         group: storageRelation('group', row.group), user: storageRelation('user', row.user),
     };
+}
+
+function serializeUploadPolicy(row: MockFileManager): Record<string, unknown> {
+    return {
+        id: row.id, name: row.name, use: row.use, is_active: row.is_active,
+        max_file_size: row.max_file_size,
+        allowed_extensions: [...row.allowed_extensions],
+        allowed_mime_types: [...row.allowed_mime_types],
+        supports_direct_upload: row.supports_direct_upload,
+    };
+}
+
+function serializeUploadLifecycle(row: MockStorageFile): Record<string, unknown> {
+    return {
+        id: row.id, filename: row.filename, content_type: row.content_type,
+        file_size: row.file_size, category: row.category,
+        upload_status: row.upload_status, is_active: row.is_active,
+        user_id: row.user, group_id: row.group, file_manager_id: row.file_manager,
+    };
+}
+
+function issueMockUploadTarget(row: MockStorageFile): Record<string, unknown> {
+    const token = `mock-upload-${row.id}-${mockUploadSessions.size + 1}`;
+    const mode = mockUploadMode;
+    const method = mode === 'config-post' ? 'POST' : 'PUT';
+    mockUploadSessions.set(token, { token, fileId: row.id, method, stored: false });
+    if (mode === 'raw-put') return { upload_url: `/api/fileman/upload/${token}`, method, fields: {}, headers: {} };
+    if (mode === 'raw-put-unprefixed') return { upload_url: `/fileman/upload/${token}`, method, fields: {}, headers: {} };
+    if (mode === 'config-put') return { upload_url: `https://mock-upload.invalid/${token}`, method, fields: {}, headers: { 'x-provider-checksum': 'mock-checksum' } };
+    if (mode === 'config-put-bearer') return { upload_url: `https://mock-upload.invalid/${token}`, method, fields: {}, headers: { Authorization: 'Bearer api-token-must-not-cross' } };
+    return { upload_url: `https://mock-upload.invalid/${token}`, method, fields: { key: `uploads/${row.id}`, policy: 'mock-policy', 'Content-Type': row.content_type }, headers: {} };
 }
 
 function serializeStorageRendition(row: MockStorageRendition): Record<string, unknown> {
@@ -5861,19 +5917,51 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         const body = opts.body ?? {};
         const filename = typeof body.filename === 'string' ? body.filename : '';
         const contentType = typeof body.content_type === 'string' ? body.content_type : '';
-        const fileSize = Number(body.file_size);
-        if (!filename || !contentType || !Number.isSafeInteger(fileSize) || fileSize < 0) {
+        const fileSize = body.file_size;
+        const idempotencyKey = typeof body.idempotency_key === 'string' ? body.idempotency_key : '';
+        if (!filename || filename.length > 255 || !contentType || typeof fileSize !== 'number' || !Number.isSafeInteger(fileSize) || fileSize < 0
+            || !/^[A-Za-z0-9._:\-]{1,128}$/.test(idempotencyKey)) {
             return { status: false, error: 'filename, content_type, and file_size are required', error_code: 400 };
         }
         const requestedManager = body.file_manager == null ? null : Number(body.file_manager);
         const requestedUse = typeof body.use === 'string' ? body.use : '';
         const requestedGroup = body.group == null ? null : Number(body.group);
+        const canManage = hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS);
         const manager = requestedManager == null
             ? db.fileManagers.find((candidate) => candidate.is_active
                 && (!requestedUse || candidate.use === requestedUse)
-                && (candidate.user === caller.id || candidate.group == null || candidate.group === requestedGroup))
+                && (requestedGroup != null
+                    ? candidate.group === requestedGroup && candidate.user == null
+                    : candidate.group == null && ((candidate.user == null && canManage) || candidate.user === caller.id)))
             : db.fileManagers.find((candidate) => candidate.id === requestedManager && candidate.is_active);
         if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };
+        if ((requestedUse && requestedUse !== manager.use) || (requestedGroup != null && requestedGroup !== manager.group)) {
+            return { status: false, error: 'Upload destination does not match the FileManager', error_code: 400 };
+        }
+        const groupAuthorized = manager.group != null && (canManage || groupCanManage(caller, manager.group));
+        const authorized = canManage || (manager.group == null && manager.user == null ? false
+            : manager.group != null && manager.user == null ? groupAuthorized
+                : manager.group == null && manager.user != null ? manager.user === caller.id
+                    : groupAuthorized && manager.user === caller.id);
+        if (!authorized) return permissionDenied();
+        const extension = filename.includes('.') ? filename.split('.').pop()!.toLowerCase() : '';
+        const typeAllowed = manager.allowed_mime_types.length === 0 || manager.allowed_mime_types.some((allowed) => allowed === contentType || (allowed.endsWith('/*') && contentType.startsWith(allowed.slice(0, -1))));
+        if ((manager.max_file_size > 0 && fileSize > manager.max_file_size)
+            || (manager.allowed_extensions.length > 0 && !manager.allowed_extensions.map((value) => value.replace(/^\./, '').toLowerCase()).includes(extension))
+            || !typeAllowed) return { status: false, error: 'File does not satisfy upload policy', error_code: 400 };
+        const attemptKey = `${caller.id}:${idempotencyKey}`;
+        const fingerprint = `${filename}\u0000${contentType}\u0000${fileSize}\u0000${manager.id}\u0000${manager.group ?? ''}\u0000${manager.use}`;
+        const replay = mockUploadAttempts.get(attemptKey);
+        if (replay) {
+            if (replay.fingerprint !== fingerprint) return { status: false, code: 409, error: 'Idempotency key was already used for another upload', error_code: 'idempotency_conflict' };
+            const existing = db.storageFiles.find((row) => row.id === replay.fileId);
+            if (!existing) return { status: false, error: 'File not found', error_code: 404 };
+            mockUploadInitiationObservations.push({ fileId: existing.id, keyDigest: mockTokenDigest(idempotencyKey), replay: true, terminal: existing.upload_status !== 'uploading' });
+            const data = existing.upload_status === 'uploading'
+                ? { ...serializeUploadLifecycle(existing), ...issueMockUploadTarget(existing) }
+                : serializeUploadLifecycle(existing);
+            return { status: true, data, graph: 'upload' };
+        }
         const now = Math.floor(Date.now() / 1000);
         const id = Math.max(5100, ...db.storageFiles.map((row) => row.id)) + 1;
         const group = body.group == null ? manager.group : Number(body.group);
@@ -5883,20 +5971,14 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
             is_public: false, group, user: caller.id, file_manager: manager.id, metadata: {}, url: null,
         };
         db.storageFiles.push(row);
-        const token = `mock-upload-${id}-${now}`;
-        const mode = mockUploadMode;
-        const session: MockUploadSession = { token, fileId: id, method: mode === 'config-post' ? 'POST' : 'PUT', stored: false };
-        mockUploadSessions.set(token, session);
-        const uploadUrl: unknown = mode === 'raw-put'
-            ? `/api/fileman/upload/${token}`
-            : mode === 'raw-put-unprefixed'
-                ? `/fileman/upload/${token}`
-                : mode === 'config-put'
-                ? { upload_url: `https://mock-upload.invalid/${token}`, method: 'PUT', headers: { 'x-provider-checksum': 'mock-checksum' } }
-                : mode === 'config-put-bearer'
-                    ? { upload_url: `https://mock-upload.invalid/${token}`, method: 'PUT', headers: { Authorization: 'Bearer api-token-must-not-cross' } }
-                : { upload_url: `https://mock-upload.invalid/${token}`, method: 'POST', fields: { key: `uploads/${id}`, policy: 'mock-policy', 'Content-Type': contentType } };
-        return { status: true, data: { id, filename, content_type: contentType, file_size: fileSize, upload_url: uploadUrl }, graph: 'upload' };
+        mockUploadAttempts.set(attemptKey, { fingerprint, fileId: id });
+        mockUploadInitiationObservations.push({ fileId: id, keyDigest: mockTokenDigest(idempotencyKey), replay: false, terminal: false });
+        const data = { ...serializeUploadLifecycle(row), ...issueMockUploadTarget(row) };
+        if (mockUploadFault === 'initiate-ambiguous') {
+            mockUploadFault = null;
+            throw new TypeError('Mock connection closed after initiation committed');
+        }
+        return { status: true, data, graph: 'upload' };
     }
 
     const bucketMatch = path.match(/^\/api\/aws\/s3\/bucket(?:\/(.+))?$/);
@@ -5960,6 +6042,17 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
 
     const managerMatch = path.match(/^\/api\/fileman\/manager(?:\/(\d+))?$/);
     if (managerMatch) {
+        const managerGraph = String(opts.params?.graph ?? 'list');
+        if (managerGraph === 'upload_policy') {
+            if (method !== 'GET' || !hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS)) return permissionDenied();
+            const requestedGroup = opts.params?.group == null ? null : Number(opts.params.group);
+            let rows = db.fileManagers.filter((row) => row.is_active);
+            if (opts.params?.group__isnull === true || opts.params?.group__isnull === 'true') rows = rows.filter((row) => row.group == null);
+            if (opts.params?.user__isnull === true || opts.params?.user__isnull === 'true') rows = rows.filter((row) => row.user == null);
+            if (requestedGroup != null) rows = rows.filter((row) => row.group === requestedGroup);
+            const listParams = Object.fromEntries(Object.entries(opts.params ?? {}).filter(([key]) => ['start', 'size', 'sort', 'search'].includes(key)));
+            return { ...listRows(rows.map(serializeUploadPolicy), listParams, (row) => `${row.name} ${row.use ?? ''}`, 'name'), graph: 'upload_policy' };
+        }
         if (!hasGlobalPermission(caller, STORAGE_VIEW_GRANTS)) return permissionDenied();
         const id = managerMatch[1] == null ? null : Number(managerMatch[1]);
         const manager = id == null ? null : db.fileManagers.find((candidate) => candidate.id === id);
@@ -5994,7 +6087,7 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         const target = manager ?? (() => {
             const backendType = String(body.backend_type ?? 'file');
             if (!['file', 's3'].includes(backendType)) return null;
-            const created: MockFileManager = { id: Math.max(...db.fileManagers.map((row) => row.id)) + 1, created: Math.floor(Date.now() / 1000), name: String(body.name ?? 'Storage backend'), use: String(body.use ?? 'uploads'), backend_type: backendType, backend_url: String(body.backend_url ?? ''), is_active: body.is_active == null ? true : Boolean(body.is_active), is_default: Boolean(body.is_default), is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: body.group == null ? null : Number(body.group), user: body.user == null ? null : Number(body.user) };
+            const created: MockFileManager = { id: Math.max(...db.fileManagers.map((row) => row.id)) + 1, created: Math.floor(Date.now() / 1000), name: String(body.name ?? 'Storage backend'), use: String(body.use ?? 'uploads'), backend_type: backendType, backend_url: String(body.backend_url ?? ''), is_active: body.is_active == null ? true : Boolean(body.is_active), is_default: Boolean(body.is_default), is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: body.group == null ? null : Number(body.group), user: body.user == null ? null : Number(body.user), max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: backendType !== 'file' };
             db.fileManagers.push(created);
             return created;
         })();
@@ -6040,12 +6133,12 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         if (method !== 'POST' || !file) return { status: false, error: 'File creation/upload is unavailable', error_code: 405 };
         const body = opts.body ?? {};
         if (body.action === 'mark_as_completed') {
-            const session = [...mockUploadSessions.values()].find((candidate) => candidate.fileId === file.id);
+            const stored = [...mockUploadSessions.values()].some((candidate) => candidate.fileId === file.id && candidate.stored);
             if (mockUploadFault === 'complete-reject') {
                 mockUploadFault = null;
                 return { status: false, code: 409, error: 'Uploaded object is not available', error_code: 'upload_incomplete' };
             }
-            file.upload_status = session?.stored ? 'completed' : 'failed';
+            file.upload_status = stored ? 'completed' : 'failed';
             file.modified = Math.floor(Date.now() / 1000);
             if (file.upload_status === 'completed') file.url = `/mock-storage/files/${file.id}`;
             if (mockUploadFault === 'complete-ambiguous') {
@@ -6056,7 +6149,7 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
                 mockUploadFault = null;
                 return { status: true, data: { upload_url: 'mock-capability-must-not-land' }, graph: 'default' };
             }
-            return { status: true, data: serializeStorageFile(file), graph: 'default' };
+            return { status: true, data: serializeUploadLifecycle(file), graph: 'default' };
         }
         if ('regenerate_renditions' in body) {
             const roles = Array.isArray(body.regenerate_renditions) ? [...new Set(body.regenerate_renditions.map(String).filter(Boolean))].slice(0, 20) : null;
