@@ -33,4 +33,3 @@ export const PHONE_HUB_ADMIN_SECTION: AdminSection = {
     routes: [{ path: '', label: 'Phone Hub', loadComponent: () => import('../phonehub/PhoneHubPage').then(({ PhoneHubPage }) => ({ default: PhoneHubPage })), permissions: PHONE_HUB_ADMIN_PERMISSIONS }],
 };
 export const COMMUNICATIONS_ADMIN_SECTIONS = [SHORTLINKS_ADMIN_SECTION, EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION, PUSH_ADMIN_SECTION, PHONE_HUB_ADMIN_SECTION] as const;
-

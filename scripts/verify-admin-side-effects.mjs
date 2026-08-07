@@ -32,4 +32,3 @@ try {
         assert(links.getDnsDomainLinks().length >= 6);
     } else throw new Error(`Unknown side-effect probe ${mode}`);
 } finally { await server.close(); }
-

@@ -8,4 +8,3 @@ const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 const names = Object.keys(pkg.scripts).filter((name) => name.startsWith('verify:admin-') && !['verify:admin-contracts', 'verify:admin-bundles'].includes(name)).sort();
 for (const name of names) execFileSync('npm', ['run', name], { cwd: root, stdio: 'inherit' });
 console.log(`${names.length} admin contracts verified`);
-

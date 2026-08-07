@@ -26,4 +26,3 @@ export const CLOUDWATCH_ADMIN_SECTION: AdminSection = {
     routes: [{ path: '', label: 'CloudWatch', loadComponent: () => import('../cloudwatch/CloudWatchDashboardPage').then(({ CloudWatchDashboardPage }) => ({ default: CloudWatchDashboardPage })), permissions: CLOUDWATCH_PERMISSIONS }],
 };
 export const OBSERVABILITY_ADMIN_SECTIONS = [DASHBOARD_ADMIN_SECTION, MONITORING_ADMIN_SECTION, CLOUDWATCH_ADMIN_SECTION] as const;
-

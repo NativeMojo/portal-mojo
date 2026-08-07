@@ -16,4 +16,3 @@ export const JOBS_ADMIN_SECTION: AdminSection = {
     ],
 };
 export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, JOBS_ADMIN_SECTION] as const;
-
