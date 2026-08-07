@@ -1,4 +1,4 @@
-import { AdminDashboardPage } from 'portal-mojo/admin';
+import { AdminDashboardPage } from 'portal-mojo/admin/observability';
 
 export function AdminDashboardDemo() {
     return <div className="flex flex-col gap-4">

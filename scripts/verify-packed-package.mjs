@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tempRoot = await mkdtemp(join(tmpdir(), 'portal-mojo-package-'));
@@ -16,6 +17,16 @@ function run(command, args, cwd) {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
     });
+}
+
+async function typeScriptFiles(directory) {
+    const files = [];
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) files.push(...await typeScriptFiles(path));
+        else if (/\.tsx?$/.test(entry.name)) files.push(path);
+    }
+    return files;
 }
 
 try {
@@ -36,6 +47,7 @@ try {
         'package.json', 'README.md', 'LICENSE',
         'src/client/index.ts', 'src/ui/index.ts',
         'src/charts/index.ts', 'src/admin/index.ts',
+        'src/admin/core/index.ts', 'src/admin/public/identity.ts',
     ]) {
         assert.ok(files.has(required), `packed package must include ${required}`);
     }
@@ -87,7 +99,16 @@ try {
         "import { Badge } from 'portal-mojo/ui';",
         "import { SeriesChart } from 'portal-mojo/charts';",
         "import { ADMIN_SECTIONS } from 'portal-mojo/admin';",
-        "document.querySelector('#app')!.textContent = String([initAuth, Badge, SeriesChart, ADMIN_SECTIONS].length);",
+        "import { adminSectionRoutes, type AdminRoute } from 'portal-mojo/admin/core';",
+        "import { USERS_ADMIN_SECTION } from 'portal-mojo/admin/identity';",
+        "import { SECURITY_OPERATIONS_ADMIN_SECTION } from 'portal-mojo/admin/security';",
+        "import { MONITORING_ADMIN_SECTION } from 'portal-mojo/admin/observability';",
+        "import { JOBS_ADMIN_SECTION } from 'portal-mojo/admin/operations';",
+        "import { DNS_ADMIN_SECTION } from 'portal-mojo/admin/infrastructure';",
+        "import { EMAIL_ADMIN_SECTION } from 'portal-mojo/admin/communications';",
+        "import { ASSISTANT_ADMIN_SECTION } from 'portal-mojo/admin/assistant';",
+        "const routes: AdminRoute[] = USERS_ADMIN_SECTION.routes;",
+        "document.querySelector('#app')!.textContent = String([initAuth, Badge, SeriesChart, ADMIN_SECTIONS, adminSectionRoutes, routes, SECURITY_OPERATIONS_ADMIN_SECTION, MONITORING_ADMIN_SECTION, JOBS_ADMIN_SECTION, DNS_ADMIN_SECTION, EMAIL_ADMIN_SECTION, ASSISTANT_ADMIN_SECTION].length);",
         '',
     ].join('\n'));
 
@@ -98,7 +119,20 @@ try {
     const installed = JSON.parse(await readFile(join(consumerDir, 'node_modules/portal-mojo/package.json'), 'utf8'));
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
-    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './charts', './client', './ui']);
+    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/security', './charts', './client', './ui']);
+    const installedRoot = join(consumerDir, 'node_modules/portal-mojo');
+    const program = ts.createProgram(await typeScriptFiles(join(installedRoot, 'src')), {
+        target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.ReactJSX,
+        skipLibCheck: true,
+    });
+    const checker = program.getTypeChecker();
+    const adminSource = program.getSourceFile(join(installedRoot, 'src/admin/index.ts'));
+    const adminSymbol = adminSource && checker.getSymbolAtLocation(adminSource);
+    assert(adminSymbol, 'packed admin source must expose a TypeScript module symbol');
+    const packedExports = checker.getExportsOfModule(adminSymbol).map((symbol) => symbol.name).sort();
+    const exportContract = JSON.parse(await readFile(resolve(root, 'scripts/admin-export-contract.json'), 'utf8'));
+    assert.deepEqual(packedExports, exportContract, 'packed admin TypeScript export map must match source exactly');
     console.log(`portal-mojo@${artifact.version} tarball verified in a clean consumer (${artifact.files.length} files)`);
 } finally {
     await rm(tempRoot, { recursive: true, force: true });

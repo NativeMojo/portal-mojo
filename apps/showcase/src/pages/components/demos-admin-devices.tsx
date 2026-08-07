@@ -18,7 +18,7 @@ import {
     showLoginEventDetail,
     showUserDeviceDetailByDuid,
     showUserDeviceLocationDetail,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';
 import { Guarded } from 'portal-mojo/ui';
 import { WorldMap, useWorldLand } from 'portal-mojo/charts';
 

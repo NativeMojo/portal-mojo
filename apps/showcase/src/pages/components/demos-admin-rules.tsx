@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { HandlerChainBuilder, parseHandlerChain, runtimeEffectiveHandlerChain, serializeHandlerChain, validateHandlerChain } from 'portal-mojo/admin';
+import { HandlerChainBuilder, parseHandlerChain, runtimeEffectiveHandlerChain, serializeHandlerChain, validateHandlerChain } from 'portal-mojo/admin/security';
 
 const EXAMPLE = 'block://?ttl=3600&fleet_wide=1,notify://perm@manage_security,oncall,ticket://?priority=9&priority=4&future=retain,custom://future?opaque=yes,resolve://?status=resolved';
 

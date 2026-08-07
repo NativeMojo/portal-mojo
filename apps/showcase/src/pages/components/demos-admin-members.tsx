@@ -1,4 +1,4 @@
-import { GroupMembersPanel, MembersPage } from 'portal-mojo/admin';
+import { GroupMembersPanel, MembersPage } from 'portal-mojo/admin/identity';
 
 const DEMO_GROUP = { id: 1, name: 'Acme Corp', kind: 'org' };
 

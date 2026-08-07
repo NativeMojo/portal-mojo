@@ -1,4 +1,4 @@
-import { CloudWatchDashboardPage } from 'portal-mojo/admin';
+import { CloudWatchDashboardPage } from 'portal-mojo/admin/observability';
 
 export function AdminCloudWatchDemo() {
     return <div className="flex flex-col gap-4">

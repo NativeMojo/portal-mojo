@@ -3,7 +3,7 @@ import {
     BotSignaturesPage,
     BouncerDevicesPage,
     BouncerSignalsPage,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';
 
 type Surface = 'signals' | 'devices' | 'signatures';
 

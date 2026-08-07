@@ -3,8 +3,8 @@ import { MetricsChart } from '../../charts';
 import { modal } from '../../ui';
 import { useAuthSnapshot, useCan } from '../../client';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
-import { JOBS_VIEW_PERMS } from '../jobs';
-import { EMAIL_ADMIN_PERMISSIONS } from '../messaging';
+import { JOBS_VIEW_PERMS } from '../jobs/models';
+import { EMAIL_ADMIN_PERMISSIONS } from '../messaging/models';
 import { LoginLocationMap } from '../security/devices/LoginLocationMap';
 import { LOGIN_SUMMARY_PERMS } from '../security/devices/models';
 import {

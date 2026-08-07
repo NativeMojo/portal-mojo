@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BackendsPage, BucketsPage, FilesPage, showBucketDetail, showFileView } from 'portal-mojo/admin';
+import { BackendsPage, BucketsPage, FilesPage, showBucketDetail, showFileView } from 'portal-mojo/admin/infrastructure';
 
 type Surface = 'buckets' | 'backends' | 'files' | 'modals';
 

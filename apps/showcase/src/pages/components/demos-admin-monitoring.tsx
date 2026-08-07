@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
     LogInspector,
     type LogRow,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/observability';
 
 const NOW = Math.floor(Date.now() / 1000);
 

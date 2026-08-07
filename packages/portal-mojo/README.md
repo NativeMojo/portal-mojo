@@ -18,7 +18,38 @@ Live demos for everything: run `npm run dev:showcase` → **Develop → Componen
 | `portal-mojo/client` | Typed django-mojo protocol layer: envelope unwrap at exactly one boundary (a failed save **rejects**), `start`/`size` paging, `'-field'` sort, Django lookups, the URL-synced `useTableParams` store (single source of truth for table state), TanStack Query hooks. Auth client: password / magic-link / passkey login, forgot/reset, cross-origin handoff (`?auth_code=` scrub-before-network), single-flight refresh + pre-request gate (synthetic-401 reject, `/api/token/refresh` recursion guard), `X-Mojo-UID` device header, `getAuthSnapshot`/`subscribeAuth` for React. Auth-challenged realtime transport: `RealtimeProvider`/`RealtimeClient`, refcounted topics, typed event projection, and a deterministic mock. Boot auth with `initAuth()`. The in-memory HTTP mock transport lives here too — it is the wire contract's executable spec and evolves in lockstep with the client (any seeded active user logs in with email + `"mojo"`). |
 | `portal-mojo/ui` | Mission-control UI: `ModelTable`, `FilterBar`/`FilterPills`, `SchemaForm`/`formModal`, `DetailView`, `RecordFeed`, `AttachmentQueue`/`UploadQueue`, `ImageEditor`/`imageEditorModal`, awaitable native-`<dialog>` `modal`, `toast`, `ThemeProvider`, `Guarded` (permission slot), `GroupSwitcher` (searchable tree selector), `RequiresGroup`, the sidebar engine (`registerMenus`/`setDefaultMenu` registry + `SidebarNav` — static or searchable accordion with a compact icon rail; global and group scopes are explicit), `Badge`/`MetricCard`/`Spark`, `fmt` formatter namespace. |
 | `portal-mojo/charts` | Dependency-free SVG charts: `SeriesChart` (line/bar/area, stacked bars, legend toggle, crosshair tooltip) and `MetricsChart` (granularity/range/type control bar for `/api/metrics/fetch`). |
-| `portal-mojo/admin` | Global Admin **section bundles**, dual-mount: the standalone back-office portal mounts all of them at root; a product portal embeds them under a global "System" area. `AdminSection` contract + `adminSectionsMenu()` (sections → domain-grouped sidebar menu, mount-point-relative, with section + route permission clauses). Admin scope masks active-group membership even when embedded. Reusable domains include credentials, monitoring, security operations, settings, Bouncer, Members, and the Assistant control plane with narrow realtime streaming plus authoritative REST fallback/reconciliation. |
+| `portal-mojo/admin/core` | Side-effect-light Admin contracts and host: `AdminSection`, the discriminated `AdminRoute` XOR, `adminSectionRoutes`, `adminSectionsMenu`, and `AdminLazyPage`. |
+| `portal-mojo/admin/{identity,security,observability,operations,infrastructure,communications,assistant}` | Narrow domain APIs and registry contributions. Built-in routes use leaf-module `loadComponent` loaders; importing `infrastructure` synchronously installs the optional Email→DNS adapter. |
+| `portal-mojo/admin` | Compatibility aggregate containing every historical named export and the stable `ADMIN_SECTIONS` roster. It intentionally installs the DNS adapter and Rule field registration synchronously. New code should prefer `admin/core` plus the domains it consumes. |
+
+### Admin route contract
+
+Routes are an explicit XOR. A host-owned page stays synchronous; a packaged
+page supplies a separately named loader. The host never guesses from whether a
+value is callable.
+
+```tsx
+const extension: AdminSection = {
+  id: 'billing', title: 'Billing', icon: 'bi-receipt',
+  permissions: ['sys.billing'],
+  routes: [{ path: '', component: BillingHome }],
+};
+
+const packaged: AdminSection = {
+  id: 'audit', title: 'Audit', icon: 'bi-journal-text',
+  permissions: ['sys.view_logs'],
+  routes: [{
+    path: '',
+    loadComponent: () => import('./AuditPage').then(({ AuditPage }) => ({ default: AuditPage })),
+  }],
+};
+```
+
+Lazy loading, chunk-error recovery, and retry render inside section and route
+permission guards, so a denied route never invokes its loader. Routes stay
+mount-relative: pass no mount for `#/…`, or `{mount: '/system'}` for the same
+sections under `#/system/…`. Root denial and first-visible fallback semantics
+are identical in both forms.
 
 ## What the consuming app must provide
 

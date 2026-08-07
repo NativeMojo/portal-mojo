@@ -3,7 +3,9 @@ import {
     type ComponentType, type ErrorInfo, type ReactNode,
 } from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
-import { GroupContext, hasPermission, useMe, type PermSpec } from '../../client';
+import { GroupContext } from '../../client/group-context';
+import { hasPermission, useMe } from '../../client/me';
+import type { PermSpec } from '../../client/model';
 import { Guarded } from '../../ui/Guarded';
 import type { MenuConfig, MenuItem } from '../../ui/menu-registry';
 
@@ -105,7 +107,7 @@ function AdminDenied() {
 
 function routeElement(route: AdminRoute): ReactNode {
     return 'loadComponent' in route
-        ? createElement(AdminLazyPage, { load: route.loadComponent })
+        ? createElement(AdminLazyPage, { load: route.loadComponent! })
         : createElement(route.component);
 }
 

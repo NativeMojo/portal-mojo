@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
     ProviderCredentialsPage,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/infrastructure';
 import {
     getAuthSnapshot, login, mojoGet, setMockDnsConfigMalformed, type Me,
 } from 'portal-mojo/client';
