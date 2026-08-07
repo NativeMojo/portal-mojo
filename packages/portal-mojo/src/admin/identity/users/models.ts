@@ -12,6 +12,11 @@ import {
     LoginEventModel, UserDeviceLocationModel, UserDeviceModel,
     USER_DEVICE_VIEW_PERMS, LOGIN_EVENT_VIEW_PERMS,
 } from '../../security/devices/models';
+export {
+    PUSH_DEVICE_VIEW_PERMISSIONS as USER_PUSH_DEVICE_PERMISSIONS,
+    PushDeviceModel,
+} from '../../messaging/push/models';
+export type { PushDeviceRow } from '../../messaging/push/models';
 
 export {
     LoginEventModel,
@@ -36,9 +41,6 @@ export const USER_MANAGE_PERMISSIONS = ['sys.users', 'sys.manage_users'];
 /** Same clause as the canonical `USER_DEVICE_VIEW_PERMS`, kept as the name
  *  UserDetail already imports. Both derive from `UserDevice.VIEW_PERMS`. */
 export const USER_DEVICE_PERMISSIONS = USER_DEVICE_VIEW_PERMS;
-export const USER_PUSH_DEVICE_PERMISSIONS = [
-    'sys.view_devices', 'sys.manage_devices', 'sys.comms', 'sys.manage_users', 'sys.users',
-];
 export const USER_LOGIN_PERMISSIONS = LOGIN_EVENT_VIEW_PERMS;
 export const USER_LOG_PERMISSIONS = ['sys.view_logs', 'sys.manage_logs', 'sys.security'];
 export const USER_EVENT_PERMISSIONS = ['sys.view_security', 'sys.security'];
@@ -189,24 +191,6 @@ export function useGenerateUserApiKey() {
         onSuccess: () => { void qc.invalidateQueries({ queryKey: ApiKeyModel.keys.root }); },
     });
 }
-
-import type { UserBasicRef } from '../../security/devices/models';
-
-export interface PushDeviceRow {
-    id: number;
-    device_id: string;
-    platform: string;
-    device_name: string;
-    app_version: string;
-    os_version: string;
-    push_enabled: boolean;
-    push_preferences: Record<string, unknown>;
-    last_seen: number;
-    user: UserBasicRef | null;
-}
-export const PushDeviceModel = defineModel<PushDeviceRow>({
-    name: 'push_device', endpoint: '/api/account/devices/push', permissions: { view: USER_PUSH_DEVICE_PERMISSIONS },
-});
 
 // LoginEventRow / LoginEventModel are re-exported from the canonical module
 // above. The local copy carried a phantom `event_type?: string` field that

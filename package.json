@@ -31,6 +31,7 @@
         "verify:admin-storage": "node scripts/verify-admin-storage.mjs",
         "verify:admin-messaging": "node scripts/verify-admin-messaging.mjs",
         "verify:admin-phonehub": "node scripts/verify-admin-phonehub.mjs",
+        "verify:admin-push": "node scripts/verify-admin-push.mjs",
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",
         "verify:worldmap": "node scripts/verify-worldmap.mjs",
         "verify:form-wizard": "node scripts/verify-form-wizard.mjs",

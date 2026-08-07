@@ -26,6 +26,7 @@
 @import "./theme/admin-storage.css";
 @import "./theme/admin-messaging.css";
 @import "./theme/admin-phonehub.css";
+@import "./theme/admin-push.css";
 @import "./theme/multiselect-dropdown.css";
 @import "./theme/datepicker.css";
 @import "./theme/formview.css";
