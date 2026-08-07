@@ -574,9 +574,10 @@ autosave editing, permission-gated UI, live metrics dashboard.
   Board #1264 — **DONE 2026-08-07**. Upload transport/UX completed independently
   in #1468/#1470.
 - Publishing: npm `portal-mojo` with TypeScript-source subpath exports;
-  reviewed SemVer bumps land on `main`, and matching GitHub Releases publish
-  through the verified OIDC workflow. `web-mojo` stays published
-  for legacy consumers. Board #1265 (parked).
+  `npm run release` verifies, commits, tags, and atomically pushes the next
+  patch; matching tag pushes publish through the verified OIDC workflow.
+  `web-mojo` stays published
+  for legacy consumers. Board #1265 — **DONE 2026-08-07**.
 
 ## Do-not-recreate list (from the web-mojo extraction)
 
