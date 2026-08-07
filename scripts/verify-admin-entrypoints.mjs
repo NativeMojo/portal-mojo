@@ -10,6 +10,8 @@ import { renderToString } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 globalThis.window = { addEventListener() {}, removeEventListener() {}, location: { hash: '', pathname: '/', search: '' }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) };
+globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
+globalThis.sessionStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 for (const mode of ['core', 'legacy', 'email-first']) {
     execFileSync(process.execPath, [resolve(root, 'scripts/verify-admin-side-effects.mjs'), mode], { cwd: root, stdio: 'inherit' });
