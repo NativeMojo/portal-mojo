@@ -28,4 +28,5 @@ export {
     getMockRequestHistory, setMockDnsConfigMalformed, setMockDnsAcmeMode, armMockDnsWriteFault,
     getMockPhoneConfigCredentialState, getMockEffectivePhoneConfigId,
     deleteMockPhoneGroupForTest,
+    setMockDnsRegistrarMode, armMockRegistrarPurchaseFault,
 } from './mock';

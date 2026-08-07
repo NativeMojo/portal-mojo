@@ -157,6 +157,16 @@ export interface RegistrarQuote {
     privacy_supported: boolean;
 }
 
+export interface RegistrarPurchaseResult {
+    purchase: number;
+    domain: number;
+    name: string;
+    status: string;
+    operation_id: string | null;
+    privacy: boolean;
+    privacy_downgraded: boolean;
+}
+
 export interface RegistrarDiscoveryRow {
     name: string;
     registered: boolean;
@@ -177,15 +187,19 @@ export interface RegistrarDiscoveryResponse {
     domains: RegistrarDiscoveryRow[];
 }
 
+export interface RegistrantExtraParam { Name: string; Value: string }
 export interface RegistrantContact {
-    [field: string]: string | undefined;
+    FirstName?: string; LastName?: string; ContactType?: string; OrganizationName?: string;
+    AddressLine1?: string; AddressLine2?: string; City?: string; State?: string;
+    CountryCode?: string; ZipCode?: string; PhoneNumber?: string; Email?: string;
+    Fax?: string; ExtraParams?: RegistrantExtraParam[];
 }
 
 export interface RegistrantContactResponse {
     scope: 'group' | 'global';
     group: number | null;
     contact: RegistrantContact | null;
-    source: string;
+    source: 'database' | 'settings_file' | 'none';
     inherited: boolean;
     effective_configured: boolean;
     problems: string[];
@@ -348,11 +362,15 @@ export function normalizeDomainListParams(params: Params): Params {
 }
 
 export function normalizePurchaseListParams(params: Params): Params {
+    if (params.graph != null && params.graph !== '' && params.graph !== 'basic') throw new Error('Purchase lists support only graph=basic');
+    for (const key of ['download_format', 'filename', 'export', 'download']) {
+        if (params[key] != null && params[key] !== '') throw new Error('Purchase export and download are not available');
+    }
     return normalizeListParams(
         params,
         new Set(['group', 'kind', 'status', 'status__in', 'created__gte', 'created__lte']),
         new Set(['domain_name', 'kind', 'status', 'price', 'created']),
-        'default',
+        'basic',
     );
 }
 

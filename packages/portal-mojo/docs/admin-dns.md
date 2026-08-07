@@ -2,8 +2,8 @@
 
 Import from `portal-mojo/admin`.
 
-`DNS_ADMIN_SECTION` mounts Domains, DNS Records, Certificates, and Provider
-Credentials under `dns/` (or `system/dns/` embedded). Its global view gate is the ANY-of
+`DNS_ADMIN_SECTION` mounts Domains, DNS Records, Certificates, Domain Purchases,
+Registrant Contact, and Provider Credentials under `dns/` (or `system/dns/` embedded). Its global view gate is the ANY-of
 clause `sys.view_dns | sys.manage_dns | sys.security`; mutations use
 `sys.manage_dns | sys.security`. Member grants cannot satisfy either clause.
 
@@ -36,6 +36,8 @@ House discovery returns the live `{count,truncated,domains}` contract. Each
 domain includes registration/hosted-zone presence, safe zone metadata,
 tracking/adoption state, and a reason. `untracked=true` returns only untracked
 rows; discovery and assignment remain interactive-superuser operations.
+
+The operator registrar workflow is documented in [admin-dns-registrar.md](admin-dns-registrar.md). It does not use discovery: House adoption is manual exact-name only. Purchase tokens remain transient, all post-confirmation outcomes reconcile through the read-only ledger, and contact PII remains imperative/local.
 
 These responses require local call-flow handling and must never enter Query or
 Mutation cache, logs, URL state, or mock state:

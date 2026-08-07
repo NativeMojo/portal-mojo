@@ -10,6 +10,21 @@ export interface FormWizardSection {
     fields: Field[];
     description?: ReactNode;
     optional?: boolean;
+    /** Custom content shares the same draft as schema fields. */
+    content?: ReactNode | ((context: FormWizardSectionContext) => ReactNode);
+    /** Removes a step without discarding its draft. */
+    eligible?: (data: FormData) => boolean;
+    /** Runs after validation and before advancing. Rejections stay on this step. */
+    onNext?: (data: FormData) => void | Promise<void>;
+    /** A receipt/status step with no Back/Next/Finish action row. */
+    terminal?: boolean;
+}
+
+export interface FormWizardSectionContext {
+    data: FormData;
+    busy: boolean;
+    setValue: (name: string, value: FormData[string]) => void;
+    patchValues: (patch: FormData) => void;
 }
 
 export interface FormWizardProps {
@@ -26,6 +41,7 @@ export interface FormWizardProps {
     busyText?: string;
     validateAllOnFinish?: boolean;
     onStepChange?: (sectionKey: string) => void;
+    onBusyChange?: (busy: boolean) => void;
     onCancel?: () => void;
     onFinish: (data: FormData) => void | Promise<void>;
     className?: string;
@@ -98,16 +114,37 @@ export function FormWizard(props: FormWizardProps) {
         onFinish,
         className,
     } = props;
-    const sections = useMemo(() => normalizeWizardSections(rawSections), [rawSections]);
-    const fields = useMemo(() => sections.flatMap((section) => section.fields), [sections]);
+    const normalizedSections = useMemo(() => normalizeWizardSections(rawSections), [rawSections]);
+    const fields = useMemo(() => normalizedSections.flatMap((section) => section.fields), [normalizedSections]);
     const mode = normalizeWizardMode(props.mode as string);
-    const [activeKey, setActiveKey] = useState<string | null>(() => sections[0]?.key ?? null);
+    const [activeKey, setActiveKey] = useState<string | null>(() => normalizedSections[0]?.key ?? null);
     const activeKeyRef = useRef(activeKey);
     activeKeyRef.current = activeKey;
     const [busy, setBusy] = useState(false);
+    const setWizardBusy = (next: boolean) => {
+        props.onBusyChange?.(next);
+        setBusy(next);
+    };
     const finishFlight = useRef(createWizardSingleFlight());
+    const transitionFlight = useRef(createWizardSingleFlight());
+    const generation = useRef(0);
+    const mounted = useRef(true);
     const resetRef = useRef(resetKey);
     const form = useSchemaFormState({ fields, initial, profile: 'wizard', reconcile: true, resetKey, deferReconcile: busy });
+    const sections = normalizedSections.filter((section) => section.eligible?.(form.values) !== false);
+
+    useEffect(() => {
+        generation.current += 1;
+        transitionFlight.current = createWizardSingleFlight();
+        if (busy) setWizardBusy(false);
+        // resetKey is the generation boundary; busy changes must not create one.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resetKey]);
+
+    useEffect(() => () => {
+        mounted.current = false;
+        generation.current += 1;
+    }, []);
 
     useEffect(() => {
         if (busy) return;
@@ -141,10 +178,28 @@ export function FormWizard(props: FormWizardProps) {
         return false;
     };
 
-    const next = () => {
+    const next = async () => {
+        if (transitionFlight.current.pending) return;
         if (!activeSection || !validateAndFocus(activeSection.fields, [activeSection])) return;
         const following = sections[activeIndex + 1];
-        if (following) go(following.key);
+        if (!following) return;
+        const acceptedGeneration = generation.current;
+        if (!activeSection.onNext) {
+            go(following.key);
+            return;
+        }
+        setWizardBusy(true);
+        form.setFormError('');
+        try {
+            await transitionFlight.current.run(() => activeSection.onNext!(form.payload(fields)));
+            if (mounted.current && generation.current === acceptedGeneration) go(following.key);
+        } catch (error) {
+            if (mounted.current && generation.current === acceptedGeneration) {
+                form.setFormError(error instanceof Error ? error.message : 'Could not continue');
+            }
+        } finally {
+            if (mounted.current && generation.current === acceptedGeneration) setWizardBusy(false);
+        }
     };
 
     const finish = async () => {
@@ -156,14 +211,15 @@ export function FormWizard(props: FormWizardProps) {
         // Capture the accepted roster and payload before any parent update.
         const acceptedFields = [...fields];
         const payload = form.payload(acceptedFields);
-        setBusy(true);
+        const acceptedGeneration = generation.current;
+        setWizardBusy(true);
         form.setFormError('');
         try {
             await finishFlight.current.run(() => onFinish(payload));
         } catch (error) {
-            form.setFormError(error instanceof Error ? error.message : 'Save failed');
+            if (mounted.current && generation.current === acceptedGeneration) form.setFormError(error instanceof Error ? error.message : 'Save failed');
         } finally {
-            setBusy(false);
+            if (mounted.current && generation.current === acceptedGeneration) setWizardBusy(false);
         }
     };
 
@@ -175,6 +231,9 @@ export function FormWizard(props: FormWizardProps) {
         <div className="form-wizard-section">
             {section.description && <div className="form-wizard-description">{section.description}</div>}
             <SchemaFieldGrid fields={section.fields} state={form} disabled={busy} />
+            {typeof section.content === 'function' ? section.content({
+                data: form.values, busy, setValue: form.setValue, patchValues: form.patchValues,
+            }) : section.content}
         </div>
     );
 
@@ -190,7 +249,7 @@ export function FormWizard(props: FormWizardProps) {
                     items={sections.map((section) => ({
                         key: section.key,
                         label: <>{section.label}{section.optional && <span className="form-wizard-optional"> Optional</span>}</>,
-                        disabled: busy && section.key !== activeKey,
+                        disabled: busy,
                         panel: sectionPanel(section),
                     }))}
                 />
@@ -207,19 +266,19 @@ export function FormWizard(props: FormWizardProps) {
                     {activeSection && sectionPanel(activeSection)}
                 </>
             )}
-            <div className="modal-actions form-wizard-actions">
+            {!activeSection?.terminal && <div className="modal-actions form-wizard-actions">
                 {onCancel && <button type="button" className="btn" disabled={busy} onClick={onCancel}>{props.cancelText ?? 'Cancel'}</button>}
                 {mode === 'wizard' && activeIndex > 0 && (
                     <button type="button" className="btn" disabled={busy} onClick={() => go(sections[activeIndex - 1]!.key)}>{props.backText ?? 'Back'}</button>
                 )}
                 {mode === 'wizard' && activeIndex < sections.length - 1 ? (
-                    <button type="button" className="btn btn-primary" disabled={busy} onClick={next}>{props.nextText ?? 'Next'}</button>
+                    <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void next()}>{props.nextText ?? 'Next'}</button>
                 ) : (
                     <button type="button" className="btn btn-primary" disabled={busy} onClick={finish}>
                         {busy ? props.busyText ?? 'Saving…' : mode === 'tabs' ? props.saveText ?? 'Save' : props.finishText ?? 'Finish'}
                     </button>
                 )}
-            </div>
+            </div>}
         </div>
     );
 }
@@ -228,19 +287,25 @@ export type FormWizardModalOptions = Omit<FormWizardProps, 'onCancel'> & { title
 
 export function formWizardModal(options: FormWizardModalOptions): Promise<FormData | null> {
     let pending = false;
+    let finishing = false;
     let live = true;
     return modal.open<FormData>((close) => (
         <div className="modal-pad">
             <h2 className="modal-title">{options.title}</h2>
             <FormWizard
                 {...options}
+                onBusyChange={(busy) => {
+                    pending = busy;
+                    options.onBusyChange?.(busy);
+                }}
                 onCancel={() => {
                     if (pending) return;
                     live = false;
                     close(null as unknown as FormData);
                 }}
                 onFinish={async (data) => {
-                    if (pending) return;
+                    if (finishing) return;
+                    finishing = true;
                     pending = true;
                     try {
                         await options.onFinish(data);
@@ -249,6 +314,7 @@ export function formWizardModal(options: FormWizardModalOptions): Promise<FormDa
                             close(data);
                         }
                     } finally {
+                        finishing = false;
                         pending = false;
                     }
                 }}

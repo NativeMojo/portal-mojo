@@ -423,7 +423,7 @@ interface MockDomainPurchase {
     id: number;
     created: number;
     modified: number;
-    group: number;
+    group: number | null;
     user: number | null;
     domain_name: string;
     kind: string;
@@ -436,6 +436,7 @@ interface MockDomainPurchase {
     operation_id: string | null;
     error: string | null;
     metadata: Record<string, unknown>;
+    lifecycle_reads?: number;
     [field: string]: unknown;
 }
 
@@ -691,6 +692,8 @@ function buildDomainPurchases(): MockDomainPurchase[] {
     return [
         { id: 8301, created: now - 360 * 86400, modified: now - 360 * 86400, group: 1, user: 1, domain_name: 'acme.example', kind: 'register', status: 'completed', price: '12.00', cost: '12.00', currency: 'USD', years: 1, quote_expires: now - 360 * 86400, operation_id: 'op-mock-8301', error: null, metadata: {} },
         { id: 8302, created: now - 14 * 86400, modified: now - 14 * 86400, group: 2, user: 2, domain_name: 'failed-example.dev', kind: 'register', status: 'failed', price: '18.00', cost: '18.00', currency: 'USD', years: 1, quote_expires: now - 14 * 86400, operation_id: null, error: 'Registrar operation failed', metadata: {} },
+        { id: 8303, created: now - 45, modified: now - 30, group: 1, user: 1, domain_name: 'ledger-pending.example', kind: 'register', status: 'submitted', price: '12.00', cost: '12.00', currency: 'USD', years: 1, quote_expires: now + 600, operation_id: null, error: null, metadata: {}, lifecycle_reads: 0 },
+        { id: 8304, created: now - 3600, modified: now - 1800, group: 1, user: 1, domain_name: 'expired-quote.example', kind: 'register', status: 'expired', price: '12.00', cost: '12.00', currency: 'USD', years: 1, quote_expires: now - 1800, operation_id: null, error: null, metadata: {} },
     ];
 }
 
@@ -938,9 +941,11 @@ function serializeDnsDomain(row: MockDnsDomain, graph = 'default'): Record<strin
     };
 }
 
-function serializeDomainPurchase(row: MockDomainPurchase): Record<string, unknown> {
+function serializeDomainPurchase(row: MockDomainPurchase, graph = 'default'): Record<string, unknown> {
     const group = db.groups.find((candidate) => candidate.id === row.group);
     const user = row.user == null ? null : db.users.find((candidate) => candidate.id === row.user);
+    const basic = { id: row.id, domain_name: row.domain_name, status: row.status, price: row.price, currency: row.currency };
+    if (graph === 'basic') return basic;
     return {
         id: row.id, created: row.created, modified: row.modified,
         domain_name: row.domain_name, kind: row.kind, status: row.status,
@@ -5395,8 +5400,16 @@ export function armMockReauth(method: string, path: string): void {
 
 let dnsConfigMalformed = false;
 let dnsAcmeMode: 'production' | 'staging' | 'unconfigured' = 'staging';
+let dnsRegistrarMode: 'ready' | 'disabled' | 'contact-missing' = 'ready';
+let dnsRegistrarFault: 'failed' | 'ambiguous' | null = null;
 let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
 let dnsFailNextRead = false;
+const mockRegistrantScopeState = new Map<string, 'saved' | 'cleared'>();
+function mockTokenDigest(value: string): string {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+    return `fnv:${(hash >>> 0).toString(16)}`;
+}
 
 /** Showcase-only fail-closed state; production transports never call this. */
 export function setMockDnsConfigMalformed(value: boolean): void {
@@ -5407,6 +5420,12 @@ export function setMockDnsConfigMalformed(value: boolean): void {
 export function setMockDnsAcmeMode(value: 'production' | 'staging' | 'unconfigured'): void {
     dnsAcmeMode = value;
 }
+
+/** Showcase-only registrar prerequisite state. */
+export function setMockDnsRegistrarMode(value: 'ready' | 'disabled' | 'contact-missing'): void { dnsRegistrarMode = value; }
+
+/** Verifier-only one-shot result after a confirmation token is consumed. */
+export function armMockRegistrarPurchaseFault(value: 'failed' | 'ambiguous'): void { dnsRegistrarFault = value; }
 
 /** Verifier-only one-shot DNS transport outcomes; all state still lives in db.dnsRecords. */
 export function armMockDnsWriteFault(mode: 'reject' | 'ambiguous' | 'reconcile'): void {
@@ -7557,8 +7576,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return {
             status: true,
             data: {
-                purchase_enabled: true,
-                registrant_contact_configured: groupId === 0 || groupId % 2 === 1,
+                purchase_enabled: dnsRegistrarMode !== 'disabled',
+                registrant_contact_configured: dnsRegistrarMode !== 'contact-missing' && (groupId === 0 || groupId % 2 === 1),
                 max_domain_price: '100.00', currency: 'USD', quote_ttl_minutes: 15,
                 allowed_record_types: ['A', 'AAAA', 'CAA', 'CNAME', 'MX', 'NS', 'SRV', 'TXT'],
                 search_batch_limit: 20, suggestions_enabled: true,
@@ -7737,15 +7756,25 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (id != null) {
             const row = db.domainPurchases.find((candidate) => candidate.id === id);
             if (!row) return { status: false, error: 'DomainPurchase not found', error_code: 404 };
-            if (!dnsMemberCan(caller, row.group, false)) return permissionDenied();
+            if (row.group == null ? !caller.is_superuser : !dnsMemberCan(caller, row.group, false)) return permissionDenied();
+            if (row.status === 'submitted' && row.lifecycle_reads != null) {
+                row.lifecycle_reads += 1;
+                if (row.lifecycle_reads >= 2) {
+                    row.status = 'completed'; row.operation_id = `op-mock-${row.id}`; row.modified = Math.floor(Date.now() / 1000);
+                    const domain = db.dnsDomains.find((candidate) => candidate.name === row.domain_name && candidate.status === 'registering');
+                    if (domain) { domain.status = 'active'; domain.hosted_zone_id = `ZMOCK${row.id}`; domain.registered_on = row.modified; domain.expires = row.modified + row.years * 365 * 86400; domain.modified = row.modified; }
+                }
+            }
             return { status: true, data: serializeDomainPurchase(row), graph: 'default' };
         }
         if (!dnsCollectionCan(caller, opts)) return permissionDenied();
         if (opts.params?.download_format || opts.params?.filename) return { status: false, error: 'Purchase export is not available', error_code: 400 };
         const groupId = requestGroupId(opts);
         const rows = groupId > 0 ? db.domainPurchases.filter((row) => row.group === groupId) : db.domainPurchases;
+        const graph = String(opts.params?.graph ?? 'basic');
+        if (graph !== 'basic') return { status: false, error: 'Purchase lists support only graph=basic', error_code: 400 };
         const result = listRows(rows as unknown as Record<string, unknown>[], opts.params ?? {}, (row) => `${row.domain_name} ${row.status}`, '-created');
-        return { ...result, graph: 'default', data: (result.data as unknown as MockDomainPurchase[]).map(serializeDomainPurchase) };
+        return { ...result, graph, data: (result.data as unknown as MockDomainPurchase[]).map((row) => serializeDomainPurchase(row, graph)) };
     }
 
     const delegationMatch = path.match(/^\/api\/dnsman\/delegation(?:\/(\d+))?$/);
@@ -7908,12 +7937,18 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const resultRow = (name: string) => {
             const normalized = name.trim().toLowerCase().replace(/\.+$/, '');
             const tld = normalized.includes('.') ? normalized.split('.').pop()! : null;
-            const available = normalized.includes('taken') ? false : normalized.includes('unknown') ? null : true;
-            return { name: normalized, available, status: available === true ? 'AVAILABLE' : available === false ? 'UNAVAILABLE' : null, price: available === true ? '12.00' : null, currency: available === true ? 'USD' : null, tld, tld_supported: tld != null, privacy_supported: tld != null, reason: available === false ? 'This domain is already registered.' : available === null ? 'The registry did not answer for this name yet — try the search again in a moment.' : null };
+            const supported = tld != null && !normalized.includes('unsupported');
+            const available = !supported ? false : normalized.includes('taken') ? false : normalized.includes('unknown') ? null : true;
+            return { name: normalized, available, status: available === true ? 'AVAILABLE' : available === false ? 'UNAVAILABLE' : null, price: available === true ? '12.00' : null, currency: available === true ? 'USD' : null, tld, tld_supported: supported, privacy_supported: supported, reason: !supported ? 'This TLD cannot be registered through this system.' : available === false ? 'This domain is already registered.' : available === null ? 'The registry did not answer for this name yet — try the search again in a moment.' : null };
         };
         if (action === 'search') {
-            if (Array.isArray(body.domains)) return { status: true, data: { results: body.domains.map((name) => resultRow(String(name))) } };
+            const limit = 20;
+            if (Array.isArray(body.domains)) {
+                if (body.domains.length > limit) return { status: false, error: `A batch search is limited to ${limit} names`, error_code: 400 };
+                return { status: true, data: { results: body.domains.map((name) => resultRow(String(name))) } };
+            }
             if (Array.isArray(body.tlds)) {
+                if (body.tlds.length > limit) return { status: false, error: `A batch search is limited to ${limit} names`, error_code: 400 };
                 const base = String(body.domain ?? '').split('.')[0];
                 return { status: true, data: { results: body.tlds.map((tld) => resultRow(`${base}.${String(tld).replace(/^\./, '')}`)) } };
             }
@@ -7928,20 +7963,32 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             const groupId = Number(body.group);
             const group = db.groups.find((candidate) => candidate.id === groupId && candidate.is_active);
             if (!group || !body.domain) return missingParams('group', 'domain');
+            if (dnsRegistrarMode === 'disabled') return { status: false, error: 'Domain purchasing is disabled on this deployment (DNSMAN_PURCHASE_ENABLED is off).', error_code: 400 };
+            if (dnsRegistrarMode === 'contact-missing' || groupId % 2 === 0) return { status: false, error: 'No registrant contact is configured', error_code: 400 };
+            const answer = resultRow(String(body.domain));
+            if (answer.available !== true || !answer.tld_supported) return { status: false, error: 'The domain cannot be quoted', error_code: 400 };
+            const years = Number(body.years ?? 1);
+            if (!Number.isInteger(years) || years < 1 || years > 10) return { status: false, error: 'Registration length must be between 1 and 10 years', error_code: 400 };
             const now = Math.floor(Date.now() / 1000);
             const id = Math.max(8300, ...db.domainPurchases.map((candidate) => candidate.id)) + 1;
-            const purchase: MockDomainPurchase = { id, created: now, modified: now, group: groupId, user: caller.id, domain_name: String(body.domain).toLowerCase(), kind: 'register', status: 'quoted', price: '12.00', cost: '12.00', currency: 'USD', years: Number(body.years ?? 1), quote_expires: now + 900, operation_id: null, error: null, metadata: {} };
+            const token = `mock-once-${id}-${Math.random().toString(36).slice(2)}`;
+            const purchase: MockDomainPurchase = { id, created: now, modified: now, group: groupId, user: caller.id, domain_name: String(body.domain).toLowerCase(), kind: 'register', status: 'quoted', price: '12.00', cost: '12.00', currency: 'USD', years, quote_expires: now + 900, operation_id: null, error: null, metadata: { confirm_digest: mockTokenDigest(token) } };
             db.domainPurchases.unshift(purchase);
-            return { status: true, data: { purchase: id, name: purchase.domain_name, price: purchase.price, currency: purchase.currency, years: purchase.years, token: `mock-confirm-${id}`, expires: purchase.quote_expires, privacy_supported: true } };
+            return { status: true, data: { purchase: id, name: purchase.domain_name, price: purchase.price, currency: purchase.currency, years: purchase.years, token, expires: purchase.quote_expires, privacy_supported: true } };
         }
         if (action === 'purchase') {
             const purchase = db.domainPurchases.find((candidate) => candidate.id === Number(body.purchase));
-            if (!purchase || String(body.confirm_token ?? '') !== `mock-confirm-${purchase?.id}` || purchase.status !== 'quoted') return { status: false, error: 'Invalid or expired confirmation token', error_code: 400 };
-            purchase.status = 'completed'; purchase.operation_id = `op-mock-${purchase.id}`; purchase.modified = Math.floor(Date.now() / 1000);
+            const digest = typeof purchase?.metadata.confirm_digest === 'string' ? purchase.metadata.confirm_digest : '';
+            if (!purchase || mockTokenDigest(String(body.confirm_token ?? '')) !== digest || purchase.status !== 'quoted' || (purchase.quote_expires ?? 0) <= Date.now() / 1000) return { status: false, error: 'That purchase confirmation is not valid. Request a new quote and try again.', error_code: 400 };
+            delete purchase.metadata.confirm_digest;
+            purchase.status = dnsRegistrarFault === 'failed' ? 'failed' : 'submitted'; purchase.error = dnsRegistrarFault === 'failed' ? 'Registrar rejected the operation after durable intent' : null; purchase.lifecycle_reads = dnsRegistrarFault === 'failed' ? undefined : 0; purchase.modified = Math.floor(Date.now() / 1000);
             const now = purchase.modified;
-            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: purchase.group, user: caller.id, name: purchase.domain_name, provider: 'route53', credential: null, status: 'active', hosted_zone_id: `ZMOCK${purchase.id}`, auto_renew: true, privacy: true, verified: true, registered_on: now, expires: now + purchase.years * 365 * 86400, last_error: null, metadata: {} };
+            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: purchase.group, user: caller.id, name: purchase.domain_name, provider: 'route53', credential: null, status: 'registering', hosted_zone_id: null, auto_renew: true, privacy: true, verified: true, registered_on: null, expires: null, last_error: null, metadata: { purchase: purchase.id } };
             db.dnsDomains.push(domain); db.dnsRecords.set(domain.id, []);
-            return { status: true, data: serializeDnsDomain(domain) };
+            const fault = dnsRegistrarFault; dnsRegistrarFault = null;
+            if (fault === 'failed') { db.dnsDomains = db.dnsDomains.filter((row) => row.id !== domain.id); db.dnsRecords.delete(domain.id); return { status: false, error: 'Registration failed after durable intent', error_code: 502 }; }
+            if (fault === 'ambiguous') return { status: false, error: 'Transport lost the purchase acknowledgement', error_code: 503 };
+            return { status: true, data: { purchase: purchase.id, domain: domain.id, name: domain.name, status: domain.status, operation_id: null, privacy: true, privacy_downgraded: false } };
         }
         if (action === 'register-existing') {
             const credential = db.dnsCredentials.find((candidate) => candidate.id === Number(body.credential));
@@ -7996,9 +8043,22 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (!caller) return permissionDenied(401);
         const groupId = requestGroupId(opts);
         if (groupId === 0 ? !caller.is_superuser : !dnsMemberCan(caller, groupId, true)) return permissionDenied();
-        const contact = method === 'POST' && opts.body?.contact && typeof opts.body.contact === 'object'
-            ? { ...opts.body.contact } : null;
-        return { status: true, data: { scope: groupId > 0 ? 'group' : 'global', group: groupId || null, contact: opts.body?.clear ? null : contact, source: contact ? 'database' : 'none', inherited: groupId > 0 && !contact, effective_configured: groupId === 0 || groupId % 2 === 1 || Boolean(contact), problems: [] } };
+        const key = groupId > 0 ? `group:${groupId}` : 'house';
+        const canonical = { ContactType: 'COMPANY', FirstName: 'Example', LastName: 'Operator', OrganizationName: 'Example Operations', AddressLine1: '100 Example Way', City: 'Example City', State: 'CA', CountryCode: 'US', ZipCode: '90000', PhoneNumber: '+1.5555550100', Email: 'dns-contact@example.invalid', Fax: '+1.5555550199', ExtraParams: [{ Name: 'MOCK', Value: 'safe-extension' }] };
+        if (method === 'POST') {
+            if (opts.body?.clear) mockRegistrantScopeState.set(key, 'cleared');
+            else if (opts.body?.contact && typeof opts.body.contact === 'object' && !Array.isArray(opts.body.contact)) {
+                const candidate = opts.body.contact as Record<string, unknown>;
+                for (const required of ['FirstName', 'LastName', 'ContactType', 'AddressLine1', 'City', 'CountryCode', 'ZipCode', 'PhoneNumber', 'Email']) if (!String(candidate[required] ?? '').trim()) return { status: false, error: `The registrant contact is not usable: ${required} is required`, error_code: 400 };
+                mockRegistrantScopeState.set(key, 'saved');
+                return { status: true, data: { scope: groupId > 0 ? 'group' : 'global', group: groupId || null, contact: { ...candidate }, source: 'database', inherited: false, effective_configured: true, problems: [] } };
+            } else return missingParams('contact');
+        }
+        const state = mockRegistrantScopeState.get(key);
+        const direct = state === 'saved' || (state == null && groupId === 1);
+        const settingsFile = state == null && groupId === 0;
+        const contact = direct || settingsFile ? canonical : null;
+        return { status: true, data: { scope: groupId > 0 ? 'group' : 'global', group: groupId || null, contact, source: direct ? 'database' : settingsFile ? 'settings_file' : 'none', inherited: groupId > 0 && !contact && groupId % 2 === 0, effective_configured: dnsRegistrarMode !== 'contact-missing' && (Boolean(contact) || groupId % 2 === 1 || groupId === 0), problems: [] } };
     }
 
     if (path === '/api/dnsman/whois' || path === '/api/dnsman/whois/privacy') {

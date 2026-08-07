@@ -23,6 +23,7 @@
 @import "./theme/admin-network.css";
 @import "./theme/admin-dns.css";
 @import "./theme/admin-dns-certificates.css";
+@import "./theme/admin-dns-registrar.css";
 @import "./theme/admin-storage.css";
 @import "./theme/admin-messaging.css";
 @import "./theme/admin-phonehub.css";
