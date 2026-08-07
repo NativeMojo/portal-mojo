@@ -8,8 +8,31 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temp = await mkdtemp(join(tmpdir(), 'portal-mojo-bundles-'));
 const budgets = {
-    portal: { entry: 1_334_285, closure: 1_620_202, defaultModule: 'AdminDashboardPage.tsx', representatives: ['UsersPage.tsx', 'IncidentsPage.tsx', 'JobDashboardPage.tsx', 'DomainsPage.tsx', 'EmailDomainsPage.tsx', 'pages.tsx'] },
-    showcase: { entry: 1_455_379, closure: 1_767_246, defaultModule: 'demos-data.tsx', representatives: ['demos-admin-identity-users.tsx', 'demos-admin-incidents.tsx', 'demos-admin-dns.tsx', 'demos-admin-messaging.tsx', 'demos-admin-assistant.tsx'] },
+    portal: {
+        entry: 1_334_285,
+        closure: 1_620_202,
+        defaultModule: 'packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx',
+        representatives: [
+            'packages/portal-mojo/src/admin/identity/users/UsersPage.tsx',
+            'packages/portal-mojo/src/admin/incidents/IncidentsPage.tsx',
+            'packages/portal-mojo/src/admin/jobs/JobDashboardPage.tsx',
+            'packages/portal-mojo/src/admin/dns/DomainsPage.tsx',
+            'packages/portal-mojo/src/admin/messaging/EmailDomainsPage.tsx',
+            'packages/portal-mojo/src/admin/assistant/pages.tsx',
+        ],
+    },
+    showcase: {
+        entry: 1_455_379,
+        closure: 1_767_246,
+        defaultModule: 'apps/showcase/src/pages/components/demos-data.tsx',
+        representatives: [
+            'apps/showcase/src/pages/components/demos-admin-identity-users.tsx',
+            'apps/showcase/src/pages/components/demos-admin-incidents.tsx',
+            'apps/showcase/src/pages/components/demos-admin-dns.tsx',
+            'apps/showcase/src/pages/components/demos-admin-messaging.tsx',
+            'apps/showcase/src/pages/components/demos-admin-assistant.tsx',
+        ],
+    },
 };
 
 function build(app, outDir) {
@@ -27,9 +50,11 @@ async function bytes(outDir, manifest, keys) {
     for (const key of keys) { const file = manifest[key]?.file; if (file?.endsWith('.js')) total += (await stat(resolve(outDir, file))).size; }
     return total;
 }
-function moduleKey(manifest, suffix) {
-    const matches = Object.keys(manifest).filter((key) => key.endsWith(suffix));
-    assert.equal(matches.length, 1, `expected one manifest module ending ${suffix}, got ${matches.join(', ')}`);
+function moduleKey(manifest, app, sourcePath) {
+    const appRoot = resolve(root, 'apps', app);
+    const expectedPath = resolve(root, sourcePath);
+    const matches = Object.keys(manifest).filter((key) => resolve(appRoot, key) === expectedPath);
+    assert.equal(matches.length, 1, `expected manifest module ${sourcePath}, got ${matches.join(', ') || 'none'}`);
     return matches[0];
 }
 
@@ -42,7 +67,7 @@ try {
         const entries = Object.keys(manifest).filter((key) => manifest[key].isEntry);
         assert.equal(entries.length, 1, `${app} must have exactly one production entry`);
         const entryClosure = closure(manifest, entries);
-        const defaultKey = moduleKey(manifest, budget.defaultModule);
+        const defaultKey = moduleKey(manifest, app, budget.defaultModule);
         const defaultClosure = closure(manifest, [...entryClosure, defaultKey]);
         const entryBytes = await bytes(outDir, manifest, entryClosure);
         const closureBytes = await bytes(outDir, manifest, defaultClosure);
@@ -52,9 +77,9 @@ try {
             const file = manifest[key]?.file;
             if (file?.endsWith('.js')) assert((await stat(resolve(outDir, file))).size <= 500_000, `${app} eager/default chunk ${file} exceeds 500000 bytes`);
         }
-        for (const suffix of budget.representatives) {
-            const key = moduleKey(manifest, suffix);
-            assert(!entryClosure.has(key), `${app} representative ${suffix} must remain async`);
+        for (const sourcePath of budget.representatives) {
+            const key = moduleKey(manifest, app, sourcePath);
+            assert(!entryClosure.has(key), `${app} representative ${sourcePath} must remain async`);
         }
         console.log(`${app}: entry ${entryBytes} bytes; entry + default ${closureBytes} bytes`);
     }
