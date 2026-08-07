@@ -39,6 +39,7 @@
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",
         "verify:worldmap": "node scripts/verify-worldmap.mjs",
         "verify:form-wizard": "node scripts/verify-form-wizard.mjs",
-        "verify:location-address": "node scripts/verify-location-address.mjs"
+        "verify:location-address": "node scripts/verify-location-address.mjs",
+        "verify:file-upload": "node scripts/verify-file-upload.mjs"
     }
 }

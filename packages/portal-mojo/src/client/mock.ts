@@ -5551,6 +5551,85 @@ let dnsRegistrarFault: 'failed' | 'ambiguous' | null = null;
 let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
 let dnsFailNextRead = false;
 const mockRegistrantScopeState = new Map<string, 'saved' | 'cleared'>();
+
+export type MockUploadMode = 'raw-put' | 'config-put' | 'config-post';
+export type MockUploadFault = 'transfer-ambiguous' | 'complete-reject' | 'complete-ambiguous';
+
+interface MockUploadSession {
+    token: string;
+    fileId: number;
+    method: 'PUT' | 'POST';
+    stored: boolean;
+}
+
+export interface MockUploadObservation {
+    fileId: number;
+    method: 'PUT' | 'POST';
+    kind: 'raw' | 'multipart';
+    headerNames: string[];
+    fieldOrder: string[];
+    contentType: string;
+    loaded: number;
+    total: number;
+}
+
+const mockUploadSessions = new Map<string, MockUploadSession>();
+const mockUploadObservations: MockUploadObservation[] = [];
+let mockUploadMode: MockUploadMode = 'raw-put';
+let mockUploadFault: MockUploadFault | null = null;
+
+/** Chooses an exact supported provider shape for the next mock initiations. */
+export function setMockUploadMode(mode: MockUploadMode): void { mockUploadMode = mode; }
+/** Arms a one-shot upload fault without recording provider values. */
+export function armMockUploadFault(fault: MockUploadFault): void { mockUploadFault = fault; }
+export function getMockUploadObservations(): MockUploadObservation[] {
+    return mockUploadObservations.map((row) => ({ ...row, headerNames: [...row.headerNames], fieldOrder: [...row.fieldOrder] }));
+}
+export function clearMockUploadObservations(): void { mockUploadObservations.length = 0; }
+
+export interface MockByteUploadRequest {
+    url: string;
+    method: 'PUT' | 'POST';
+    file: Blob;
+    contentType: string;
+    headers: Record<string, string>;
+    fields: Array<[string, string]>;
+    signal: AbortSignal;
+    onProgress(loaded: number, total: number): void;
+}
+
+/** Stateful byte plane used only when the in-memory transport is selected. */
+export async function mockUploadBytes(request: MockByteUploadRequest): Promise<void> {
+    const token = request.url.split('/').filter(Boolean).pop() ?? '';
+    const session = mockUploadSessions.get(token);
+    if (!session || session.method !== request.method) throw new Error('Mock upload capability is invalid');
+    const multipartOverhead = request.method === 'POST'
+        ? 192 + request.fields.reduce((total, [name, value]) => total + name.length + value.length + 48, 0)
+        : 0;
+    const total = request.file.size + multipartOverhead;
+    let loaded = 0;
+    for (let part = 1; part <= 4; part += 1) {
+        await mockDelay(12, request.signal);
+        loaded = part === 4 ? total : Math.floor(total * part / 4);
+        request.onProgress(loaded, total);
+    }
+    session.stored = true;
+    const fieldOrder = request.method === 'POST' ? [...request.fields.map(([name]) => name), 'file'] : [];
+    mockUploadObservations.push({
+        fileId: session.fileId,
+        method: request.method,
+        kind: request.method === 'POST' ? 'multipart' : 'raw',
+        headerNames: Object.keys(request.headers).sort(),
+        fieldOrder,
+        contentType: request.contentType,
+        loaded,
+        total,
+    });
+    if (mockUploadFault === 'transfer-ambiguous') {
+        mockUploadFault = null;
+        throw new TypeError('Mock provider connection closed after transfer');
+    }
+}
 function mockTokenDigest(value: string): string {
     let hash = 2166136261;
     for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
@@ -5590,6 +5669,21 @@ export interface MockFetchOpts {
     body?: Record<string, unknown>;
     /** Forwarded by the transport; auth endpoints ignore it, data endpoints will enforce it come C3. */
     headers?: Record<string, string>;
+    signal?: AbortSignal;
+}
+
+function mockAbortError(): DOMException {
+    return new DOMException('The operation was aborted', 'AbortError');
+}
+
+function mockDelay(ms: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.reject(mockAbortError());
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(done, ms);
+        function done(): void { signal?.removeEventListener('abort', abort); resolve(); }
+        function abort(): void { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(mockAbortError()); }
+        signal?.addEventListener('abort', abort, { once: true });
+    });
 }
 
 /**
@@ -5755,11 +5849,47 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
     if (!path.startsWith('/api/aws/s3/bucket')
         && !path.startsWith('/api/fileman/manager')
         && !path.startsWith('/api/fileman/file')
+        && path !== '/api/fileman/upload/initiate'
         && !path.startsWith('/api/shortlink/link')
         && !path.startsWith('/api/shortlink/history')) return undefined;
     const caller = userFromBearer(opts.headers);
     if (!caller) return permissionDenied(401);
     const method = (opts.method ?? 'GET').toUpperCase();
+
+    if (path === '/api/fileman/upload/initiate') {
+        if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const body = opts.body ?? {};
+        const filename = typeof body.filename === 'string' ? body.filename : '';
+        const contentType = typeof body.content_type === 'string' ? body.content_type : '';
+        const fileSize = Number(body.file_size);
+        if (!filename || !contentType || !Number.isSafeInteger(fileSize) || fileSize < 0) {
+            return { status: false, error: 'filename, content_type, and file_size are required', error_code: 400 };
+        }
+        const requestedManager = body.file_manager == null ? null : Number(body.file_manager);
+        const manager = requestedManager == null
+            ? db.fileManagers.find((candidate) => candidate.is_active && (candidate.user === caller.id || candidate.group == null))
+            : db.fileManagers.find((candidate) => candidate.id === requestedManager && candidate.is_active);
+        if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };
+        const now = Math.floor(Date.now() / 1000);
+        const id = Math.max(5100, ...db.storageFiles.map((row) => row.id)) + 1;
+        const group = body.group == null ? manager.group : Number(body.group);
+        const row: MockStorageFile = {
+            id, created: now, modified: now, filename, file_size: fileSize, content_type: contentType,
+            category: contentType.split('/')[0] || 'file', upload_status: 'uploading', is_active: true,
+            is_public: false, group, user: caller.id, file_manager: manager.id, metadata: {}, url: null,
+        };
+        db.storageFiles.push(row);
+        const token = `mock-upload-${id}-${now}`;
+        const mode = mockUploadMode;
+        const session: MockUploadSession = { token, fileId: id, method: mode === 'config-post' ? 'POST' : 'PUT', stored: false };
+        mockUploadSessions.set(token, session);
+        const uploadUrl: unknown = mode === 'raw-put'
+            ? `/api/fileman/upload/${token}`
+            : mode === 'config-put'
+                ? { upload_url: `https://mock-upload.invalid/${token}`, method: 'PUT', headers: { 'x-provider-checksum': 'mock-checksum' } }
+                : { upload_url: `https://mock-upload.invalid/${token}`, method: 'POST', fields: { key: `uploads/${id}`, policy: 'mock-policy', 'Content-Type': contentType } };
+        return { status: true, data: { id, filename, content_type: contentType, file_size: fileSize, upload_url: uploadUrl }, graph: 'upload' };
+    }
 
     const bucketMatch = path.match(/^\/api\/aws\/s3\/bucket(?:\/(.+))?$/);
     if (bucketMatch) {
@@ -5877,10 +6007,11 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
 
     const fileMatch = path.match(/^\/api\/fileman\/file(?:\/(\d+))?$/);
     if (fileMatch) {
-        if (!hasGlobalPermission(caller, STORAGE_VIEW_GRANTS)) return permissionDenied();
         const id = fileMatch[1] == null ? null : Number(fileMatch[1]);
         const file = id == null ? null : db.storageFiles.find((candidate) => candidate.id === id);
         if (id != null && !file) return { status: false, error: 'File not found', error_code: 404 };
+        const ownsFile = file?.user === caller.id;
+        if (!hasGlobalPermission(caller, STORAGE_VIEW_GRANTS) && !ownsFile) return permissionDenied();
         if (method === 'GET' && file) {
             advanceMockRenditionLifecycle(file);
             return { status: true, data: serializeStorageFile(file), graph: 'default' };
@@ -5890,7 +6021,8 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
             const result = listRows(serialized, opts.params ?? {}, (row) => `${row.filename} ${row.content_type}`, '-created');
             return { ...result, graph: 'list' };
         }
-        if (!hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS)) return permissionDenied();
+        const completionOnly = method === 'POST' && ownsFile && opts.body?.action === 'mark_as_completed';
+        if (!hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS) && !completionOnly) return permissionDenied();
         if (method === 'DELETE' && file) {
             db.storageFiles = db.storageFiles.filter((candidate) => candidate.id !== file.id);
             db.fileRenditions = db.fileRenditions.filter((candidate) => candidate.original_file !== file.id);
@@ -5899,6 +6031,21 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         }
         if (method !== 'POST' || !file) return { status: false, error: 'File creation/upload is unavailable', error_code: 405 };
         const body = opts.body ?? {};
+        if (body.action === 'mark_as_completed') {
+            const session = [...mockUploadSessions.values()].find((candidate) => candidate.fileId === file.id);
+            if (mockUploadFault === 'complete-reject') {
+                mockUploadFault = null;
+                return { status: false, code: 409, error: 'Uploaded object is not available', error_code: 'upload_incomplete' };
+            }
+            file.upload_status = session?.stored ? 'completed' : 'failed';
+            file.modified = Math.floor(Date.now() / 1000);
+            if (file.upload_status === 'completed') file.url = `/mock-storage/files/${file.id}`;
+            if (mockUploadFault === 'complete-ambiguous') {
+                mockUploadFault = null;
+                throw new TypeError('Mock connection closed after completion');
+            }
+            return { status: true, data: serializeStorageFile(file), graph: 'default' };
+        }
         if ('regenerate_renditions' in body) {
             const roles = Array.isArray(body.regenerate_renditions) ? [...new Set(body.regenerate_renditions.map(String).filter(Boolean))].slice(0, 20) : null;
             const existingRoles = db.fileRenditions.filter((row) => row.original_file === file.id).map((row) => row.role);
@@ -7343,7 +7490,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         ...(safeDnsParams ? { params: safeDnsParams } : {}),
         ...(locationObservables ? { observables: locationObservables } : {}),
     });
-    await new Promise((r) => setTimeout(r, LATENCY_MS));
+    await mockDelay(LATENCY_MS, opts.signal);
 
     // ── Admin Assistant — REST-only complete slice (#1299) ──────────
     // Deliberately no websocket, polling, progress, cancel, or action route.
