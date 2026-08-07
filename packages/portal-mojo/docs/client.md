@@ -145,11 +145,11 @@ certificate material likewise stay outside model/query state.
 `startFileUpload(file, options?)` implements django-mojo's three stages:
 initiate the File, transfer bytes to the returned capability, then reconcile
 and mark the File completed. It returns a `FileUploadTask` immediately; its
-`result` always resolves to a fixed `completed`, `failed`, `cancelled`, or
-`uncertain` outcome.
+`result` always resolves to a fixed `completed`, `failed`, or `uncertain`
+outcome.
 
 ```ts
-const task = startFileUpload(file, { fileManagerId: 12, groupId: 4 });
+const task = startFileUpload(file, { fileManagerId: 12, groupId: 4, use: 'attachments' });
 const unsubscribe = task.subscribe(({ phase, loadedBytes, totalBytes }) => {
     console.log(phase, loadedBytes, totalBytes);
 });
@@ -162,18 +162,27 @@ progress therefore includes wire overhead. Provider fields are appended
 before `file`, and the browser owns the multipart boundary. Plain relative or
 absolute capability strings are raw PUTs; configuration objects support PUT
 and POST only. The server-echoed MIME type governs the byte request.
+Root-relative direct-upload paths missing the deployment's `/api` prefix are
+repaired before transfer. API Bearer and DUID headers are never forwarded;
+an unsafe backend-provided Bearer transfer header produces only a fixed safe
+outcome.
 
 Snapshots and outcomes never contain capability URLs, provider fields or
 headers, API bearer/DUID values, raw response bodies, or File URLs. A completed
 outcome exposes only an `UploadedFileRef`: authoritative id, name, MIME, size,
 category, manager id, and group id.
 
-`cancel()` aborts current work. Cancellation after initiation, dropped
-provider responses, and ambiguous completion responses are `uncertain`, since
-remote bytes or a completed File may already exist. `recover()` reconciles and
+`cancel()` aborts current work. Even an initiation abort is `uncertain` with a
+nullable File id: the server may have committed before the response became
+observable. `recover()` cannot act without an id and returns the same outcome;
+calling `retry()` explicitly starts a new initiation. Cancellation after a known initiation, dropped provider responses,
+and ambiguous completion responses are likewise `uncertain`, since remote
+bytes or a completed File may already exist. `recover()` reconciles and
 attempts completion without replaying bytes. `retry()` reconciles first and
 replays the retained private capability only while the File is still
-uploading. Both are single-flight and generation guarded.
+uploading. Both are single-flight and generation guarded. A successful
+completion POST is never authoritative by itself; a following File GET must
+confirm `completed` before the task returns success.
 
 ## `mojoQueryDefaults()`
 

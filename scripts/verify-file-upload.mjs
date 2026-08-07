@@ -28,15 +28,19 @@ try {
 
     mock.clearMockUploadObservations();
     mock.setMockUploadMode('raw-put');
-    const rawTask = upload.startFileUpload(new File(['hello'], 'C:\\fakepath\\hello.txt', { type: 'text/plain' }));
+    const rawTask = upload.startFileUpload(new File(['hello'], 'C:\\fakepath\\hello.txt', { type: 'text/plain' }), { use: 'uploads', groupId: 1 });
     const raw = await rawTask.result;
     assert.equal(raw.status, 'completed');
     assert.equal(raw.file.filename, 'hello.txt');
     assert.equal(raw.file.contentType, 'text/plain');
-    assert.equal(typeof raw.file.fileManagerId, 'number');
+    assert.equal(raw.file.fileManagerId, 4101, 'flat use selector reaches manager resolution');
     assert.equal(JSON.stringify(rawTask.getSnapshot()).includes('mock-upload'), false);
     assert.deepEqual(Object.keys(raw.file).sort(), ['category', 'contentType', 'fileManagerId', 'filename', 'groupId', 'id', 'size']);
     assert.equal(mock.getMockUploadObservations()[0].method, 'PUT');
+
+    mock.setMockUploadMode('raw-put-unprefixed');
+    const repairedTask = upload.startFileUpload(new File(['repair'], 'repair.txt', { type: 'text/plain' }));
+    assert.equal((await repairedTask.result).status, 'completed', 'root-relative direct paths receive the missing /api prefix');
 
     mock.clearMockUploadObservations();
     mock.setMockUploadMode('config-post');
@@ -65,9 +69,37 @@ try {
     assert.equal(mock.getMockUploadObservations().length, 1, 'recovery reconciles/completes without replay');
 
     mock.setMockUploadMode('raw-put');
+    const cancelledInitiation = upload.startFileUpload(new File(['cancel'], 'cancel.txt', { type: 'text/plain' }));
+    cancelledInitiation.cancel();
+    const unknownInitiation = await cancelledInitiation.result;
+    assert.deepEqual(
+        { status: unknownInitiation.status, fileId: unknownInitiation.fileId, code: unknownInitiation.failure.code },
+        { status: 'uncertain', fileId: null, code: 'remote_state_unknown' },
+        'an aborted initiation never claims that no row committed',
+    );
+    assert.strictEqual(cancelledInitiation.recover(), cancelledInitiation.result, 'id-less recovery cannot create a possible duplicate');
+    assert.equal((await cancelledInitiation.retry()).status, 'completed', 'id-less uncertainty can explicitly restart');
+
+    mock.setMockUploadMode('config-put-bearer');
+    const bearerTask = upload.startFileUpload(new File(['bearer'], 'bearer.txt', { type: 'text/plain' }));
+    const bearerOutcome = await bearerTask.result;
+    assert.equal(bearerOutcome.status, 'uncertain');
+    assert.equal(typeof bearerOutcome.fileId, 'number', 'known initiation id remains available for reconciliation');
+    assert.equal(JSON.stringify(bearerOutcome).includes('api-token-must-not-cross'), false, 'Bearer capability is rejected with only a fixed safe error');
+
+    mock.setMockUploadMode('raw-put');
     mock.armMockUploadFault('complete-ambiguous');
     const completeAmbiguous = upload.startFileUpload(new File(['done'], 'done.txt', { type: 'text/plain' }));
     assert.equal((await completeAmbiguous.result).status, 'completed', 'completion ambiguity reconciles authoritative state');
+
+    mock.clearMockRequestHistory();
+    mock.armMockUploadFault('complete-body-malformed');
+    const completionBodyTrap = upload.startFileUpload(new File(['authoritative'], 'authoritative.txt', { type: 'text/plain' }));
+    const authoritative = await completionBodyTrap.result;
+    assert.equal(authoritative.status, 'completed', 'completion POST data is ignored in favor of a later GET');
+    assert.equal(JSON.stringify(authoritative).includes('mock-capability-must-not-land'), false);
+    const fileHistory = mock.getMockRequestHistory().filter((entry) => entry.path === `/api/fileman/file/${authoritative.file.id}`);
+    assert.deepEqual(fileHistory.slice(-2).map((entry) => entry.method), ['POST', 'GET'], 'authoritative GET follows completion POST');
 
     assert.equal(upload.sanitizeUploadBasename('/tmp/path/name.txt'), 'name.txt');
     assert.equal(upload.sanitizeUploadBasename('..'), 'upload.bin');
@@ -75,6 +107,8 @@ try {
     const source = await readFile(new URL('../packages/portal-mojo/src/client/upload.ts', import.meta.url), 'utf8');
     assert.match(source, /form\.append\('file', request\.file\)/);
     assert.match(source, /initiated\.contentType/);
+    assert.match(source, /body\.use = this\.#options\.use\.trim\(\)/);
+    assert.match(source, /\? value : `\/api\$\{value\}`/);
     assert(!source.includes("headers['Authorization']"));
     assert(!source.includes('getDuid'));
     assert.match(source, /#initiated/);
