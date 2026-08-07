@@ -15,7 +15,7 @@ try {
     assert.equal(manifest.publishConfig?.access, 'public');
     assert.equal(manifest.publishConfig?.registry, 'https://registry.npmjs.org/');
     assert.equal(manifest.peerDependencies?.['react-dom'], '^19');
-    assert.deepEqual(Object.keys(manifest.exports).sort(), ['./admin', './admin/assistant', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/security', './charts', './client', './ui']);
+    assert.deepEqual(Object.keys(manifest.exports).sort(), ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './ui', './ui/shell']);
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     for (const name of ['ASSISTANT_ADMIN_SECTION', 'AssistantFeed', 'AssistantPanel', 'AssistantLauncher', 'AssistantContextLauncher', 'ConversationsPage', 'SkillsPage', 'MemoriesPage']) assert(admin[name] !== undefined, `portal-mojo/admin must export ${name}`);
     for (const name of ['FilesPage', 'FileUploadSurface', 'FileManagerUploadPolicyModel']) assert(admin[name] !== undefined, `portal-mojo/admin must export ${name}`);

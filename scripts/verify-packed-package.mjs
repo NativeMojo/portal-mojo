@@ -45,9 +45,11 @@ try {
     const files = new Set(artifact.files.map((entry) => entry.path));
     for (const required of [
         'package.json', 'README.md', 'LICENSE',
-        'src/client/index.ts', 'src/ui/index.ts',
+        'src/client/index.ts', 'src/client/runtime.ts',
+        'src/ui/index.ts', 'src/ui/shell.ts',
         'src/charts/index.ts', 'src/admin/index.ts',
-        'src/admin/core/index.ts', 'src/admin/public/identity.ts',
+        'src/admin/core/index.ts', 'src/admin/registry.ts',
+        'src/admin/public/identity.ts', 'src/admin/public/assistant-launcher.ts',
     ]) {
         assert.ok(files.has(required), `packed package must include ${required}`);
     }
@@ -96,9 +98,12 @@ try {
     await writeFile(join(consumerDir, 'index.html'), '<div id="app"></div><script type="module" src="/src/main.ts"></script>\n');
     await writeFile(join(consumerDir, 'src/main.ts'), [
         "import { initAuth } from 'portal-mojo/client';",
+        "import { usingMockTransport } from 'portal-mojo/client/runtime';",
         "import { Badge } from 'portal-mojo/ui';",
+        "import { ThemeProvider } from 'portal-mojo/ui/shell';",
         "import { SeriesChart } from 'portal-mojo/charts';",
         "import { ADMIN_SECTIONS } from 'portal-mojo/admin';",
+        "import { ADMIN_SECTIONS as REGISTRY_ADMIN_SECTIONS } from 'portal-mojo/admin/registry';",
         "import { adminSectionRoutes, type AdminRoute } from 'portal-mojo/admin/core';",
         "import { USERS_ADMIN_SECTION } from 'portal-mojo/admin/identity';",
         "import { SECURITY_OPERATIONS_ADMIN_SECTION } from 'portal-mojo/admin/security';",
@@ -107,8 +112,9 @@ try {
         "import { DNS_ADMIN_SECTION } from 'portal-mojo/admin/infrastructure';",
         "import { EMAIL_ADMIN_SECTION } from 'portal-mojo/admin/communications';",
         "import { ASSISTANT_ADMIN_SECTION } from 'portal-mojo/admin/assistant';",
+        "import { AssistantLauncher } from 'portal-mojo/admin/assistant/launcher';",
         "const routes: AdminRoute[] = USERS_ADMIN_SECTION.routes;",
-        "document.querySelector('#app')!.textContent = String([initAuth, Badge, SeriesChart, ADMIN_SECTIONS, adminSectionRoutes, routes, SECURITY_OPERATIONS_ADMIN_SECTION, MONITORING_ADMIN_SECTION, JOBS_ADMIN_SECTION, DNS_ADMIN_SECTION, EMAIL_ADMIN_SECTION, ASSISTANT_ADMIN_SECTION].length);",
+        "document.querySelector('#app')!.textContent = String([initAuth, usingMockTransport, Badge, ThemeProvider, SeriesChart, ADMIN_SECTIONS, REGISTRY_ADMIN_SECTIONS, adminSectionRoutes, routes, SECURITY_OPERATIONS_ADMIN_SECTION, MONITORING_ADMIN_SECTION, JOBS_ADMIN_SECTION, DNS_ADMIN_SECTION, EMAIL_ADMIN_SECTION, ASSISTANT_ADMIN_SECTION, AssistantLauncher].length);",
         '',
     ].join('\n'));
 
@@ -119,7 +125,7 @@ try {
     const installed = JSON.parse(await readFile(join(consumerDir, 'node_modules/portal-mojo/package.json'), 'utf8'));
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
-    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/security', './charts', './client', './ui']);
+    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './ui', './ui/shell']);
     const installedRoot = join(consumerDir, 'node_modules/portal-mojo');
     const program = ts.createProgram(await typeScriptFiles(join(installedRoot, 'src')), {
         target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
