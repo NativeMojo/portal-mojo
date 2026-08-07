@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { Badge, ModelTable, fmt, modal, type Column, type FilterDef } from '../../ui';
 import { parseHandlerChain } from './handler-dsl';
 import { openRuleSetEditor } from './editors';

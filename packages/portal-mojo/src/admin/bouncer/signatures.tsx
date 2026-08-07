@@ -4,7 +4,7 @@ import {
     fmt, modal, toast,
     type BatchAction, type Column, type Field, type FilterDef, type FormData,
 } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     BOUNCER_MANAGE_PERMS, BOUNCER_SIGNATURE_TYPES, BotSignatureModel,
     type BotSignatureRow, type BotSignatureType,

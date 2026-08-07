@@ -1,4 +1,4 @@
-import { defineModel, registerNonFilterParams, type Params } from '../../../client';
+import { defineModel, registerNonFilterParams, type Params } from '../../../client/runtime';
 
 registerNonFilterParams('push_surface');
 

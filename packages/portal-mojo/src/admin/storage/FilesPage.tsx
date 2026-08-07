@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, CollectionSelect, ModelTable, fmt, modal, type BatchAction, type Column, type FilterDef } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { FileView } from './FileView';
 import { FileUploadSurface } from './FileUploadSurface';
 import { FileModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, exportFiles, openCapabilityUrl, saveFileAndReconcileGroup, type FileRow, type RelationRow } from './models';

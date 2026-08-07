@@ -12,7 +12,7 @@
 //     (rest/jobs.py on_list_runners) but `GET /api/jobs/stats` does NOT —
 //     its `runners` array is manager.get_runners() verbatim. Hence
 //     `RunnerHeartbeat` (stats) vs `RunnerRow` (the runners endpoint).
-import { defineModel, type Params } from '../../client';
+import { defineModel, type Params } from '../../client/runtime';
 import type { Tone } from '../../ui';
 
 // ── Permission constants ──────────────────────────────────────────────

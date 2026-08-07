@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     defineModel, mojoCall, withFreshAuth,
     sanitizeAvatarRelation, type User,
-} from '../../../client';
+} from '../../../client/runtime';
 // ONE defineModel per endpoint (#1291). The device / device-location /
 // login-event models are DEFINED in admin/security/devices/models.ts — the
 // fleet-wide owner of those three endpoints — and re-exported here so

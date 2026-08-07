@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import {
     Badge, ModelTable, fmt, formModal, modal,
     type BatchAction, type Column, type FilterDef,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan, type PermSpec } from '../../client';
+import { useCan, type PermSpec } from '../../client/runtime';
 import {
     ArmedButton, Badge, DetailView, Eyebrow, FlatRow, ModelTable,
     SchemaForm, fmt, modal, toast,

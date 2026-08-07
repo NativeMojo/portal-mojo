@@ -1,4 +1,4 @@
-import { DnsRecordsPage, DomainsPage } from 'portal-mojo/admin';
+import { DnsRecordsPage, DomainsPage } from 'portal-mojo/admin/infrastructure';
 
 /** The shipped pages, not a visual facsimile. They run against the sole central mock. */
 export function AdminDnsRecordsDemo({ surface }: { surface: 'domains' | 'records' }) {

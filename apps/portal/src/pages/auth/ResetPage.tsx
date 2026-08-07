@@ -20,8 +20,8 @@
 // on the meter.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { resetPasswordWithCode, resetPasswordWithToken, usingMockTransport } from 'portal-mojo/client';
-import { generatePassword, PasswordStrengthMeter, toast } from 'portal-mojo/ui';
+import { resetPasswordWithCode, resetPasswordWithToken, usingMockTransport } from 'portal-mojo/client/runtime';
+import { generatePassword, PasswordStrengthMeter, toast } from 'portal-mojo/ui/shell';
 import { clearResetEmail, consumeReturnRoute, peekResetEmail } from './config';
 
 export function ResetPage() {

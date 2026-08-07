@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { hasPermission, useMe } from '../../client';
+import { hasPermission, useMe } from '../../client/runtime';
 import { Badge, DetailView, Eyebrow, FlatRow, fmt, modal, toast } from '../../ui';
 import { revokeCertificate, useAcmeDelegations, useDnsCapabilities } from './api';
 import {

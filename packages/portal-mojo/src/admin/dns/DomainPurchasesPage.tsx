@@ -1,4 +1,4 @@
-import { useMe, hasPermission } from '../../client';
+import { useMe, hasPermission } from '../../client/runtime';
 import { Badge, ModelTable, modal, type Column, type FilterDef } from '../../ui';
 import { DomainPurchaseDetail } from './DomainPurchaseDetail';
 import { showDomainOnboarding } from './DomainOnboardingDialog';

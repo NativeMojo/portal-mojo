@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { JsonBlock, MultiSelectDropdown, TagInput, modal, toast } from 'portal-mojo/ui';
-import { mojoCall } from 'portal-mojo/client';
+import { mojoCall } from 'portal-mojo/client/runtime';
 import { GroupModel, type GroupRow } from '../../models';
 import { buildAuthConfigDiff, resolveAuthConfigChain } from './auth-config';
 

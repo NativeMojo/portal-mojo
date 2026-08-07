@@ -1,5 +1,5 @@
-import { mojoCall, type Envelope, type MetricsResponse } from '../../client';
-import type { Params } from '../../client';
+import { mojoCall, type Envelope, type MetricsResponse } from '../../client/runtime';
+import type { Params } from '../../client/runtime';
 import type { MetricsFetchParams } from '../../charts';
 import {
     METRIC_DISCOVERY_PAGE_SIZE,

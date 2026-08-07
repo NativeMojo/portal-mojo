@@ -20,14 +20,14 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Eyebrow, toast } from 'portal-mojo/ui';
-import { mojoCall, useCan } from 'portal-mojo/client';
+import { mojoCall, useCan } from 'portal-mojo/client/runtime';
 // ONE editor, ONE projection, two scopes (#1287): the platform page and this
 // group panel now render the same `GeofenceRuleEditor` — including its
 // guided↔JSON toggle, which this file's private FriendlyEditor never had.
 import {
     GeofenceRuleEditor, makeRuleEditorValue, ruleFromEditorValue,
     type RuleEditorValue,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';
 import { GroupModel, type GroupRow } from '../../models';
 import {
     GROUP_GEOFENCE_EDIT_PERMS, buildGroupRulePayload, describeRule, isAdvancedRule,

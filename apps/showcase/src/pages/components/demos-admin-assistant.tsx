@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ConversationsPage, MemoriesPage, SkillsPage } from 'portal-mojo/admin';
+import { ConversationsPage, MemoriesPage, SkillsPage } from 'portal-mojo/admin/assistant';
 import { useRealtimeStatus, useRealtimeTopic } from 'portal-mojo/client';
 
 type Surface = 'conversations' | 'skills' | 'memory';

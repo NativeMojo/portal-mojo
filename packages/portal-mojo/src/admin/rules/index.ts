@@ -1,6 +1,3 @@
-import type { AdminRoute } from '../index';
-import { SECURITY_VIEW_PERMS } from '../security-permissions';
-import { RuleSetsPage } from './RuleSetsPage';
 
 // Importing the bundle also installs the namespaced SchemaForm field renderer.
 export * from './models';
@@ -8,6 +5,4 @@ export * from './handler-dsl';
 export * from './HandlerChainBuilder';
 export * from './editors';
 
-export const RULES_ADMIN_ROUTES: AdminRoute[] = [
-    { path: 'rules', label: 'Rule Engine', component: RuleSetsPage, permissions: SECURITY_VIEW_PERMS },
-];
+export { RULES_ADMIN_ROUTES } from '../domains/security';

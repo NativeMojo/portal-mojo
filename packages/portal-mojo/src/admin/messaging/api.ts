@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { mojoCall, mojoDelete, mojoSave, withFreshAuth } from '../../client';
+import { mojoCall, mojoDelete, mojoSave, withFreshAuth } from '../../client/runtime';
 import { EmailDomainModel, MailboxModel, SentMessageModel, type DomainActionResult, type DomainAuditResult, type DomainOnboardInput, type EmailDomainRow, type MailboxRow, type SendEmailInput, type SentMessageRow } from './models';
 import { redactMessagingError, sanitizeAuditResult, sanitizeDomainActionResult, sanitizeEmailDomainRow, sanitizeMailboxRow, sanitizeSentMessageRow } from './sanitize';
 

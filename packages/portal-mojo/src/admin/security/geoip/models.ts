@@ -28,7 +28,7 @@ import { useQuery, type QueryClient } from '@tanstack/react-query';
 import {
     createSafeExporter, defineModel, mojoCall, mojoList,
     type Params,
-} from '../../../client';
+} from '../../../client/runtime';
 import { boundedSecurityText, sanitizeSecurityValue } from '../../incidents/sanitize';
 
 // ── Permissions (backend-derived, `sys.`-pinned, fail-closed) ─────────

@@ -14,7 +14,7 @@
 // manage grant alone never opens the page. When the gate fails nothing is
 // rendered that queries — a denied caller issues zero requests.
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     Badge,
     ModelTable,

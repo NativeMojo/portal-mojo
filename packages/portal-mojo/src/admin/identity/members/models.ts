@@ -4,7 +4,7 @@ import {
     type Group,
     type Params,
     type User,
-} from '../../../client';
+} from '../../../client/runtime';
 
 /** Group-local read gate for the reusable fixed-group composition. */
 export const MEMBER_GROUP_READ_PERMISSIONS = [

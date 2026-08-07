@@ -13,7 +13,7 @@ import {
     ArmedButton, Badge, DetailView, Eyebrow, FlatRow, StatusPanel,
     fmt, formModal, modal, toast, type Field, type Tone,
 } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { countryName } from '../../charts/worldmap/countryCentroids';
 import {
     GEOIP_MANAGE_PERMS, GeoLocatedIPModel, blockActive, blockExpired,

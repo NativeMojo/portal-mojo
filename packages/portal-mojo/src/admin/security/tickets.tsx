@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { mojoSave, useCan } from '../../client';
+import { mojoSave, useCan } from '../../client/runtime';
 import type { RecordFeedItem } from '../../client/record-feed';
 import {
     Badge, CollectionSelect, DetailView, MarkdownView, ModelTable, RecordFeed, SchemaForm, fmt, modal, toast,

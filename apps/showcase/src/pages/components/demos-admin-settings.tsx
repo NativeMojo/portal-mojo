@@ -2,7 +2,7 @@ import {
     SettingsPage,
     buildSettingPayload,
     type SettingRow,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/operations';
 
 const SECRET_ROW: SettingRow = {
     id: 402,

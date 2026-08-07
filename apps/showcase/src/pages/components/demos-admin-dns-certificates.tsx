@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { CertificatesPage } from 'portal-mojo/admin';
+import { CertificatesPage } from 'portal-mojo/admin/infrastructure';
 import {
     getAuthSnapshot, login, mojoGet, setMockDnsAcmeMode, type Me,
 } from 'portal-mojo/client';

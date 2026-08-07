@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { modal, toast } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { deleteDnsRecordSet, useDnsCapabilities, useDnsRecordCoordinator, useDnsRecords } from './api';
 import { DNS_RECORD_TYPES, diffRecordSet, isSpentAcmeChallenge, recordKey, recordWarnings, relativeRecordName, snapshotRecordOwner } from './dns-data';
 import { DnsRecordEditor } from './DnsRecordEditor';

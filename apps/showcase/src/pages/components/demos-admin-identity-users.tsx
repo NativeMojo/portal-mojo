@@ -1,4 +1,4 @@
-import { UsersPage } from 'portal-mojo/admin';
+import { UsersPage } from 'portal-mojo/admin/identity';
 
 export function AdminIdentityUsersDemo() {
     return (

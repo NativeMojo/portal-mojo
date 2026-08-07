@@ -21,7 +21,7 @@ import {
     showBlockedIpDetail,
     showIPSetDetail,
     type RuleEditorValue,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';
 import { Guarded } from 'portal-mojo/ui';
 
 type Surface =

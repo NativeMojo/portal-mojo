@@ -29,7 +29,7 @@ import {
     toast,
     type Tone,
 } from '../../ui';
-import { downloadBlob } from '../../client';
+import { downloadBlob } from '../../client/runtime';
 import {
     BROADCAST_COMMANDS,
     broadcastCommand,
@@ -56,7 +56,7 @@ import {
     useRunnerJobLogs,
     useRunnerSysinfo,
 } from './queries';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 
 // ── Small presentational pieces ───────────────────────────────────────
 

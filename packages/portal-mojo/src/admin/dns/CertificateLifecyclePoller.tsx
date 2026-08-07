@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { MojoList } from '../../client';
+import type { MojoList } from '../../client/runtime';
 import { CertificateModel, type CertificateRow } from './models';
 import { deriveCertificateRenewalHealth } from './certificate-data';
 

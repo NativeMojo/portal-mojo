@@ -1,4 +1,4 @@
-import { MetricsExplorerPage } from 'portal-mojo/admin';
+import { MetricsExplorerPage } from 'portal-mojo/admin/observability';
 
 export function AdminMetricsExplorerDemo() {
     return (

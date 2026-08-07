@@ -1,4 +1,4 @@
-import { defineModel, type Params } from '../../client';
+import { defineModel, type Params } from '../../client/runtime';
 import {
     sanitizeEmailDomainRow, sanitizeMailboxRow, sanitizePublicMessageRow,
     sanitizeSentMessageRow, sanitizeTemplateRow,

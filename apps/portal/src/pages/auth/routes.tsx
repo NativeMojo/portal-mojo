@@ -15,14 +15,15 @@
 // deployments to '#/auth/login' instead of the console-login hint.
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Navigate, useLocation, type RouteObject } from 'react-router-dom';
-import { redirectToHostedAuth, useAuthSnapshot } from 'portal-mojo/client';
+import { redirectToHostedAuth, useAuthSnapshot } from 'portal-mojo/client/runtime';
 import { AuthIndexRoute, AuthLayout } from './AuthLayout';
-import { LoginPage } from './LoginPage';
-import { ForgotPage } from './ForgotPage';
-import { ResetPage } from './ResetPage';
-import { MagicPage } from './MagicPage';
 import { FreshAuthHost } from './FreshAuthHost';
 import { authMode, stashReturnRoute } from './config';
+
+const loadLoginPage = () => import('./LoginPage').then(({ LoginPage }) => ({ Component: LoginPage }));
+const loadForgotPage = () => import('./ForgotPage').then(({ ForgotPage }) => ({ Component: ForgotPage }));
+const loadResetPage = () => import('./ResetPage').then(({ ResetPage }) => ({ Component: ResetPage }));
+const loadMagicPage = () => import('./MagicPage').then(({ MagicPage }) => ({ Component: MagicPage }));
 
 /**
  * The in-app auth pages. Registered unconditionally — deep links (reset /
@@ -35,10 +36,10 @@ export const authRoutes: RouteObject[] = [
         element: <AuthLayout />,
         children: [
             { index: true, element: <AuthIndexRoute /> },
-            { path: 'login', element: <LoginPage /> },
-            { path: 'forgot', element: <ForgotPage /> },
-            { path: 'reset', element: <ResetPage /> },
-            { path: 'magic', element: <MagicPage /> },
+            { path: 'login', lazy: loadLoginPage },
+            { path: 'forgot', lazy: loadForgotPage },
+            { path: 'reset', lazy: loadResetPage },
+            { path: 'magic', lazy: loadMagicPage },
         ],
     },
 ];

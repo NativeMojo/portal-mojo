@@ -3,7 +3,7 @@
 // fanned out with allSettled), column chooser, persisted view state,
 // auto-refresh, expandable rows, recency grouping, and server-side export.
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan, type User } from '../../../client';
+import { useCan, type User } from '../../../client/runtime';
 import {
     Badge, fmt, formModal, groupByRecency, modal, toast, ModelTable,
     type BatchAction, type Column, type FilterDef,

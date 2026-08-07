@@ -1,4 +1,4 @@
-import { defineModel, type Params } from '../../client';
+import { defineModel, type Params } from '../../client/runtime';
 
 export const PHONE_NUMBER_VIEW_PERMISSIONS = ['sys.view_phone_numbers', 'sys.manage_phone_numbers', 'sys.comms', 'sys.manage_users'];
 export const PHONE_NUMBER_MANAGE_PERMISSIONS = ['sys.manage_phone_numbers', 'sys.comms', 'sys.manage_users'];

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArmedButton, Badge, DataView, DetailView, FlatRow, SchemaForm, fmt, modal, toast } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { FilePreview, filePreviewCategory } from './FilePreview';
 import { normalizeRenditions, normalizeRenditionRoles, pollRenditionConvergence, renditionTargetSignature, type RenditionPollStop } from './file-renditions';
 import { FileModel, ShortLinkShareModel, STORAGE_MANAGE_PERMS, createFileShare, deleteFileShare, isSafeCapabilityUrl, openCapabilityUrl, setFileShareActive, saveFileAndReconcileGroup, type FileRenditionRow } from './models';

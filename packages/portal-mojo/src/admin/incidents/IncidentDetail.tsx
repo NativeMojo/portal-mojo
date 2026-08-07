@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createIncidentHistoryAdapter, useCan, useMe } from '../../client';
+import { createIncidentHistoryAdapter, useCan, useMe } from '../../client/runtime';
 import { Badge, DetailView, Eyebrow, FlatRow, KnownFieldsCard, RecordFeed, StatusPanel, fmt, toast, type Tone } from '../../ui';
 import { SECURITY_MANAGE_PERMS } from '../security-permissions';
 import { AssistantContextLauncher } from '../assistant/launchers';

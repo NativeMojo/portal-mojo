@@ -21,7 +21,7 @@
 // shared ImageField avatar manager hangs off the kebab;
 // presence/status/locked/warning render as chips instead of a two-row aux.
 import { useSyncExternalStore } from 'react';
-import { useCan, useMe } from '../../../client';
+import { useCan, useMe } from '../../../client/runtime';
 import {
     DetailView, getFormTabs, subscribeFormTabs, fmt, modal,
     type Chip, type DetailMenuEntry,

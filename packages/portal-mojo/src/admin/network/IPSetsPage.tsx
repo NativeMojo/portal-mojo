@@ -11,7 +11,7 @@ import {
     Badge, ModelTable, fmt, toast,
     type BatchAction, type Column, type FilterDef,
 } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     IPSET_CACHE_ONLY_HELP, IPSET_KIND_BADGE_OPTIONS, IPSET_MANAGE_PERMS,
     IPSET_SOURCE_OPTIONS, IPSetModel, isCacheOnlyIPSet, type IPSetRow,

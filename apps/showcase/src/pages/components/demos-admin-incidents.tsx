@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EventsPage, IncidentsPage } from 'portal-mojo/admin';
+import { EventsPage, IncidentsPage } from 'portal-mojo/admin/security';
 
 function Surface() {
     const [surface, setSurface] = useState<'incidents' | 'events'>('incidents');

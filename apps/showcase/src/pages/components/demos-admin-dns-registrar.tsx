@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { DomainPurchasesPage, RegistrantContactPage } from 'portal-mojo/admin';
+import { DomainPurchasesPage, RegistrantContactPage } from 'portal-mojo/admin/infrastructure';
 import { getAuthSnapshot, login, mojoGet, setMockDnsRegistrarMode, type Me } from 'portal-mojo/client';
 
 type Leg = 'manager' | 'missing-contact' | 'viewer' | 'platform';

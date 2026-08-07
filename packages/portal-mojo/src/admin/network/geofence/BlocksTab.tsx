@@ -22,7 +22,7 @@ import {
     Badge, ModelTable, fmt, groupByDay,
     type Column, type FilterDef, type Tone,
 } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { MetricsChart, MetricsMiniWidget, exportChartPng } from '../../../charts';
 import { COUNTRY_OPTIONS, countryName } from '../../../charts/worldmap/countryCentroids';
 import { countryFlag } from '../../security/geoip';

@@ -2,13 +2,12 @@ import { useQuery, type QueryClient } from '@tanstack/react-query';
 import {
     MojoError, defineModel, mojoCall, mojoDelete, mojoGet, mojoSave, useCan, withFreshAuth,
     type Envelope, type Params,
-} from '../../client';
+} from '../../client/runtime';
 import { createSafeExporter } from '../../client/safe-export';
 import { USER_VIEW_PERMISSIONS } from '../identity/users/models';
+import { BUCKET_MANAGE_PERMS, STORAGE_MANAGE_PERMS, STORAGE_VIEW_PERMS } from './permissions';
 
-export const STORAGE_VIEW_PERMS = ['sys.view_fileman', 'sys.manage_files', 'sys.files'];
-export const STORAGE_MANAGE_PERMS = ['sys.manage_files', 'sys.files'];
-export const BUCKET_MANAGE_PERMS = ['sys.manage_aws', 'sys.files'];
+export { BUCKET_MANAGE_PERMS, STORAGE_MANAGE_PERMS, STORAGE_VIEW_PERMS } from './permissions';
 export const GROUP_DIRECTORY_PERMS = ['sys.view_groups', 'sys.manage_groups', 'sys.manage_group', 'sys.groups'];
 export const USER_DIRECTORY_PERMS = USER_VIEW_PERMISSIONS;
 

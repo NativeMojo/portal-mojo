@@ -24,7 +24,7 @@
 //
 // `POST /api/jobs/publish` does not exist either — web-mojo's `Job.publish`
 // was dead code. Republishing happens through the `retry_request` action.
-import { mojoCall } from '../../client';
+import { mojoCall } from '../../client/runtime';
 import type {
     JobQueueSize,
     JobsConfig,

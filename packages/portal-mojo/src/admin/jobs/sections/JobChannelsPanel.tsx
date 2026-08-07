@@ -3,7 +3,7 @@
 // part of that view worth keeping: its severity thresholds. The view itself is
 // not ported — it read `/api/jobs/health`, which raises server-side.
 import { ArmedButton, Badge, fmt, toast } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { forceSchedulerLead } from '../control';
 import {
     JOBS_MANAGE_PERMS,

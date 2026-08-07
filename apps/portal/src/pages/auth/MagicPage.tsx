@@ -10,7 +10,7 @@
 // double-effect would burn it on the second POST.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { loginWithMagicToken, sendMagicLink, usingMockTransport } from 'portal-mojo/client';
+import { loginWithMagicToken, sendMagicLink, usingMockTransport } from 'portal-mojo/client/runtime';
 import { consumeReturnRoute } from './config';
 
 type Landing =

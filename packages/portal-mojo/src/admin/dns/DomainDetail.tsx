@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { hasPermission, useMe } from '../../client';
+import { hasPermission, useMe } from '../../client/runtime';
 import { DetailView, Eyebrow, FlatRow, fmt } from '../../ui';
 import { useDnsCapabilities } from './api';
 import { providerLabel } from './data';

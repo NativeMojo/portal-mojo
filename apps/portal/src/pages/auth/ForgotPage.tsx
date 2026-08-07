@@ -6,7 +6,7 @@
 // in django-mojo on_forgot_password — the copy here mirrors that).
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { forgotPassword, usingMockTransport } from 'portal-mojo/client';
+import { forgotPassword, usingMockTransport } from 'portal-mojo/client/runtime';
 import { stashResetEmail } from './config';
 
 export function ForgotPage() {

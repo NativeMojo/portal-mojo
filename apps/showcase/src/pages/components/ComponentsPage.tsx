@@ -7,70 +7,101 @@
 // House invariant on display here too: tables and filters are SERVER-driven
 // (wire params, django-mojo answers) — the Groups demo below runs against
 // /api/group on whichever transport the app is using (mock or live).
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+    Component, Suspense, lazy, useEffect, useMemo, useState,
+    type ComponentType, type ReactNode,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { TableDemo } from './demos-data';
-import { FiltersDemo } from './demos-filters';
-import { SearchDemo } from './demos-search';
-import { ChartsDemo } from './demos-charts';
-import { FormsDemo, ModalsDemo, ToastsDemo } from './demos-feedback';
-import { DetailViewFullDemo } from './demos-detailview';
-import { DataViewDemo } from './demos-dataview';
-import { DisplayDemo, SkeletonDemo, AccessDemo } from './demos-display';
-import { PopoverDemo } from './demos-popover';
-import { TagInputDemo } from './demos-taginput';
-import { DrawerDemo } from './demos-drawer';
-import { RightPanelDemo } from './demos-right-panel';
-import { ComboBoxDemo } from './demos-combobox';
-import { FormatDemo } from './demos-format';
-import { CollectionMultiSelectDemo } from './demos-collection-multiselect';
-import { DetailPrimitivesDemo } from './demos-detail-primitives';
-import { CalendarDemo } from './demos-calendar';
-import { MarkdownDemo } from './demos-markdown';
-import { DatePickerDemo } from './demos-datepicker';
-import { MultiSelectDropdownDemo } from './demos-multiselect-dropdown';
-import { AutosaveDemo } from './demos-autosave';
-import { TimezoneSelectDemo } from './demos-timezone-select';
-import { TimePickerDemo } from './demos-timepicker';
-import { DateRangeDemo } from './demos-daterange';
-import { DateTimePickerDemo } from './demos-datetimepicker';
-import { KitchenSinkDemo } from './demos-kitchen-sink';
-import { CollectionSelectDemo } from './demos-collection-select';
-import { PasswordDemo } from './demos-password';
-import { IdiomsDemo } from './demos-idioms';
-import { LoadingDemo } from './demos-loading';
-import { RecordFeedDemo } from './demos-record-feed';
-import { AdminCredentialsDemo } from './demos-admin-credentials';
-import { AdminMonitoringDemo } from './demos-admin-monitoring';
-import { AdminMetricsExplorerDemo } from './demos-admin-metrics-explorer';
-import { AdminDashboardDemo } from './demos-admin-dashboard';
-import { AdminCloudWatchDemo } from './demos-admin-cloudwatch';
-import { AdminSettingsDemo } from './demos-admin-settings';
-import { AdminBouncerDemo } from './demos-admin-bouncer';
-import { AdminDevicesDemo } from './demos-admin-devices';
-import { AdminNetworkDemo } from './demos-admin-network';
-import { AdminDnsDemo } from './demos-admin-dns';
-import { AdminDnsCertificatesDemo } from './demos-admin-dns-certificates';
-import { AdminDnsRegistrarDemo } from './demos-admin-dns-registrar';
-import { AdminIncidentsDemo } from './demos-admin-incidents';
-import { AdminRulesDemo } from './demos-admin-rules';
-import { AdminJobsDemo } from './demos-admin-jobs';
-import { AdminMembersDemo } from './demos-admin-members';
-import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
-import { AdminStorageDemo } from './demos-admin-storage';
-import { AdminShortlinksDemo } from './demos-admin-shortlinks';
-import { AdminMessagingDemo } from './demos-admin-messaging';
-import { AdminPhoneHubDemo } from './demos-admin-phonehub';
-import { AdminPushDemo } from './demos-admin-push';
-import { AdminAssistantDemo } from './demos-admin-assistant';
-import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
-import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
-import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
-import { LocationAddressDemo } from './demos-location-address';
-import { FileUploadDemo } from './demos-file-upload';
-import { ImageEditorDemo } from './demos-image-editor';
 
-interface DemoSection {
+class DemoLoadBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
+    state = { failed: false };
+    static getDerivedStateFromError() { return { failed: true }; }
+    render() {
+        if (!this.state.failed) return this.props.children;
+        return <div className="panel panel-pad" role="alert"><h2>Demo could not load</h2><p className="dim">The demo bundle was unavailable.</p><button className="btn btn-primary" onClick={this.props.retry}>Retry</button></div>;
+    }
+}
+
+function lazyDemo<TModule, TKey extends keyof TModule>(load: () => Promise<TModule>, exportName: TKey): ComponentType {
+    const normalized = async () => ({ default: (await load())[exportName] as unknown as ComponentType });
+    return function LazyDemoDescriptor() {
+        const [attempt, setAttempt] = useState(0);
+        const Demo = useMemo(() => lazy(normalized), [attempt]);
+        return <DemoLoadBoundary key={attempt} retry={() => setAttempt((value) => value + 1)}><Suspense fallback={<div className="panel panel-pad" role="status">Loading demo…</div>}><Demo /></Suspense></DemoLoadBoundary>;
+    };
+}
+
+const TableDemo = lazyDemo(() => import('./demos-data'), 'TableDemo');
+const FiltersDemo = lazyDemo(() => import('./demos-filters'), 'FiltersDemo');
+const SearchDemo = lazyDemo(() => import('./demos-search'), 'SearchDemo');
+const ChartsDemo = lazyDemo(() => import('./demos-charts'), 'ChartsDemo');
+const FormsDemo = lazyDemo(() => import('./demos-feedback'), 'FormsDemo');
+const ModalsDemo = lazyDemo(() => import('./demos-feedback'), 'ModalsDemo');
+const ToastsDemo = lazyDemo(() => import('./demos-feedback'), 'ToastsDemo');
+const DetailViewFullDemo = lazyDemo(() => import('./demos-detailview'), 'DetailViewFullDemo');
+const DataViewDemo = lazyDemo(() => import('./demos-dataview'), 'DataViewDemo');
+const DisplayDemo = lazyDemo(() => import('./demos-display'), 'DisplayDemo');
+const SkeletonDemo = lazyDemo(() => import('./demos-display'), 'SkeletonDemo');
+const AccessDemo = lazyDemo(() => import('./demos-display'), 'AccessDemo');
+const PopoverDemo = lazyDemo(() => import('./demos-popover'), 'PopoverDemo');
+const TagInputDemo = lazyDemo(() => import('./demos-taginput'), 'TagInputDemo');
+const DrawerDemo = lazyDemo(() => import('./demos-drawer'), 'DrawerDemo');
+const RightPanelDemo = lazyDemo(() => import('./demos-right-panel'), 'RightPanelDemo');
+const ComboBoxDemo = lazyDemo(() => import('./demos-combobox'), 'ComboBoxDemo');
+const FormatDemo = lazyDemo(() => import('./demos-format'), 'FormatDemo');
+const CollectionMultiSelectDemo = lazyDemo(() => import('./demos-collection-multiselect'), 'CollectionMultiSelectDemo');
+const DetailPrimitivesDemo = lazyDemo(() => import('./demos-detail-primitives'), 'DetailPrimitivesDemo');
+const CalendarDemo = lazyDemo(() => import('./demos-calendar'), 'CalendarDemo');
+const MarkdownDemo = lazyDemo(() => import('./demos-markdown'), 'MarkdownDemo');
+const DatePickerDemo = lazyDemo(() => import('./demos-datepicker'), 'DatePickerDemo');
+const MultiSelectDropdownDemo = lazyDemo(() => import('./demos-multiselect-dropdown'), 'MultiSelectDropdownDemo');
+const AutosaveDemo = lazyDemo(() => import('./demos-autosave'), 'AutosaveDemo');
+const TimezoneSelectDemo = lazyDemo(() => import('./demos-timezone-select'), 'TimezoneSelectDemo');
+const TimePickerDemo = lazyDemo(() => import('./demos-timepicker'), 'TimePickerDemo');
+const DateRangeDemo = lazyDemo(() => import('./demos-daterange'), 'DateRangeDemo');
+const DateTimePickerDemo = lazyDemo(() => import('./demos-datetimepicker'), 'DateTimePickerDemo');
+const KitchenSinkDemo = lazyDemo(() => import('./demos-kitchen-sink'), 'KitchenSinkDemo');
+const CollectionSelectDemo = lazyDemo(() => import('./demos-collection-select'), 'CollectionSelectDemo');
+const PasswordDemo = lazyDemo(() => import('./demos-password'), 'PasswordDemo');
+const IdiomsDemo = lazyDemo(() => import('./demos-idioms'), 'IdiomsDemo');
+const LoadingDemo = lazyDemo(() => import('./demos-loading'), 'LoadingDemo');
+const RecordFeedDemo = lazyDemo(() => import('./demos-record-feed'), 'RecordFeedDemo');
+const AdminCredentialsDemo = lazyDemo(() => import('./demos-admin-credentials'), 'AdminCredentialsDemo');
+const AdminMonitoringDemo = lazyDemo(() => import('./demos-admin-monitoring'), 'AdminMonitoringDemo');
+const AdminMetricsExplorerDemo = lazyDemo(() => import('./demos-admin-metrics-explorer'), 'AdminMetricsExplorerDemo');
+const AdminDashboardDemo = lazyDemo(() => import('./demos-admin-dashboard'), 'AdminDashboardDemo');
+const AdminCloudWatchDemo = lazyDemo(() => import('./demos-admin-cloudwatch'), 'AdminCloudWatchDemo');
+const AdminSettingsDemo = lazyDemo(() => import('./demos-admin-settings'), 'AdminSettingsDemo');
+const AdminBouncerDemo = lazyDemo(() => import('./demos-admin-bouncer'), 'AdminBouncerDemo');
+const AdminDevicesDemo = lazyDemo(() => import('./demos-admin-devices'), 'AdminDevicesDemo');
+const AdminNetworkDemo = lazyDemo(() => import('./demos-admin-network'), 'AdminNetworkDemo');
+const AdminDnsDemo = lazyDemo(() => import('./demos-admin-dns'), 'AdminDnsDemo');
+const AdminDnsCertificatesDemo = lazyDemo(() => import('./demos-admin-dns-certificates'), 'AdminDnsCertificatesDemo');
+const AdminDnsRegistrarDemo = lazyDemo(() => import('./demos-admin-dns-registrar'), 'AdminDnsRegistrarDemo');
+const AdminIncidentsDemo = lazyDemo(() => import('./demos-admin-incidents'), 'AdminIncidentsDemo');
+const AdminRulesDemo = lazyDemo(() => import('./demos-admin-rules'), 'AdminRulesDemo');
+const AdminJobsDemo = lazyDemo(() => import('./demos-admin-jobs'), 'AdminJobsDemo');
+const AdminMembersDemo = lazyDemo(() => import('./demos-admin-members'), 'AdminMembersDemo');
+const AdminIdentityUsersDemo = lazyDemo(() => import('./demos-admin-identity-users'), 'AdminIdentityUsersDemo');
+const AdminStorageDemo = lazyDemo(() => import('./demos-admin-storage'), 'AdminStorageDemo');
+const AdminShortlinksDemo = lazyDemo(() => import('./demos-admin-shortlinks'), 'AdminShortlinksDemo');
+const AdminMessagingDemo = lazyDemo(() => import('./demos-admin-messaging'), 'AdminMessagingDemo');
+const AdminPhoneHubDemo = lazyDemo(() => import('./demos-admin-phonehub'), 'AdminPhoneHubDemo');
+const AdminPushDemo = lazyDemo(() => import('./demos-admin-push'), 'AdminPushDemo');
+const AdminAssistantDemo = lazyDemo(() => import('./demos-admin-assistant'), 'AdminAssistantDemo');
+const ChartsMetricsC2Demo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsMetricsC2Demo');
+const ChartsMiniWidgetDemo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsMiniWidgetDemo');
+const ChartsKpiDemo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsKpiDemo');
+const ChartsPieDemo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsPieDemo');
+const WorldMapDemo = lazyDemo(() => import('./demos-worldmap'), 'WorldMapDemo');
+const WorldMapRoutesDemo = lazyDemo(() => import('./demos-worldmap'), 'WorldMapRoutesDemo');
+const FormWizardDemo = lazyDemo(() => import('./demos-form-wizard'), 'FormWizardDemo');
+const TabsDemo = lazyDemo(() => import('./demos-form-wizard'), 'TabsDemo');
+const LocationAddressDemo = lazyDemo(() => import('./demos-location-address'), 'LocationAddressDemo');
+const FileUploadDemo = lazyDemo(() => import('./demos-file-upload'), 'FileUploadDemo');
+const ImageEditorDemo = lazyDemo(() => import('./demos-image-editor'), 'ImageEditorDemo');
+
+interface DemoDescriptor {
     key: string;
     title: string;
     icon: string;
@@ -80,7 +111,7 @@ interface DemoSection {
 
 interface DemoGroup {
     title: string;
-    sections: DemoSection[];
+    sections: DemoDescriptor[];
 }
 
 const GROUPS: DemoGroup[] = [
@@ -476,7 +507,7 @@ const GROUPS: DemoGroup[] = [
     },
 ];
 
-const SECTIONS: DemoSection[] = GROUPS.flatMap((g) => g.sections);
+const SECTIONS: DemoDescriptor[] = GROUPS.flatMap((g) => g.sections);
 
 const groupOf = (key: string): string | undefined =>
     GROUPS.find((g) => g.sections.some((s) => s.key === key))?.title;
@@ -485,7 +516,7 @@ export function ComponentsPage() {
     const [sp, setSp] = useSearchParams();
     const activeKey = sp.get('demo') ?? SECTIONS[0]!.key;
     const active = SECTIONS.find((s) => s.key === activeKey) ?? SECTIONS[0]!;
-    const [, setRemountNonce] = useState(0);
+    const [remountNonce, setRemountNonce] = useState(0);
 
     // Open state per group — starts with (only) the active demo's group, and
     // any navigation (clicks here, deep links, back/forward) re-opens the
@@ -559,7 +590,7 @@ export function ComponentsPage() {
                     <h1 className="panel-title">{active.title}</h1>
                     <p className="dim cmp-blurb">{active.blurb}</p>
                 </div>
-                {active.render()}
+                <div key={`${active.key}:${remountNonce}`}>{active.render()}</div>
             </div>
         </div>
     );

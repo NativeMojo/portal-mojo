@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShortlinkHistoryPage, ShortlinksPage, showShortlinkDetail } from 'portal-mojo/admin';
+import { ShortlinkHistoryPage, ShortlinksPage, showShortlinkDetail } from 'portal-mojo/admin/communications';
 
 export function AdminShortlinksDemo() {
     const [surface, setSurface] = useState<'links' | 'history' | 'detail'>('links');

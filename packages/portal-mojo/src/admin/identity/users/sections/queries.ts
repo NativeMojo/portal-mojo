@@ -6,7 +6,7 @@
 // lists with their own paging/search run their own param'd queries and
 // dedupe through the TanStack cache.
 import { useQuery } from '@tanstack/react-query';
-import { mojoCall } from '../../../../client';
+import { mojoCall } from '../../../../client/runtime';
 import { LogModel } from '../../../monitoring';
 import { EventModel } from '../../../incidents';
 import { MemberModel } from '../../members';

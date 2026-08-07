@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     defineModel, mojoCall, mojoSave, withFreshAuth,
     type Params, type PermSpec,
-} from '../../client';
+} from '../../client/runtime';
 
 /** Global operator gate for the cross-group credential pages. */
 export const GLOBAL_CREDENTIAL_PERMS = ['sys.manage_groups', 'sys.groups'];

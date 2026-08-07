@@ -9,7 +9,7 @@ import {
     Badge, ModelTable, formModal, fmt, toast,
     type Column, type FilterDef, type Tone,
 } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { COUNTRY_OPTIONS } from '../../../charts';
 import { GEOIP_LOOKUP_FIELDS } from './geoip-forms';
 import { showGeoIpDossier } from './GeoIpDossier';

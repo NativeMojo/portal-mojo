@@ -1,5 +1,5 @@
 import { Badge, DetailView, Eyebrow, FlatRow, fmt } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     SETTINGS_PERMISSIONS, SettingModel, settingGroupLabel, type SettingRow,
 } from './model';

@@ -27,7 +27,9 @@ the real thing, not a demo shim.
 
 The toolkit — client, params store, UI components, charts — is the
 `portal-mojo` package (`packages/portal-mojo`, subpath exports
-`portal-mojo/client` · `/ui` · `/charts` · `/admin`; see its README).
+`portal-mojo/client` · `/ui` · `/charts` · `/admin/core` and narrow
+`/admin/<domain>` entries; the `/admin` aggregate remains compatibility-only.
+See the package README for the domain map.
 This app owns what is deployment-specific:
 
 - `src/main.tsx` — providers + hash router wiring.

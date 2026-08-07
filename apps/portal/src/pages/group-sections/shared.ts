@@ -1,5 +1,5 @@
 // group-sections/shared.ts — tiny helpers shared across the group sections.
-import type { Params } from 'portal-mojo/client';
+import type { Params } from 'portal-mojo/client/runtime';
 import type { Tone } from 'portal-mojo/ui';
 
 /** Audit log level → Timeline tone (GroupView.js LOG_LEVEL_TONE). */

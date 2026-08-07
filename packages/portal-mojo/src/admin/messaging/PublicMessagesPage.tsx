@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ArmedButton, Badge, DetailView, FlatRow, ModelTable, fmt, groupByDay, modal, toast, type BatchAction, type Column, type FilterDef, type Section } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { deleteMessagingRow } from './api';
 import { exportPublicMessages } from './data';
 import { PUBLIC_MESSAGE_DELETE_PERMISSIONS, PUBLIC_MESSAGE_MANAGE_PERMISSIONS, PublicMessageModel, type PublicMessageRow } from './models';

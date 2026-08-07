@@ -1,27 +1,16 @@
 import { Link } from 'react-router-dom';
 import { MetricsChart } from '../../charts';
 import { modal } from '../../ui';
-import { useAuthSnapshot, useCan } from '../../client';
-import { UserDetail } from '../identity';
+import { useAuthSnapshot, useCan } from '../../client/runtime';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
-import { JOBS_VIEW_PERMS } from '../jobs';
-import { EMAIL_ADMIN_PERMISSIONS } from '../messaging';
-import {
-    LOGIN_SUMMARY_PERMS, LoginLocationMap, showLoginEventDetail,
-    showUserDeviceDetailByDuid,
-} from '../security/devices';
+import { JOBS_VIEW_PERMS } from '../jobs/models';
+import { EMAIL_ADMIN_PERMISSIONS } from '../messaging/models';
+import { LoginLocationMap } from '../security/devices/LoginLocationMap';
+import { LOGIN_SUMMARY_PERMS } from '../security/devices/models';
 import {
     DASHBOARD_METRIC_PERMISSIONS, DASHBOARD_SERIES, dashboardLoginStart,
     useDashboardCount, useDashboardScalars,
 } from './data';
-
-export const ADMIN_DASHBOARD_PERMISSIONS = [...new Set([
-    ...DASHBOARD_METRIC_PERMISSIONS,
-    ...SECURITY_VIEW_PERMS,
-    ...JOBS_VIEW_PERMS,
-    ...EMAIL_ADMIN_PERMISSIONS,
-    ...LOGIN_SUMMARY_PERMS,
-])];
 
 function MetricOverview() {
     const { can } = useCan(DASHBOARD_METRIC_PERMISSIONS);
@@ -79,14 +68,16 @@ function AttentionOverview() {
 function LoginOverview() {
     const { can } = useCan(LOGIN_SUMMARY_PERMS);
     if (!can) return null;
-    const openUser = (id: number) => { void modal.detail((close) => <UserDetail id={id} onClose={() => close(null)} />); };
+    const openUser = (id: number) => { void import('../identity/users/UserDetail').then(({ UserDetail }) => modal.detail((close) => <UserDetail id={id} onClose={() => close(null)} />)); };
+    const openDevice = (duid: string) => { void import('../security/devices/UserDeviceDetail').then(({ showUserDeviceDetailByDuid }) => showUserDeviceDetailByDuid(duid)); };
+    const openLogin = (id: number) => { void import('../security/devices/LoginEventDetail').then(({ showLoginEventDetail }) => showLoginEventDetail(id, { onOpenUser: openUser, onOpenDeviceByDuid: openDevice })); };
     return <section className="panel panel-pad dashboard-login-map">
         <div><div className="eyebrow">Security</div><h2>Login locations · last 30 days</h2></div>
         <LoginLocationMap
             height={360}
             drStart={dashboardLoginStart()}
             onOpenUser={openUser}
-            onOpenLogin={(id) => showLoginEventDetail(id, { onOpenUser: openUser, onOpenDeviceByDuid: showUserDeviceDetailByDuid })}
+            onOpenLogin={openLogin}
         />
     </section>;
 }

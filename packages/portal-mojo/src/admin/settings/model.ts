@@ -1,4 +1,4 @@
-import { defineModel, mojoSave, withFreshAuth, type Params } from '../../client';
+import { defineModel, mojoSave, withFreshAuth, type Params } from '../../client/runtime';
 
 /** The exact system-level ANY-of gate declared by Setting.RestMeta. */
 export const SETTINGS_PERMISSIONS = ['sys.manage_settings', 'sys.groups'];

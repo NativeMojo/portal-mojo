@@ -19,10 +19,10 @@ try {
         server.ssrLoadModule('/packages/portal-mojo/src/admin/dashboard/data.ts'),
         server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts'),
     ]);
-    const [page, dataSource, adminIndex, portalMain, portalMenus, mockSource, devices, sentPage, showcase, docs] = await Promise.all([
+    const [page, dataSource, adminCore, portalMain, portalMenus, mockSource, devices, sentPage, showcase, docs] = await Promise.all([
         read('packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx'),
         read('packages/portal-mojo/src/admin/dashboard/data.ts'),
-        read('packages/portal-mojo/src/admin/index.ts'),
+        read('packages/portal-mojo/src/admin/core/index.ts'),
         read('apps/portal/src/main.tsx'),
         read('apps/portal/src/menus.ts'),
         read('packages/portal-mojo/src/client/mock.ts'),
@@ -49,7 +49,7 @@ try {
     const menu = admin.adminSectionsMenu(admin.ADMIN_SECTIONS, { grouped: true });
     const overview = menu.items.find((item) => item.id === 'admin:overview');
     assert.deepEqual(overview.children.map((item) => [item.label, item.route]), [['Dashboard', '/']]);
-    assert.match(adminIndex, /fallbackToFirstVisible/);
+    assert.match(adminCore, /fallbackToFirstVisible/);
     assert.doesNotMatch(portalMain, /DashboardPage/);
     assert.doesNotMatch(portalMenus, /id:\s*'admin:dashboard'/);
     await assert.rejects(access(new URL('../apps/portal/src/pages/DashboardPage.tsx', import.meta.url)));

@@ -5,7 +5,7 @@ import {
     GroupApiKeysSection,
     WebhookSubscriptionsSection,
     type CredentialGroup,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/identity';
 
 const DEMO_GROUP: CredentialGroup = {
     id: 1,

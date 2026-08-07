@@ -17,23 +17,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     MojoError, defineModel, mojoCall, mojoList, mojoMetrics, useCan,
     type Envelope, type Params,
-} from '../../client';
-import { SECURITY_DELETE_PERMS, SECURITY_MANAGE_PERMS, SECURITY_VIEW_PERMS } from '../security-permissions';
+} from '../../client/runtime';
 import { sanitizeEventRow } from '../incidents/sanitize';
 import type { EventRow } from '../incidents/models';
 import { GEOFENCE_VIEW_PERMS, SECURITY_EVENTS_PERMS } from './geofence/geofence-data';
+import { IPSET_DELETE_PERMS, IPSET_MANAGE_PERMS, IPSET_VIEW_PERMS } from './permissions';
 import type {
     AllowlistPayload, BypassHoldersPayload, GeoDecision, GeoRulesConfig, GeofenceRule,
 } from './geofence/geofence-data';
 
 // ── Permissions (backend-derived, `sys.`-pinned, fail-closed) ─────────
 
-/** `IPSet.RestMeta.VIEW_PERMS = ["view_security","security"]`. */
-export const IPSET_VIEW_PERMS = SECURITY_VIEW_PERMS;
-/** `IPSet.RestMeta.SAVE_PERMS = ["manage_security","security"]`. */
-export const IPSET_MANAGE_PERMS = SECURITY_MANAGE_PERMS;
-/** `IPSet.RestMeta.DELETE_PERMS = ["manage_security"]` — deliberately narrower. */
-export const IPSET_DELETE_PERMS = SECURITY_DELETE_PERMS;
+export { IPSET_DELETE_PERMS, IPSET_MANAGE_PERMS, IPSET_VIEW_PERMS } from './permissions';
 
 /**
  * `metrics/rest/helpers.check_view_permissions`: for `account == "global"` the
@@ -604,4 +599,3 @@ export async function findGeoIpIdByAddress(endpoint: string, ip: string): Promis
     if (typeof id !== 'number') throw new MojoError(`No GeoIP record cached for ${ip}`, 404);
     return id;
 }
-

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMe } from '../../client';
+import { useMe } from '../../client/runtime';
 import { modal, toast } from '../../ui';
 import { adoptHouseDomain } from './api';
 import { DomainModel } from './models';

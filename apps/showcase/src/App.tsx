@@ -1,4 +1,4 @@
-import { ModalHost, ToastHost, useTheme, type ThemePref } from 'portal-mojo/ui';
+import { ModalHost, ToastHost, useTheme, type ThemePref } from 'portal-mojo/ui/shell';
 import { ComponentsPage } from './pages/components/ComponentsPage';
 
 const NEXT: Record<ThemePref, ThemePref> = { light: 'dark', dark: 'system', system: 'light' };

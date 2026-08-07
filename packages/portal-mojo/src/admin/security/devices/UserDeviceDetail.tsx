@@ -19,7 +19,7 @@ import {
     Badge, DetailView, Eyebrow, FlatRow, KnownFieldsCard, MetricCard, Timeline,
     fmt, modal, toast, type Chip, type Tone,
 } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { BOUNCER_VIEW_PERMS, BouncerDeviceModel } from '../../bouncer/models';
 import { showBouncerDeviceDetail } from '../../bouncer/devices';
 import { GEOIP_VIEW_PERMS, countryFlag, threatTone } from '../geoip/models';

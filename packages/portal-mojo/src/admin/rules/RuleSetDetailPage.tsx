@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { Badge, DetailView, FlatRow, JsonBlock, ModelTable, fmt, modal, toast, type BatchAction, type Column } from '../../ui';
 import { HandlerChainBuilder } from './HandlerChainBuilder';
 import { parseHandlerChain, runtimeEffectiveHandlerChain, validateHandlerChain } from './handler-dsl';

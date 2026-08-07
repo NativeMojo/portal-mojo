@@ -26,12 +26,14 @@
 // Abuse flag semantics: false → block when detected; true → require the flag
 // (rare — not expressible in the friendly editor); absent/null → don't care.
 import { COUNTRY_OPTIONS, countryName } from '../../../charts/worldmap/countryCentroids';
-import { SECURITY_VIEW_PERMS } from '../../security-permissions';
 
 // The country table is #1426's (`portal-mojo/charts`). web-mojo derived its
 // picker from the same centroid table; the inline 249-entry copy that wave 4
 // carried is DELETED rather than moved — one country-name source, package-wide.
 export { COUNTRY_OPTIONS, countryName };
+export {
+    GEOFENCE_MANAGE_PERMS, GEOFENCE_VIEW_PERMS, GROUP_GEOFENCE_EDIT_PERMS, SECURITY_EVENTS_PERMS,
+} from './permissions';
 
 // ── Permissions ───────────────────────────────────────────────────────
 // Geofence config is PLATFORM-WIDE. `@md.requires_global_perms` on every
@@ -39,26 +41,6 @@ export { COUNTRY_OPTIONS, countryName };
 // superuser) ONLY — no group fallback, and a GroupScopedToken is refused
 // outright. So every clause here is `sys.`-pinned: a member grant must never
 // open platform enforcement config.
-
-/** `@md.requires_global_perms("view_geofence","manage_geofence","security")`. */
-export const GEOFENCE_VIEW_PERMS = ['sys.view_geofence', 'sys.manage_geofence', 'sys.security'];
-
-/** `@md.requires_global_perms("manage_geofence","security")` — POST/DELETE. */
-export const GEOFENCE_MANAGE_PERMS = ['sys.manage_geofence', 'sys.security'];
-
-/**
- * Change history, the blocks log and the posture header's Last-change chip all
- * read `incident.Event`, whose `RestMeta.VIEW_PERMS` is `view_security|security`.
- * A geofence-only grant passes the page gate and must NOT see events.
- */
-export const SECURITY_EVENTS_PERMS = SECURITY_VIEW_PERMS;
-
-/**
- * Editing the GROUP layer needs either the global geofence grant or group
- * management rights (the group REST enforces its own save perms — a 403 from
- * it still surfaces inline). GroupGeofenceSection.js:36.
- */
-export const GROUP_GEOFENCE_EDIT_PERMS = ['sys.manage_geofence', 'sys.security', 'sys.manage_groups', 'sys.groups'];
 
 // ── US states (ISO 3166-2 region codes) ───────────────────────────────
 

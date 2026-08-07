@@ -2,10 +2,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as mojo from 'portal-mojo/client';
+import {
+    RealtimeProvider, initAuth, login, mojoQueryDefaults, onAuth, usingMockTransport,
+} from 'portal-mojo/client/runtime';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './theme.css';
-import { ThemeProvider } from 'portal-mojo/ui';
+import { ThemeProvider } from 'portal-mojo/ui/shell';
 import App from './App';
 
 // This app has no VITE_MOJO_API on purpose — it's a standalone showcase
@@ -15,15 +17,14 @@ import App from './App';
 // backend), so — since there is no login page here — sign in as the mock's
 // fixed demo identity once at boot, silently, so every data-backed demo
 // (tables, filters, search…) works for a first-time visitor out of the box.
-mojo.initAuth();
-if (!mojo.usingMockTransport()) {
+initAuth();
+if (!usingMockTransport()) {
     throw new Error('apps/showcase is mock-only — do not point it at a real VITE_MOJO_API');
 }
 const queryClient = new QueryClient({
-    defaultOptions: { queries: { ...mojo.mojoQueryDefaults().queries, staleTime: 30_000 } },
+    defaultOptions: { queries: { ...mojoQueryDefaults().queries, staleTime: 30_000 } },
 });
-const realtimeMock = mojo.createRealtimeMock();
-mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
+onAuth('login', () => { void queryClient.invalidateQueries(); });
 const root = createRoot(document.getElementById('root')!);
 
 async function bootstrap() {
@@ -32,7 +33,24 @@ async function bootstrap() {
     // an anonymous first query can otherwise outlive login invalidation and
     // replace the authenticated result with its late 401 response.
     try {
-        await mojo.login('showcase.operator@nativemojo.com', 'mojo');
+        const [{ createRealtimeMock }] = await Promise.all([
+            import('portal-mojo/client'),
+            login('showcase.operator@nativemojo.com', 'mojo'),
+        ]);
+        const realtimeMock = createRealtimeMock();
+        root.render(
+            <StrictMode>
+                <QueryClientProvider client={queryClient}>
+                    <RealtimeProvider socketFactory={realtimeMock.factory}>
+                        <ThemeProvider>
+                            <HashRouter>
+                                <App />
+                            </HashRouter>
+                        </ThemeProvider>
+                    </RealtimeProvider>
+                </QueryClientProvider>
+            </StrictMode>,
+        );
     } catch (error) {
         console.error('Showcase auto-login failed:', error);
         root.render(
@@ -44,19 +62,6 @@ async function bootstrap() {
         );
         return;
     }
-    root.render(
-        <StrictMode>
-            <QueryClientProvider client={queryClient}>
-                <mojo.RealtimeProvider socketFactory={realtimeMock.factory}>
-                    <ThemeProvider>
-                        <HashRouter>
-                            <App />
-                        </HashRouter>
-                    </ThemeProvider>
-                </mojo.RealtimeProvider>
-            </QueryClientProvider>
-        </StrictMode>,
-    );
 }
 
 void bootstrap();

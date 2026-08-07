@@ -58,6 +58,20 @@ Admin section bundles contribute through `adminSectionsMenu`. Use
 experience. Routes remain mount-relative; multiple embedded root sections
 share one `/system` landing instead of emitting duplicate index routes.
 
+Import the route/menu machinery from `portal-mojo/admin/core`, then import only
+the registry domains the shell installs. The stable domains are `identity`,
+`security`, `observability`, `operations`, `infrastructure`, `communications`,
+and `assistant`. `portal-mojo/admin` remains the compatibility aggregate and
+retains every historical export, but deliberately performs the legacy DNS and
+Rule-field setup at import time.
+
+Built-in routes use `loadComponent`; external sections may use `component`.
+These properties are mutually exclusive. Loading and retryable error states
+live inside both permission guards, so access denial performs no page import.
+The infrastructure entry installs the optional managed-DNS adapter
+synchronously, which makes Email-first navigation safe even before any DNS page
+chunk has loaded. `admin/core` performs neither DNS nor field registration.
+
 ## Permissions (A2) — client gates, server authority
 
 `Me.permissions` is a dict; truthy `true` OR `1` grants. Semantics

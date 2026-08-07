@@ -27,8 +27,11 @@ try {
         readFile(new URL('../packages/portal-mojo/src/admin/assistant/streaming.ts', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/admin/assistant/launchers.tsx', import.meta.url), 'utf8'),
     ]);
-    assert.equal((portalRoot.match(/<mojo\.RealtimeProvider>/g) ?? []).length, 1);
-    assert.equal((showcaseRoot.match(/<mojo\.RealtimeProvider/g) ?? []).length, 1);
+    const providerCount = (source) => (source.match(/<(?:[A-Za-z_$][\w$]*\.)?RealtimeProvider(?=[\s>])/g) ?? []).length;
+    assert.equal(providerCount(portalRoot), 1, 'Portal must mount exactly one RealtimeProvider');
+    assert.equal(providerCount(showcaseRoot), 1, 'Showcase must mount exactly one RealtimeProvider');
+    assert.match(portalRoot, /import\s+\*\s+as\s+mojo\s+from\s+['"]portal-mojo\/client\/runtime['"]/);
+    assert.match(showcaseRoot, /import\s*\{[^}]*\bRealtimeProvider\b[^}]*\}\s*from\s*['"]portal-mojo\/client\/runtime['"]/s);
     assert.doesNotMatch(`${apiSource}\n${panelSource}\n${feedSource}`, /defineModel|ModelTable|create.*Adapter|useQuery|useMutation|EventSource|setInterval/);
     assert.match(panelSource, /chooseAssistantTransport/);
     assert.match(panelSource, /conversation\.user\.id === me\.id/);

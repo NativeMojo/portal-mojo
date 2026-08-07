@@ -9,7 +9,7 @@
 // admin-views-another-user path is not a backend surface. Other-user detail
 // therefore stays explicitly unavailable and never issues this query.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { mojoCall, useMe } from '../../../../client';
+import { mojoCall, useMe } from '../../../../client/runtime';
 import { Eyebrow, toast } from '../../../../ui';
 import type { UserRow } from '../models';
 

@@ -27,7 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
     defineModel, mojoCall, mojoList, useAuthSnapshot,
     type Params,
-} from '../../../client';
+} from '../../../client/runtime';
 import type { WorldMapTone } from '../../../charts';
 import type { GeoLocatedIPRow } from '../geoip/models';
 

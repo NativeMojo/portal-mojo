@@ -10,7 +10,7 @@
 //     sub-graph is `basic`, whose field list carries no `id`. The source read
 //     `this._ud?.id` and therefore never showed the item.
 import { Badge, DetailView, Eyebrow, FlatRow, fmt, modal, type Tone } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { EventModel } from '../../incidents/models';
 import { SECURITY_VIEW_PERMS } from '../../security-permissions';
 import { LogModel, LOGS_ADMIN_PERMISSIONS } from '../../monitoring/models';

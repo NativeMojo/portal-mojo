@@ -40,7 +40,7 @@ import {
     type JobsStats,
     type RunnerRow,
     type ScheduledTaskRow,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/operations';
 import { Guarded } from 'portal-mojo/ui';
 
 type Surface =

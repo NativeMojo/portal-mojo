@@ -8,10 +8,9 @@ import {
     Badge, Eyebrow, FlatRow, MetricCard, Timeline,
     fmt, type TimelineItem,
 } from 'portal-mojo/ui';
-import {
-    GroupApiKeyModel, LogModel, type GroupApiKeyRow, type LogRow,
-} from 'portal-mojo/admin';
-import { useModelList } from 'portal-mojo/client';
+import { GroupApiKeyModel, type GroupApiKeyRow } from 'portal-mojo/admin/identity';
+import { LogModel, type LogRow } from 'portal-mojo/admin/observability';
+import { useModelList } from 'portal-mojo/client/runtime';
 import { GroupModel, MemberModel, type GroupRow } from '../../models';
 import { kindLabel } from './models';
 import { LOG_TONE, groupAuditParams } from './shared';
