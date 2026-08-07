@@ -26,9 +26,6 @@
 // Abuse flag semantics: false → block when detected; true → require the flag
 // (rare — not expressible in the friendly editor); absent/null → don't care.
 import { COUNTRY_OPTIONS, countryName } from '../../../charts/worldmap/countryCentroids';
-import {
-    GEOFENCE_MANAGE_PERMS, GEOFENCE_VIEW_PERMS, GROUP_GEOFENCE_EDIT_PERMS, SECURITY_EVENTS_PERMS,
-} from './permissions';
 
 // The country table is #1426's (`portal-mojo/charts`). web-mojo derived its
 // picker from the same centroid table; the inline 249-entry copy that wave 4
