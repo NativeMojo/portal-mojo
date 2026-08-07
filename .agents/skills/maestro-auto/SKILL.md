@@ -1,21 +1,21 @@
 ---
 name: maestro-auto
 description: >-
-  Scope and build one or more maestro board items in one mostly-autonomous run:
-  parallel sub-agent scoping, a cross-item coherence pass, ONE consolidated
-  approval gate, then sub-agent builds — parallel across worktrees where the
-  repo isolates checkouts and the items are independent, sequential otherwise —
-  merged back and verified by ONE closing test run. Confirms the roster up
-  front, then interrupts the user once for approval instead of twice per item,
-  and only for decisions that change the shape of the work.
-user-invocable: true
-argument-hint: <item-ids, e.g. "431" or "431 432 438" (omit to pick from the board)>
-maestro-skill-version: 15
+  Scope and build one or more maestro board items in one mostly-autonomous
+  run: parallel sub-agent scoping, a cross-item coherence pass, ONE
+  consolidated approval gate, then sub-agent builds — parallel across
+  worktrees where the repo isolates checkouts and the items are independent,
+  sequential otherwise — merged back and verified by ONE closing test run.
+  Confirms the roster up front, then interrupts the user once for approval
+  instead of twice per item, and only for decisions that change the shape of
+  the work.
 ---
+
+<!-- Generated from .claude/skills/maestro-auto/SKILL.md (maestro-skill-version: 15). Do not edit directly. -->
 
 # Maestro Auto — Scope + Build, One Gate
 
-`/maestro-scope` then `/maestro-build` over **one or more** items as a single
+`$maestro-scope` then `$maestro-build` over **one or more** items as a single
 run, same engineering discipline: the user approves **once**, at a single
 consolidated gate, instead of twice per item, and **one** closing run verifies
 everything built. (The pre-flight roster confirm is not a third gate — seconds,
@@ -24,7 +24,7 @@ before any work starts.)
 You are the orchestrator, not the builder:
 
 - **Sub-agents touch code.** Scoping, red-teaming and building each run in a
-  fresh-context sub-agent (Opus, high effort). They read, plan, edit, test and
+  fresh-context sub-agent (frontier model, high reasoning). They read, plan, edit, test and
   commit; they never write to the board.
 - **You own the board and the batch.** Every `update_board_item`,
   `comment_on_item`, stage flip and claim goes through you, so a sub-agent that
@@ -32,7 +32,7 @@ You are the orchestrator, not the builder:
 
 Use it whenever the user hands you already-filed items to work with minimal
 supervision — **one item or a dozen**. Not for anything unfiled
-(`/maestro-task`), not for work too small to track (`/maestro-vibe`).
+(`$maestro-task`), not for work too small to track (`$maestro-vibe`).
 
 ## One Item or Many
 
@@ -50,11 +50,11 @@ At N=1, and nothing else differs:
 - **Both gates still run.** The roster confirm and the phase-4 gate are what
   make an unsupervised build safe; they cost seconds and one reply.
 
-Choose `/maestro-scope` + `/maestro-build` instead when the user wants to read
+Choose `$maestro-scope` + `$maestro-build` instead when the user wants to read
 the plan before it is pushed to the item, or to steer the build as it happens —
-those skills also take one id or many (`/maestro-scope 431 432`,
-`/maestro-build 431 432`) when only that half of the journey is wanted.
-`/maestro-auto` is for approve-once, read-the-result, at any N.
+those skills also take one id or many (`$maestro-scope 431 432`,
+`$maestro-build 431 432`) when only that half of the journey is wanted.
+`$maestro-auto` is for approve-once, read-the-result, at any N.
 
 ## Board Resolution
 
@@ -372,7 +372,7 @@ Then, for each item — concurrently within a parallel group, otherwise in order
    (create the directory if absent), first line: `<!-- generated from maestro
    item <id> — do not edit; the board item is the source of truth -->`. Commit
    it as the build-start marker.
-3. **Spawn one build sub-agent** (Opus, high effort) with the approved plan, the
+3. **Spawn one build sub-agent** (frontier model, high reasoning) with the approved plan, the
    repo's conventions, and its batch context (build order, what earlier items in
    this run landed, any shared helper another item introduced). Brief: the
    `maestro-build` workflow for one item — read before editing, one logical unit

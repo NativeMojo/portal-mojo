@@ -4,10 +4,9 @@ description: >-
   Pull one or more maestro board items, scope each inside this repo with full
   investigation rigor, append a file-level ## Plan to every workspec, and push
   them back (stage=planned) via the maestro MCP.
-user-invocable: true
-argument-hint: <item-ids, e.g. "431" or "431 432" (omit to pick from the board)>
-maestro-skill-version: 17
 ---
+
+<!-- Generated from .claude/skills/maestro-scope/SKILL.md (maestro-skill-version: 17). Do not edit directly. -->
 
 # Maestro Scope — Design the Plan on the Item
 
@@ -16,7 +15,7 @@ differs — the plan goes back to the item's workspec, not a local planning file
 
 ## One Item or Many
 
-**Takes any number of ids** — `/maestro-scope 431`, `/maestro-scope 431 432
+**Takes any number of ids** — `$maestro-scope 431`, `$maestro-scope 431 432
 438`. Scoping is read-only, so it parallelizes cleanly.
 
 - **One item** → run the workflow below inline, in this session.
@@ -288,10 +287,10 @@ item, ask for the right id — never go hunting for the item they probably meant
    "evidence": […]})` — description replaces whole; `contract` carries the same
    verification decision as data (see below) — and
    `comment_on_item(item, <3-5 line plan summary>)`.
-9. Hand off: "run `/maestro-build <item-id>` to build it" — name the item title
+9. Hand off: "run `$maestro-build <item-id>` to build it" — name the item title
    alongside the id; that line is often read back in a later session. Several
    items scoped in this session hand off as one line carrying every id
-   (`/maestro-build 431 432 438`, or `/maestro-auto` for the unsupervised
+   (`$maestro-build 431 432 438`, or `$maestro-auto` for the unsupervised
    route), in the build order the cross-check produced.
 
 ## Verification Tier — how much testing this change actually needs
