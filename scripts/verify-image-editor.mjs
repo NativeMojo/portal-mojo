@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
@@ -7,6 +9,7 @@ const server = await createServer({ root, appType: 'custom', logLevel: 'silent',
 
 try {
     const math = await server.ssrLoadModule('/packages/portal-mojo/src/ui/image-editor/math.ts');
+    const canvas = await server.ssrLoadModule('/packages/portal-mojo/src/ui/image-editor/canvas.ts');
     const image = { width: 1000, height: 500 };
     const mapping = math.canvasMapping(image, { width: 500, height: 500 });
     assert.deepEqual(mapping, { scale: 0.5, offsetX: 0, offsetY: 125 });
@@ -42,7 +45,36 @@ try {
     timeline = math.commitSnapshot(timeline.history, 0, { mode: 'crop', operations: operations.slice(0, 2) }, 3);
     assert.deepEqual(timeline.history.map((entry) => entry.mode), ['transform', 'crop'], 'divergence truncates redo snapshots');
     assert(Object.isFrozen(timeline.history) && Object.isFrozen(timeline.history[1].operations), 'snapshots and operation rosters are immutable');
-    console.log('verify-image-editor: math goldens passed');
+
+    const pixels = { width: 2, height: 1, data: new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 255, 128]) };
+    const browserFixtureOps = [
+        { kind: 'crop', rect: { x: 1, y: 0, width: 1, height: 1 }, output: { width: 2, height: 1 } },
+        { kind: 'filters', filters: { ...math.DEFAULT_FILTERS, grayscale: 100 }, preset: 'none' },
+    ];
+    const rendered = canvas.applyOperationsToPixels(pixels, browserFixtureOps);
+    assert.deepEqual({ width: rendered.width, height: rendered.height }, { width: 2, height: 1 }, 'browser raster adapter emits requested output dimensions');
+    assert.deepEqual([...rendered.data], [18, 18, 18, 128, 18, 18, 18, 128], 'deterministic pixels preserve alpha and exclude crop overlays');
+    assert.equal(createHash('sha256').update(rendered.data).digest('hex'), '93f3353464ccb8c946a58b77e823ae0c4a80fce737c279a083b9cd6d30343ec2');
+    const transformThenCrop = [
+        { kind: 'transform', scale: 2, rotation: 0, translateX: 0, translateY: 0 },
+        { kind: 'crop', rect: { x: 0, y: 0, width: 1, height: 1 }, output: null },
+    ];
+    assert.deepEqual(math.operationOutputSize(pixels, transformThenCrop), { width: 1, height: 1 });
+    assert.deepEqual(math.operationOutputSize(pixels, [...transformThenCrop].reverse()), { width: 2, height: 2 }, 'chronological action order changes composition');
+
+    const [editorSource, portalCss, showcaseCss] = await Promise.all([
+        readFile(new URL('../packages/portal-mojo/src/ui/image-editor/ImageEditor.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../apps/portal/src/theme/image-editor.css', import.meta.url), 'utf8'),
+        readFile(new URL('../apps/showcase/src/theme/image-editor.css', import.meta.url), 'utf8'),
+    ]);
+    assert.match(editorSource, /saveGeneration/);
+    assert.match(editorSource, /loadGeneration/);
+    assert.match(editorSource, /canvas\.toBlob|pixelSurfaceToBlob/);
+    assert(!/download\s*=|\.click\(\)/.test(editorSource), 'save never auto-downloads');
+    assert.equal(portalCss, showcaseCss, 'both themes carry byte-identical editor styles');
+    await stat(new URL('../packages/portal-mojo/docs/image-editor.md', import.meta.url));
+    await stat(new URL('../apps/showcase/src/pages/components/demos-image-editor.tsx', import.meta.url));
+    console.log('verify-image-editor: math, raster, history, and three-legged contracts passed');
 } finally {
     await server.close();
 }

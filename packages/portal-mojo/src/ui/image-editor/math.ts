@@ -343,7 +343,12 @@ export function transformOutputSize(input: ImageSize, transform: TransformState)
 }
 
 export function combinedFilters(filters: FilterState, preset: FilterPresetName): FilterState {
-    return { ...filters, ...FILTER_PRESETS[preset].filters };
+    const entry = FILTER_PRESETS[preset];
+    if (!entry) {
+        console.warn(`ImageEditor: unknown filter preset ${JSON.stringify(preset)} — falling back to Original.`);
+        return { ...filters };
+    }
+    return { ...filters, ...entry.filters };
 }
 
 export function filterString(filters: FilterState, preset: FilterPresetName = 'none'): string {
@@ -372,9 +377,28 @@ export function appendOperation(
 export function operationOutputSize(source: ImageSize, operations: readonly ImageEditorOperation[]): ImageSize {
     return operations.reduce<ImageSize>((size, operation) => {
         if (operation.kind === 'transform') return transformOutputSize(size, operation);
-        if (operation.kind === 'crop') return operation.output ?? { width: operation.rect.width, height: operation.rect.height };
+        if (operation.kind === 'crop') return operation.output ?? {
+            width: Math.max(1, Math.floor(operation.rect.width)),
+            height: Math.max(1, Math.floor(operation.rect.height)),
+        };
         return size;
     }, source);
+}
+
+export function lastCropData(source: ImageSize, operations: readonly ImageEditorOperation[]): CropData | null {
+    let size = source;
+    let latest: CropData | null = null;
+    for (const operation of operations) {
+        if (operation.kind === 'transform') size = transformOutputSize(size, operation);
+        else if (operation.kind === 'crop') {
+            latest = cropDataFromBox(operation.rect, size);
+            size = operation.output ?? {
+                width: Math.max(1, Math.floor(operation.rect.width)),
+                height: Math.max(1, Math.floor(operation.rect.height)),
+            };
+        }
+    }
+    return latest;
 }
 
 export function commitSnapshot(

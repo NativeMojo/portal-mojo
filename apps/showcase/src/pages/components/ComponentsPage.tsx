@@ -68,6 +68,7 @@ import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
 import { LocationAddressDemo } from './demos-location-address';
 import { FileUploadDemo } from './demos-file-upload';
+import { ImageEditorDemo } from './demos-image-editor';
 
 interface DemoSection {
     key: string;
@@ -176,6 +177,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Pickers',
         sections: [
+            {
+                key: 'image-editor', title: 'Image editor', icon: 'bi-crop',
+                blurb: 'Full-resolution transform, source-pixel crop, and deterministic filter composition with bounded history, explicit PNG Blob results, and an awaitable modal.',
+                render: () => <ImageEditorDemo />,
+            },
             {
                 key: 'file-upload', title: 'File upload', icon: 'bi-cloud-arrow-up',
                 blurb: 'Accessible picker/drop queue plus controlled FileField/ImageField relation attachment with truthful upload, retry, recovery, clear, orphan, and awaiting-save states.',

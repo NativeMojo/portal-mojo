@@ -1,0 +1,80 @@
++/* Token-only ImageEditor styles. Keep byte-identical in portal/showcase. */
+.image-editor {
+    display: flex; flex-direction: column; min-height: min(720px, 88vh);
+    background: var(--surface); color: var(--ink); overflow: hidden;
+}
+.image-editor-modal-title { margin: 0; padding: 13px 16px; border-bottom: 1px solid var(--line); color: var(--ink-strong); font-size: 16px; }
+.image-editor-toolbar,
+.image-editor-controls,
+.image-editor-footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.image-editor-modes,
+.image-editor-history { display: flex; align-items: center; gap: 6px; }
+.image-editor-controls { justify-content: flex-start; flex-wrap: wrap; background: var(--surface2); }
+.image-editor-apply { margin-left: auto; }
+.image-editor-value { color: var(--mute); font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
+.image-editor-preset { display: flex; align-items: center; gap: 7px; color: var(--mute); font-size: 12px; }
+.image-editor-preset .select { min-width: 170px; }
+.image-editor-sliders {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px 14px; padding: 10px 14px; border-bottom: 1px solid var(--line);
+    background: var(--surface);
+}
+.image-editor-sliders label { display: grid; gap: 3px; color: var(--mute); font-size: 11px; text-transform: capitalize; }
+.image-editor-sliders label span { display: flex; justify-content: space-between; }
+.image-editor-sliders b { color: var(--ink-strong); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.image-editor-sliders input { width: 100%; accent-color: var(--accent); }
+.image-editor-stage {
+    position: relative; display: grid; place-items: center; flex: 1; min-height: 360px;
+    overflow: hidden; padding: 18px; background: var(--bg);
+    background-image: linear-gradient(45deg, var(--line-soft) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--line-soft) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--line-soft) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--line-soft) 75%);
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    background-size: 16px 16px;
+}
+.image-editor-preview { position: relative; display: inline-block; max-width: 100%; max-height: min(56vh, 620px); line-height: 0; }
+.image-editor-canvas {
+    display: block; max-width: 100%; max-height: min(56vh, 620px);
+    width: auto; height: auto; object-fit: contain; box-shadow: var(--shadow-pop);
+    touch-action: none; cursor: default;
+}
+.image-editor-stage.is-transform .image-editor-canvas { cursor: grab; }
+.image-editor-stage.is-transform .image-editor-canvas:active { cursor: grabbing; }
+.image-editor-crop {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    touch-action: none; overflow: visible;
+}
+.image-editor-crop-shade { fill: color-mix(in srgb, var(--bg) 68%, transparent); pointer-events: none; }
+.image-editor-crop-box { fill: transparent; stroke: var(--ink-strong); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: move; }
+.image-editor-crop-handle { fill: var(--surface); stroke: var(--ink-strong); stroke-width: 1; }
+.image-editor-crop-handle[data-crop-handle="nw"],
+.image-editor-crop-handle[data-crop-handle="se"] { cursor: nwse-resize; }
+.image-editor-crop-handle[data-crop-handle="ne"],
+.image-editor-crop-handle[data-crop-handle="sw"] { cursor: nesw-resize; }
+.image-editor-crop-handle[data-crop-handle="n"],
+.image-editor-crop-handle[data-crop-handle="s"] { cursor: ns-resize; }
+.image-editor-crop-handle[data-crop-handle="e"],
+.image-editor-crop-handle[data-crop-handle="w"] { cursor: ew-resize; }
+.image-editor-message {
+    position: absolute; z-index: 2; padding: 9px 12px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--surface); color: var(--mute); box-shadow: var(--shadow);
+}
+.image-editor-error {
+    padding: 9px 14px; border-top: 1px solid var(--bad); background: var(--bad-soft);
+    color: var(--bad); font-size: 12.5px;
+}
+.image-editor-footer { border-top: 1px solid var(--line); border-bottom: 0; color: var(--mute); font-size: 12px; }
+.image-editor-footer .modal-actions { margin: 0; }
+.image-editor-demo-result { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.image-editor-demo-result img { width: 96px; height: 72px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+@media (max-width: 680px) {
+    .image-editor { min-height: 82vh; }
+    .image-editor-toolbar, .image-editor-footer { align-items: stretch; flex-direction: column; }
+    .image-editor-modes, .image-editor-history { flex-wrap: wrap; }
+    .image-editor-footer .modal-actions { align-self: flex-end; }
+    .image-editor-stage { min-height: 280px; padding: 10px; }
+}
