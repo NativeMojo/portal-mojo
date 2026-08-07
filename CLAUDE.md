@@ -86,3 +86,11 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
 
 Fable for contract-dense foundation work (Chunks A/B) and review; Opus 5
 (`/fast`) for volume fan-out (pages, field components, CSS porting).
+
+## Responses
+
+- Short and plain. No preamble, no recap of what I just did.
+- Lead with the answer. Detail only if asked.
+- Don't explain reasoning unless it changes what the user does next.
+- No unnecessary tool calls to prove a point — state it and move on.
+- Ask before acting on anything beyond the literal request.
