@@ -25,6 +25,7 @@ import {
     WebhookSubscriptionsPage,
 } from './credentials';
 import { MONITORING_ADMIN_SECTION } from './monitoring';
+import { CLOUDWATCH_ADMIN_SECTION } from './cloudwatch';
 import { SETTINGS_ADMIN_SECTION } from './settings';
 import { BOUNCER_ADMIN_SECTION } from './bouncer';
 import {
@@ -42,6 +43,7 @@ import { ADMIN_DASHBOARD_PERMISSIONS, AdminDashboardPage } from './dashboard';
 
 export * from './credentials';
 export * from './monitoring';
+export * from './cloudwatch';
 export * from './settings';
 export * from './bouncer';
 export * from './security-permissions';
@@ -151,6 +153,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
         ],
     },
     MONITORING_ADMIN_SECTION,
+    CLOUDWATCH_ADMIN_SECTION,
     SETTINGS_ADMIN_SECTION,
     SECURITY_OPERATIONS_ADMIN_SECTION,
     BOUNCER_ADMIN_SECTION,

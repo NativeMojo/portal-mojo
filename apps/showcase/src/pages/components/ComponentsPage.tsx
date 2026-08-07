@@ -44,6 +44,7 @@ import { AdminCredentialsDemo } from './demos-admin-credentials';
 import { AdminMonitoringDemo } from './demos-admin-monitoring';
 import { AdminMetricsExplorerDemo } from './demos-admin-metrics-explorer';
 import { AdminDashboardDemo } from './demos-admin-dashboard';
+import { AdminCloudWatchDemo } from './demos-admin-cloudwatch';
 import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
@@ -326,6 +327,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-dashboard', title: 'Admin dashboard', icon: 'bi-grid-1x2',
                 blurb: 'Global operational overview backed only by authoritative metric and count endpoints, with independent permission gates and safe root fallback.',
                 render: () => <AdminDashboardDemo />,
+            },
+            {
+                key: 'admin-cloudwatch', title: 'CloudWatch', icon: 'bi-clouds',
+                blurb: 'Global EC2, RDS, and Redis infrastructure monitoring with exact resource discovery, friendly metric identities, constrained controls, and modal-only resource details.',
+                render: () => <AdminCloudWatchDemo />,
             },
             {
                 key: 'admin-messaging', title: 'Email & contact messages', icon: 'bi-envelope-at',

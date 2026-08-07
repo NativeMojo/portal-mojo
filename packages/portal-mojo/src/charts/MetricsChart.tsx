@@ -13,7 +13,7 @@
 // reached the backend. This port sends dt_*. The `range` param rides along
 // for quick ranges because the shipped mock windows off it; each side
 // ignores the other's param.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { mojoMetrics, type MetricsResponse } from '../client/client';
 import type { Params } from '../client/types';
@@ -172,6 +172,16 @@ export interface MetricsChartProps {
     showRefresh?: boolean;
     showStats?: boolean;
     showDataTable?: boolean;
+    /** Optional backend capability subset; unsupported controls are omitted. */
+    allowedGranularities?: string[];
+    /** Changing this value requests one refresh from an owning parent. */
+    refreshSignal?: unknown;
+}
+
+function constrainGranularities(values: readonly string[], configured?: readonly string[]): string[] {
+    if (!configured) return [...values];
+    const supported = new Set(GRANULARITIES.map((item) => item.value));
+    return values.filter((value) => configured.includes(value) && supported.has(value));
 }
 
 export function MetricsChart({
@@ -196,6 +206,8 @@ export function MetricsChart({
     showRefresh = true,
     showStats = true,
     showDataTable = true,
+    allowedGranularities,
+    refreshSignal,
 }: MetricsChartProps) {
     const [range, setRange] = useState<RangeState>(() => ({ kind: 'quick', value: defaultRange, anchor: Date.now() }));
     const [granularity, setGranularity] = useState(defaultGranularity);
@@ -226,7 +238,10 @@ export function MetricsChart({
             allowed = granularitiesForSpanMs((dtEnd - dtStart) * 1000);
         }
     }
-    const effective = allowed.includes(granularity) ? granularity : allowed[allowed.length - 1]!;
+    const configured = constrainGranularities(GRANULARITIES.map((item) => item.value), allowedGranularities);
+    const constrained = constrainGranularities(allowed, allowedGranularities);
+    const available = constrained.length > 0 ? constrained : configured.length > 0 ? configured : constrainGranularities(allowed);
+    const effective = available.includes(granularity) ? granularity : available[available.length - 1]!;
 
     const wire: MetricsFetchParams = {
         ...apiParams,
@@ -263,7 +278,9 @@ export function MetricsChart({
     // rather than firing a request the backend would bucket differently.
     const pickRange = (next: string) => {
         setRange({ kind: 'quick', value: next, anchor: Date.now() });
-        const ok = RANGE_GRANULARITY[next] ?? ['days'];
+        const rangeGranularities = RANGE_GRANULARITY[next] ?? ['days'];
+        const constrainedNext = constrainGranularities(rangeGranularities, allowedGranularities);
+        const ok = constrainedNext.length > 0 ? constrainedNext : configured.length > 0 ? configured : rangeGranularities;
         if (!ok.includes(granularity)) setGranularity(ok[ok.length - 1]!);
     };
 
@@ -276,7 +293,9 @@ export function MetricsChart({
         setRange({ kind: 'custom', start: picked.start, end: picked.end });
         const epochs = ymdRangeToEpochSeconds(picked.start, picked.end);
         if (epochs) {
-            const ok = granularitiesForSpanMs((epochs.dtEnd - epochs.dtStart) * 1000);
+            const rangeGranularities = granularitiesForSpanMs((epochs.dtEnd - epochs.dtStart) * 1000);
+            const constrainedNext = constrainGranularities(rangeGranularities, allowedGranularities);
+            const ok = constrainedNext.length > 0 ? constrainedNext : configured.length > 0 ? configured : rangeGranularities;
             if (!ok.includes(granularity)) setGranularity(ok[ok.length - 1]!);
         }
     };
@@ -284,9 +303,16 @@ export function MetricsChart({
     // Refresh re-anchors a quick window at NOW (web-mojo kept the stale
     // window — deliberate fix, documented in charts.md).
     const refresh = () => {
-        if (range.kind === 'quick') setRange({ ...range, anchor: Date.now() });
-        void query.refetch();
+        if (range.kind === 'quick') setRange({ ...range, anchor: Math.max(Date.now(), range.anchor + 1) });
+        else void query.refetch();
     };
+
+    const priorRefreshSignal = useRef(refreshSignal);
+    useEffect(() => {
+        if (Object.is(priorRefreshSignal.current, refreshSignal)) return;
+        priorRefreshSignal.current = refreshSignal;
+        refresh();
+    }, [refreshSignal]);
 
     const openStats = () => {
         void showSeriesStats({
@@ -324,8 +350,8 @@ export function MetricsChart({
                     {showGranularity && (
                         <>
                             <div className="seg seg-xs gran-toggle" role="group" aria-label="Granularity">
-                                {GRANULARITIES.map((g) => {
-                                    const enabled = allowed.includes(g.value);
+                                {GRANULARITIES.filter((g) => !allowedGranularities || configured.length === 0 || configured.includes(g.value)).map((g) => {
+                                    const enabled = available.includes(g.value);
                                     return (
                                         <button
                                             key={g.value}
@@ -345,7 +371,7 @@ export function MetricsChart({
                                 onChange={(e) => setGranularity(e.target.value)}
                                 aria-label="Granularity"
                             >
-                                {GRANULARITIES.filter((g) => allowed.includes(g.value)).map((g) => (
+                                {GRANULARITIES.filter((g) => available.includes(g.value)).map((g) => (
                                     <option key={g.value} value={g.value}>{g.label}</option>
                                 ))}
                             </select>
