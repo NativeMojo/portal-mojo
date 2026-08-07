@@ -569,7 +569,8 @@ autosave editing, permission-gated UI, live metrics dashboard.
   Board #1263 (parked; the endpoint files to NativeMojo Inbox as a django-mojo
   item at activation).
 - Reusable WebSocket transport (`wss://…/ws/realtime/`, challenged bearer
-  handshake, heartbeat, refcounted topics) + Assistant streaming consumer.
+  handshake, heartbeat, refcounted topics) + Assistant streaming consumer with
+  backend-echoed per-turn request correlation.
   Board #1264 — **DONE 2026-08-07**. Upload transport/UX completed independently
   in #1468/#1470.
 - Publishing: npm `portal-mojo` with TypeScript-source subpath exports;

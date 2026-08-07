@@ -13,6 +13,8 @@ globalThis.document = { hidden: false, addEventListener() {}, removeEventListene
 globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
 globalThis.sessionStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
 
+const REQUEST_ID = '5dbeb7d4-44a7-4e26-b6bd-708f146b42d9';
+
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 try {
@@ -59,19 +61,20 @@ try {
     assert.equal(streaming.chooseAssistantTransport({ owner: false, textOnly: true, hasViewAdmin: true, realtimeStatus: 'ready' }), 'inspect');
 
     // Exact positive projectors sanitize raw tool inputs and terminal tool lists.
-    assert.deepEqual(streaming.projectAssistantThinking({ type: 'assistant_thinking', conversation_id: 41 }), { type: 'thinking', conversationId: 41 });
-    assert.deepEqual(streaming.projectAssistantText({ type: 'assistant_text', conversation_id: 41, text: 'checking', blocks: [{ type: 'alert', level: 'info', message: 'safe' }] }), { type: 'text', conversationId: 41, text: 'checking', blocks: [{ type: 'alert', level: 'info', title: undefined, message: 'safe' }] });
-    const tool = streaming.projectAssistantToolCall({ type: 'assistant_tool_call', conversation_id: 41, tool: 'query_users', input: { password: 'private' } });
-    assert.deepEqual(tool, { type: 'tool', conversationId: 41, name: 'query_users', status: 'running', count: 1 });
+    assert.deepEqual(streaming.projectAssistantThinking({ type: 'assistant_thinking', conversation_id: 41, request_id: REQUEST_ID }), { type: 'thinking', conversationId: 41, requestId: REQUEST_ID });
+    assert.deepEqual(streaming.projectAssistantText({ type: 'assistant_text', conversation_id: 41, request_id: REQUEST_ID, text: 'checking', blocks: [{ type: 'alert', level: 'info', message: 'safe' }] }), { type: 'text', conversationId: 41, requestId: REQUEST_ID, text: 'checking', blocks: [{ type: 'alert', level: 'info', title: undefined, message: 'safe' }] });
+    const tool = streaming.projectAssistantToolCall({ type: 'assistant_tool_call', conversation_id: 41, request_id: REQUEST_ID, tool: 'query_users', input: { password: 'private' } });
+    assert.deepEqual(tool, { type: 'tool', conversationId: 41, requestId: REQUEST_ID, name: 'query_users', status: 'running', count: 1 });
     assert.equal(JSON.stringify(tool).includes('private'), false);
-    const plan = streaming.projectAssistantPlan({ type: 'assistant_plan', conversation_id: 41, plan: { plan_id: 'p1', title: 'Plan', steps: [{ id: 1, description: 'Inspect', status: 'pending', tool: 'secret_tool', tool_input: { secret: true } }] } });
+    const plan = streaming.projectAssistantPlan({ type: 'assistant_plan', conversation_id: 41, request_id: REQUEST_ID, plan: { plan_id: 'p1', title: 'Plan', steps: [{ id: 1, description: 'Inspect', status: 'pending', tool: 'secret_tool', tool_input: { secret: true } }] } });
     assert.deepEqual(plan.steps, [{ id: 1, description: 'Inspect', status: 'pending' }]);
-    assert.deepEqual(streaming.projectAssistantPlanUpdate({ type: 'assistant_plan_update', conversation_id: 41, plan_id: 'p1', step_id: 1, status: 'done', summary: 'Complete' }), { type: 'plan_update', conversationId: 41, planId: 'p1', stepId: 1, status: 'done', summary: 'Complete' });
-    const response = streaming.projectAssistantResponse({ type: 'assistant_response', conversation_id: 41, message_id: 91, created: 123, response: 'done', tool_calls_made: [{ tool: 'one', input: { secret: 1 } }, { tool: 'two', input: { secret: 2 } }], blocks: [] });
+    assert.deepEqual(streaming.projectAssistantPlanUpdate({ type: 'assistant_plan_update', conversation_id: 41, request_id: REQUEST_ID, plan_id: 'p1', step_id: 1, status: 'done', summary: 'Complete' }), { type: 'plan_update', conversationId: 41, requestId: REQUEST_ID, planId: 'p1', stepId: 1, status: 'done', summary: 'Complete' });
+    const response = streaming.projectAssistantResponse({ type: 'assistant_response', conversation_id: 41, request_id: REQUEST_ID, message_id: 91, created: 123, response: 'done', tool_calls_made: [{ tool: 'one', input: { secret: 1 } }, { tool: 'two', input: { secret: 2 } }], blocks: [] });
     assert.equal(response.toolCount, 2);
     assert.equal(JSON.stringify(response).includes('tool_calls_made'), false);
     assert.equal(streaming.projectAssistantResponse({ type: 'assistant_text', conversation_id: 41, response: 'wrong type' }), null);
-    assert.deepEqual(streaming.projectAssistantError({ type: 'assistant_error', conversation_id: 41, error: 'failed' }), { type: 'error', conversationId: 41, error: 'failed' });
+    assert.deepEqual(streaming.projectAssistantError({ type: 'assistant_error', conversation_id: 41, request_id: REQUEST_ID, error: 'failed' }), { type: 'error', conversationId: 41, requestId: REQUEST_ID, error: 'failed' });
+    assert.equal(streaming.projectAssistantResponse({ type: 'assistant_response', conversation_id: 41, response: 'missing correlation' }), null);
     assert.equal(data.projectReply({ conversation_id: 2, response: 'ok', tool_calls_made: [{ input: 'private' }] }).tool_calls_made, 1);
 
     const readyClient = () => {
@@ -82,16 +85,23 @@ try {
         return { client, wire };
     };
     const callbacks = (overrides = {}) => ({ onConversation() {}, onText() {}, onProgress() {}, onResponse() {}, onReconcile() {}, onUnknown() {}, ...overrides });
+    const observedRequestId = (wire) => {
+        const value = [...wire.observations].reverse().find((entry) => entry.kind === 'assistant')?.requestId;
+        assert.match(value, /^[0-9a-f-]{36}$/, 'Assistant send includes a UUID request_id');
+        return value;
+    };
 
     // Correlation, direct path, and authoritative terminal dedupe.
     {
         const { client, wire } = readyClient(); const received = []; const seen = new Set();
         const turn = streaming.startAssistantRealtimeTurn(client, { message: 'hello', conversationId: 41, seenMessageIds: seen }, callbacks({ onResponse: (message) => received.push(message) }));
-        wire.direct({ type: 'assistant_response', conversation_id: 99, message_id: 1, response: 'wrong', blocks: [] }, 1);
+        const requestId = observedRequestId(wire);
+        wire.direct({ type: 'assistant_response', conversation_id: 99, request_id: requestId, message_id: 1, response: 'wrong conversation', blocks: [] }, 1);
+        wire.direct({ type: 'assistant_response', conversation_id: 41, request_id: REQUEST_ID, message_id: 2, response: 'wrong request', blocks: [] }, 1);
         assert.equal(received.length, 0);
-        wire.direct({ type: 'assistant_response', conversation_id: 41, message_id: 501, created: 123, response: 'right', blocks: [], tool_calls_made: [{ input: 'private' }] }, 1);
+        wire.direct({ type: 'assistant_response', conversation_id: 41, request_id: requestId, message_id: 501, created: 123, response: 'right', blocks: [], tool_calls_made: [{ input: 'private' }] }, 1);
         await turn.promise;
-        wire.direct({ type: 'assistant_response', conversation_id: 41, message_id: 501, response: 'duplicate', blocks: [] }, 1);
+        wire.direct({ type: 'assistant_response', conversation_id: 41, request_id: requestId, message_id: 501, response: 'duplicate', blocks: [] }, 1);
         assert.deepEqual(received.map((message) => [message.id, message.content]), [[501, 'right']]);
         assert(seen.has(501));
     }
@@ -100,11 +110,38 @@ try {
     {
         const { client, wire } = readyClient(); const received = [];
         const turn = streaming.startAssistantRealtimeTurn(client, { message: 'wrapped', conversationId: 42, seenMessageIds: new Set() }, callbacks({ onResponse: (message) => received.push(message) }));
-        wire.wrapped({ type: 'assistant_response', conversation_id: 42, message_id: 502, response: 'topic injection', blocks: [] }, 'group:1:events', 1);
+        const requestId = observedRequestId(wire);
+        wire.wrapped({ type: 'assistant_response', conversation_id: 42, request_id: requestId, message_id: 502, response: 'topic injection', blocks: [] }, 'group:1:events', 1);
         assert.deepEqual(received, [], 'Assistant ignores same-shaped topic traffic');
-        wire.direct({ type: 'assistant_response', conversation_id: 42, message_id: 503, response: 'direct response', blocks: [] }, 1);
+        wire.direct({ type: 'assistant_response', conversation_id: 42, request_id: requestId, message_id: 503, response: 'direct response', blocks: [] }, 1);
         await turn.promise;
         assert.deepEqual(received.map((message) => message.content), ['direct response']);
+    }
+
+    // Two turns in one conversation accept only their own request_id.
+    {
+        const { client, wire } = readyClient(); const first = []; const second = [];
+        const turnA = streaming.startAssistantRealtimeTurn(client, { message: 'first', conversationId: 45, seenMessageIds: new Set() }, callbacks({ onResponse: (message) => first.push(message.content) }));
+        const requestA = observedRequestId(wire);
+        const turnB = streaming.startAssistantRealtimeTurn(client, { message: 'second', conversationId: 45, seenMessageIds: new Set() }, callbacks({ onResponse: (message) => second.push(message.content) }));
+        const requestB = observedRequestId(wire);
+        assert.notEqual(requestA, requestB);
+        wire.direct({ type: 'assistant_response', conversation_id: 45, request_id: requestB, message_id: 505, response: 'second only', blocks: [] }, 1);
+        wire.direct({ type: 'assistant_response', conversation_id: 45, request_id: requestA, message_id: 504, response: 'first only', blocks: [] }, 1);
+        await Promise.all([turnA.promise, turnB.promise]);
+        assert.deepEqual(first, ['first only']);
+        assert.deepEqual(second, ['second only']);
+    }
+
+    // Missing or mismatched request IDs fail boundedly and are never guessed.
+    {
+        const { client, wire } = readyClient(); let unknown = 0; let refreshes = 0;
+        const turn = streaming.startAssistantRealtimeTurn(client, { message: 'uncorrelated', conversationId: 44, seenMessageIds: new Set(), ackTimeoutMs: 5, refreshList: async () => { refreshes += 1; } }, callbacks({ onUnknown: () => { unknown += 1; } }));
+        wire.direct({ type: 'assistant_thinking', conversation_id: 44 }, 1);
+        wire.direct({ type: 'assistant_thinking', conversation_id: 44, request_id: REQUEST_ID }, 1);
+        await assert.rejects(turn.promise, streaming.AssistantOutcomeUnknownError);
+        assert.equal(unknown, 1); assert.equal(refreshes, 1);
+        assert.equal(wire.observations.filter((entry) => entry.kind === 'assistant').length, 1, 'uncorrelated outcome must never auto-resend');
     }
 
     // Known-conversation disconnect waits for reauth, then REST-detail reconcile.

@@ -9,7 +9,8 @@ Import from `portal-mojo/admin`.
 - An owned, text-only conversation uses realtime only when the shared transport
   is authenticated and the caller locally has `sys.view_admin`, matching the
   WebSocket handler's narrower server check. The client sends exactly
-  `{type:'assistant_message',message,conversation_id?}`. A caller with only
+  `{type:'assistant_message',message,request_id,conversation_id?}`, with a fresh
+  canonical UUID per turn. A caller with only
   `sys.assistant`, any send with attachments, an unavailable socket, and a
   foreign inspect-only conversation stay on REST. Messages are never
   auto-resubmitted across paths.
@@ -21,9 +22,9 @@ Import from `portal-mojo/admin`.
   projects only `assistant_thinking`, `assistant_text`,
   `assistant_tool_call`, `assistant_plan`, `assistant_plan_update`,
   `assistant_response`, and `assistant_error`. Thinking, text, tool, plan,
-  update, and response events require a positive `conversation_id` and are
-  correlated to the active turn. `assistant_error` alone may omit it; such an
-  uncorrelated server error terminates the active turn. Tool state retains
+  update, response, and error events require the exact `request_id` sent for
+  the active turn. Non-error events also require a positive `conversation_id`;
+  an error may omit only the conversation id. Tool state retains
   bounded name/status/count only; raw input and the terminal `tool_calls_made`
   list never enter UI state, caches, logs, or mock observations. Plans omit
   tool inputs. Terminal duplication is checked only with the backend's
@@ -38,10 +39,11 @@ Import from `portal-mojo/admin`.
   reconnect; locally observed permission loss immediately clears this
   consumer's transient stream/subscriptions without disabling the shared
   provider.
-- Direct-source binding does not solve first-send or concurrent-turn
-  correlation: the current server protocol has no per-send acknowledgement id.
-  Consumers must retain the existing single-flight behavior until that wire
-  contract is designed.
+- Direct-source binding and the echoed `request_id` jointly isolate concurrent
+  turns, including turns in the same conversation. Missing or mismatched IDs
+  are ignored; if no correlated acknowledgement arrives within ten seconds,
+  the outcome is marked unknown, the list is refreshed, and the send is never
+  retried automatically.
 - `POST /api/assistant/context` sends only `{model, pk}`. The returned conversation id is immediately fetched from `/api/assistant/conversation/<id>?graph=detail`; the client never synthesizes or reposts context text.
 - Conversation and Skill lists/details/deletes are imperative and component-local. They do not use `defineModel`, Query cache, `ModelTable`, a `RecordFeed` adapter, persistence, or exports.
 - A foreign conversation visible to an administrator is inspect-only. Only `conversation.user.id === me.id` enables continuation.
