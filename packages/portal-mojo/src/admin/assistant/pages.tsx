@@ -1,21 +1,54 @@
-import { useCallback, useEffect, useState } from 'react';
-import { mojoList, useCan, useMe } from '../../client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { mojoList, useCan, useMe, useRealtime, useRealtimeStatus } from '../../client';
 import { Badge, fmt, modal, toast } from '../../ui';
 import { AssistantFeed } from './AssistantFeed';
 import { deleteAssistantConversation, deleteAssistantMemory, deleteAssistantSkill, getAssistantConversation, getAssistantMemory, getAssistantSkill, listAssistantConversations, listAssistantSkills, saveAssistantMemory, sendAssistantMessage } from './api';
 import type { AssistantConversation, AssistantConversationSummary, AssistantSkill } from './types';
 import type { FileReference } from '../../client/record-feed';
+import { ASSISTANT_PERMISSIONS } from './AssistantPanel';
+import { AssistantOutcomeUnknownError, chooseAssistantTransport, startAssistantRealtimeTurn, type AssistantRealtimeTurn } from './streaming';
 
 function PageState({ loading, error, retry }: { loading: boolean; error: string; retry(): void }) { if (loading) return <div className="panel panel-pad dim">Loading…</div>; if (error) return <div className="panel panel-pad"><div className="form-alert" role="alert">{error}</div><button type="button" className="btn" onClick={retry}>Retry</button></div>; return null; }
 function Heading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <header className="admin-page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div></header>; }
 
 function ConversationInspect({ id, close }: { id: number; close(): void }) {
-    const { data: me } = useMe(); const [data, setData] = useState<AssistantConversation | null>(null); const [loading, setLoading] = useState(true); const [responding, setResponding] = useState(false); const [error, setError] = useState('');
-    const load = useCallback(async () => { setLoading(true); setError(''); try { setData(await getAssistantConversation(id)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Conversation unavailable'); } finally { setLoading(false); } }, [id]);
+    const { data: me } = useMe(); const { can: canAssistant } = useCan(ASSISTANT_PERMISSIONS); const { can: canViewAdmin } = useCan('sys.view_admin');
+    const realtime = useRealtime(); const realtimeStatus = useRealtimeStatus();
+    const [data, setData] = useState<AssistantConversation | null>(null); const [loading, setLoading] = useState(true); const [responding, setResponding] = useState(false); const [error, setError] = useState('');
+    const stream = useRef<AssistantRealtimeTurn | null>(null); const seenMessageIds = useRef(new Set<number | string>());
+    const load = useCallback(async () => { setLoading(true); setError(''); try { const next = await getAssistantConversation(id); seenMessageIds.current = new Set(next.messages.map((message) => message.id)); setData(next); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Conversation unavailable'); } finally { setLoading(false); } }, [id]);
     useEffect(() => { void load(); }, [load]);
+    useEffect(() => () => { stream.current?.cancel(); stream.current = null; }, []);
+    useEffect(() => { if (!canAssistant) { stream.current?.cancel(); stream.current = null; setResponding(false); close(); } }, [canAssistant, close]);
+    useEffect(() => { if (!canViewAdmin && stream.current) { stream.current.cancel(); stream.current = null; setResponding(false); void load(); } }, [canViewAdmin, load]);
     if (loading || error || !data || !me) return <div className="modal-pad"><PageState loading={loading} error={error || (!data ? 'Conversation unavailable' : '')} retry={() => void load()} /><button type="button" className="btn" onClick={close}>Close</button></div>;
     const owner = data.user.id === me.id;
-    const send = async (message: string, attachments: readonly FileReference[] = []) => { if (!owner || responding) return; setResponding(true); const now = Math.floor(Date.now() / 1000); const userMessage = { id: `inspect-user-${Date.now()}`, role: 'user' as const, content: message, created: now, blocks: attachments.length ? [{ type: 'attachment' as const, files: [...attachments] }] : [] }; setData((current) => current ? { ...current, messages: [...current.messages, userMessage] } : current); try { const reply = await sendAssistantMessage(message, data.id, attachments); setData((current) => current ? { ...current, modified: now, messages: [...current.messages, { id: `inspect-assistant-${Date.now()}`, role: 'assistant', content: reply.response, created: now, blocks: reply.blocks }] } : current); } catch (cause) { setData((current) => current ? { ...current, messages: current.messages.filter((item) => item.id !== userMessage.id) } : current); throw cause; } finally { setResponding(false); } };
+    const send = async (message: string, attachments: readonly FileReference[] = []) => {
+        if (!owner || responding) return;
+        setResponding(true); const now = Math.floor(Date.now() / 1000);
+        const userMessage = { id: `inspect-user-${Date.now()}`, role: 'user' as const, content: message, created: now, blocks: attachments.length ? [{ type: 'attachment' as const, files: [...attachments] }] : [] };
+        setData((current) => current ? { ...current, messages: [...current.messages, userMessage] } : current);
+        try {
+            const transport = chooseAssistantTransport({ owner, textOnly: attachments.length === 0, hasViewAdmin: canViewAdmin, realtimeStatus: realtimeStatus.status });
+            if (transport === 'websocket') {
+                const turn = startAssistantRealtimeTurn(realtime, { message, conversationId: data.id, seenMessageIds: seenMessageIds.current }, {
+                    onConversation: () => {},
+                    onText: (next) => setData((current) => current ? { ...current, messages: [...current.messages, next] } : current),
+                    onProgress: () => {},
+                    onResponse: (next) => setData((current) => current ? { ...current, modified: now, messages: current.messages.some((item) => item.id === next.id) ? current.messages : [...current.messages, next] } : current),
+                    onReconcile: setData,
+                    onUnknown: () => { window.dispatchEvent(new CustomEvent('portal-mojo:assistant-list-refresh')); },
+                });
+                stream.current = turn; await turn.promise; stream.current = null;
+            } else {
+                const reply = await sendAssistantMessage(message, data.id, attachments);
+                setData((current) => current ? { ...current, modified: now, messages: [...current.messages, { id: `inspect-assistant-${Date.now()}`, role: 'assistant', content: reply.response, created: now, blocks: reply.blocks }] } : current);
+            }
+        } catch (cause) {
+            if (!(cause instanceof AssistantOutcomeUnknownError)) setData((current) => current ? { ...current, messages: current.messages.filter((item) => item.id !== userMessage.id) } : current);
+            throw cause;
+        } finally { stream.current = null; setResponding(false); }
+    };
     return <div className="modal-pad assistant-inspect"><header><div><div className="eyebrow">Conversation #{data.id}</div><h2>{data.title}</h2><p className="dim">Owner: {data.user.display_name} · updated {fmt.datetime(data.modified)}</p></div><button className="btn-icon" type="button" onClick={close} aria-label="Close"><i className="bi bi-x-lg" /></button></header><AssistantFeed messages={data.messages} user={{ id: me.id, display_name: me.display_name ?? 'You' }} onSend={send} responding={responding} disabled={!owner} attachmentKey={data.id} /></div>;
 }
 
@@ -23,6 +56,7 @@ export function ConversationsPage() {
     const { data: me } = useMe(); const { can: isAdmin } = useCan('sys.view_admin'); const [rows, setRows] = useState<AssistantConversationSummary[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
     const load = useCallback(async () => { setLoading(true); setError(''); try { setRows((await listAssistantConversations()).rows); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Conversations unavailable'); } finally { setLoading(false); } }, []);
     useEffect(() => { void load(); }, [load]);
+    useEffect(() => { const refresh = () => { void load(); }; window.addEventListener('portal-mojo:assistant-list-refresh', refresh); return () => window.removeEventListener('portal-mojo:assistant-list-refresh', refresh); }, [load]);
     const remove = async (row: AssistantConversationSummary) => { const confirmed = await modal.confirm({ title: 'Delete conversation?', message: `Delete “${row.title}”? This cannot be undone.`, confirmText: 'Delete', danger: true }); if (!confirmed) return; try { await deleteAssistantConversation(row.id); setRows((current) => current.filter((item) => item.id !== row.id)); toast.success('Conversation deleted'); } catch (cause) { toast.error(cause instanceof Error ? cause.message : 'Delete failed'); } };
     return <div><Heading eyebrow="Assistant" title="Conversations" description="Inspect Assistant history. Only the owner may continue a conversation." /><PageState loading={loading} error={error} retry={() => void load()} />{!loading && !error && <div className="panel assistant-list"><table><thead><tr><th>Conversation</th><th>Owner</th><th>Updated</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><button className="link-button" type="button" onClick={() => void modal.detail((close) => <ConversationInspect id={row.id} close={() => close(null)} />)}>{row.title}</button><small>#{row.id}</small></td><td>{row.user.display_name}{row.user.id === me?.id && <Badge tone="info">You</Badge>}</td><td>{fmt.datetime(row.modified)}</td><td><button className="btn-icon" type="button" aria-label={`Delete ${row.title}`} disabled={!isAdmin && row.user.id !== me?.id} onClick={() => void remove(row)}><i className="bi bi-trash" /></button></td></tr>)}</tbody></table>{rows.length === 0 && <p className="empty">No conversations.</p>}</div>}</div>;
 }

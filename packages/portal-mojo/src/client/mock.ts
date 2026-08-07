@@ -7638,9 +7638,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     });
     await mockDelay(LATENCY_MS, opts.signal);
 
-    // ── Admin Assistant — REST-only complete slice (#1299) ──────────
-    // Deliberately no websocket, polling, progress, cancel, or action route.
-    // Action choices return through the ordinary POST /api/assistant message.
+    // ── Admin Assistant — authoritative HTTP side (#1299) ──────────
+    // The injected WebSocket protocol mock lives adjacently in
+    // realtime-mock.ts; it never replaces a global or bloats this REST wire.
+    // Action choices on this fallback return through ordinary POST.
     if (path.startsWith('/api/assistant')) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);

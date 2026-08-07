@@ -569,9 +569,9 @@ autosave editing, permission-gated UI, live metrics dashboard.
   domains a deployment runs; boot-time version handshake, degrade gracefully.
   Board #1263 (parked; the endpoint files to NativeMojo Inbox as a django-mojo
   item at activation).
-- WebSocket client (`wss://…/ws/realtime/`, bearer handshake, ping) + 3-stage
-  uploads (`fileman/upload/initiate` → multipart/S3 (file field last) → mark_as_completed).
-  Board #1264 (parked).
+- Reusable WebSocket transport (`wss://…/ws/realtime/`, challenged bearer
+  handshake, heartbeat, refcounted topics) + Assistant streaming consumer.
+  Board #1264. Upload transport/UX completed independently in #1468/#1470.
 - Publishing: npm `portal-mojo` with TypeScript-source subpath exports;
   reviewed SemVer bumps land on `main`, and matching GitHub Releases publish
   through the verified OIDC workflow. `web-mojo` stays published

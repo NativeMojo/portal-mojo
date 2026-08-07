@@ -22,6 +22,8 @@ export * from './markdown';
 export * from './record-feed';
 export * from './safe-export';
 export * from './upload';
+export * from './realtime';
+export * from './realtime-mock';
 export * from './types';
 // Dev affordance: per-endpoint call counts from the mock (single-flight proof).
 export {

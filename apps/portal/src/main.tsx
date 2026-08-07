@@ -70,9 +70,11 @@ mojo.onAuth('logout', () => { void queryClient.invalidateQueries(); });
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
-            <ThemeProvider>
-                <RouterProvider router={router} />
-            </ThemeProvider>
+            <mojo.RealtimeProvider>
+                <ThemeProvider>
+                    <RouterProvider router={router} />
+                </ThemeProvider>
+            </mojo.RealtimeProvider>
         </QueryClientProvider>
     </StrictMode>,
 );

@@ -11,6 +11,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [defineModel.md](defineModel.md) | Model definitions + hooks, POST_SAVE_ACTIONS, `fetchOne`, cache keys |
 | [params.md](params.md) | `useTableParams` — the single source of truth for table state; persistence blob |
 | [auth.md](auth.md) | Login flows, token upkeep, hosted-auth (bouncer page) bridge, auth events |
+| [realtime.md](realtime.md) | Auth-challenged WebSocket lifecycle, heartbeat/backoff, refcounted topics, typed event projection, deterministic mock |
 | [auth-pages.md](auth-pages.md) | The in-app auth pages: routes + guard, `VITE_MOJO_AUTH` switch, fresh-auth (440 step-up) modal, MFA panel, password tools |
 | [admin-credentials.md](admin-credentials.md) | Group API keys and webhook subscriptions — dual-mount pages, permission registry, secret-safe create/reveal/rotation |
 | [admin-dashboard.md](admin-dashboard.md) | Package-owned global Admin landing, authoritative signals, independent gates, caller-isolated caches, and root fallback |
@@ -36,7 +37,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
 | [admin-phonehub.md](admin-phonehub.md) | Global Phone Hub: evidence-backed lookup, sanitized SMS audits, and write-only provider configuration |
 | [admin-push.md](admin-push.md) | Global Push admin: caller stats, global metrics, strict audits, templates, and cache-free FCM configuration |
-| [admin-assistant.md](admin-assistant.md) | Global REST-only Assistant panel, conversations, strict blocks, context reuse, skills, and explicit tiered memory |
+| [admin-assistant.md](admin-assistant.md) | Global Assistant streaming selection/reconciliation, strict projectors/blocks, context reuse, skills, and explicit tiered memory |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |

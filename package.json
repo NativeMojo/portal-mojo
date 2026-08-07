@@ -21,6 +21,7 @@
         "version:major": "npm version major -w portal-mojo --no-git-tag-version",
         "release:publish": "npm publish -w portal-mojo",
         "verify:admin-navigation": "node scripts/verify-admin-navigation.mjs",
+        "verify:realtime": "node scripts/verify-realtime.mjs",
         "verify:admin-assistant": "node scripts/verify-admin-assistant.mjs",
         "verify:admin-dashboard": "node scripts/verify-admin-dashboard.mjs",
         "verify:admin-cloudwatch": "node scripts/verify-admin-cloudwatch.mjs",

@@ -22,6 +22,7 @@ if (!mojo.usingMockTransport()) {
 const queryClient = new QueryClient({
     defaultOptions: { queries: { ...mojo.mojoQueryDefaults().queries, staleTime: 30_000 } },
 });
+const realtimeMock = mojo.createRealtimeMock();
 mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
 const root = createRoot(document.getElementById('root')!);
 
@@ -46,11 +47,13 @@ async function bootstrap() {
     root.render(
         <StrictMode>
             <QueryClientProvider client={queryClient}>
-                <ThemeProvider>
-                    <HashRouter>
-                        <App />
-                    </HashRouter>
-                </ThemeProvider>
+                <mojo.RealtimeProvider socketFactory={realtimeMock.factory}>
+                    <ThemeProvider>
+                        <HashRouter>
+                            <App />
+                        </HashRouter>
+                    </ThemeProvider>
+                </mojo.RealtimeProvider>
             </QueryClientProvider>
         </StrictMode>,
     );
