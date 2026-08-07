@@ -8,11 +8,12 @@ const manifestPath = 'packages/portal-mojo/package.json';
 const releaseFiles = [manifestPath, 'package-lock.json'];
 
 function run(command, args, options = {}) {
-    return execFileSync(command, args, {
+    const output = execFileSync(command, args, {
         cwd: root,
         encoding: 'utf8',
         stdio: options.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'],
-    })?.trim();
+    });
+    return options.raw ? output : output?.trim();
 }
 
 export function parseStableVersion(version) {
@@ -27,6 +28,10 @@ export function nextVersion(version, releaseType) {
     if (releaseType === 'minor') return `${major}.${minor + 1}.0`;
     if (releaseType === 'patch') return `${major}.${minor}.${patch + 1}`;
     throw new Error(`Release type must be patch, minor, or major; got ${releaseType}`);
+}
+
+export function porcelainPaths(output) {
+    return output.split('\0').filter(Boolean).map((entry) => entry.slice(3));
 }
 
 function packageVersion() {
@@ -44,11 +49,8 @@ function assertCleanMain() {
     if (head !== remoteMain) throw new Error('Local main must exactly match origin/main before releasing');
 }
 
-function assertOnlyVersionFilesChanged() {
-    const changed = run('git', ['status', '--porcelain'])
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => line.slice(3));
+export function assertOnlyVersionFilesChanged() {
+    const changed = porcelainPaths(run('git', ['status', '--porcelain=v1', '-z'], { raw: true }));
     const unexpected = changed.filter((path) => !releaseFiles.includes(path));
     if (unexpected.length) throw new Error(`Release verification changed unexpected files: ${unexpected.join(', ')}`);
     for (const path of releaseFiles) {
