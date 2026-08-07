@@ -1,6 +1,9 @@
 // App-owned Group models remain here until the sibling package boundary
 // lands. Reusable User/Member/monitoring models are canonical admin exports.
-import { defineModel, type Group } from 'portal-mojo/client';
+import { defineModel, type Group } from 'portal-mojo/client/runtime';
+import { GROUP_DESTRUCTIVE_PERMS, GROUP_MANAGE_PERMS, GROUP_VIEW_PERMS } from './group-permissions';
+
+export { GROUP_DESTRUCTIVE_PERMS, GROUP_MANAGE_PERMS, GROUP_VIEW_PERMS } from './group-permissions';
 
 export {
     ApiKeyModel,
@@ -42,10 +45,6 @@ export type GroupRow = Group & {
     metadata: Record<string, unknown>;
     member_count: number;
 };
-
-export const GROUP_VIEW_PERMS = ['sys.groups', 'sys.view_groups'];
-export const GROUP_MANAGE_PERMS = ['sys.groups', 'sys.manage_groups'];
-export const GROUP_DESTRUCTIVE_PERMS = ['sys.groups', 'sys.manage_groups'];
 
 export const GroupModel = defineModel<GroupRow>({
     name: 'group',

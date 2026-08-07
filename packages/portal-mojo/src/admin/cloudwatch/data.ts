@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { mojoCall, useAuthSnapshot, type MetricsResponse, type Params } from '../../client';
+import { mojoCall, useAuthSnapshot, type MetricsResponse, type Params } from '../../client/runtime';
 import type { MetricsFetchParams } from '../../charts';
 
 export const CLOUDWATCH_PERMISSIONS = ['sys.manage_aws'];

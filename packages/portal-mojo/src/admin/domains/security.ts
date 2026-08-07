@@ -4,8 +4,8 @@ import { LOGS_ADMIN_PERMISSIONS } from '../monitoring/models';
 import { GEOIP_VIEW_PERMS } from '../security/geoip/models';
 import { LOGIN_EVENT_VIEW_PERMS, USER_DEVICE_VIEW_PERMS } from '../security/devices/models';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
-import { IPSET_VIEW_PERMS } from '../network/models';
-import { GEOFENCE_VIEW_PERMS } from '../network/geofence/geofence-data';
+import { GEOFENCE_VIEW_PERMS } from '../network/geofence/permissions';
+import { IPSET_VIEW_PERMS } from '../network/permissions';
 
 export const INCIDENTS_ADMIN_ROUTES: AdminRoute[] = [
     { path: 'incidents', label: 'Incidents', loadComponent: () => import('../incidents/IncidentsPage').then(({ IncidentsPage }) => ({ default: IncidentsPage })), permissions: SECURITY_VIEW_PERMS },
@@ -53,4 +53,3 @@ export const NETWORK_SECURITY_ADMIN_SECTION: AdminSection = {
 };
 
 export const SECURITY_ADMIN_SECTIONS = [SECURITY_OPERATIONS_ADMIN_SECTION, BOUNCER_ADMIN_SECTION, DEVICE_INTEL_ADMIN_SECTION, GEOIP_ADMIN_SECTION, NETWORK_SECURITY_ADMIN_SECTION] as const;
-

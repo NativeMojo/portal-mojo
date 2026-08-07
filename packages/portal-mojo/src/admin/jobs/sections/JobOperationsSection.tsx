@@ -15,7 +15,7 @@
 //   · every destructive control is an ArmedButton, not a plain button.
 import { useState, type ReactNode } from 'react';
 import { ArmedButton, JsonBlock, modal, toast } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import {
     cleanupConsumers,
     clearQueue,

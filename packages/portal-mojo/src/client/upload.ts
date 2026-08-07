@@ -1,5 +1,5 @@
 import { apiOrigin, mojoCall, usingMockTransport } from './client';
-import { mockUploadBytes } from './mock';
+import type { MockByteUploadRequest } from './mock';
 
 const INITIATE_PATH = '/api/fileman/upload/initiate';
 const FILE_PATH = '/api/fileman/file';
@@ -161,7 +161,7 @@ function publicUploadUrl(url: string): string {
     return new URL(url, origin).toString();
 }
 
-function xhrUpload(request: Parameters<typeof mockUploadBytes>[0]): Promise<void> {
+function xhrUpload(request: MockByteUploadRequest): Promise<void> {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const abort = () => xhr.abort();
@@ -367,7 +367,10 @@ class UploadTask implements FileUploadTask {
             signal,
             onProgress: (loaded: number, total: number) => this.#publish({ loadedBytes: loaded, totalBytes: total > 0 ? total : null }, generation),
         };
-        await (usingMockTransport() ? mockUploadBytes(request) : xhrUpload(request));
+        if (usingMockTransport()) {
+            const { mockUploadBytes } = await import('./mock');
+            await mockUploadBytes(request);
+        } else await xhrUpload(request);
     }
 
     async #read(generation: number, signal: AbortSignal): Promise<WireFile> {

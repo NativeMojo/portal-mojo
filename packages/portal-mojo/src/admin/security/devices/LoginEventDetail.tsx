@@ -3,7 +3,7 @@
 // False, so there are no actions here by contract: only the record, and
 // cross-links to the user, the device and the IP dossier.
 import { Badge, DetailView, Eyebrow, FlatRow, fmt, modal } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { countryFlag, GEOIP_VIEW_PERMS } from '../geoip/models';
 import { showGeoIpDossierForAddress } from '../geoip/GeoIpDossier';
 import {

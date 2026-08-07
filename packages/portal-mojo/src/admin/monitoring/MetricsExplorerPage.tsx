@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { KPITile, MetricsChart } from '../../charts';
-import { useAuthSnapshot, useMe } from '../../client';
+import { useAuthSnapshot, useMe } from '../../client/runtime';
 import { modal } from '../../ui';
 import {
     dedupeMetricSlugs,

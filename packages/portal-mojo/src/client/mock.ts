@@ -15,7 +15,7 @@
 // pages (Chunk C3) — then they 401 without a bearer, like the real backend.
 import { markdownToHtml } from './markdown-parse';
 import type { Params, User } from './types';
-import { getDnsAdminIntegration, registerDnsAdminIntegration } from '../admin/dns/dns-integration';
+import { getDnsAdminIntegration, type ManagedDnsRecordInput } from '../admin/dns/dns-integration';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
 function mulberry32(seed: number) {
@@ -4232,18 +4232,14 @@ const db = {
 };
 
 let messagingManagedFault=false;
-/** Installed only by the infrastructure/legacy DNS setup entrypoints. */
-export function registerMockManagedDnsIntegration(): () => void {
-    return registerDnsAdminIntegration({
-        applyManagedDnsRecords: (domainId, records) => {
-            if (!db.dnsDomains.some((domain) => domain.id === domainId)) throw new Error('Domain not found');
-            if(messagingManagedFault){messagingManagedFault=false;throw new Error('Provider rejected DNS write: X-Amz-Security-Token: mock-raw-token');}
-            const existing=db.dnsRecords.get(domainId)??[];
-            const incoming=records.map(record=>({...record,record_values:[...record.record_values]}));
-            const owners=new Set(incoming.map(record=>`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`));
-            db.dnsRecords.set(domainId,[...existing.filter(record=>!owners.has(`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`)),...incoming]);
-        },
-    });
+/** Invoked through the synchronously installed DNS adapter only under the mock transport. */
+export function applyMockManagedDnsRecords(domainId: number, records: readonly ManagedDnsRecordInput[]): void {
+    if (!db.dnsDomains.some((domain) => domain.id === domainId)) throw new Error('Domain not found');
+    if(messagingManagedFault){messagingManagedFault=false;throw new Error('Provider rejected DNS write: X-Amz-Security-Token: mock-raw-token');}
+    const existing=db.dnsRecords.get(domainId)??[];
+    const incoming=records.map(record=>({...record,record_values:[...record.record_values]}));
+    const owners=new Set(incoming.map(record=>`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`));
+    db.dnsRecords.set(domainId,[...existing.filter(record=>!owners.has(`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`)),...incoming]);
 }
 
 function getField(row: Record<string, unknown>, field: string): unknown {

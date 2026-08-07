@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { mojoCall, mojoList } from '../../client';
+import { mojoCall, mojoList } from '../../client/runtime';
 import { PhoneConfigModel, sanitizePhoneConfigRow, sanitizePhoneNumberRow, type PhoneConfigRow, type PhoneNumberRow, type PhoneRelation } from './models';
 
 export const PHONE_GROUP_CHOICE_LIMIT=100;

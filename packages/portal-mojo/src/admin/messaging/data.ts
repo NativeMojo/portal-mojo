@@ -1,4 +1,4 @@
-import { createSafeExporter } from '../../client';
+import { createSafeExporter } from '../../client/runtime';
 import { EmailDomainModel, EmailTemplateModel, PublicMessageModel, SentMessageModel, type EmailDomainRow, type EmailTemplateRow, type PublicMessageRow, type SentMessageRow } from './models';
 import { sanitizeEmailDomainRow, sanitizePublicMessageRow, sanitizeSentMessageRow, sanitizeTemplateRow } from './sanitize';
 

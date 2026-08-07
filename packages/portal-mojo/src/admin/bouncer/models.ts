@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
     defineModel, mojoCall,
     type Params,
-} from '../../client';
+} from '../../client/runtime';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
 import { sanitizeIncidentRow } from '../incidents/sanitize';
 

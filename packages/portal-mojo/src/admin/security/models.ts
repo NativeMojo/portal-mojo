@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { defineModel } from '../../client';
+import { defineModel } from '../../client/runtime';
 import {
     SECURITY_DELETE_PERMS, SECURITY_MANAGE_PERMS, SECURITY_USER_LOOKUP_PERMS,
     SECURITY_VIEW_PERMS,

@@ -16,7 +16,7 @@
 import {
     ArmedButton, Badge, formModal, modal, toast, type Field,
 } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { GEOIP_MANAGE_PERMS, GeoLocatedIPModel } from '../../security/geoip';
 import {
     AllowlistRaceError, findGeoIpIdByAddress, resolveGeoIpIdForAddress,

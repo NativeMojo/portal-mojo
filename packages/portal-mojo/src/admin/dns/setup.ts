@@ -1,16 +1,22 @@
 import { usingMockTransport } from '../../client/client';
-import { registerMockManagedDnsIntegration } from '../../client/mock';
-import { resolveDnsDomainByName } from './api';
-import { registerDnsAdminIntegration } from './dns-integration';
+import { registerDnsAdminIntegration, type ManagedDnsRecordInput } from './dns-integration';
 import { registerDnsDomainLinks } from './domain-links';
 
 // Registration is synchronous and page-free. The compatibility aggregate and
 // infrastructure domain both install it, so Email may be visited before DNS.
 registerDnsAdminIntegration({
-    resolveDomainByName: resolveDnsDomainByName,
+    resolveDomainByName: async (normalizedName: string) => {
+        const { resolveDnsDomainByName } = await import('./api');
+        return resolveDnsDomainByName(normalizedName);
+    },
     recordsHref: (domainId) => `dns/records?domain=${encodeURIComponent(domainId)}`,
+    ...(usingMockTransport() ? {
+        applyManagedDnsRecords: async (domainId: number, records: readonly ManagedDnsRecordInput[]) => {
+            const { applyMockManagedDnsRecords } = await import('../../client/mock');
+            applyMockManagedDnsRecords(domainId, records);
+        },
+    } : {}),
 });
-if (usingMockTransport()) registerMockManagedDnsIntegration();
 registerDnsDomainLinks(
     { key: 'domains', label: 'Domains', icon: 'bi-globe2', route: 'domains' },
     { key: 'records', label: 'DNS Records', icon: 'bi-list-columns', route: (domain) => `records?domain=${encodeURIComponent(domain.id)}` },

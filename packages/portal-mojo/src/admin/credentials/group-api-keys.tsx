@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
     GroupContext, hasPermission, useCan, useMe,
     type PermSpec,
-} from '../../client';
+} from '../../client/runtime';
 import {
     ArmedButton, Badge, DetailView, Eyebrow, FlatRow, ModelTable,
     SchemaForm, fmt, modal, toast,

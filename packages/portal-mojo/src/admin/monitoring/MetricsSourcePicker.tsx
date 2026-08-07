@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { CollectionSelect } from '../../ui';
 import type { MetricAccount, MetricsDiscoveryPage } from './metrics-explorer-data';
 

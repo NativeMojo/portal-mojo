@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as mojo from 'portal-mojo/client';
+import * as mojo from 'portal-mojo/client/runtime';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './theme.css';
 import './menus';
@@ -25,7 +25,7 @@ handleAuthTokenLanding();
 if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__mojo = mojo;
 }
-import { ThemeProvider } from 'portal-mojo/ui';
+import { ThemeProvider } from 'portal-mojo/ui/shell';
 
 // This artifact is the fleet-wide Admin, never a group-scoped product portal.
 // Remove stale deep-link scope without erasing another portal's remembered

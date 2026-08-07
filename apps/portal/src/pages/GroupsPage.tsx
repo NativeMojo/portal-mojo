@@ -8,7 +8,7 @@ import {
     Badge, fmt, formModal, modal, toast, ModelTable,
     type BatchAction, type Column, type FilterDef,
 } from 'portal-mojo/ui';
-import { useCan } from 'portal-mojo/client';
+import { useCan } from 'portal-mojo/client/runtime';
 import {
     GROUP_KIND_OPTIONS, GROUP_MANAGE_PERMS, GroupModel, type GroupRow,
 } from '../models';

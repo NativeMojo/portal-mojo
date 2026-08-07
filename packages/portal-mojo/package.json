@@ -26,17 +26,21 @@
     },
     "exports": {
         "./client": "./src/client/index.ts",
+        "./client/runtime": "./src/client/runtime.ts",
         "./ui": "./src/ui/index.ts",
+        "./ui/shell": "./src/ui/shell.ts",
         "./charts": "./src/charts/index.ts",
         "./admin": "./src/admin/index.ts",
         "./admin/core": "./src/admin/core/index.ts",
+        "./admin/registry": "./src/admin/registry.ts",
         "./admin/identity": "./src/admin/public/identity.ts",
         "./admin/security": "./src/admin/public/security.ts",
         "./admin/observability": "./src/admin/public/observability.ts",
         "./admin/operations": "./src/admin/public/operations.ts",
         "./admin/infrastructure": "./src/admin/public/infrastructure.ts",
         "./admin/communications": "./src/admin/public/communications.ts",
-        "./admin/assistant": "./src/admin/public/assistant.ts"
+        "./admin/assistant": "./src/admin/public/assistant.ts",
+        "./admin/assistant/launcher": "./src/admin/public/assistant-launcher.ts"
     },
     "scripts": {
         "typecheck": "tsc --noEmit"

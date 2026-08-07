@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMe } from '../../client';
+import { useMe } from '../../client/runtime';
 import { Badge, CollectionSelect, modal } from '../../ui';
 import { DNS_GROUP_CHOICE_ENDPOINT, clearRegistrantContact, fetchRegistrantContact, saveRegistrantContact } from './api';
 import type { DnsGroupChoice, RegistrantContact, RegistrantContactResponse } from './models';

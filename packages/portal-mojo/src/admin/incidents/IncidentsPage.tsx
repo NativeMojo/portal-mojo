@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { createSafeExporter, useCan } from '../../client';
+import { createSafeExporter, useCan } from '../../client/runtime';
 import { Badge, ModelTable, fmt, modal, type BatchAction, type Column, type FilterDef, type Tone } from '../../ui';
 import { SECURITY_MANAGE_PERMS } from '../security-permissions';
 import { INCIDENT_LIFECYCLE, IncidentModel, buildIncidentMerge, showIncidentDetail, type IncidentRow } from './models';

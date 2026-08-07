@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { mojoList, useCan, useMe, useRealtime, useRealtimeStatus } from '../../client';
+import { mojoList, useCan, useMe, useRealtime, useRealtimeStatus } from '../../client/runtime';
 import { Badge, fmt, modal, toast } from '../../ui';
 import { AssistantFeed } from './AssistantFeed';
 import { deleteAssistantConversation, deleteAssistantMemory, deleteAssistantSkill, getAssistantConversation, getAssistantMemory, getAssistantSkill, listAssistantConversations, listAssistantSkills, saveAssistantMemory, sendAssistantMessage } from './api';

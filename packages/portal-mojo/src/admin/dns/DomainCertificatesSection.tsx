@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { hasPermission, useMe } from '../../client';
+import { hasPermission, useMe } from '../../client/runtime';
 import { Badge, fmt, modal, toast } from '../../ui';
 import { CertificateDetail } from './CertificateDetail';
 import { CertificateLifecyclePoller } from './CertificateLifecyclePoller';

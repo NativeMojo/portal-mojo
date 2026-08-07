@@ -1,6 +1,6 @@
 import type { AdminSection } from '../core';
 import { DNS_MANAGE_PERMISSIONS, DNS_VIEW_PERMISSIONS } from '../dns/models';
-import { BUCKET_MANAGE_PERMS, STORAGE_VIEW_PERMS } from '../storage/models';
+import { BUCKET_MANAGE_PERMS, STORAGE_VIEW_PERMS } from '../storage/permissions';
 
 export const DNS_ADMIN_SECTION: AdminSection = {
     id: 'dns', title: 'DNS', icon: 'bi-globe2', navigationGroup: 'infrastructure', basePath: 'dns', permissions: DNS_VIEW_PERMISSIONS,
@@ -22,4 +22,3 @@ export const STORAGE_ADMIN_SECTION: AdminSection = {
     ],
 };
 export const INFRASTRUCTURE_ADMIN_SECTIONS = [DNS_ADMIN_SECTION, STORAGE_ADMIN_SECTION] as const;
-

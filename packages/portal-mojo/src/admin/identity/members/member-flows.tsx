@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { mojoCall, mojoSave, type Group } from '../../../client';
+import { mojoCall, mojoSave, type Group } from '../../../client/runtime';
 import { formModal, modal, toast } from '../../../ui';
 import { MemberModel, type MemberRow } from './models';
 

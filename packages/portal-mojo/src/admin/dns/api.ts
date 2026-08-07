@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
-} from '../../client';
+} from '../../client/runtime';
 import {
     CertificateModel, DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainPurchaseRow, sanitizeDomainRow,
     sanitizeRegistrarDiscoveryResponse,

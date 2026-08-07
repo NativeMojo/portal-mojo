@@ -8,7 +8,7 @@
 // the new default land.
 import { useState } from 'react';
 import { ModelTable, fmt, groupByDay, Badge, type Column, type FilterDef, type Preset } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { COUNTRY_OPTIONS, countryName } from '../../../charts';
 import { countryFlag } from '../geoip/models';
 import { LoginLocationMap } from './LoginLocationMap';

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { FormWizard, modal, type FormData } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { getDnsAdminIntegration } from '../dns/dns-integration';
 import { DNS_VIEW_PERMISSIONS } from '../dns/models';
 import { onboardEmailDomain } from './api';

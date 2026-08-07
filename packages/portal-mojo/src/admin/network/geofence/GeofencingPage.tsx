@@ -10,7 +10,7 @@
 // rules save or an override removal invalidates the key and every consumer
 // re-reads, with no `config-changed` event plumbing.
 import { useState } from 'react';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import type { EventRow } from '../../incidents/models';
 import {
     GEOFENCE_API_MISSING_MESSAGE, GEOFENCE_EVENT_CATEGORIES, GeofenceEventModel,

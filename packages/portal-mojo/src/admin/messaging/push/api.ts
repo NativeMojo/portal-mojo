@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { mojoCall, mojoList } from '../../../client';
+import { mojoCall, mojoList } from '../../../client/runtime';
 import { PushConfigModel, sanitizePushConfigRow, type PushConfigRow, type PushRelation } from './models';
 
 export interface PushStats { total_sent:number; total_failed:number; total_pending:number; registered_devices:number; enabled_devices:number }

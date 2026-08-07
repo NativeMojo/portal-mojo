@@ -1,4 +1,4 @@
-import { defineModel, type Params } from '../../client';
+import { defineModel, type Params } from '../../client/runtime';
 import { sanitizeCertificateRow } from './certificate-data';
 
 export { sanitizeCertificateRow } from './certificate-data';

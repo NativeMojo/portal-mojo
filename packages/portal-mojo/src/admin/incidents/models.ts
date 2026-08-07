@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { createElement } from 'react';
-import { defineModel, mojoCall, mojoList, type Params } from '../../client';
+import { defineModel, mojoCall, mojoList, type Params } from '../../client/runtime';
 import { modal } from '../../ui';
 import { SECURITY_DELETE_PERMS, SECURITY_MANAGE_PERMS, SECURITY_VIEW_PERMS } from '../security-permissions';
 import { sanitizeEventRow, sanitizeIncidentRow } from './sanitize';

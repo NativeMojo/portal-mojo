@@ -3,8 +3,8 @@
 //   children: [ …existing, ...adminRoutes ]
 import type { RouteObject } from 'react-router-dom';
 import { AdminLazyPage, adminSectionRoutes } from 'portal-mojo/admin/core';
-import { Guarded } from 'portal-mojo/ui';
-import { GROUP_VIEW_PERMS } from '../models';
+import { Guarded } from 'portal-mojo/ui/shell';
+import { GROUP_VIEW_PERMS } from '../group-permissions';
 import { ADMIN_SECTIONS } from '../admin-sections';
 
 const loadGroupsPage = () => import('./GroupsPage').then(({ GroupsPage }) => ({ default: GroupsPage }));

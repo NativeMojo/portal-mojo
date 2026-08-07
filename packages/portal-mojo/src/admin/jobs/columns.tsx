@@ -21,7 +21,7 @@
 // preset param bundles and swaps its column set with the segment, because the
 // segment IS the params — `status` (+ `run_at__isnull` to split Queued from
 // Scheduled) and nothing else.
-import { createSafeExporter } from '../../client';
+import { createSafeExporter } from '../../client/runtime';
 import { Badge, fmt, type Column, type Preset } from '../../ui';
 import {
     isOverdueJob,

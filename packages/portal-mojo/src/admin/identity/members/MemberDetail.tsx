@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan, type PermSpec } from '../../../client';
+import { useCan, type PermSpec } from '../../../client/runtime';
 import {
     Badge, DetailView, Eyebrow, FlatRow, FormView, JsonBlock, MetricCard,
     ModelTable, fmt, formModal, toast, type Column, type DetailMenuEntry,

@@ -1,13 +1,13 @@
 // The standalone artifact is one GLOBAL Admin portal. Product portals own
 // their own groupKind menus and GroupProvider; this app deliberately has no
 // active-group navigation or member-derived permission context.
-import { registerMenus, setDefaultMenu, type MenuItem } from 'portal-mojo/ui';
+import { registerMenus, setDefaultMenu, type MenuItem } from 'portal-mojo/ui/shell';
 import {
     ADMIN_NAVIGATION_GROUPS,
     adminSectionsMenu,
 } from 'portal-mojo/admin/core';
 import { ADMIN_SECTIONS } from './admin-sections';
-import { GROUP_VIEW_PERMS } from './models';
+import { GROUP_VIEW_PERMS } from './group-permissions';
 
 const contributions = adminSectionsMenu(ADMIN_SECTIONS, {
     name: 'admin-contributions',

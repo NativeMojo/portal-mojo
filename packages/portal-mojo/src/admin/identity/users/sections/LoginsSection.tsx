@@ -12,7 +12,7 @@
 // endpoint; absent, it issues NO request at all rather than a denied one.
 import { useState } from 'react';
 import { Eyebrow, fmt } from '../../../../ui';
-import { useCan } from '../../../../client';
+import { useCan } from '../../../../client/runtime';
 import { LoginLocationMap } from '../../../security/devices/LoginLocationMap';
 import { showLoginEventDetail } from '../../../security/devices/LoginEventDetail';
 import { showUserDeviceDetailByDuid } from '../../../security/devices/UserDeviceDetail';

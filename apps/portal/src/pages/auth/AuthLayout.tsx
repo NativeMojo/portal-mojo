@@ -4,8 +4,8 @@
 // re-tokenized; the app chrome (Sidebar/TopNav) is deliberately absent —
 // authRoutes mount as SIBLINGS of the App route, not children.
 import { Navigate, Outlet, useSearchParams } from 'react-router-dom';
-import { useTheme, type ThemePref } from 'portal-mojo/ui';
-import { usingMockTransport } from 'portal-mojo/client';
+import { useTheme, type ThemePref } from 'portal-mojo/ui/shell';
+import { usingMockTransport } from 'portal-mojo/client/runtime';
 
 const NEXT: Record<ThemePref, ThemePref> = { light: 'dark', dark: 'system', system: 'light' };
 const PREF_ICON: Record<ThemePref, string> = { light: 'bi-sun', dark: 'bi-moon-stars', system: 'bi-circle-half' };

@@ -21,7 +21,7 @@ import {
     getAuthSnapshot, isPasskeySupported, login, loginWithPasskey,
     sessionIsPersistent, setFreshAuthHandler,
     type MfaChallenge,
-} from 'portal-mojo/client';
+} from 'portal-mojo/client/runtime';
 import { MfaPanel } from './MfaPanel';
 
 function errorMessage(error: unknown): string {

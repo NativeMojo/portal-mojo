@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan, type Params } from '../../../client';
+import { useCan, type Params } from '../../../client/runtime';
 import { Badge, Eyebrow, SecurityItem, fmt, modal } from '../../../ui';
 import { MemberDetail, type MemberNavigationCallbacks } from './MemberDetail';
 import { openMemberAdmissionDialog, type AdmissionGroup, type AdmissionMode } from './member-flows';

@@ -1,5 +1,5 @@
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { apiOrigin, defineModel, mojoCall, mojoDelete, mojoGet, mojoList, mojoSave, type Params } from '../../client';
+import { apiOrigin, defineModel, mojoCall, mojoDelete, mojoGet, mojoList, mojoSave, type Params } from '../../client/runtime';
 
 export const SHORTLINK_MANAGE_PERMISSIONS = ['sys.manage_shortlinks'];
 export const SHORTLINK_ENDPOINT = '/api/shortlink/link';

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MetricsChart } from '../../charts';
-import { useAuthSnapshot } from '../../client';
+import { useAuthSnapshot } from '../../client/runtime';
 import { fmt } from '../../ui';
 import {
     CLOUDWATCH_GRANULARITIES, loadCloudWatchSeries,

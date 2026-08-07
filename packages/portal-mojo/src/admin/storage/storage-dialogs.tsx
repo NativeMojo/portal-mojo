@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CollectionSelect, modal } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     GROUP_DIRECTORY_PERMS, USER_DIRECTORY_PERMS, SUPPORTED_FILE_MANAGER_BACKENDS,
     saveFileManagerAtomic, storageRefreshFailure, storageRelationId, type FileManagerRow, type RelationRow,

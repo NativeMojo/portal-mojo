@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     CollectionSelect, modal, toast, type CollectionSelectValue,
 } from '../../ui';

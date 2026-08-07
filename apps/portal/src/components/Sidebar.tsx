@@ -1,6 +1,6 @@
 // Standalone Admin chrome. Group switching belongs to product portals; this
 // artifact is deliberately global and renders one categorized Admin menu.
-import { SidebarNav } from 'portal-mojo/ui';
+import { SidebarNav } from 'portal-mojo/ui/shell';
 
 const USING_MOCK = !import.meta.env.VITE_MOJO_API;
 

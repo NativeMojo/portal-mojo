@@ -1,4 +1,4 @@
-import { defineModel, type Params } from '../../client';
+import { defineModel, type Params } from '../../client/runtime';
 import type { FieldOption, FormData } from '../../client/types';
 import { SECURITY_MANAGE_PERMS, SECURITY_VIEW_PERMS } from '../security-permissions';
 

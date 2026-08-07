@@ -9,7 +9,7 @@
 // LOGIN_TONE, PROVIDER_ICONS) — read in full 2026-08-05.
 import { useState, type ReactNode } from 'react';
 import { dateFns, fmt, type Tone } from '../../../../ui';
-import { useCan, type Params } from '../../../../client';
+import { useCan, type Params } from '../../../../client/runtime';
 import { USER_MANAGE_PERMISSIONS, type UserRow } from '../models';
 
 // ── Disable lifecycle (metadata.protected.disable.*) ──────────────────

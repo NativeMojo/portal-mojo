@@ -26,7 +26,7 @@
 //   · every trusted-HTML slot (`meta`, `detail`, `auxFn`) is a ReactNode.
 import { useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     ArmedButton,
     Badge,

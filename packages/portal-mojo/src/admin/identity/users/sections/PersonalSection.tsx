@@ -10,7 +10,7 @@
 // server silently DROPS the write and the source UI toasts a success that
 // never happened. The verified badge still renders from the row.
 import { Badge, Eyebrow, FlatRow, FormView } from '../../../../ui';
-import type { Field } from '../../../../client';
+import type { Field } from '../../../../client/runtime';
 import { UserModel, type UserRow } from '../models';
 
 const NAME_FIELDS: Field[] = [

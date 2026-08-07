@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { ModalHost, RightPanelProvider, RightPanelSlot, ToastHost, useRightPanel } from 'portal-mojo/ui';
+import { ModalHost, RightPanelProvider, RightPanelSlot, ToastHost, useRightPanel } from 'portal-mojo/ui/shell';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
 

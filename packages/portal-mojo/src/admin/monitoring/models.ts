@@ -1,4 +1,4 @@
-import { defineModel, mojoCall, mojoList, type Envelope } from '../../client';
+import { defineModel, mojoCall, mojoList, type Envelope } from '../../client/runtime';
 
 /** Exact system-pinned gates from logit.Log.RestMeta.VIEW_PERMS. */
 export const LOGS_ADMIN_PERMISSIONS = [

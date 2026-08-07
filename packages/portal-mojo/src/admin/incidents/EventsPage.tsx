@@ -1,4 +1,4 @@
-import { createSafeExporter } from '../../client';
+import { createSafeExporter } from '../../client/runtime';
 import { Badge, ModelTable, fmt, groupByDay, type Column, type FilterDef, type Tone } from '../../ui';
 import { EventModel, showEventDetail, type EventRow } from './models';
 import { sanitizeEventRow } from './sanitize';

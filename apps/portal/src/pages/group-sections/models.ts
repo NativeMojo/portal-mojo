@@ -24,7 +24,7 @@
 //     manage_users|manage_members|manage_group|manage_groups on the group.
 //   · /api/incident/event 200 (empty on the instance) — columns per the
 //     django model: created/category/title (+ level/details/model_*).
-import { defineModel } from 'portal-mojo/client';
+import { defineModel } from 'portal-mojo/client/runtime';
 
 // ── Group kinds (Group.js GroupKinds — the FULL known-kind catalog) ───
 export const GROUP_KINDS: Record<string, string> = {

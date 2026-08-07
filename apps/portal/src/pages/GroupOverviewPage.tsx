@@ -2,7 +2,7 @@
 // plus the signed-in user's membership (role + permissions) from the
 // GroupProvider. Wrapped in RequiresGroup: without an active group it shows
 // the pick-a-group state instead.
-import { useActiveGroup } from 'portal-mojo/client';
+import { useActiveGroup } from 'portal-mojo/client/runtime';
 import { Badge, RequiresGroup, fmt } from 'portal-mojo/ui';
 
 function Overview() {

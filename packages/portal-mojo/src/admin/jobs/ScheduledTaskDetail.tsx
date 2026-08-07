@@ -27,7 +27,7 @@
 //     than shipping disabled (wave-7a precedent). Tracked as django-mojo #1309.
 import type { ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { mojoList, useCan } from '../../client';
+import { mojoList, useCan } from '../../client/runtime';
 import {
     ArmedButton,
     Badge,

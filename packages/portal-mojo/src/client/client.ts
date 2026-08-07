@@ -15,7 +15,6 @@
 //
 // With VITE_MOJO_API unset the transport is the in-memory mock; set it to a
 // django-mojo origin and the same code talks to the real backend.
-import { mockFetch } from './mock';
 import { MojoError } from './errors';
 import { DUID_HEADER, getDuid } from './duid';
 import type { MojoList, Params } from './types';
@@ -23,6 +22,11 @@ import type { MojoList, Params } from './types';
 export { MojoError, AuthRequiredError } from './errors';
 
 const API_BASE: string = import.meta.env.VITE_MOJO_API ?? '';
+let mockModule: Promise<typeof import('./mock')> | null = null;
+
+function loadMockModule(): Promise<typeof import('./mock')> {
+    return mockModule ??= import('./mock');
+}
 
 /** True when the in-memory mock transport is active (VITE_MOJO_API unset). */
 export function usingMockTransport(): boolean {
@@ -118,6 +122,7 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
     if (bearer) headers['Authorization'] = bearer;
 
     if (!API_BASE) {
+        const { mockFetch } = await loadMockModule();
         return (await mockFetch(path, { ...opts, headers })) as Envelope;
     }
     const res = await fetch(`${API_BASE}${path}${buildQuery(opts.params ?? {})}`, {
@@ -253,6 +258,7 @@ export async function mojoDownload(endpoint: string, params: Params, format: 'cs
     if (bearer) headers['Authorization'] = bearer;
 
     if (!API_BASE) {
+        const { mockFetch } = await loadMockModule();
         const body = (await mockFetch(endpoint, { params: withFormat, headers })) as Envelope;
         if (body.status === false) {
             const legacyStatus = typeof body.error_code === 'number' ? body.error_code : 0;

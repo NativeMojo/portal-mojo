@@ -8,7 +8,7 @@ import {
     ArmedButton, Badge, DetailView, Eyebrow, FlatRow, StatusPanel,
     fmt, modal, toast,
 } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import {
     IPSET_CACHE_ONLY_HELP, IPSET_DELETE_PERMS, IPSET_KIND_BADGE_OPTIONS,
     IPSET_MANAGE_PERMS, IPSET_SOURCE_OPTIONS, IPSetModel,

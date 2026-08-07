@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MetricsChart } from '../../charts';
 import { modal } from '../../ui';
-import { useAuthSnapshot, useCan } from '../../client';
+import { useAuthSnapshot, useCan } from '../../client/runtime';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
 import { JOBS_VIEW_PERMS } from '../jobs/models';
 import { EMAIL_ADMIN_PERMISSIONS } from '../messaging/models';

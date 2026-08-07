@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { mojoCall, mojoList, useAuthSnapshot, type Params } from '../../client';
+import { mojoCall, mojoList, useAuthSnapshot, type Params } from '../../client/runtime';
 
 export const DASHBOARD_METRIC_PERMISSIONS = ['sys.view_metrics', 'sys.metrics'];
 export const DASHBOARD_SERIES = ['user_activity_day', 'group_activity_day', 'api_calls', 'api_errors'] as const;

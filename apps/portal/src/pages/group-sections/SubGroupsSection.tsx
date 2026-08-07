@@ -8,7 +8,7 @@ import {
     Badge, Eyebrow,
     fmt, formModal, toast,
 } from 'portal-mojo/ui';
-import { useCan } from 'portal-mojo/client';
+import { useCan } from 'portal-mojo/client/runtime';
 import { GROUP_MANAGE_PERMS, GroupModel, type GroupRow } from '../../models';
 import { GROUP_KIND_COMBO_OPTIONS, kindLabel } from './models';
 

@@ -11,7 +11,7 @@
 // auth/verify/email/send).
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { mojoCall, withFreshAuth, type Field } from '../../../../client';
+import { mojoCall, withFreshAuth, type Field } from '../../../../client/runtime';
 import {
     Badge, ImageField, PasswordStrengthMeter, fmt, formModal, modal, toast,
     type FileFieldOwnerResult,

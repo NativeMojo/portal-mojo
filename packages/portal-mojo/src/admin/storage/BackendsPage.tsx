@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, ModelTable, fmt, modal, toast, type BatchAction, type Column, type FilterDef } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { FileManagerDetail } from './FileManagerDetail';
 import { openFileManagerEditor } from './storage-dialogs';
 import { FileManagerModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, USER_DIRECTORY_PERMS, exportFileManagers, storageRelationId, saveFileManagerAtomic, type FileManagerRow } from './models';

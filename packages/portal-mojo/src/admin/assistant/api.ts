@@ -1,4 +1,4 @@
-import { mojoCall, mojoDelete, mojoList, type Params } from '../../client';
+import { mojoCall, mojoDelete, mojoList, type Params } from '../../client/runtime';
 import { projectConversation, projectConversationSummary, projectReply, projectSkill } from './data';
 import type { AssistantConversation, AssistantConversationSummary, AssistantReply, AssistantSkill } from './types';
 import type { FileReference } from '../../client/record-feed';

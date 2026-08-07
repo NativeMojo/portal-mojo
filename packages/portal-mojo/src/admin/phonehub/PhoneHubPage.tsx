@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArmedButton, Badge, DetailView, FlatRow, ModelTable, Tabs, fmt, modal, toast, type Column, type FilterDef } from '../../ui';
-import { mojoList, useCan } from '../../client';
+import { mojoList, useCan } from '../../client/runtime';
 import { buildPhoneConfigPayload, fetchPhoneGroupChoices, lookupPhoneNumber, normalizePhoneNumber, savePhoneConfigImperative, testPhoneConfigImperative, type PhoneSecretField, type SecretEdit } from './api';
 import { exportPhoneConfigs, exportPhoneNumbers, exportSmsAudits } from './data';
 import {

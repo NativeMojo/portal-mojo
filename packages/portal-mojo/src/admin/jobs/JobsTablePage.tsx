@@ -19,7 +19,7 @@
 //     handler answers "cancel_request must be true" at HTTP 200.
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { ModelTable, type BatchAction, type FilterDef, type RowTone } from '../../ui';
 import { JOB_EXPORTER, JOB_SEGMENTS, jobColumns, jobSegmentOf } from './columns';
 import { showJobDetail } from './JobDetail';

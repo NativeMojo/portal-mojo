@@ -13,7 +13,7 @@ import {
     type Chip, type Tone,
 } from '../../../ui';
 import { WorldMap, useWorldLand } from '../../../charts';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { EventModel } from '../../incidents/models';
 import { SECURITY_VIEW_PERMS } from '../../security-permissions';
 import { LogModel, LOGS_ADMIN_PERMISSIONS } from '../../monitoring/models';

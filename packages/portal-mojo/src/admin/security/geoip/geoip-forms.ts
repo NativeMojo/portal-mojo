@@ -14,7 +14,7 @@
 //      to a text input WITH a console.warn — the same control, plus noise. The
 //      backend coerces FloatField/IntegerField from strings, so the wire is
 //      unchanged; the expected format moves into `help`.
-import type { Field, ModelForm } from '../../../client';
+import type { Field, ModelForm } from '../../../client/runtime';
 import { THREAT_LEVEL_OPTIONS } from './models';
 
 export const GEOIP_EDIT_LOCATION_FIELDS: Field[] = [

@@ -16,7 +16,7 @@ import {
     completeMfaRecovery, completeMfaSms, completeMfaTotp, loginWithPasskey,
     isPasskeySupported, sendMfaSms,
     type AuthUser, type MfaChallenge,
-} from 'portal-mojo/client';
+} from 'portal-mojo/client/runtime';
 
 type KnownMethod = 'totp' | 'sms' | 'passkey';
 const KNOWN: KnownMethod[] = ['totp', 'sms', 'passkey'];

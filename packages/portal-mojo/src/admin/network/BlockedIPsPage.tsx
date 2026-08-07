@@ -19,7 +19,7 @@ import {
     Badge, ModelTable, fmt, formModal,
     type BatchAction, type Column, type FilterDef, type Tone,
 } from '../../ui';
-import { useCan } from '../../client';
+import { useCan } from '../../client/runtime';
 import { COUNTRY_OPTIONS } from '../../charts/worldmap/countryCentroids';
 import {
     GEOIP_MANAGE_PERMS, GEOIP_UNBLOCK_FIELDS, GeoLocatedIPModel, blockActive, blockExpired,

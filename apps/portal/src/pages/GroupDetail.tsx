@@ -27,7 +27,7 @@ import {
     DetailView, JsonBlock, MetadataSection, formModal, modal, toast,
     type DetailMenuEntry,
 } from 'portal-mojo/ui';
-import { mojoList, useCan, type Params } from 'portal-mojo/client';
+import { mojoList, useCan, type Params } from 'portal-mojo/client/runtime';
 import {
     GLOBAL_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
     WebhookSubscriptionModel, WebhookSubscriptionsSection,

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { KPITile, MetricsChart } from '../../../charts';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import { Badge, DetailView, FlatRow, ModelTable, Tabs, fmt, modal, toast, type Column, type FilterDef } from '../../../ui';
 import { fetchPushGroupChoices, fetchPushStats, parseFcmServiceAccount, savePushConfigImperative, testPushConfigConnection, type FcmCredentialEdit } from './api';
 import {

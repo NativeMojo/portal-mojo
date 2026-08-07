@@ -12,7 +12,7 @@
 // carries the plain-language diff of the clauses being added and removed.
 import { useState } from 'react';
 import { ArmedButton, Badge, fmt, toast } from '../../../ui';
-import { useCan } from '../../../client';
+import { useCan } from '../../../client/runtime';
 import type { EventRow } from '../../incidents/models';
 import {
     GEOFENCE_EVENT_CATEGORIES, GeofenceEventModel, configChangedBy,

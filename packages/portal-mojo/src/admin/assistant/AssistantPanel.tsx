@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useCan, useMe, useRealtime, useRealtimeStatus } from '../../client';
+import { useCan, useMe, useRealtime, useRealtimeStatus } from '../../client/runtime';
 import type { RightPanelRenderContext } from '../../ui';
 import { AssistantFeed } from './AssistantFeed';
 import { sendAssistantMessage } from './api';

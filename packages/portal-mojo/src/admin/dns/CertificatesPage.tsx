@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { hasPermission, useMe } from '../../client';
+import { hasPermission, useMe } from '../../client/runtime';
 import { Badge, ModelTable, fmt, modal, toast, type Column, type FilterDef } from '../../ui';
 import { useDnsCapabilities } from './api';
 import { CertificateDetail } from './CertificateDetail';

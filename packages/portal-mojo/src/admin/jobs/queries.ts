@@ -7,7 +7,7 @@
 // while `me` loads, so the first render of an admin page never races a gate.
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { mojoList, useCan, type Params } from '../../client';
+import { mojoList, useCan, type Params } from '../../client/runtime';
 import {
     fetchChannels,
     fetchJobStats,

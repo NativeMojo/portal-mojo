@@ -12,7 +12,7 @@ import {
     getAuthSnapshot, isPasskeySupported, login, loginWithPasskey,
     usingMockTransport,
     type AuthUser, type MfaChallenge,
-} from 'portal-mojo/client';
+} from 'portal-mojo/client/runtime';
 import { MfaPanel } from './MfaPanel';
 import { consumeReturnRoute } from './config';
 
