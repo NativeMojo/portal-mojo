@@ -81,13 +81,15 @@ class LazyPageBoundary extends Component<LazyPageBoundaryProps, LazyPageBoundary
 export function AdminLazyPage({ load }: { load: () => Promise<{ default: ComponentType }> }) {
     const [attempt, setAttempt] = useState(0);
     const Page = useMemo(() => lazy(load), [load, attempt]);
-    return createElement(LazyPageBoundary, { key: attempt, onRetry: () => setAttempt((value) => value + 1) },
-        createElement(Suspense, {
+    return createElement(LazyPageBoundary, {
+        key: attempt,
+        onRetry: () => setAttempt((value) => value + 1),
+        children: createElement(Suspense, {
             fallback: createElement('div', { className: 'panel panel-pad admin-route-loading', role: 'status' },
                 createElement('span', { className: 'spinner', 'aria-hidden': true }),
                 createElement('span', null, 'Loading admin page…')),
         }, createElement(Page)),
-    );
+    });
 }
 
 function relativePath(...parts: Array<string | undefined>): string {
