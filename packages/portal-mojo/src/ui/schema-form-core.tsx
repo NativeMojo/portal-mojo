@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { Field, FieldValue, FormData } from '../client/types';
-import { resolveShowWhen, validateFieldValue } from './form-autosave';
+import { declaredFieldPatch, resolveShowWhen, validateFieldValue } from './form-autosave';
 import { emptyFieldValue, resolveFieldRenderer, warnUnknownFieldType } from './field-registry';
 
 export type ValidationProfile = 'schema-form' | 'wizard';
@@ -65,6 +65,7 @@ export interface SchemaFormState {
     formError: string;
     visibleFields: Field[];
     setValue: (name: string, value: FieldValue) => void;
+    patchValues: (patch: FormData) => void;
     setErrors: (errors: Record<string, string>) => void;
     setFormError: (message: string) => void;
     validate: (fields?: Field[]) => Record<string, string>;
@@ -126,6 +127,23 @@ export function useSchemaFormState({ fields, initial = {}, profile, reconcile = 
         });
     }, [fields]);
 
+    const patchValues = useCallback((patch: FormData) => {
+        const safe = declaredFieldPatch(fields, patch);
+        if (Object.keys(safe).length === 0) return;
+        setValues((current) => {
+            const next = { ...current, ...safe };
+            setErrorsState((currentErrors) => {
+                const nextErrors = { ...currentErrors };
+                for (const name of Object.keys(safe)) delete nextErrors[name];
+                for (const field of fields) {
+                    if (!resolveShowWhen(field.showWhen, next)) delete nextErrors[field.name];
+                }
+                return nextErrors;
+            });
+            return next;
+        });
+    }, [fields]);
+
     const validate = useCallback((subset = fields) => {
         const next = validateSchemaFields(subset, values, profile);
         setErrorsState((current) => {
@@ -151,6 +169,7 @@ export function useSchemaFormState({ fields, initial = {}, profile, reconcile = 
         formError,
         visibleFields: visibleSchemaFields(fields, values),
         setValue,
+        patchValues,
         setErrors: setErrorsState,
         setFormError,
         validate,
@@ -218,7 +237,7 @@ function SchemaField({ field, state, disabled = false }: { field: Field; state: 
             <div className="field">
                 <span id={labelId} className="field-label">{field.label}{field.required && <em> *</em>}</span>
                 <div ref={state.registerFocusTarget(field.name)} tabIndex={-1} aria-labelledby={labelId} aria-describedby={describedBy} aria-invalid={!!error || undefined}>
-                    <Registered field={field} value={value} invalid={!!error} disabled={disabled} controlId={controlId} ariaDescribedBy={describedBy} focusTarget={state.registerFocusTarget(field.name)} commit={set} />
+                    <Registered field={field} value={value} invalid={!!error} disabled={disabled} controlId={controlId} ariaDescribedBy={describedBy} focusTarget={state.registerFocusTarget(field.name)} commit={set} commitPatch={state.patchValues} />
                 </div>
                 {error && <span id={errorId} className="field-error">{error}</span>}
                 {field.help && !error && <span id={helpId} className="field-help">{field.help}</span>}

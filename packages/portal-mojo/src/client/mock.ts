@@ -5183,12 +5183,23 @@ export interface MockRequestHistoryEntry {
     path: string;
     /** Only non-sensitive DNS/metrics query values needed by contract verification. */
     params?: Params;
+    /** Derived location diagnostics only — never query/body/provider values. */
+    observables?: {
+        input_length?: number;
+        has_session_token?: boolean;
+        has_place_id?: boolean;
+        has_coordinates?: boolean;
+    };
 }
 
 const requestHistory: MockRequestHistoryEntry[] = [];
 
 export function getMockRequestHistory(): MockRequestHistoryEntry[] {
-    return requestHistory.map((entry) => ({ ...entry, ...(entry.params ? { params: { ...entry.params } } : {}) }));
+    return requestHistory.map((entry) => ({
+        ...entry,
+        ...(entry.params ? { params: { ...entry.params } } : {}),
+        ...(entry.observables ? { observables: { ...entry.observables } } : {}),
+    }));
 }
 
 export function clearMockRequestHistory(): void {
@@ -5224,6 +5235,7 @@ export function armMockDnsWriteFault(mode: 'reject' | 'ambiguous' | 'reconcile')
 export function armMockMessagingManagedFailure():void{messagingManagedFault=true;}
 
 const LATENCY_MS = 220;
+let locationSessionSequence = 0;
 
 export interface MockFetchOpts {
     params?: Params;
@@ -6866,8 +6878,87 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         || path.startsWith('/api/metrics/')
         ? { ...(opts.params ?? {}) }
         : undefined;
-    requestHistory.push({ method, path, ...(safeDnsParams ? { params: safeDnsParams } : {}) });
+    const locationObservables = path.startsWith('/api/location/') ? {
+        ...('input' in (opts.params ?? {}) ? { input_length: String(opts.params?.input ?? '').length } : {}),
+        ...('session_token' in (opts.params ?? {}) ? { has_session_token: Boolean(opts.params?.session_token) } : {}),
+        ...('place_id' in (opts.params ?? {}) ? { has_place_id: Boolean(opts.params?.place_id) } : {}),
+        ...(('lat' in (opts.params ?? {}) || 'lng' in (opts.params ?? {})) ? {
+            has_coordinates: opts.params?.lat != null && opts.params?.lng != null,
+        } : {}),
+    } : undefined;
+    requestHistory.push({
+        method,
+        path,
+        ...(safeDnsParams ? { params: safeDnsParams } : {}),
+        ...(locationObservables ? { observables: locationObservables } : {}),
+    });
     await new Promise((r) => setTimeout(r, LATENCY_MS));
+
+    // ── Public location — exact mixed django-mojo envelopes ──────────
+    if (path === '/api/location/address/validate') {
+        if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const body = opts.body ?? {};
+        if (!body.address1 || !body.state) return { status: false, error: 'address1 and state are required', error_code: 400 };
+        return {
+            status: true,
+            data: {
+                valid: true,
+                source: String(body.provider ?? 'usps'),
+                standardized_address: {
+                    address1: String(body.address1), address2: String(body.address2 ?? ''),
+                    city: String(body.city ?? 'Mountain View'), state: String(body.state),
+                    postal_code: String(body.postal_code ?? '94043'),
+                },
+                metadata: { mock: true },
+            },
+        };
+    }
+    if (path === '/api/location/address/suggestions') {
+        if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const input = String(opts.params?.input ?? '').trim();
+        if (!input) return { success: false, status: false, error: 'input is required', data: [], size: 0, count: 0 };
+        if (input.toLowerCase().includes('fail')) return { success: false, status: false, error: 'Mock provider failure', data: [], size: 0, count: 0 };
+        const sessionToken = String(opts.params?.session_token ?? `mock-location-session-${++locationSessionSequence}`);
+        const data = [
+            { id: 'mock-googleplex', place_id: 'mock-googleplex', description: '1600 Amphitheatre Parkway, Mountain View, CA, USA', main_text: '1600 Amphitheatre Parkway', secondary_text: 'Mountain View, CA, USA', types: ['street_address'] },
+            { id: 'mock-market', place_id: 'mock-market', description: '1 Market Street, San Francisco, CA, USA', main_text: '1 Market Street', secondary_text: 'San Francisco, CA, USA', types: ['street_address'] },
+        ];
+        return { success: true, session_token: sessionToken, data, size: data.length, count: data.length };
+    }
+    if (path === '/api/location/address/place-details') {
+        if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+        if (!opts.params?.place_id) return { success: false, status: false, error: 'place_id is required' };
+        const market = opts.params.place_id === 'mock-market';
+        return {
+            success: true,
+            address: market ? {
+                address1: '1 Market Street', city: 'San Francisco', state: 'California', state_code: 'CA',
+                postal_code: '94105', country: 'United States', country_code: 'US',
+                latitude: 37.7936, longitude: -122.3958,
+                formatted_address: '1 Market Street, San Francisco, CA 94105, USA', place_id: 'mock-market',
+            } : {
+                address1: '1600 Amphitheatre Parkway', city: 'Mountain View', state: 'California', state_code: 'CA',
+                postal_code: '94043', country: 'United States', country_code: 'US',
+                latitude: 37.4224764, longitude: -122.0842499,
+                formatted_address: '1600 Amphitheatre Parkway, Mountain View, CA 94043, USA', place_id: 'mock-googleplex',
+            },
+        };
+    }
+    if (path === '/api/location/address/geocode') {
+        if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        if (!opts.body?.address) return { success: false, status: false, error: 'address is required' };
+        return { success: true, latitude: 37.4224764, longitude: -122.0842499, formatted_address: '1600 Amphitheatre Parkway, Mountain View, CA 94043, USA', place_id: 'mock-googleplex', address_components: { state: 'CA', postal_code: '94043' } };
+    }
+    if (path === '/api/location/address/reverse-geocode') {
+        if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+        if (opts.params?.lat == null || opts.params?.lng == null) return { success: false, status: false, error: 'Invalid lat/lng coordinates' };
+        return { success: true, formatted_address: '1600 Amphitheatre Parkway, Mountain View, CA 94043, USA', place_id: 'mock-googleplex', address_components: { state: 'CA', postal_code: '94043' } };
+    }
+    if (path === '/api/location/timezone') {
+        if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+        if (opts.params?.lat == null || opts.params?.lng == null) return { success: false, status: false, error: 'Invalid lat/lng coordinates' };
+        return { success: true, timezone_id: 'America/Los_Angeles', timezone_name: 'Pacific Daylight Time', raw_offset: -28800, dst_offset: 3600, total_offset: -25200 };
+    }
     if (armedReauth?.method === method && armedReauth.path === path) {
         // The real @requires_fresh_auth runs after authentication. An armed
         // endpoint must still answer 401 to an anonymous caller, and that

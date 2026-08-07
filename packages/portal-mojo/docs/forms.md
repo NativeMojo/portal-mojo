@@ -191,6 +191,7 @@ interface RegistryFieldProps {
     invalid?: boolean;              // paint the error border (text is the surface's)
     disabled?: boolean;
     commit: (value: FieldValue) => void;   // THE change pipeline, once per commit
+    commitPatch: (patch: FieldValues) => void; // one declared-field transaction
 }
 registerFieldType('rating', RatingField);       // add / replace (HMR-safe)
 registerFieldType(['a', 'b'], SharedField);     // aliases share one renderer
@@ -221,6 +222,7 @@ dates exist. This is the ONE conversion point.
 | `collection` | CollectionSelect | one picked row | the row's **id** (`string \| number`); `null` clears | `null` |
 | `collectionmultiselect`, `collection-multiselect` | CollectionMultiSelect | checked rows | **array of ids** | `[]` |
 | `combo`, `combobox`, `autocomplete` | ComboBox | committed option/text | the committed value (`string \| number`; free text iff `allowCustom`) | `''` |
+| `address` | AddressField | private draft + provider suggestions | raw committed address, or one atomic mapped details patch | `''` |
 | `datepicker`, `monthpicker`, `yearpicker` | DatePicker | canonical `YYYY-MM-DD` / `YYYY-MM` / `YYYY` | the shape it read (see below); **epoch seconds** at UTC midnight by default; `outputFormat` overrides | `null` |
 | `daterange`, `monthrange`, `yearrange` | DateRangePicker | canonical `[start, end]` pair | as above, per element — **`[startEpoch, endEpoch]`** by default | `null` |
 | `timepicker` | TimePicker (+ the REAL TimezoneSelect in its slot) | HH:MM (+ zone) | serialized **string** — `'iso'` (default) `'14:30-07:00'`, `'iana'` `'14:30 America/…'`; times are never epochs | `''` |
@@ -237,7 +239,8 @@ Registry-type Field props (all optional, additive): `precision`,
 `timezone`/`timezones`, `model`/`endpoint`, `labelField`/`valueField`,
 `maxItems`, `emptyFetch`, `debounceMs`, `requiresActiveGroup`,
 `defaultParams`, `enableSearch`, `maxTags`, `allowDuplicates`,
-`allowCustom`, `showDescription`, `maxSuggestions`, `disabled`. Component
+`allowCustom`, `showDescription`, `maxSuggestions`, `addressFields`,
+`country`, `minChars`, `disabled`. Component
 knobs a Field doesn't carry (locale, firstDay, disabledDates, …) are
 reachable only by using the component directly.
 
@@ -308,6 +311,10 @@ shown) — plus the explicit-precision override, `outputFormat:'date'`, the
   field-type registry above — extend THIS language via `registerFieldType`;
   don't fork it. New renderers must fire on COMMIT only and keep state
   wire-shaped (convert in the renderer, like the date bindings do).
+- `commitPatch` is for one provider-driven gesture, such as address details.
+  Both form surfaces filter it to declared field names. FormView validates
+  and queues the whole accepted patch as one batch, so server failure rolls
+  every member back together.
 - `daterange` here is ONE field name whose value is a `[start, end]` pair —
   NOT web-mojo's `startName`/`endName` twin wire keys. A model with two
   separate date COLUMNS should use two `datepicker` fields.
@@ -365,4 +372,5 @@ orchestrator files follow-ups.
 | `checklistdropdown` | — | — | folded into `multiselect` (sweep: ONE implementation) — alias deliberately NOT registered |
 | `buttongroup` | — | — | **GAP** — segmented control; source was the split-pipeline bug family (do-not-recreate), needs a fresh build |
 | `combo` / `combobox` / `autocomplete` | — | ComboBox | OK (ComboInput feature spec, commit-only) |
+| `address` | — | AddressField | OK (private session token, details → atomic declared-field patch) |
 | `tabset` | FormView `tabs` prop | — | OK — tabsets are FORM STRUCTURE here (registry-of-tabs + permissions), not a field type |

@@ -21,10 +21,11 @@
 //     binding may hold hooks/state of its own.
 import { useState } from 'react';
 import type { ComponentType } from 'react';
-import type { Field, FieldValue } from '../client/types';
+import type { Field, FieldValue, FieldValues } from '../client/types';
 import { CollectionMultiSelect } from './CollectionMultiSelect';
 import { CollectionSelect } from './CollectionSelect';
 import { ComboBox, type ComboValue } from './ComboBox';
+import { AddressField } from './AddressField';
 import { MultiSelectDropdown, type MultiSelectValue } from './MultiSelectDropdown';
 import { TagInput } from './TagInput';
 import { DatePicker } from './date/DatePicker';
@@ -57,6 +58,8 @@ export interface RegistryFieldProps {
     focusTarget?: (node: HTMLElement | null) => void;
     /** THE change pipeline: called once per commit with the next state value. */
     commit: (value: FieldValue) => void;
+    /** Atomic multi-field commit, filtered to fields declared by the surface. */
+    commitPatch: (patch: FieldValues) => void;
 }
 
 /** A renderer is a function component over RegistryFieldProps. */
@@ -130,7 +133,9 @@ function warnConfigOnce(field: Field, note: string): void {
 
 /** The last-resort control — also what a misconfigured binding degrades to
  *  (never "render nothing"). Commits on blur/Enter like FormView text. */
-function FallbackTextInput({ field, value, invalid, disabled, commit }: RegistryFieldProps) {
+function FallbackTextInput({ field, value, invalid, disabled, commit }: Pick<
+    RegistryFieldProps, 'field' | 'value' | 'invalid' | 'disabled' | 'commit'
+>) {
     const committed = value == null || typeof value === 'object' ? '' : String(value);
     const [draft, setDraft] = useState<string | null>(null);
     const shown = draft ?? committed;
@@ -250,6 +255,32 @@ registerFieldType(['combo', 'combobox', 'autocomplete'], function ComboField({ f
             disabled={disabled || field.disabled}
             required={field.required}
             onChange={(v) => commit(v)}
+        />
+    );
+});
+
+registerFieldType('address', function AddressRegistryField({
+    field, value, invalid, disabled, controlId, ariaDescribedBy,
+    focusTarget, commit, commitPatch,
+}) {
+    return (
+        <AddressField
+            fieldName={field.name}
+            fields={field.addressFields}
+            value={typeof value === 'string' ? value : String(value ?? '')}
+            country={field.country}
+            minChars={field.minChars}
+            debounceMs={field.debounceMs}
+            maxSuggestions={field.maxSuggestions}
+            placeholder={field.placeholder}
+            disabled={disabled || field.disabled}
+            required={field.required}
+            invalid={invalid}
+            id={controlId}
+            ariaDescribedBy={ariaDescribedBy}
+            focusTarget={focusTarget}
+            onCommit={(next) => commit(next)}
+            onPatch={commitPatch}
         />
     );
 });

@@ -255,6 +255,7 @@ function FieldRow({ field, form }: { field: Field; form: FormAutosaveApi }) {
                             value={value ?? emptyFieldValue(field)}
                             invalid={!!error}
                             commit={(v) => form.commit(field.name, v)}
+                            commitPatch={form.commitPatch}
                         />
                         {footSlot}
                     </div>

@@ -127,6 +127,14 @@ export function expandDotted(flat: Record<string, FieldValue>): Record<string, u
     return out;
 }
 
+/** Keep only keys explicitly declared by this form. Address details are an
+ * atomic multi-field gesture, but they must never become an arbitrary row
+ * patch just because a provider returned an extra component. */
+export function declaredFieldPatch(fields: Field[], patch: FieldValues): FieldValues {
+    const names = new Set(fields.map((field) => field.name));
+    return Object.fromEntries(Object.entries(patch).filter(([name]) => names.has(name)));
+}
+
 // ── Reducer ───────────────────────────────────────────────────────────
 
 /** Reducer-side status — 'pending' is derived from `pending` membership. */
@@ -149,6 +157,8 @@ export type AutosaveAction =
     | { type: 'EDIT'; field: Field; value: FieldValue; fields: Field[] }
     /** The commit pipeline: showWhen gate → zod → change-detect → queue. */
     | { type: 'COMMIT'; field: Field; value: FieldValue; fields: Field[] }
+    /** One controlled gesture that updates, validates and queues many fields. */
+    | { type: 'COMMIT_PATCH'; patch: FieldValues; fields: Field[] }
     /** pending[names] → in flight ('saving'). */
     | { type: 'BATCH_START'; names: string[] }
     /** Batch settled OK: fresh snapshot; saved flash; mid-flight edits stay dirty. */
@@ -251,6 +261,50 @@ export function autosaveReducer(state: AutosaveState, action: AutosaveAction): A
                 fieldState: { ...s.fieldState, [n]: 'dirty' },
                 fieldError: { ...s.fieldError, [n]: null },
             };
+            return applyHideCascade(s, action.fields);
+        }
+
+        case 'COMMIT_PATCH': {
+            const patch = declaredFieldPatch(action.fields, action.patch);
+            if (Object.keys(patch).length === 0) return state;
+            let s: AutosaveState = { ...state, draft: { ...state.draft, ...patch } };
+            const visible = action.fields.filter((field) =>
+                field.name in patch && resolveShowWhen(field.showWhen, s.draft));
+
+            // A place selection is one transaction. If any mapped value is
+            // invalid, none of the values enters the autosave batch.
+            const invalid = visible
+                .map((field) => [field, validateFieldValue(field, patch[field.name]!)] as const)
+                .filter(([, issue]) => issue != null);
+            if (invalid.length > 0) {
+                const pending = { ...s.pending };
+                const fieldState = { ...s.fieldState };
+                const fieldError = { ...s.fieldError };
+                for (const field of visible) delete pending[field.name];
+                for (const [field, issue] of invalid) {
+                    fieldState[field.name] = 'error';
+                    fieldError[field.name] = issue;
+                }
+                return applyHideCascade({ ...s, draft: state.draft, pending, fieldState, fieldError }, action.fields);
+            }
+
+            const pending = { ...s.pending };
+            const fieldState = { ...s.fieldState };
+            const fieldError = { ...s.fieldError };
+            for (const field of visible) {
+                const name = field.name;
+                const value = patch[name]!;
+                if (valueChanged(field, value, s.server[name])) {
+                    pending[name] = value;
+                    fieldState[name] = 'dirty';
+                    fieldError[name] = null;
+                } else {
+                    delete pending[name];
+                    if (fieldState[name] !== 'saving') fieldState[name] = 'idle';
+                    fieldError[name] = null;
+                }
+            }
+            s = { ...s, pending, fieldState, fieldError };
             return applyHideCascade(s, action.fields);
         }
 
@@ -363,6 +417,8 @@ export interface FormAutosaveApi {
     setValue: (name: string, value: FieldValue) => void;
     /** The commit pipeline. Omitting `value` commits the current draft. */
     commit: (name: string, value?: FieldValue) => void;
+    /** Atomic declared-field commit. One patch becomes one autosave batch. */
+    commitPatch: (patch: FieldValues) => void;
     /** Visibility under showWhen against the LIVE values. */
     visible: (field: Field) => boolean;
     /** True while a POST is in flight. */
@@ -471,6 +527,11 @@ export function useFormAutosave<T>(opts: UseFormAutosaveOptions<T>): FormAutosav
         armBatchTimer();
     }, [armBatchTimer, byName]);
 
+    const commitPatch = useCallback((patch: FieldValues) => {
+        dispatch({ type: 'COMMIT_PATCH', patch, fields: optsRef.current.fields });
+        armBatchTimer();
+    }, [armBatchTimer]);
+
     const visible = useCallback(
         (field: Field) => resolveShowWhen(field.showWhen, state.draft),
         [state.draft],
@@ -512,6 +573,7 @@ export function useFormAutosave<T>(opts: UseFormAutosaveOptions<T>): FormAutosav
         status,
         setValue,
         commit,
+        commitPatch,
         visible,
         saving: state.inflight,
     };

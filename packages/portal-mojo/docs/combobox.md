@@ -45,7 +45,7 @@ The input's text is a private **draft**; the committed value lives in the
 | Click option / Enter on highlighted | commit that option |
 | Enter on typed text (`allowCustom`) | resolve → option, else commit text as custom |
 | Blur / outside click / Tab / chevron-close | **settle**: exact label or `String(value)` match → that option; else custom when allowed (`''` commits a clear); else **revert** — the display falls back to the committed label |
-| Escape | revert, keep focus — never commits |
+| Escape while list is open | Popover dismisses → revert, keep focus — never commits |
 
 Never per keystroke — web-mojo's ComboBox emitted per keystroke and
 FormView's 300ms autosave saved partial text. Typed text equal to an
@@ -69,8 +69,8 @@ with `allowCustom` — "No matches found. Press Enter to use custom value." /
 
 ArrowDown opens, then moves next; ArrowUp previous; both wrap over the
 *visible* (maxSuggestions-capped) list. Enter selects the highlighted
-option, else commits custom text. Escape reverts (and is passed through to
-e.g. a parent `<dialog>` only when there is nothing to escape). Tab settles
+option, else commits custom text. Escape reverts through the shared Popover
+(and reaches a parent `<dialog>` once the list is closed). Tab settles
 and passes through. The highlighted option scrolls into view
 (`block:'nearest'`). Full combobox pattern: `role=combobox`,
 `aria-expanded`, `aria-autocomplete=list`, `aria-controls`,
@@ -87,8 +87,8 @@ strings.
   committed value per keystroke, so its revert restored the typed text.
 - **Numeric values survive** — selection passes option objects in closures;
   web-mojo strict-equalled stringified `data-value` DOM attributes.
-- **No listener leak** — the outside-mousedown listener attaches only while
-  open and is removed on close/unmount.
+- **One dismissal owner** — shared Popover alone listens for outside
+  mousedown/Escape; ComboBox only chooses settle-vs-revert.
 - Unknown `value` under `allowCustom:false` warns once and displays
   verbatim — never renders nothing (rule 4).
 
@@ -99,8 +99,7 @@ strings.
   convert before binding).
 - `description` renders only when provided (web-mojo silently defaulted it
   to the label, duplicating every row — not carried).
-- The dropdown is locally positioned (`absolute` in the component's own
-  stacking context, 300px scroll) — inside `overflow:hidden` containers it
-  clips. MERGE-WIRE: revisit against the Popover primitive (#1271).
+- The dropdown is mounted in the shared top-layer Popover, so overflow
+  containers and native dialogs do not clip it.
 - Styles live in `apps/portal/src/theme/combobox.css` (tokens only, both
   themes); consuming apps must include it.
