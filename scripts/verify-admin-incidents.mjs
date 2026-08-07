@@ -84,6 +84,7 @@ try {
     assert(mergeHistory.data.some((row) => row.kind === 'merged'));
     const eventDelete = await mock.mockFetch(`/api/incident/event/${movedEvents.data[0].id}`, { method: 'DELETE', headers: manager });
     assert.equal(eventDelete.error_code, 403);
+    assert.match(await readFile(new URL('../packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx', import.meta.url), 'utf8'), /\/security\/incidents\?status=open/);
 
     console.log('admin incident/event contract verified');
 } finally {

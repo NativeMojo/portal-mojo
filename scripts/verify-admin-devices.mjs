@@ -377,6 +377,10 @@ try {
     // …while the LIST endpoint takes the dr_field triple.
     assert.match(dataLayer, /params\.dr_field = 'created'/, 'the list leg always names dr_field explicitly');
     assert.match(dataLayer, /Math\.min\(500/, 'the list leg is bounded at 500, not the source\'s 1000');
+    const dashboard = await read('packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx');
+    assert.match(dashboard, /<LoginLocationMap/);
+    assert.match(dashboard, /drStart=\{dashboardLoginStart\(\)\}/);
+    assert.doesNotMatch(dashboard, /drEnd=/, 'the dashboard leaves the upper instant unbounded');
 
     console.log('admin devices / login locations / geoip contract verified');
 } finally {

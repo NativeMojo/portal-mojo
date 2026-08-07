@@ -67,7 +67,7 @@ smearing).
 ```tsx
 <MetricsChart
     title="Platform activity"
-    slugs={['api_calls', 'logins', 'errors']}
+    slugs={['api_calls', 'user_activity_day', 'api_errors']}
     seriesLabels={{ api_calls: 'API Calls' }}   // wire carries raw slugs
     account="global"
     defaultRange="24h"                          // 1H / 24H / 7D / 30D
@@ -133,12 +133,12 @@ drives both.
 ```tsx
 <MetricsMiniWidget
     title="Logins" icon="bi bi-box-arrow-in-right"
-    slugs={['logins']}                    // FIRST slug drives the card
+    slugs={['user_activity_day']}          // FIRST slug drives the card
     granularity="hours" defaultRange="24h" chartType="line"
     subtitle={(ctx) => <><b>{ctx.total}</b> in 24h · {ctx.nowLabel}: {ctx.nowValue}</>}
     showTrending trendRange={6}
     tone="accent"                          // token-tinted card variant
-    showSettings showDateRange settingsKey="dash-logins"
+    showSettings showDateRange settingsKey="dash-activity"
     search={{                              // the C2 addition
         model: GroupModel,                 // or endpoint: '/api/group'
         toAccount: (id) => `group-${id}`,  // picked row → account param
@@ -179,7 +179,7 @@ drives both.
 <KPIStrip
     tiles={[
         { slug: 'api_calls', label: 'API Calls', tone: 'good' },
-        { slug: 'errors', label: 'Errors', tone: 'bad', severity: 'warn' },
+        { slug: 'api_errors', label: 'API errors', tone: 'bad', severity: 'warn' },
         { key: 'open', label: 'Open Tickets', value: openCount, sparklineSlug: 'api_calls' },
     ]}
     granularity="days" range="7d" account="global"

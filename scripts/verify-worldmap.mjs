@@ -231,6 +231,8 @@ try {
     assert.match(component, /prefers-reduced-motion|animateRoutes/, 'route animation is opt-out');
     assert.equal(themePortal, themeShowcase, 'the two theme dirs keep worldmap.css byte-identical');
     assert.doesNotMatch(stripComments(themePortal), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
+    const dashboard = await readFile(new URL('../packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx', import.meta.url), 'utf8');
+    assert.match(dashboard, /<LoginLocationMap/, 'the Admin dashboard reuses the package WorldMap-backed login surface');
 
     console.log('worldmap projection/centroid/binding contract verified');
 } finally {

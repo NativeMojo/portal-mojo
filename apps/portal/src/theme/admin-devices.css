@@ -254,9 +254,6 @@ button.us-login-row .us-row-meta { display: block; }
     font-size: 12.5px;
 }
 
-/* ── Dashboard panel ───────────────────────────────────────────────── */
-.dash-login-map { display: flex; flex-direction: column; gap: 10px; }
-
 @media (max-width: 640px) {
     .ll-head { align-items: flex-start; }
     .lm-modes { margin-left: 0; }

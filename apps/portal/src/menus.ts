@@ -42,12 +42,6 @@ registerMenus([{
     presentation: 'accordion',
     items: [
         { divider: 'Admin' },
-        {
-            id: 'admin:overview',
-            label: 'Overview',
-            icon: 'bi-grid-1x2',
-            children: [{ id: 'admin:dashboard', label: 'Dashboard', route: '/' }],
-        },
         identity,
         ...contributedCategories,
     ],

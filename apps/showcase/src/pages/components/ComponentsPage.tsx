@@ -43,6 +43,7 @@ import { RecordFeedDemo } from './demos-record-feed';
 import { AdminCredentialsDemo } from './demos-admin-credentials';
 import { AdminMonitoringDemo } from './demos-admin-monitoring';
 import { AdminMetricsExplorerDemo } from './demos-admin-metrics-explorer';
+import { AdminDashboardDemo } from './demos-admin-dashboard';
 import { AdminSettingsDemo } from './demos-admin-settings';
 import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
@@ -321,6 +322,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Admin',
         sections: [
+            {
+                key: 'admin-dashboard', title: 'Admin dashboard', icon: 'bi-grid-1x2',
+                blurb: 'Global operational overview backed only by authoritative metric and count endpoints, with independent permission gates and safe root fallback.',
+                render: () => <AdminDashboardDemo />,
+            },
             {
                 key: 'admin-messaging', title: 'Email & contact messages', icon: 'bi-envelope-at',
                 blurb: 'Global SES domains, mailboxes, immutable delivery history, templates and the public support queue — explicit side effects, offline previews, and secret-safe mock parity.',

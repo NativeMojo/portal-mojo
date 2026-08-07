@@ -21,8 +21,8 @@ export function ChartsDemo() {
             </div>
             <MetricsChart
                 title="MetricsChart · live /api/metrics/fetch"
-                slugs={['api_calls', 'logins', 'errors']}
-                seriesLabels={{ api_calls: 'API Calls', logins: 'Logins', errors: 'Errors' }}
+                slugs={['api_calls', 'user_activity_day', 'api_errors']}
+                seriesLabels={{ api_calls: 'API Calls', user_activity_day: 'User activity', api_errors: 'API errors' }}
                 defaultRange="24h"
                 defaultGranularity="hours"
                 height={240}

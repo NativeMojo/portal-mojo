@@ -61,6 +61,9 @@ try {
     assert(admin.ADMIN_SECTIONS.flatMap((section) => section.routes).every((route) => !route.path.includes(':')),
         'shipped Admin record details must not register child routes');
     const metricsRoutes = admin.MONITORING_ADMIN_SECTION.routes.filter((route) => route.path.startsWith('metrics/'));
+    assert.equal(admin.ADMIN_SECTIONS[0].id, 'dashboard');
+    assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS).some((route) => route.path === ''));
+    assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS, { mount: '/system' }).some((route) => route.path === 'system'));
     assert.deepEqual(metricsRoutes.map((route) => route.path), ['metrics/explorer', 'metrics/permissions']);
     assert.deepEqual(metricsRoutes[0].permissions, ['sys.view_metrics', 'sys.metrics']);
     assert.deepEqual(metricsRoutes[1].permissions, ['sys.manage_incidents', 'sys.metrics', 'sys.manage_metrics']);

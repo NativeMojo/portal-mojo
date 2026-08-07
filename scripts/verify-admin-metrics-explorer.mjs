@@ -110,6 +110,8 @@ try {
     assert.equal('deltaPct' in points[1], false, 'previous zero legitimately omits delta_pct');
     const scalar = await explorer.readMetricValue('global', 'limits:max_users');
     assert.deepEqual(scalar, { account: 'global', slug: 'limits:max_users', value: 5000 });
+    const dashboardSeries = await mock.mockFetch('/api/metrics/fetch', { headers, params: { account: 'global', slugs: 'user_activity_day,group_activity_day,api_calls,api_errors', granularity: 'days', range: '30d' } });
+    assert.equal(dashboardSeries.status, true);
 
     assert.equal(stats.csvEscape('=SUM(A1:A2)'), "'=SUM(A1:A2)");
     assert.equal(stats.csvEscape('+cmd'), "'+cmd");
