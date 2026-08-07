@@ -572,7 +572,9 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - WebSocket client (`wss://…/ws/realtime/`, bearer handshake, ping) + 3-stage
   uploads (`fileman/upload/initiate` → multipart/S3 (file field last) → mark_as_completed).
   Board #1264 (parked).
-- Publish plan: npm `portal-mojo` with subpath exports; web-mojo stays published
+- Publishing: npm `portal-mojo` with TypeScript-source subpath exports;
+  reviewed SemVer bumps land on `main`, and matching GitHub Releases publish
+  through the verified OIDC workflow. `web-mojo` stays published
   for legacy consumers. Board #1265 (parked).
 
 ## Do-not-recreate list (from the web-mojo extraction)
