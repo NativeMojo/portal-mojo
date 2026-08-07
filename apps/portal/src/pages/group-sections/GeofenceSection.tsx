@@ -27,7 +27,7 @@ import { mojoCall, useCan } from 'portal-mojo/client';
 import {
     GeofenceRuleEditor, makeRuleEditorValue, ruleFromEditorValue,
     type RuleEditorValue,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';
 import { GroupModel, type GroupRow } from '../../models';
 import {
     GROUP_GEOFENCE_EDIT_PERMS, buildGroupRulePayload, describeRule, isAdvancedRule,

@@ -2,11 +2,13 @@
 // MERGE-WIRE: main.tsx routes — spread into the App children array:
 //   children: [ …existing, ...adminRoutes ]
 import type { RouteObject } from 'react-router-dom';
-import { ADMIN_SECTIONS, adminSectionRoutes } from 'portal-mojo/admin';
+import { AdminLazyPage, adminSectionRoutes } from 'portal-mojo/admin/core';
 import { Guarded } from 'portal-mojo/ui';
 import { GROUP_VIEW_PERMS } from '../models';
-import { GroupsPage } from './GroupsPage';
-import { ApiKeysPage } from './ApiKeysPage';
+import { ADMIN_SECTIONS } from '../admin-sections';
+
+const loadGroupsPage = () => import('./GroupsPage').then(({ GroupsPage }) => ({ default: GroupsPage }));
+const loadApiKeysPage = () => import('./ApiKeysPage').then(({ ApiKeysPage }) => ({ default: ApiKeysPage }));
 
 function AdminDenied() {
     return (
@@ -25,10 +27,13 @@ export const adminRoutes: RouteObject[] = [
         path: 'groups',
         element: (
             <Guarded permission={GROUP_VIEW_PERMS} fallback={<AdminDenied />}>
-                <GroupsPage />
+                <AdminLazyPage load={loadGroupsPage} />
             </Guarded>
         ),
     },
-    { path: 'apikeys', element: <ApiKeysPage /> },
+    {
+        path: 'apikeys',
+        element: <AdminLazyPage load={loadApiKeysPage} />,
+    },
     ...adminSectionRoutes(ADMIN_SECTIONS),
 ];

@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { hostedAuthUrl, logout, redirectToHostedAuth, useAuthSnapshot, useMe } from 'portal-mojo/client';
 import { useTheme, type ThemePref, fmt } from 'portal-mojo/ui';
-import { AssistantLauncher } from 'portal-mojo/admin';
+import { AssistantLauncher } from 'portal-mojo/admin/assistant';
 import { authMode } from '../pages/auth/config';
 
 const TITLES: Record<string, string> = { '/': 'Dashboard', '/users': 'Users', '/settings': 'Settings', '/group': 'Group' };

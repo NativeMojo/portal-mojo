@@ -29,7 +29,7 @@ export {
     isAdvancedRule,
     regionName,
     ruleToForm,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';
 
 export type {
     AbuseFlagKey,
@@ -37,4 +37,4 @@ export type {
     GeofenceRule,
     RuleClause,
     RuleForm,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/security';

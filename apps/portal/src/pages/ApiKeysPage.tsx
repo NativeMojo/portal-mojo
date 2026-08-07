@@ -19,7 +19,7 @@ import {
 } from 'portal-mojo/ui';
 import {
     ApiKeyModel, showSecretDialog, useGenerateUserApiKey, type ApiKeyRow,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/identity';
 
 const nowSec = () => Math.floor(Date.now() / 1000);
 

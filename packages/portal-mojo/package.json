@@ -28,7 +28,15 @@
         "./client": "./src/client/index.ts",
         "./ui": "./src/ui/index.ts",
         "./charts": "./src/charts/index.ts",
-        "./admin": "./src/admin/index.ts"
+        "./admin": "./src/admin/index.ts",
+        "./admin/core": "./src/admin/core/index.ts",
+        "./admin/identity": "./src/admin/public/identity.ts",
+        "./admin/security": "./src/admin/public/security.ts",
+        "./admin/observability": "./src/admin/public/observability.ts",
+        "./admin/operations": "./src/admin/public/operations.ts",
+        "./admin/infrastructure": "./src/admin/public/infrastructure.ts",
+        "./admin/communications": "./src/admin/public/communications.ts",
+        "./admin/assistant": "./src/admin/public/assistant.ts"
     },
     "scripts": {
         "typecheck": "tsc --noEmit"

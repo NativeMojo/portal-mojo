@@ -30,10 +30,11 @@ import {
 import { mojoList, useCan, type Params } from 'portal-mojo/client';
 import {
     GLOBAL_CREDENTIAL_PERMS, GroupApiKeyModel, GroupApiKeysSection,
-    LogModel, WebhookSubscriptionModel, WebhookSubscriptionsSection,
+    WebhookSubscriptionModel, WebhookSubscriptionsSection,
     MEMBER_INVITE_PERMISSIONS, MEMBER_SAVE_PERMISSIONS, MEMBER_USER_DIRECTORY_PERMISSIONS,
     openMemberAdmissionDialog,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/identity';
+import { LogModel } from 'portal-mojo/admin/observability';
 import {
     GROUP_DESTRUCTIVE_PERMS, GROUP_MANAGE_PERMS,
     GroupModel, MemberModel, type GroupRow,

@@ -18,12 +18,10 @@ export {
     type PasskeyRow,
     type PushDeviceRow,
     type UserRow,
-    LogModel,
-    LOG_LEVEL_OPTIONS,
-    type LogRow,
     MemberModel,
     type MemberRow,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/identity';
+export { LogModel, LOG_LEVEL_OPTIONS, type LogRow } from 'portal-mojo/admin/observability';
 
 export const GROUP_KIND_OPTIONS = [
     { value: 'org', label: 'Org' },

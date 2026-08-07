@@ -6,8 +6,9 @@ import { sendAssistantMessage } from './api';
 import type { AssistantConversation, AssistantMessage } from './types';
 import type { FileReference } from '../../client/record-feed';
 import { AssistantOutcomeUnknownError, chooseAssistantTransport, startAssistantRealtimeTurn, type AssistantRealtimeProgress, type AssistantRealtimeTurn } from './streaming';
+import { ASSISTANT_PERMISSIONS } from './permissions';
 
-export const ASSISTANT_PERMISSIONS = ['sys.view_admin', 'sys.assistant'];
+export { ASSISTANT_PERMISSIONS } from './permissions';
 
 export function AssistantPanel({ context, initialConversation = null }: { context: RightPanelRenderContext; initialConversation?: AssistantConversation | null }) {
     const { can } = useCan(ASSISTANT_PERMISSIONS);

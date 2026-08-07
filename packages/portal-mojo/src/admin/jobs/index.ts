@@ -4,12 +4,6 @@
 // which channel is backed up, why did this job fail, retry or cancel it, clear
 // stuck work, purge history — plus the (cron-style) scheduled tasks the old
 // portal's backend supported but never wired up.
-import type { AdminSection } from '../index';
-import { JobDashboardPage } from './JobDashboardPage';
-import { JobRunnersPage } from './JobRunnersPage';
-import { JobsTablePage } from './JobsTablePage';
-import { ScheduledTasksPage } from './ScheduledTasksPage';
-import { JOBS_VIEW_PERMS, SCHEDULED_TASK_VIEW_PERMS } from './models';
 
 export * from './models';
 export * from './control';
@@ -50,36 +44,4 @@ export * from './JobDetail';
  * Routes and the sidebar entry are generated from this object — a mounting app
  * edits nothing.
  */
-export const JOBS_ADMIN_SECTION: AdminSection = {
-    id: 'jobs',
-    title: 'Jobs',
-    icon: 'bi-cpu',
-    navigationGroup: 'operations',
-    permissions: [...new Set([...JOBS_VIEW_PERMS, ...SCHEDULED_TASK_VIEW_PERMS])],
-    routes: [
-        {
-            path: '',
-            label: 'Dashboard',
-            component: JobDashboardPage,
-            permissions: JOBS_VIEW_PERMS,
-        },
-        {
-            path: 'runners',
-            label: 'Runners',
-            component: JobRunnersPage,
-            permissions: JOBS_VIEW_PERMS,
-        },
-        {
-            path: 'list',
-            label: 'Jobs',
-            component: JobsTablePage,
-            permissions: JOBS_VIEW_PERMS,
-        },
-        {
-            path: 'scheduled-tasks',
-            label: 'Scheduled Tasks',
-            component: ScheduledTasksPage,
-            permissions: SCHEDULED_TASK_VIEW_PERMS,
-        },
-    ],
-};
+export { JOBS_ADMIN_SECTION } from '../domains/operations';

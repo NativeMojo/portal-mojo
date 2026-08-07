@@ -4,9 +4,9 @@
 import { registerMenus, setDefaultMenu, type MenuItem } from 'portal-mojo/ui';
 import {
     ADMIN_NAVIGATION_GROUPS,
-    ADMIN_SECTIONS,
     adminSectionsMenu,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin/core';
+import { ADMIN_SECTIONS } from './admin-sections';
 import { GROUP_VIEW_PERMS } from './models';
 
 const contributions = adminSectionsMenu(ADMIN_SECTIONS, {
