@@ -6,7 +6,7 @@ const FILE_PATH = '/api/fileman/file';
 const FALLBACK_MIME = 'application/octet-stream';
 
 export type FileUploadPhase = 'initiating' | 'uploading' | 'reconciling' | 'completing'
-    | 'completed' | 'failed' | 'cancelled' | 'uncertain';
+    | 'completed' | 'failed' | 'uncertain';
 export type FileUploadFailureStage = 'initiate' | 'transfer' | 'reconcile' | 'complete';
 
 export interface UploadedFileRef {
@@ -21,7 +21,7 @@ export interface UploadedFileRef {
 
 export interface FileUploadFailure {
     stage: FileUploadFailureStage;
-    code: 'invalid_response' | 'request_failed' | 'cancelled_after_initiate' | 'remote_state_unknown';
+    code: 'request_failed' | 'cancelled_after_initiate' | 'remote_state_unknown';
     message: string;
     retryable: boolean;
 }
@@ -29,8 +29,7 @@ export interface FileUploadFailure {
 export type FileUploadOutcome =
     | { status: 'completed'; file: UploadedFileRef }
     | { status: 'failed'; fileId: number | null; failure: FileUploadFailure }
-    | { status: 'cancelled'; fileId: null }
-    | { status: 'uncertain'; fileId: number; failure: FileUploadFailure };
+    | { status: 'uncertain'; fileId: number | null; failure: FileUploadFailure };
 
 export interface FileUploadSnapshot {
     phase: FileUploadPhase;
@@ -44,6 +43,7 @@ export interface FileUploadSnapshot {
 export interface StartFileUploadOptions {
     fileManagerId?: number;
     groupId?: number;
+    use?: string;
 }
 
 export interface FileUploadTask {
@@ -60,7 +60,7 @@ interface InitiatedUpload {
     filename: string;
     contentType: string;
     size: number;
-    capability: NormalizedCapability;
+    capability: NormalizedCapability | null;
 }
 
 interface NormalizedCapability {
@@ -110,14 +110,15 @@ function safeScalarEntries(value: unknown): Array<[string, string]> {
     });
 }
 
-// Authorization may itself be a backend-issued provider capability (Azure or
-// GCS, for example). The client never injects its API bearer here.
+// Non-Bearer Authorization may itself be a provider capability. Bearer is
+// rejected because the API token must never cross into the byte plane.
 const FORBIDDEN_PROVIDER_HEADERS = new Set(['cookie', 'host', 'content-length', 'x-mojo-uid']);
 
 function safeHeaders(value: unknown): Record<string, string> {
     const headers: Record<string, string> = {};
     for (const [name, item] of safeScalarEntries(value)) {
         const lower = name.toLowerCase();
+        if (lower === 'authorization' && /^Bearer\s/i.test(item)) throw new TypeError('Unsafe upload provider header');
         if (FORBIDDEN_PROVIDER_HEADERS.has(lower) || lower === 'content-type') continue;
         if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name)) throw new TypeError('Invalid upload provider header');
         headers[name] = item;
@@ -129,7 +130,7 @@ function safeCapabilityUrl(value: unknown): string {
     if (typeof value !== 'string' || value.trim() !== value || !value) throw new TypeError('Invalid upload URL');
     if (value.startsWith('/')) {
         if (value.startsWith('//') || value.includes('\\') || /[\u0000-\u001f\u007f#]/.test(value)) throw new TypeError('Invalid upload URL');
-        return value;
+        return value === '/api' || value.startsWith('/api/') ? value : `/api${value}`;
     }
     const parsed = new URL(value);
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.hash) throw new TypeError('Invalid upload URL');
@@ -179,7 +180,6 @@ function xhrUpload(request: Parameters<typeof mockUploadBytes>[0]): Promise<void
 
 function safeFailure(stage: FileUploadFailureStage, code: FileUploadFailure['code'], retryable: boolean): FileUploadFailure {
     const messages: Record<FileUploadFailure['code'], string> = {
-        invalid_response: 'The upload service returned an invalid response.',
         request_failed: 'The upload request failed.',
         cancelled_after_initiate: 'Cancellation was requested after the server created the upload.',
         remote_state_unknown: 'The server could not confirm the upload state.',
@@ -242,7 +242,10 @@ class UploadTask implements FileUploadTask {
 
     #start(mode: 'initial' | 'retry' | 'recover'): Promise<FileUploadOutcome> {
         if (this.#active) return this.#active;
-        if (mode !== 'initial' && !['failed', 'uncertain', 'cancelled'].includes(this.#snapshot.phase)) return this.#result;
+        if (mode !== 'initial' && !['failed', 'uncertain'].includes(this.#snapshot.phase)) return this.#result;
+        // Recovery is reconciliation-only. Without an id it must not create a
+        // possible duplicate; the caller must explicitly choose retry/restart.
+        if (mode === 'recover' && !this.#initiated) return this.#result;
         const generation = this.#snapshot.generation + 1;
         this.#snapshot = { phase: this.#initiated ? 'reconciling' : 'initiating', generation, fileId: this.#initiated?.id ?? null, loadedBytes: 0, totalBytes: null, outcome: null };
         this.#controller = new AbortController();
@@ -276,10 +279,14 @@ class UploadTask implements FileUploadTask {
             if (generation !== this.#snapshot.generation) return this.#snapshot.outcome ?? this.#failOutcome(stage, generation);
             const aborted = error instanceof DOMException && error.name === 'AbortError';
             if (!this.#initiated) {
-                const outcome: FileUploadOutcome = aborted
-                    ? { status: 'cancelled', fileId: null }
-                    : { status: 'failed', fileId: null, failure: safeFailure(stage, error instanceof TypeError ? 'invalid_response' : 'request_failed', true) };
-                this.#publish({ phase: outcome.status, outcome }, generation);
+                // The request may have committed before its response or abort
+                // became observable. Without an id there is nothing safe to
+                // reconcile, so absence of a File row must never be claimed.
+                const outcome: FileUploadOutcome = {
+                    status: 'uncertain', fileId: null,
+                    failure: safeFailure('initiate', 'remote_state_unknown', true),
+                };
+                this.#publish({ phase: 'uncertain', outcome }, generation);
                 return outcome;
             }
             if (!aborted && (stage === 'complete' || stage === 'reconcile')) {
@@ -304,6 +311,7 @@ class UploadTask implements FileUploadTask {
         const body: Record<string, unknown> = { filename, content_type: requestedType, file_size: this.#file.size };
         if (this.#options.fileManagerId != null) body.file_manager = this.#options.fileManagerId;
         if (this.#options.groupId != null) body.group = this.#options.groupId;
+        if (this.#options.use?.trim()) body.use = this.#options.use.trim();
         const envelope = await mojoCall(INITIATE_PATH, { method: 'POST', body, signal });
         if (!isRecord(envelope.data)) throw new TypeError('Invalid upload initiation response');
         const id = integer(envelope.data.id);
@@ -311,12 +319,15 @@ class UploadTask implements FileUploadTask {
         const serverFilename = typeof envelope.data.filename === 'string' && envelope.data.filename ? envelope.data.filename : null;
         const size = integer(envelope.data.file_size);
         if (id == null || contentType == null || serverFilename == null || size == null) throw new TypeError('Invalid upload initiation response');
-        this.#initiated = { id, filename: serverFilename, contentType, size, capability: normalizeUploadCapability(envelope.data.upload_url) };
+        const initiated: InitiatedUpload = { id, filename: serverFilename, contentType, size, capability: null };
+        this.#initiated = initiated;
         this.#publish({ fileId: id }, generation);
+        initiated.capability = normalizeUploadCapability(envelope.data.upload_url);
     }
 
     async #transfer(generation: number, signal: AbortSignal): Promise<void> {
         const initiated = this.#initiated!;
+        if (!initiated.capability) throw new TypeError('Upload capability is unavailable');
         this.#publish({ phase: 'uploading', loadedBytes: 0, totalBytes: null }, generation);
         const request = {
             ...initiated.capability,
@@ -337,8 +348,9 @@ class UploadTask implements FileUploadTask {
 
     async #complete(generation: number, signal: AbortSignal): Promise<FileUploadOutcome> {
         this.#publish({ phase: 'completing' }, generation);
-        const envelope = await mojoCall(`${FILE_PATH}/${this.#initiated!.id}`, { method: 'POST', body: { action: 'mark_as_completed' }, signal });
-        return this.#completeOutcome(safeCompletedFile(envelope.data), generation);
+        await mojoCall(`${FILE_PATH}/${this.#initiated!.id}`, { method: 'POST', body: { action: 'mark_as_completed' }, signal });
+        const row = await this.#read(generation, signal);
+        return this.#completeOutcome(safeCompletedFile(row), generation);
     }
 
     #completeOutcome(file: UploadedFileRef, generation: number): FileUploadOutcome {

@@ -5552,8 +5552,8 @@ let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
 let dnsFailNextRead = false;
 const mockRegistrantScopeState = new Map<string, 'saved' | 'cleared'>();
 
-export type MockUploadMode = 'raw-put' | 'config-put' | 'config-post';
-export type MockUploadFault = 'transfer-ambiguous' | 'complete-reject' | 'complete-ambiguous';
+export type MockUploadMode = 'raw-put' | 'raw-put-unprefixed' | 'config-put' | 'config-put-bearer' | 'config-post';
+export type MockUploadFault = 'transfer-ambiguous' | 'complete-reject' | 'complete-ambiguous' | 'complete-body-malformed';
 
 interface MockUploadSession {
     token: string;
@@ -5866,8 +5866,12 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
             return { status: false, error: 'filename, content_type, and file_size are required', error_code: 400 };
         }
         const requestedManager = body.file_manager == null ? null : Number(body.file_manager);
+        const requestedUse = typeof body.use === 'string' ? body.use : '';
+        const requestedGroup = body.group == null ? null : Number(body.group);
         const manager = requestedManager == null
-            ? db.fileManagers.find((candidate) => candidate.is_active && (candidate.user === caller.id || candidate.group == null))
+            ? db.fileManagers.find((candidate) => candidate.is_active
+                && (!requestedUse || candidate.use === requestedUse)
+                && (candidate.user === caller.id || candidate.group == null || candidate.group === requestedGroup))
             : db.fileManagers.find((candidate) => candidate.id === requestedManager && candidate.is_active);
         if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };
         const now = Math.floor(Date.now() / 1000);
@@ -5885,8 +5889,12 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         mockUploadSessions.set(token, session);
         const uploadUrl: unknown = mode === 'raw-put'
             ? `/api/fileman/upload/${token}`
-            : mode === 'config-put'
+            : mode === 'raw-put-unprefixed'
+                ? `/fileman/upload/${token}`
+                : mode === 'config-put'
                 ? { upload_url: `https://mock-upload.invalid/${token}`, method: 'PUT', headers: { 'x-provider-checksum': 'mock-checksum' } }
+                : mode === 'config-put-bearer'
+                    ? { upload_url: `https://mock-upload.invalid/${token}`, method: 'PUT', headers: { Authorization: 'Bearer api-token-must-not-cross' } }
                 : { upload_url: `https://mock-upload.invalid/${token}`, method: 'POST', fields: { key: `uploads/${id}`, policy: 'mock-policy', 'Content-Type': contentType } };
         return { status: true, data: { id, filename, content_type: contentType, file_size: fileSize, upload_url: uploadUrl }, graph: 'upload' };
     }
@@ -6043,6 +6051,10 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
             if (mockUploadFault === 'complete-ambiguous') {
                 mockUploadFault = null;
                 throw new TypeError('Mock connection closed after completion');
+            }
+            if (mockUploadFault === 'complete-body-malformed') {
+                mockUploadFault = null;
+                return { status: true, data: { upload_url: 'mock-capability-must-not-land' }, graph: 'default' };
             }
             return { status: true, data: serializeStorageFile(file), graph: 'default' };
         }
