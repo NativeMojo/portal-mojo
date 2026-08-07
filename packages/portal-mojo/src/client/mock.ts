@@ -4232,16 +4232,19 @@ const db = {
 };
 
 let messagingManagedFault=false;
-registerDnsAdminIntegration({
-    applyManagedDnsRecords: (domainId, records) => {
-        if (!db.dnsDomains.some((domain) => domain.id === domainId)) throw new Error('Domain not found');
-        if(messagingManagedFault){messagingManagedFault=false;throw new Error('Provider rejected DNS write: X-Amz-Security-Token: mock-raw-token');}
-        const existing=db.dnsRecords.get(domainId)??[];
-        const incoming=records.map(record=>({...record,record_values:[...record.record_values]}));
-        const owners=new Set(incoming.map(record=>`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`));
-        db.dnsRecords.set(domainId,[...existing.filter(record=>!owners.has(`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`)),...incoming]);
-    },
-});
+/** Installed only by the infrastructure/legacy DNS setup entrypoints. */
+export function registerMockManagedDnsIntegration(): () => void {
+    return registerDnsAdminIntegration({
+        applyManagedDnsRecords: (domainId, records) => {
+            if (!db.dnsDomains.some((domain) => domain.id === domainId)) throw new Error('Domain not found');
+            if(messagingManagedFault){messagingManagedFault=false;throw new Error('Provider rejected DNS write: X-Amz-Security-Token: mock-raw-token');}
+            const existing=db.dnsRecords.get(domainId)??[];
+            const incoming=records.map(record=>({...record,record_values:[...record.record_values]}));
+            const owners=new Set(incoming.map(record=>`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`));
+            db.dnsRecords.set(domainId,[...existing.filter(record=>!owners.has(`${record.type.toUpperCase()}\u0000${record.name.toLowerCase().replace(/\.+$/,'')}`)),...incoming]);
+        },
+    });
+}
 
 function getField(row: Record<string, unknown>, field: string): unknown {
     if (Object.prototype.hasOwnProperty.call(row, field)) return row[field];

@@ -1,3 +1,5 @@
+import { usingMockTransport } from '../../client/client';
+import { registerMockManagedDnsIntegration } from '../../client/mock';
 import { resolveDnsDomainByName } from './api';
 import { registerDnsAdminIntegration } from './dns-integration';
 import { registerDnsDomainLinks } from './domain-links';
@@ -8,6 +10,7 @@ registerDnsAdminIntegration({
     resolveDomainByName: resolveDnsDomainByName,
     recordsHref: (domainId) => `dns/records?domain=${encodeURIComponent(domainId)}`,
 });
+if (usingMockTransport()) registerMockManagedDnsIntegration();
 registerDnsDomainLinks(
     { key: 'domains', label: 'Domains', icon: 'bi-globe2', route: 'domains' },
     { key: 'records', label: 'DNS Records', icon: 'bi-list-columns', route: (domain) => `records?domain=${encodeURIComponent(domain.id)}` },
@@ -16,4 +19,3 @@ registerDnsDomainLinks(
     { key: 'registrant', label: 'Registrant Contact', icon: 'bi-person-vcard', route: 'registrant' },
     { key: 'credentials', label: 'Provider Credentials', icon: 'bi-key', route: 'credentials' },
 );
-
