@@ -3,11 +3,11 @@ import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
 } from '../../client';
 import {
-    CertificateModel, DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
+    CertificateModel, DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainPurchaseRow, sanitizeDomainRow,
     sanitizeRegistrarDiscoveryResponse,
     type CertificateRow, type DnsCapabilities, type DnsCredentialRow,
     type DnsGroupChoice, type DnsProviderCapability, type DnsRecordRow,
-    type DnsRecordSetResponse, type DomainRow, type RegistrarQuote,
+    type DnsRecordSetResponse, type DomainRow, type DomainPurchaseRow, type RegistrarQuote, type RegistrarPurchaseResult,
     type RegistrarDiscoveryResponse, type RegistrarSearchRow, type RegistrantContact, type RegistrantContactResponse,
     type WhoisResponse,
 } from './models';
@@ -16,6 +16,8 @@ import {
     type AcmeDelegationStatus,
 } from './certificate-data';
 import { recordKey, sameRecordOwnerSnapshot, snapshotRecordOwner, type RecordOwnerSnapshot } from './dns-data';
+import { sanitizePurchaseResult } from './purchase-data';
+import { sanitizeRegistrantResponse } from './registrant-data';
 
 export const DNS_GROUP_CHOICE_ENDPOINT = '/api/dnsman/credential/group-choice';
 
@@ -224,8 +226,29 @@ export function quoteDomain(input: { group: number; domain: string; years?: numb
     return postData('/api/dnsman/registrar/quote', input);
 }
 
-export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string }): Promise<DomainRow> {
-    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/purchase', input));
+export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string }): Promise<RegistrarPurchaseResult> {
+    return sanitizePurchaseResult(await postData('/api/dnsman/registrar/purchase', input));
+}
+
+/** Detail and its error remain modal-local; neither enters Query cache. */
+export async function fetchPurchaseDetail(id: number): Promise<DomainPurchaseRow> {
+    const response = await mojoCall(`/api/dnsman/purchase/${id}`, { params: { graph: 'default' } });
+    return sanitizeDomainPurchaseRow(response.data);
+}
+
+export async function fetchRegistrantContact(group: number | null): Promise<RegistrantContactResponse> {
+    const response = await mojoCall('/api/dnsman/registrant', { ...(group == null ? {} : { params: { group } }) });
+    return sanitizeRegistrantResponse(response.data);
+}
+
+export async function saveRegistrantContact(contact: RegistrantContact, group: number | null = null): Promise<RegistrantContactResponse> {
+    const response = await mojoCall('/api/dnsman/registrant', { method: 'POST', body: { ...(group == null ? {} : { group }), contact } });
+    return sanitizeRegistrantResponse(response.data);
+}
+
+export async function clearRegistrantContact(group: number | null): Promise<RegistrantContactResponse> {
+    const response = await mojoCall('/api/dnsman/registrant', { method: 'POST', body: { ...(group == null ? {} : { group }), clear: true } });
+    return sanitizeRegistrantResponse(response.data);
 }
 
 export async function registerExistingDomain(input: { group: number; domain: string; credential: number }): Promise<DomainRow> {
@@ -411,16 +434,7 @@ export async function resolveDnsDomainByName(normalizedName: string): Promise<nu
 
 /** Legal-contact PII: imperative and deliberately outside Query. */
 export async function getRegistrantContact(group?: number | null): Promise<RegistrantContactResponse> {
-    const response = await mojoCall('/api/dnsman/registrant', group == null ? {} : { params: { group } });
-    return response.data as RegistrantContactResponse;
-}
-
-export function saveRegistrantContact(contact: RegistrantContact, group?: number | null): Promise<RegistrantContactResponse> {
-    return postData('/api/dnsman/registrant', group == null ? { contact } : { group, contact });
-}
-
-export function clearRegistrantContact(group?: number | null): Promise<RegistrantContactResponse> {
-    return postData('/api/dnsman/registrant', group == null ? { clear: true } : { group, clear: true });
+    return fetchRegistrantContact(group ?? null);
 }
 
 /** Registrar PII: imperative and deliberately outside Query. */

@@ -12,7 +12,7 @@ import {
 
 ## Routes and permissions
 
-The one canonical DNS section is `id: "dns"`, `basePath: "dns"`, in Infrastructure. Its routes are ordered `domains`, `records`, `certificates`, `credentials`. All four accept the global, system-pinned any-of view clause `sys.view_dns | sys.manage_dns | sys.security`; record mutation controls use `sys.manage_dns | sys.security`. Group/member grants never open Admin.
+The one canonical DNS section is `id: "dns"`, `basePath: "dns"`, in Infrastructure. Its routes are ordered `domains`, `records`, `certificates`, `purchases`, `registrant`, `credentials`. The read surfaces accept the global, system-pinned any-of view clause `sys.view_dns | sys.manage_dns | sys.security`; registrant and record mutation controls use `sys.manage_dns | sys.security`. Group/member grants never open Admin.
 
 Domains uses the server-backed `DomainModel` list and `modal.detail`. Detail composes Overview, DNS Records, and the bounded Certificates section; Records is the same `DnsRecordsPanel` used by the standalone page. That page owns only `domain` and `record_type` in the URL. It may select the first active domain only when `domain` is absent. Invalid, denied, missing, and inactive deep links are preserved and shown as errors.
 

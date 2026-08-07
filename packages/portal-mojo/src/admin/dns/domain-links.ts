@@ -14,7 +14,9 @@ export const DNS_DOMAIN_LINK_ORDER: Readonly<Record<string, number>> = {
     domains: 10,
     records: 20,
     certificates: 30,
-    credentials: 40,
+    purchases: 40,
+    registrant: 50,
+    credentials: 60,
 };
 const links = new Map<string, DnsDomainLink>();
 const listeners = new Set<() => void>();

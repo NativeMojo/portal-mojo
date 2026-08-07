@@ -100,6 +100,11 @@ try {
     assert.match(tabsSource, /controlledTabHealTransition\(lastNotice\.current/, 'controlled invalid-key notification uses the resettable de-loop transition');
     assert.match(wizardSource, /finishFlight\.current\.pending/, 'finish is single-flight');
     assert.match(wizardSource, /deferReconcile: busy/, 'roster/reset reconciliation defers while pending');
+    for (const token of ['content?', 'eligible?', 'onNext?', 'terminal?']) assert(wizardSource.includes(token), `additive section contract: ${token}`);
+    assert.match(wizardSource, /disabled: busy/, 'tabs lock during every async transition');
+    assert.match(wizardSource, /!activeSection\?\.terminal/, 'terminal sections have no action row');
+    assert.match(wizardSource, /generation\.current === acceptedGeneration/, 'stale async transitions cannot advance or rewrite state');
+    assert.match(wizardSource, /props\.onBusyChange\?\.\(next\)/, 'modal dismissal gate is synchronously informed before state scheduling');
     assert.match(wizardSource, /const payload = form\.payload\(acceptedFields\)/, 'finish captures roster and payload');
     assert.match(modalSource, /item\.canDismiss\?\.\(\) === false/, 'Escape/backdrop share the dynamic dismissal guard');
     assert.match(coreSource, /profile === 'wizard'/, 'SchemaForm and wizard validation profiles stay distinct');

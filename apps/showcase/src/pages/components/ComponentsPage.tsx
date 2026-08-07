@@ -50,6 +50,7 @@ import { AdminDevicesDemo } from './demos-admin-devices';
 import { AdminNetworkDemo } from './demos-admin-network';
 import { AdminDnsDemo } from './demos-admin-dns';
 import { AdminDnsCertificatesDemo } from './demos-admin-dns-certificates';
+import { AdminDnsRegistrarDemo } from './demos-admin-dns-registrar';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminJobsDemo } from './demos-admin-jobs';
@@ -398,6 +399,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-dns-certificates', title: 'DNS certificates & ACME', icon: 'bi-patch-check',
                 blurb: 'Global certificate custody, in-zone ACME requests, renewal-aware bounded polling, delegation readiness, and literal platform gates for house assets without exposing private material.',
                 render: () => <AdminDnsCertificatesDemo />,
+            },
+            {
+                key: 'admin-dns-registrar', title: 'DNS registrar & contacts', icon: 'bi-cart-check',
+                blurb: 'Safe domain search/quote/purchase with one-use tokens and durable-ledger reconciliation, plus locally held scoped registrant PII and manual superuser-only House adoption.',
+                render: () => <AdminDnsRegistrarDemo />,
             },
             {
                 key: 'admin-incidents', title: 'Incidents & events', icon: 'bi-shield-exclamation',

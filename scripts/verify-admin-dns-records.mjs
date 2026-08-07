@@ -21,9 +21,10 @@ try {
     const reverse = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/domain-links.ts');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
 
-    assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'credentials']);
+    assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials']);
     assert.equal(dns.DNS_ADMIN_SECTION.basePath, 'dns');
-    assert(dns.DNS_ADMIN_SECTION.routes.every((route) => route.permissions === dns.DNS_VIEW_PERMISSIONS));
+    assert(dns.DNS_ADMIN_SECTION.routes.filter((route) => route.path !== 'registrant').every((route) => route.permissions === dns.DNS_VIEW_PERMISSIONS));
+    assert.equal(dns.DNS_ADMIN_SECTION.routes.find((route) => route.path === 'registrant').permissions, dns.DNS_MANAGE_PERMISSIONS);
     assert.deepEqual(dns.DNS_MANAGE_PERMISSIONS, ['sys.manage_dns', 'sys.security']);
 
     for (const [type, wire] of [

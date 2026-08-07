@@ -24,8 +24,8 @@ try {
     const poller = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/CertificateLifecyclePoller.tsx');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
 
-    assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'credentials']);
-    assert.deepEqual(dns.getDnsDomainLinks().map((link) => link.key), ['domains', 'records', 'certificates', 'credentials']);
+    assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials']);
+    assert.deepEqual(dns.getDnsDomainLinks().map((link) => link.key), ['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials']);
     assert.equal(models.CertificateModel.endpoint, '/api/dnsman/certificate');
     assert.throws(() => models.normalizeCertificateListParams({ graph: 'material' }), /only graph=default/);
     assert.throws(() => models.normalizeCertificateListParams({ download_format: 'pem' }), /not available/);

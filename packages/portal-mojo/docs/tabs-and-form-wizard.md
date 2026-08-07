@@ -29,7 +29,7 @@ The tablist uses automatic activation: Left/Right wraps and skips disabled tabs;
 
 ## FormWizard
 
-Sections have `{ key, label, fields, description?, optional? }`. Section keys must be non-empty and unique, and field names must be globally unique. Later duplicates are warned and dropped. One shared controlled store spans every section, so `showWhen` may depend on a different step and navigation never loses drafts.
+Sections have `{ key, label, fields, description?, optional?, content?, eligible?, onNext?, terminal? }`. `content` may be a node or a render function over the shared draft/busy state. `eligible(data)` removes a step without destroying its draft. `onNext(data)` is an async single-flight transition after section validation. `terminal` renders an actionless receipt/status step. Section keys must be non-empty and unique, and field names must be globally unique. Later duplicates are warned and dropped.
 
 Core props are `sections`, `initial`, `resetKey`, `mode: 'wizard' | 'tabs'`, `tabVariant`, button labels, `validateAllOnFinish`, `onStepChange`, `onCancel`, and `onFinish(data)`. Wizard mode has ordered Back/Next/Finish flow. Back does not validate; Next validates visible fields on the active step. Tabs mode provides non-linear navigation and one Save action. Finish validates all visible sections by default, opens the first invalid section, and focuses its first error. Set `validateAllOnFinish={false}` only when active-section validation is deliberately sufficient; the emitted payload still includes all visible fields.
 
@@ -46,7 +46,7 @@ const save = User.useSave();
 />
 ```
 
-`formWizardModal(options)` adds `title` and optional `size`, and returns the submitted `FormData` or `null` for idle cancellation. Its required `onFinish` runs before success closes. Escape, backdrop, and Cancel are blocked while finish is pending; rejection keeps the dialog and values open.
+`formWizardModal(options)` adds `title` and optional `size`, and returns the submitted `FormData` or `null` for idle cancellation. Its required `onFinish` runs before success closes. Next/Back/tabs/Cancel/Escape/backdrop are all locked during async transitions or finish. Reset/unmount generations make late completions stale, so they cannot advance, close, or rewrite a newer roster.
 
 ```tsx
 const result = await formWizardModal({
