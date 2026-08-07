@@ -32,6 +32,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-dns-certificates.md](admin-dns-certificates.md) | Certificate custody and ACME lifecycle — in-zone requests, delegation readiness, house gates, renewal-aware bounded polling, and the no-material boundary |
 | [admin-storage.md](admin-storage.md) | Global S3 buckets, masked storage backends, capability-safe FileView/shares, and finite rendition convergence |
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
+| [admin-phonehub.md](admin-phonehub.md) | Global Phone Hub: evidence-backed lookup, sanitized SMS audits, and write-only provider configuration |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |

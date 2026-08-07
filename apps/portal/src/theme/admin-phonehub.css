@@ -1,0 +1,8 @@
+.phonehub-page { display: grid; gap: 18px; min-width: 0; }
+.phonehub-heading { padding: 4px 2px; }
+.phonehub-heading h1 { margin: 2px 0 4px; font-size: 1.55rem; color: var(--ink-strong); }
+.phonehub-heading p { margin: 0; max-width: 76ch; }
+.phonehub-secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.phonehub-config-editor .form-grid { align-items: end; }
+.phonehub-page code { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .phonehub-secret-row { grid-template-columns: 1fr; } }

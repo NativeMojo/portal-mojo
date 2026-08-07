@@ -26,4 +26,6 @@ export * from './types';
 export {
     armMockReauth, clearMockRequestHistory, getMockCallCounts,
     getMockRequestHistory, setMockDnsConfigMalformed, setMockDnsAcmeMode, armMockDnsWriteFault,
+    getMockPhoneConfigCredentialState, getMockEffectivePhoneConfigId,
+    deleteMockPhoneGroupForTest,
 } from './mock';

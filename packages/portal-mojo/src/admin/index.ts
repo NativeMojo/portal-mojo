@@ -39,6 +39,7 @@ import { NETWORK_SECURITY_ADMIN_SECTION } from './network';
 import { DNS_ADMIN_SECTION } from './dns';
 import { STORAGE_ADMIN_SECTION } from './storage';
 import { EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION } from './messaging';
+import { PHONE_HUB_ADMIN_SECTION } from './phonehub';
 import { ADMIN_DASHBOARD_PERMISSIONS, AdminDashboardPage } from './dashboard';
 
 export * from './credentials';
@@ -56,6 +57,7 @@ export * from './network';
 export * from './dns';
 export * from './storage';
 export * from './messaging';
+export * from './phonehub';
 export * from './dashboard';
 
 export type AdminNavigationGroup =
@@ -165,6 +167,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     STORAGE_ADMIN_SECTION,
     EMAIL_ADMIN_SECTION,
     PUBLIC_MESSAGES_ADMIN_SECTION,
+    PHONE_HUB_ADMIN_SECTION,
 ];
 
 function relativePath(...parts: Array<string | undefined>): string {
