@@ -3,7 +3,7 @@
 // the transport badge in the sidebar footer says which one is answering.
 // The filter system has its own test bed next door in demos-filters.tsx
 // (it used to be two paragraphs of prose here, which is not a test bed).
-import { type Group } from 'portal-mojo/client';
+import { type Group } from 'portal-mojo/client/runtime';
 import { Badge, fmt, groupByField, ModelTable, type Column, type FilterDef } from 'portal-mojo/ui';
 import { GroupModel, GROUP_KIND_OPTIONS } from '../../models';
 
