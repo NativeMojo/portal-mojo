@@ -33,6 +33,8 @@ export * from './password';
 export * from './Popover';
 export * from './TagInput';
 export * from './toast';
+export * from './FileDrop';
+export * from './UploadQueue';
 export * from './ui';
 export * from './FormFields';
 export * from './FormView';
