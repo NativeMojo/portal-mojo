@@ -140,6 +140,41 @@ keys are used only by the imperative call and are never stored in mock state
 or returned. Registrar confirmation tokens, legal-contact PII, WHOIS PII, and
 certificate material likewise stay outside model/query state.
 
+## Imperative file uploads
+
+`startFileUpload(file, options?)` implements django-mojo's three stages:
+initiate the File, transfer bytes to the returned capability, then reconcile
+and mark the File completed. It returns a `FileUploadTask` immediately; its
+`result` always resolves to a fixed `completed`, `failed`, `cancelled`, or
+`uncertain` outcome.
+
+```ts
+const task = startFileUpload(file, { fileManagerId: 12, groupId: 4 });
+const unsubscribe = task.subscribe(({ phase, loadedBytes, totalBytes }) => {
+    console.log(phase, loadedBytes, totalBytes);
+});
+const outcome = await task.result;
+unsubscribe();
+```
+
+Progress is the count reported by the actual byte transport. Multipart POST
+progress therefore includes wire overhead. Provider fields are appended
+before `file`, and the browser owns the multipart boundary. Plain relative or
+absolute capability strings are raw PUTs; configuration objects support PUT
+and POST only. The server-echoed MIME type governs the byte request.
+
+Snapshots and outcomes never contain capability URLs, provider fields or
+headers, API bearer/DUID values, raw response bodies, or File URLs. A completed
+outcome exposes only an `UploadedFileRef`: authoritative id, name, MIME, size,
+category, manager id, and group id.
+
+`cancel()` aborts current work. Cancellation after initiation, dropped
+provider responses, and ambiguous completion responses are `uncertain`, since
+remote bytes or a completed File may already exist. `recover()` reconciles and
+attempts completion without replaying bytes. `retry()` reconciles first and
+replays the retained private capability only while the File is still
+uploading. Both are single-flight and generation guarded.
+
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx

@@ -74,6 +74,8 @@ export interface FetchOpts {
     params?: Params;
     method?: 'GET' | 'POST' | 'DELETE';
     body?: Record<string, unknown>;
+    /** Cancels the selected transport request. */
+    signal?: AbortSignal;
 }
 
 export interface Envelope {
@@ -122,6 +124,7 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
         method: opts.method ?? 'GET',
         headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
+        signal: opts.signal,
     });
     if (!res.ok) {
         // django-mojo sends its envelope on error responses too — surface the

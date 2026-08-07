@@ -21,6 +21,7 @@ export * from './location';
 export * from './markdown';
 export * from './record-feed';
 export * from './safe-export';
+export * from './upload';
 export * from './types';
 // Dev affordance: per-endpoint call counts from the mock (single-flight proof).
 export {
@@ -30,4 +31,5 @@ export {
     deleteMockPhoneGroupForTest,
     setMockDnsRegistrarMode, armMockRegistrarPurchaseFault,
     getMockPushConfigCredentialState,
+    armMockUploadFault, clearMockUploadObservations, getMockUploadObservations, setMockUploadMode,
 } from './mock';
