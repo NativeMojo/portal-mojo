@@ -1,4 +1,4 @@
-+/* Token-only ImageEditor styles. Keep byte-identical in portal/showcase. */
+/* Token-only ImageEditor styles. Keep byte-identical in portal/showcase. */
 .image-editor {
     display: flex; flex-direction: column; min-height: min(720px, 88vh);
     background: var(--surface); color: var(--ink); overflow: hidden;
