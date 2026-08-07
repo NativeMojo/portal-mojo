@@ -10,6 +10,7 @@
 @import "./theme/markdown.css";
 @import "./theme/record-feed.css";
 @import "./theme/admin-security.css";
+@import "./theme/admin-dashboard.css";
 @import "./theme/admin-monitoring.css";
 @import "./theme/admin-bouncer.css";
 @import "./theme/admin-incidents.css";

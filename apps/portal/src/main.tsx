@@ -26,7 +26,6 @@ if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__mojo = mojo;
 }
 import { ThemeProvider } from 'portal-mojo/ui';
-import { DashboardPage } from './pages/DashboardPage';
 
 // This artifact is the fleet-wide Admin, never a group-scoped product portal.
 // Remove stale deep-link scope without erasing another portal's remembered
@@ -48,7 +47,6 @@ const router = createHashRouter([
         path: '/',
         element: <RequireAuth><App /></RequireAuth>,
         children: [
-            { index: true, element: <DashboardPage /> },
             ...adminRoutes,
         ],
     },

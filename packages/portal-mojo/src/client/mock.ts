@@ -2039,13 +2039,12 @@ function serializeLoginEvent(row: MockLoginEvent, graph = 'list'): Record<string
 /** `/summary` and `/user` accept ONLY dr_start / dr_end, parsed by dates.parse
  *  — NOT the dr_field triple the list endpoint uses. */
 function applyMockDateBounds(rows: MockLoginEvent[], params: Params): MockLoginEvent[] {
-    const start = params.dr_start ? String(params.dr_start) : '';
-    const end = params.dr_end ? String(params.dr_end) : '';
+    const start = params.dr_start ? Date.parse(String(params.dr_start)) / 1000 : null;
+    const end = params.dr_end ? Date.parse(String(params.dr_end)) / 1000 : null;
     if (!start && !end) return rows;
     return rows.filter((row) => {
-        const day = new Date(row.created * 1000).toISOString().slice(0, 10);
-        if (start && day < start) return false;
-        if (end && day > end) return false;
+        if (start != null && Number.isFinite(start) && row.created < start) return false;
+        if (end != null && Number.isFinite(end) && row.created > end) return false;
         return true;
     });
 }
@@ -3823,6 +3822,7 @@ function buildMessaging(){const now=Math.floor(Date.now()/1000);return {
     sentMessages:[
         {id:7301,created:now-1200,modified:now-900,mailbox:7201,to_addresses:['operator@example.test'],cc_addresses:[],bcc_addresses:['audit@example.test'],subject:'Welcome',status:'delivered',ses_message_id:'010201demo',status_reason:null,body_text:'Welcome to the demo.',body_html:'<p>Welcome <a href="https://network.invalid">outside</a></p>'},
         {id:7302,created:now-600,modified:now-500,mailbox:7202,to_addresses:['fail@example.test'],cc_addresses:[],bcc_addresses:[],subject:'Failure fixture',status:'failed',ses_message_id:null,status_reason:'Provider rejected the recipient',body_text:'Delivery test',body_html:'<meta http-equiv="refresh" content="0;url=https://network.invalid"><img src="https://network.invalid/pixel">'},
+        {id:7303,created:now-300,modified:now-250,mailbox:7201,to_addresses:['bounce@example.test'],cc_addresses:[],bcc_addresses:[],subject:'Bounce fixture',status:'bounced',ses_message_id:'010201bounce',status_reason:'Mailbox unavailable',body_text:'Delivery test',body_html:null},
     ] as MockSentMessage[],
     emailTemplates:[{id:7401,created:now-80*86400,modified:now-4000,name:'welcome',subject_template:'Welcome, {{ name }}',html_template:'<h1>Welcome</h1><a href="https://network.invalid">Continue</a>',text_template:'Welcome'}] as MockEmailTemplate[],
     publicMessages:[{id:7501,created:now-300,modified:now-300,kind:'support',status:'open',name:'Ada Example',email:'ada@example.test',subject:'Cannot sign in',group:null,message:'My passkey is not being accepted.',metadata:{company:'Example Co',severity:'high',utm_source:'docs',private_payload:'withheld-canary'},ip_address:'203.0.113.42',user_agent:'DemoBrowser/1.0'},{id:7502,created:now-86400,modified:now-7200,kind:'contact_us',status:'closed',name:'Grace Example',email:'grace@example.test',subject:'Partnership',group:1,message:'Would like to talk.',metadata:{category:'sales'},ip_address:'198.51.100.9',user_agent:'DemoBrowser/2.0'}] as MockPublicMessage[],
@@ -4641,8 +4641,9 @@ const METRIC_CATEGORY_SLUGS: Record<string, string[]> = {
 
 const SERIES: { slug: string; label: string; base: number; spread: number }[] = [
     { slug: 'api_calls', label: 'API Calls', base: 240, spread: 90 },
-    { slug: 'logins', label: 'Logins', base: 70, spread: 34 },
-    { slug: 'errors', label: 'Errors', base: 12, spread: 10 },
+    { slug: 'api_errors', label: 'API Errors', base: 12, spread: 10 },
+    { slug: 'user_activity_day', label: 'User Activity', base: 70, spread: 34 },
+    { slug: 'group_activity_day', label: 'Group Activity', base: 48, spread: 22 },
     { slug: 'auth:failures', label: 'Authentication Failures', base: 18, spread: 9 },
     { slug: 'auth:successes', label: 'Authentication Successes', base: 92, spread: 31 },
     { slug: 'foo:count', label: 'Foo Count', base: 31, spread: 8 },
@@ -4655,9 +4656,10 @@ const SERIES: { slug: string; label: string; base: number; spread: number }[] = 
 /** Live-shaped maintained registries. Discovery exposes only these names. */
 const METRIC_ACCOUNT_CATEGORIES: Record<string, Record<string, string[]>> = {
     public: {
-        traffic: ['api_calls'],
+        activity: ['api_calls', 'api_errors', 'user_activity_day', 'group_activity_day'],
     },
     global: {
+        dashboard: ['user_activity_day', 'group_activity_day', 'api_calls', 'api_errors'],
         auth: METRIC_CATEGORY_SLUGS.auth!,
         collisions: METRIC_CATEGORY_SLUGS.collisions!,
         growth: METRIC_CATEGORY_SLUGS.growth!,
@@ -4668,11 +4670,8 @@ const METRIC_ACCOUNT_CATEGORIES: Record<string, Record<string, string[]>> = {
         auth: ['auth:failures', 'auth:successes'],
         collisions: ['foo:count', 'bar:count'],
     },
-    'user-14': {
-        activity: ['logins'],
-    },
     'ops-private': {
-        operations: ['errors', 'jobs.failed'],
+        operations: ['api_errors', 'jobs.failed'],
     },
     'finance-hidden': {
         billing: ['billing:revenue'],
@@ -4687,7 +4686,7 @@ const METRIC_ACCOUNT_VIEW_POLICY: Record<string, 'public' | string[]> = {
 
 const METRIC_SCALAR_VALUES: Record<string, Record<string, unknown>> = {
     public: { 'status:release': '2026.08' },
-    global: { 'limits:max_users': 5000, 'feature:maintenance': false },
+    global: { 'limits:max_users': 5000, 'feature:maintenance': false, total_users: db.users.length, total_groups: db.groups.length },
     'group-1': { 'limits:max_members': 250 },
     'user-14': { 'preferences:quota': 25 },
     'ops-private': { 'threshold:error_budget': 0.03 },

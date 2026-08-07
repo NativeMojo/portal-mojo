@@ -617,6 +617,7 @@ try {
     for (const endpoint of ['/api/jobs/job', '/api/jobs/event', '/api/jobs/logs', '/api/jobs/scheduled_task', '/api/jobs/task_result']) {
         assert.equal(modelSource.split(`endpoint: '${endpoint}'`).length - 1, 1, `exactly one defineModel for ${endpoint}`);
     }
+    assert.match(await read('packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx'), /\/jobs\/list\?status=failed/);
 
     console.log('admin jobs engine contract verified');
 } finally {

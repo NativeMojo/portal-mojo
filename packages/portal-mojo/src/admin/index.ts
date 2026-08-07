@@ -38,6 +38,7 @@ import { NETWORK_SECURITY_ADMIN_SECTION } from './network';
 import { DNS_ADMIN_SECTION } from './dns';
 import { STORAGE_ADMIN_SECTION } from './storage';
 import { EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION } from './messaging';
+import { ADMIN_DASHBOARD_PERMISSIONS, AdminDashboardPage } from './dashboard';
 
 export * from './credentials';
 export * from './monitoring';
@@ -53,8 +54,10 @@ export * from './network';
 export * from './dns';
 export * from './storage';
 export * from './messaging';
+export * from './dashboard';
 
 export type AdminNavigationGroup =
+    | 'overview'
     | 'identity-access'
     | 'security'
     | 'observability'
@@ -70,6 +73,7 @@ export const ADMIN_NAVIGATION_GROUPS: Readonly<Record<AdminNavigationGroup, {
     icon: string;
     order: number;
 }>> = {
+    overview: { id: 'admin:overview', label: 'Overview', icon: 'bi-grid-1x2', order: 0 },
     'identity-access': { id: 'admin:identity-access', label: 'Identity & Access', icon: 'bi-people', order: 10 },
     security: { id: 'admin:security', label: 'Security', icon: 'bi-shield-check', order: 20 },
     observability: { id: 'admin:observability', label: 'Observability', icon: 'bi-activity', order: 30 },
@@ -111,10 +115,21 @@ export interface AdminRoute {
     permissions?: PermSpec;
     /** Present → the route appears as a sidebar item under the section. */
     label?: string;
+    /** A denied root landing redirects to the first visible admin route. */
+    fallbackToFirstVisible?: boolean;
 }
 
 /** Registry of every shipped admin section. */
 export const ADMIN_SECTIONS: readonly AdminSection[] = [
+    {
+        id: 'dashboard',
+        basePath: '',
+        title: 'Overview',
+        icon: 'bi-grid-1x2',
+        navigationGroup: 'overview',
+        permissions: ADMIN_DASHBOARD_PERMISSIONS,
+        routes: [{ path: '', label: 'Dashboard', component: AdminDashboardPage, permissions: ADMIN_DASHBOARD_PERMISSIONS, fallbackToFirstVisible: true }],
+    },
     USERS_ADMIN_SECTION,
     MEMBERS_ADMIN_SECTION,
     {
@@ -170,18 +185,21 @@ function AdminDenied() {
         ));
 }
 
-function guardedElement(section: AdminSection, route: AdminRoute): ReactNode {
+function guardedElement(section: AdminSection, route: AdminRoute, sections: readonly AdminSection[], mount: string): ReactNode {
     const page = createElement(route.component);
+    const fallback = route.fallbackToFirstVisible
+        ? createElement(AdminMountLanding, { sections: sections.filter((candidate) => candidate !== section), mount })
+        : createElement(AdminDenied);
     const routeGuarded = route.permissions
         ? createElement(Guarded, {
             permission: route.permissions,
-            fallback: createElement(AdminDenied),
+            fallback,
             children: page,
         })
         : page;
     const guarded = createElement(Guarded, {
         permission: section.permissions,
-        fallback: createElement(AdminDenied),
+        fallback,
         children: routeGuarded,
     });
     return createElement(AdminGlobalScope, { children: guarded });
@@ -264,7 +282,7 @@ export function adminSectionRoutes(
         for (const route of section.routes) {
             routes.push({
                 path: relativePath(mount, base, route.path),
-                element: guardedElement(section, route),
+                element: guardedElement(section, route, sections, mount),
             });
         }
     }

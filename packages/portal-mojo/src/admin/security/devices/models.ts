@@ -25,7 +25,7 @@
 //     searchable via the default fallback, so the UI must not promise more.
 import { useQuery } from '@tanstack/react-query';
 import {
-    defineModel, mojoCall,
+    defineModel, mojoCall, mojoList, useAuthSnapshot,
     type Params,
 } from '../../../client';
 import type { WorldMapTone } from '../../../charts';
@@ -318,6 +318,7 @@ export function normalizeCountryCode(value: string | null | undefined): string |
  *     rather than being forwarded.
  */
 export function useLoginLocationSummary(args: LoginLocationSummaryArgs) {
+    const auth = useAuthSnapshot();
     const userId = Number.isInteger(args.userId) ? Number(args.userId) : null;
     const country = normalizeCountryCode(args.countryCode);
     const path = userId != null ? '/api/account/logins/user' : '/api/account/logins/summary';
@@ -333,13 +334,13 @@ export function useLoginLocationSummary(args: LoginLocationSummaryArgs) {
     }
 
     return useQuery({
-        queryKey: [path, params] as const,
+        queryKey: [path, auth.uid, params] as const,
         queryFn: async (): Promise<LoginLocationSummaryRow[]> => {
             const body = await mojoCall(path, { params });
             const rows = body.data;
             return Array.isArray(rows) ? (rows as LoginLocationSummaryRow[]) : [];
         },
-        enabled: args.enabled !== false,
+        enabled: args.enabled !== false && auth.authenticated && Boolean(auth.uid),
     });
 }
 
@@ -356,6 +357,7 @@ export interface LoginLocationListArgs {
 /** The `list` graph carries lat/lng plus the `basic` user — everything the
  *  "every login" mode plots and every tooltip needs, and nothing more. */
 export function useLoginLocationList(args: LoginLocationListArgs) {
+    const auth = useAuthSnapshot();
     const userId = Number.isInteger(args.userId) ? Number(args.userId) : null;
     const params: Params = {
         graph: 'list',
@@ -370,7 +372,11 @@ export function useLoginLocationList(args: LoginLocationListArgs) {
         if (args.drStart) params.dr_start = args.drStart;
         if (args.drEnd) params.dr_end = args.drEnd;
     }
-    return LoginEventModel.useList(params, { enabled: args.enabled !== false });
+    return useQuery({
+        queryKey: [LoginEventModel.endpoint, 'list', auth.uid, params] as const,
+        queryFn: () => mojoList<LoginEventRow>(LoginEventModel.endpoint, params),
+        enabled: args.enabled !== false && auth.authenticated && Boolean(auth.uid),
+    });
 }
 
 // ── Device presentation helpers (DeviceView.js pure functions) ────────
