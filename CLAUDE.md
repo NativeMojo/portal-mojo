@@ -66,8 +66,18 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
 
 ## Git
 
-- Work on `main`, in place. Never create branches/worktrees or push without
-  Ian's explicit permission.
+- Every code build runs on its own `codex/<item>` branch in a dedicated Git
+  worktree. Never share a checkout between concurrent builds; keep `main` as
+  the integration checkout only.
+- After scoped verification is green, merge the completed branch into local
+  `main`. A build is not done until it verifies that merge, removes its exact
+  worktree, deletes its exact merged local branch, runs `git worktree prune`,
+  and confirms neither remains. Never bulk-delete worktrees or branches owned
+  by other sessions. Pushing remains opt-in and requires Ian's explicit
+  permission.
+- Package releases are a separate reviewed action: follow `RELEASING.md`.
+  Routine publishing happens from a matching GitHub Release, never by sharing
+  npm credentials between developers.
 - Commit finished work by explicit pathspec (never `git add -A`), message
   trailer names the building model, e.g.
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`

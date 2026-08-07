@@ -1,0 +1,70 @@
+name: Publish portal-mojo
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-portal-mojo
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+      - name: Validate release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          test "$RELEASE_PRERELEASE" = "false" || {
+            echo "Prereleases are not published by this stable release workflow" >&2
+            exit 1
+          }
+          package_version="$(node -p "require('./packages/portal-mojo/package.json').version")"
+          node -e '
+            if (!/^\d+\.\d+\.\d+$/.test(process.argv[1])) {
+              throw new Error(`Package version must be stable SemVer: ${process.argv[1]}`)
+            }
+          ' "$package_version"
+          test "$RELEASE_TAG" = "v$package_version" || {
+            echo "Release tag $RELEASE_TAG must equal package version v$package_version" >&2
+            exit 1
+          }
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "Release commit must be on main" >&2
+            exit 1
+          }
+          current_version="$(npm view portal-mojo version 2>/dev/null || true)"
+          if test -n "$current_version"; then
+            node -e '
+              const parse = (value) => value.split(".").map(Number)
+              const [current, next] = process.argv.slice(1).map(parse)
+              const greater = next.some((part, index) =>
+                part > current[index] && next.slice(0, index).every((prior, i) => prior === current[i]))
+              if (!greater) throw new Error(
+                `Release ${process.argv[2]} must be newer than npm latest ${process.argv[1]}`)
+            ' "$current_version" "$package_version"
+          fi
+      - run: npm ci
+      - run: npm run verify:release
+      - name: Publish to npm
+        run: npm run release:publish
+        env:
+          # Only needed for the one-time bootstrap publish; remove the secret
+          # after npm Trusted Publishing is configured for this workflow.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

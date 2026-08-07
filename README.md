@@ -9,6 +9,10 @@ npm install          # workspace root
 npm run dev          # http://localhost:5199 — mock django-mojo API built in
 ```
 
+Install the public toolkit in a Vite + TypeScript application with
+`npm install portal-mojo`. Releases are versioned on `main` and published by a
+GitHub Release; maintainers should follow [`RELEASING.md`](RELEASING.md).
+
 Point at a real backend with one env var in `apps/portal/.env.local`:
 
 ```
