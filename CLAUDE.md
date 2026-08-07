@@ -76,8 +76,8 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
   by other sessions. Pushing remains opt-in and requires Ian's explicit
   permission.
 - Package releases are a separate reviewed action: follow `RELEASING.md`.
-  Routine publishing happens from a matching GitHub Release, never by sharing
-  npm credentials between developers.
+  `npm run release` verifies, commits, tags, and atomically pushes; the tag
+  publishes through GitHub OIDC without developer npm credentials.
 - Commit finished work by explicit pathspec (never `git add -A`), message
   trailer names the building model, e.g.
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
