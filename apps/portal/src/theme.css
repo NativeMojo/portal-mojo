@@ -24,6 +24,7 @@
 @import "./theme/admin-dns-certificates.css";
 @import "./theme/admin-dns-registrar.css";
 @import "./theme/admin-storage.css";
+@import "./theme/admin-shortlinks.css";
 @import "./theme/admin-messaging.css";
 @import "./theme/admin-phonehub.css";
 @import "./theme/multiselect-dropdown.css";

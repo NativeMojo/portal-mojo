@@ -30,6 +30,7 @@
         "verify:admin-dns-certificates": "node scripts/verify-admin-dns-certificates.mjs",
         "verify:admin-dns-registrar": "node scripts/verify-admin-dns-registrar.mjs",
         "verify:admin-storage": "node scripts/verify-admin-storage.mjs",
+        "verify:admin-shortlinks": "node scripts/verify-admin-shortlinks.mjs",
         "verify:admin-messaging": "node scripts/verify-admin-messaging.mjs",
         "verify:admin-phonehub": "node scripts/verify-admin-phonehub.mjs",
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",

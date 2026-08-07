@@ -91,8 +91,12 @@ change, or timeout. Timeout leaves manual Refresh.
 Regeneration sends `{regenerate_renditions:true|string[]}` with deduped roles
 capped at 20. Share creation sends `{share:true|options}` imperatively; options
 and the newly returned capability URL stay in one modal-local result and never
-enter Query/Mutation caches. Separately authorized rows are labeled “Visible
-shares” and revoke only through `{is_active:false}` so the audit row survives.
+enter Query/Mutation caches. The response parser uses the collision-safe
+`shortlink_code` key and validates the ISO `expires_at`. Separately authorized
+rows are labeled “Visible shares”; the backend owner fallback remains available
+without granting global Shortlinks Admin. Safe `track_clicks` and bounded note
+values are retained, and operators can use the live active toggle or permanent
+DELETE contract.
 
 ## Mock and verification
 
