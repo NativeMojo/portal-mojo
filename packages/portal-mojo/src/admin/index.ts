@@ -39,7 +39,7 @@ import { NETWORK_SECURITY_ADMIN_SECTION } from './network';
 import { DNS_ADMIN_SECTION } from './dns';
 import { STORAGE_ADMIN_SECTION } from './storage';
 import { SHORTLINKS_ADMIN_SECTION } from './shortlinks';
-import { EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION } from './messaging';
+import { EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION, PUSH_ADMIN_SECTION } from './messaging';
 import { PHONE_HUB_ADMIN_SECTION } from './phonehub';
 import { ADMIN_DASHBOARD_PERMISSIONS, AdminDashboardPage } from './dashboard';
 
@@ -170,6 +170,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     SHORTLINKS_ADMIN_SECTION,
     EMAIL_ADMIN_SECTION,
     PUBLIC_MESSAGES_ADMIN_SECTION,
+    PUSH_ADMIN_SECTION,
     PHONE_HUB_ADMIN_SECTION,
 ];
 

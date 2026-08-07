@@ -582,6 +582,14 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - Provider credentials use an imperative cache-free tri-state flow (untouched, non-empty replacement, confirmed null clear). Group choices have an independent global permission and 100-row bound. The UI states the current Mojo-only per-group send branch, stored/testable Twilio/AWS limitation, test-mode limitation, fallback order, and cascade behavior; it adds neither SMS sending nor API-key provisioning.
 - Added exact mock contracts and personas, both-theme styles, showcase proof, AI reference docs, and `verify:admin-phonehub`.
 
+### #1296 — Push Notifications admin (2026-08-06)
+
+- Added one global/no-group Push page whose caller stats, global metrics, devices, deliveries, templates, and config tabs are independently gated; only the active authorized tab mounts. `push_surface` is a registered host param and tab switches clear incompatible flat table params.
+- Promoted PushDevice to the canonical messaging/push package with the identity file retaining a compatibility re-export of the same model. Exact clauses omit the phantom `sys.users` grant.
+- Added positive pre-Query projectors that exclude device tokens, platform responses, arbitrary delivery payloads, and expanded user PII. All four models expose no delete action, matching live `CAN_DELETE=false`, and the mock fabricates no delete cascade.
+- FCM service accounts use an imperative cache-free tri-state flow: untouched, validated object replacement, or confirmed null clear. Config testing uses only the custom connection endpoint with its server-side dummy token; no send, caller test, retry, device-token, or record-route surface was added.
+- Added exact mock personas/contracts, both-theme styles, showcase proof, AI reference docs, and `verify:admin-push`.
+
 ## Working agreements
 
 - **Port from source.** Before building any listed item, read its web-mojo file

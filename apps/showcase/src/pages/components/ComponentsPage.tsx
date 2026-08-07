@@ -61,6 +61,7 @@ import { AdminStorageDemo } from './demos-admin-storage';
 import { AdminShortlinksDemo } from './demos-admin-shortlinks';
 import { AdminMessagingDemo } from './demos-admin-messaging';
 import { AdminPhoneHubDemo } from './demos-admin-phonehub';
+import { AdminPushDemo } from './demos-admin-push';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
@@ -352,6 +353,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-phonehub', title: 'Phone Hub', icon: 'bi-phone',
                 blurb: 'Global phone lookup, sanitized SMS audit history, and write-only Twilio, AWS, and Mojo provider configuration with exact operation gates.',
                 render: () => <AdminPhoneHubDemo />,
+            },
+            {
+                key: 'admin-push', title: 'Push notifications', icon: 'bi-bell',
+                blurb: 'Caller-only stats, globally gated metrics, strict device/delivery projections, templates, and cache-free FCM configuration without send, retry, or delete shortcuts.',
+                render: () => <AdminPushDemo />,
             },
             {
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',

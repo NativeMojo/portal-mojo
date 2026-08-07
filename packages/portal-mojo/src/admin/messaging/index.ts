@@ -5,6 +5,7 @@ import { MailboxesPage } from './MailboxesPage';
 import { PublicMessagesPage } from './PublicMessagesPage';
 import { SentMessagesPage } from './SentMessagesPage';
 import { EMAIL_ADMIN_PERMISSIONS, PUBLIC_MESSAGE_VIEW_PERMISSIONS } from './models';
+export * from './push';
 
 export * from './models';
 export * from './sanitize';

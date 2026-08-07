@@ -35,6 +35,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-shortlinks.md](admin-shortlinks.md) | Global shortlink operations, destination-free caches, bounded click history, and reconciled one-shot mutations |
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
 | [admin-phonehub.md](admin-phonehub.md) | Global Phone Hub: evidence-backed lookup, sanitized SMS audits, and write-only provider configuration |
+| [admin-push.md](admin-push.md) | Global Push admin: caller stats, global metrics, strict audits, templates, and cache-free FCM configuration |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |

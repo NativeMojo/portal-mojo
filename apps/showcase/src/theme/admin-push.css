@@ -1,0 +1,13 @@
+.push-page { display: grid; gap: 18px; min-width: 0; }
+.push-heading { padding: 4px 2px; }
+.push-heading h1 { margin: 2px 0 4px; font-size: 1.55rem; color: var(--ink-strong); }
+.push-heading p { margin: 0; max-width: 78ch; }
+.push-stats { display: grid; gap: 18px; }
+.push-stats section { border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--surface); }
+.push-stats h2 { margin: 0 0 4px; font-size: 1rem; color: var(--ink-strong); }
+.push-kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.push-kpi-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.push-preview { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface2); max-width: 520px; }
+.push-preview p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.push-editor textarea { font-family: var(--font-mono, ui-monospace, monospace); }
+@media (max-width: 700px) { .push-kpi-grid, .push-kpi-grid-two { grid-template-columns: 1fr; } }

@@ -1245,13 +1245,17 @@ interface MockDevice {
 
 interface MockPushDevice {
     id: number;
+    created: number;
+    modified: number;
     user: number;
+    device_token: string;
     device_id: string;
     platform: string;
     device_name: string;
     app_version: string;
     os_version: string;
     push_enabled: boolean;
+    is_active: boolean;
     push_preferences: Record<string, unknown>;
     last_seen: number;
     [field: string]: unknown;
@@ -1385,16 +1389,23 @@ function buildPushDevices(): MockPushDevice[] {
         { user: 1, platform: 'ios', name: "Ian's iPhone", os: '19.2', app: '2.4.1', lastSeenDays: 0 },
         { user: 1, platform: 'web', name: 'Chrome on Mac', os: 'macOS 15', app: '2.4.1', enabled: false, lastSeenDays: 12 },
         { user: 2, platform: 'android', name: 'Pixel 11', os: '17', app: '2.3.9', lastSeenDays: 1 },
+        { user: 43, platform: 'web', name: 'Owner browser', os: 'Linux', app: '2.4.1', lastSeenDays: 2 },
+        { user: 14, platform: 'ios', name: 'Showcase iPhone', os: '19.2', app: '2.4.1', lastSeenDays: 0 },
+        { user: 14, platform: 'web', name: 'Showcase browser', os: 'macOS 15', app: '2.4.1', lastSeenDays: 1 },
     ];
     return seeds.map((s, i) => ({
         id: 300 + i,
+        created: nowSec - (90-i*10)*DAY,
+        modified: nowSec - s.lastSeenDays*DAY - 1800,
         user: s.user,
+        device_token: `fcm-device-token-canary-${i}`,
         device_id: `dev-${s.user}-${i}`,
         platform: s.platform,
         device_name: s.name,
         app_version: s.app,
         os_version: s.os,
         push_enabled: s.enabled ?? true,
+        is_active: true,
         push_preferences: {},
         last_seen: nowSec - s.lastSeenDays * DAY - 1800,
     }));
@@ -2565,13 +2576,41 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     phoneComms.is_active = true; phoneComms.is_superuser = false;
     phoneComms.username = 'phone.comms'; phoneComms.email = 'phone.comms@nativemojo.com';
     phoneComms.display_name = 'Phone Comms Operator'; phoneComms.permissions = { comms: true };
-    const shortlinkManager = at(39);
+    const shortlinkManager = at(46);
     shortlinkManager.is_active = true;
     shortlinkManager.is_superuser = false;
     shortlinkManager.username = 'shortlink.manager';
     shortlinkManager.email = 'shortlink.manager@nativemojo.com';
     shortlinkManager.display_name = 'Shortlink Manager';
     shortlinkManager.permissions = { manage_shortlinks: true };
+    const pushDeviceViewer = at(39);
+    pushDeviceViewer.is_active = true; pushDeviceViewer.is_superuser = false;
+    pushDeviceViewer.username = 'push.device-viewer'; pushDeviceViewer.email = 'push.device-viewer@nativemojo.com';
+    pushDeviceViewer.display_name = 'Push Device Viewer'; pushDeviceViewer.permissions = { view_devices: true };
+    const pushDeliveryViewer = at(40);
+    pushDeliveryViewer.is_active = true; pushDeliveryViewer.is_superuser = false;
+    pushDeliveryViewer.username = 'push.delivery-viewer'; pushDeliveryViewer.email = 'push.delivery-viewer@nativemojo.com';
+    pushDeliveryViewer.display_name = 'Push Delivery Viewer'; pushDeliveryViewer.permissions = { view_notifications: true };
+    const pushTemplateManager = at(41);
+    pushTemplateManager.is_active = true; pushTemplateManager.is_superuser = false;
+    pushTemplateManager.username = 'push.template-manager'; pushTemplateManager.email = 'push.template-manager@nativemojo.com';
+    pushTemplateManager.display_name = 'Push Template Manager'; pushTemplateManager.permissions = { manage_notifications: true, view_groups: true };
+    const pushConfigManager = at(42);
+    pushConfigManager.is_active = true; pushConfigManager.is_superuser = false;
+    pushConfigManager.username = 'push.config-manager'; pushConfigManager.email = 'push.config-manager@nativemojo.com';
+    pushConfigManager.display_name = 'Push Config Manager'; pushConfigManager.permissions = { manage_push_config: true, view_groups: true };
+    const pushOwner = at(43);
+    pushOwner.is_active = true; pushOwner.is_superuser = false;
+    pushOwner.username = 'push.owner'; pushOwner.email = 'push.owner@nativemojo.com';
+    pushOwner.display_name = 'Push Owner'; pushOwner.permissions = { owner: true };
+    const pushUsersOnly = at(44);
+    pushUsersOnly.is_active = true; pushUsersOnly.is_superuser = false;
+    pushUsersOnly.username = 'push.users-only'; pushUsersOnly.email = 'push.users-only@nativemojo.com';
+    pushUsersOnly.display_name = 'Push Users Only'; pushUsersOnly.permissions = { users: true };
+    const pushMetricsViewer = at(45);
+    pushMetricsViewer.is_active = true; pushMetricsViewer.is_superuser = false;
+    pushMetricsViewer.username = 'push.metrics-viewer'; pushMetricsViewer.email = 'push.metrics-viewer@nativemojo.com';
+    pushMetricsViewer.display_name = 'Push Metrics Viewer'; pushMetricsViewer.permissions = { view_metrics: true };
     const metricsViewer = at(24);
     metricsViewer.is_active = true;
     metricsViewer.is_superuser = false;
@@ -3937,6 +3976,25 @@ interface MockPublicMessage { id:number;created:number;modified:number;kind:stri
 interface MockPhoneNumber { id:number;created:number;modified:number;phone_number:string;country_code:string|null;region:string|null;state:string|null;carrier:string|null;line_type:string|null;is_mobile:boolean;is_voip:boolean;is_valid:boolean;registered_owner:string|null;owner_type:string|null;address_line1:string|null;address_city:string|null;address_state:string|null;address_zip:string|null;address_country:string|null;lookup_provider:string|null;lookup_data:Record<string,unknown>;lookup_expires_at:number|null;lookup_count:number;last_lookup_at:number|null }
 interface MockSms { id:number;created:number;modified:number;direction:string;from_number:string;to_number:string;body:string;status:string;provider:string|null;provider_message_id:string|null;error_code:string|null;error_message:string|null;metadata:Record<string,unknown>;is_test:boolean;sent_at:number|null;delivered_at:number|null;user:number|null;group:number|null }
 interface MockPhoneConfig { id:number;created:number;modified:number;group:number|null;name:string;is_active:boolean;provider:'twilio'|'aws'|'mojo';twilio_from_number:string|null;aws_region:string|null;aws_sender_id:string|null;mojo_remote_url:string|null;lookup_enabled:boolean;lookup_cache_days:number;test_mode:boolean }
+interface MockPushDelivery { id:number;created:number;modified:number;user:number;device:number;template:number|null;title:string|null;body:string|null;category:string;action_url:string|null;data_payload:Record<string,unknown>;status:string;sent_at:number|null;delivered_at:number|null;error_message:string|null;platform_data:Record<string,unknown> }
+interface MockPushTemplate { id:number;created:number;modified:number;group:number|null;name:string;title_template:string|null;body_template:string|null;action_url:string|null;data_template:Record<string,unknown>;category:string;priority:'low'|'normal'|'high';variables:Record<string,unknown>;is_active:boolean }
+interface MockPushConfig { id:number;created:number;modified:number;group:number|null;name:string;is_active:boolean;test_mode:boolean;default_sound:string;fcm_project_id:string|null }
+function buildPushAdmin(){const now=Math.floor(Date.now()/1000);return {
+    deliveries:[
+        {id:7901,created:now-3600,modified:now-3500,user:14,device:304,template:8001,title:'Welcome back',body:'Your workspace is ready.',category:'account',action_url:'https://app.example.test/home',data_payload:{workspace_id:42,private_payload:'must-never-enter-query'},status:'delivered',sent_at:now-3580,delivered_at:now-3500,error_message:null,platform_data:{message_id:'fcm-platform-canary',credential:'must-never-enter-query'}},
+        {id:7902,created:now-1800,modified:now-1750,user:14,device:305,template:null,title:'Sync requested',body:null,category:'system',action_url:null,data_payload:{action:'sync',private_payload:'must-never-enter-query'},status:'sent',sent_at:now-1750,delivered_at:null,error_message:null,platform_data:{test_mode:true,raw:'must-never-enter-query'}},
+        {id:7903,created:now-900,modified:now-850,user:2,device:302,template:8002,title:'Delivery failed',body:'Please retry later.',category:'alerts',action_url:null,data_payload:{private_payload:'must-never-enter-query'},status:'failed',sent_at:null,delivered_at:null,error_message:'FCM rejected the registration token',platform_data:{error:{token:'must-never-enter-query'}}},
+        {id:7904,created:now-300,modified:now-300,user:43,device:303,template:null,title:'Owner fixture',body:'Caller-only statistics proof.',category:'general',action_url:null,data_payload:{},status:'pending',sent_at:null,delivered_at:null,error_message:null,platform_data:{}},
+    ] as MockPushDelivery[],
+    templates:[
+        {id:8001,created:now-120*86400,modified:now-3600,group:null,name:'welcome',title_template:'Welcome, {name}',body_template:'Your workspace is ready.',action_url:'https://app.example.test/home',data_template:{kind:'welcome'},category:'account',priority:'normal',variables:{name:'Display name'},is_active:true},
+        {id:8002,created:now-30*86400,modified:now-7200,group:1,name:'alert',title_template:'Alert: {title}',body_template:'{message}',action_url:null,data_template:{severity:'{severity}'},category:'alerts',priority:'high',variables:{title:'Alert title',message:'Alert body',severity:'Severity'},is_active:true},
+    ] as MockPushTemplate[],
+    configs:[
+        {id:8101,created:now-200*86400,modified:now-3600,group:null,name:'Platform FCM',is_active:true,test_mode:false,default_sound:'default',fcm_project_id:'platform-demo'},
+        {id:8102,created:now-45*86400,modified:now-1800,group:1,name:'Acme test push',is_active:true,test_mode:true,default_sound:'ping.aiff',fcm_project_id:'acme-demo'},
+    ] as MockPushConfig[],
+};}
 function buildPhoneHub(){const now=Math.floor(Date.now()/1000);return {
     phoneNumbers:[
         {id:7601,created:now-120*86400,modified:now-3600,phone_number:'+14155550100',country_code:'US',region:'San Francisco',state:'CA',carrier:'Twilio Demo Mobile',line_type:'mobile',is_mobile:true,is_voip:false,is_valid:true,registered_owner:'Example Customer',owner_type:'consumer',address_line1:null,address_city:'San Francisco',address_state:'CA',address_zip:'94105',address_country:'US',lookup_provider:'twilio',lookup_data:{raw_provider_payload:'must-never-enter-query'},lookup_expires_at:now+40*86400,lookup_count:3,last_lookup_at:now-3600},
@@ -4014,6 +4072,7 @@ function buildStorageRenditions(): MockStorageRendition[] {
 
 const messagingSeed = buildMessaging();
 const phoneHubSeed = buildPhoneHub();
+const pushAdminSeed = buildPushAdmin();
 const db = {
     users,
     groups,
@@ -4025,6 +4084,13 @@ const db = {
     geoIps: geoIpRows,
     deviceLocations: buildDeviceLocations(deviceRows, geoIpRows),
     pushDevices: buildPushDevices(),
+    pushDeliveries: pushAdminSeed.deliveries,
+    pushTemplates: pushAdminSeed.templates,
+    pushConfigs: pushAdminSeed.configs,
+    pushConfigSecrets: new Map<number,Record<string,unknown>>([
+        [8101,{type:'service_account',project_id:'platform-demo',client_email:'fcm@example.test',private_key:'private-key-canary'}],
+        [8102,{type:'service_account',project_id:'acme-demo',client_email:'fcm@example.test',private_key:'private-key-canary'}],
+    ]),
     loginEvents: loginEventRows,
     // #1287: the geofence evidence plane shares the incident Event table.
     incidentEvents: [...buildIncidentEvents(), ...buildGeofenceEvents()],
@@ -7095,6 +7161,34 @@ function messagingParams(params:Params,filters:readonly string[],sorts:readonly 
 function messagingList(rows:Record<string,unknown>[],params:Params,search:(row:Record<string,unknown>)=>string,graph:string,serialize:(row:Record<string,unknown>,graph:string)=>Record<string,unknown>,defaultSort:string){const result=listRows(rows,params,search,defaultSort);return {...result,graph,data:(result.data as Record<string,unknown>[]).map(row=>serialize(row,graph))};}
 function mockEmailList(value:unknown):string[]{const values=Array.isArray(value)?value:[value];return values.flatMap(item=>item==null?[]:[String(item).trim()]).filter(Boolean);}
 function renderMockEmailTemplate(value:string|null,context:Record<string,unknown>):string|null{if(!value)return null;return value.replace(/{{\s*([a-zA-Z0-9_.]+)\s*}}/g,(_match,key:string)=>{let current:unknown=context;for(const part of key.split('.'))current=current&&typeof current==='object'?(current as Record<string,unknown>)[part]:undefined;return current==null?'':String(current);});}
+const PUSH_DEVICE_VIEW_GRANTS=['view_devices','manage_devices','comms','manage_users'];
+const PUSH_DEVICE_SAVE_GRANTS=['manage_devices','comms'];
+const PUSH_DELIVERY_VIEW_GRANTS=['view_notifications','manage_notifications','comms','manage_users'];
+const PUSH_DELIVERY_SAVE_GRANTS=['manage_notifications','comms'];
+const PUSH_TEMPLATE_VIEW_GRANTS=['manage_notifications','manage_groups','comms','owner','manage_users'];
+const PUSH_TEMPLATE_SAVE_GRANTS=['manage_notifications','manage_groups','comms'];
+const PUSH_CONFIG_GRANTS=['manage_push_config','manage_groups','comms'];
+const PUSH_CONFIG_TEST_GRANTS=['manage_push_config','comms'];
+function mockPushUser(id:number){const row=db.users.find(item=>item.id===id);return row?userBasic(row):null;}
+function mockPushGroup(id:number|null){if(id==null)return null;const row=db.groups.find(item=>item.id===id);return row?{id:row.id,name:row.name}:null;}
+function pushDeviceWire(row:MockPushDevice,graph:string){const basic={id:row.id,device_id:row.device_id,platform:row.platform,device_name:row.device_name,push_enabled:row.push_enabled,last_seen:row.last_seen};if(graph==='basic')return basic;const normal={...basic,app_version:row.app_version,os_version:row.os_version,push_preferences:{...row.push_preferences},user:mockPushUser(row.user)};return graph==='full'?{...normal,created:row.created,modified:row.modified,is_active:row.is_active}:normal;}
+function pushTemplateWire(row:MockPushTemplate,graph:string){const basic={id:row.id,name:row.name,category:row.category,priority:row.priority,is_active:row.is_active};if(graph==='basic')return basic;const normal={...basic,title_template:row.title_template,body_template:row.body_template,action_url:row.action_url,data_template:{...row.data_template},variables:{...row.variables},group:mockPushGroup(row.group)};return graph==='full'?{...normal,created:row.created,modified:row.modified}:normal;}
+function pushConfigWire(row:MockPushConfig,graph:string){const basic={id:row.id,name:row.name,test_mode:row.test_mode,default_sound:row.default_sound,is_active:row.is_active,fcm_project_id:row.fcm_project_id};if(graph==='basic')return basic;const normal={...basic,created:row.created,modified:row.modified,group:mockPushGroup(row.group)};return normal;}
+function pushDeliveryWire(row:MockPushDelivery,graph:string){const basic={id:row.id,title:row.title,category:row.category,status:row.status,sent_at:row.sent_at,created:row.created};if(graph==='basic')return basic;const device=db.pushDevices.find(item=>item.id===row.device);const normal={...basic,body:row.body,action_url:row.action_url,data_payload:{...row.data_payload},delivered_at:row.delivered_at,error_message:row.error_message,user:mockPushUser(row.user),device:device?pushDeviceWire(device,'basic'):null};return graph==='full'?{...normal,modified:row.modified,platform_data:{...row.platform_data},template:row.template==null?null:pushTemplateWire(db.pushTemplates.find(item=>item.id===row.template)!,'basic')}:normal;}
+function pushOwnRows<T extends {user:number}>(caller:MockUser,rows:T[],grants:string[]):T[]{return hasGlobalPermission(caller,grants)?rows:rows.filter(row=>row.user===caller.id);}
+function applyPushTemplate(row:MockPushTemplate,body:Record<string,unknown>){for(const key of ['name','title_template','body_template','action_url','category'] as const)if(key in body)(row as unknown as Record<string,unknown>)[key]=body[key]==null?null:String(body[key]);if('group'in body)row.group=body.group==null?null:Number(body.group);if('priority'in body&&['low','normal','high'].includes(String(body.priority)))row.priority=String(body.priority) as MockPushTemplate['priority'];if(isPlainObject(body.data_template))row.data_template={...body.data_template};if(isPlainObject(body.variables))row.variables={...body.variables};if('is_active'in body)row.is_active=Boolean(body.is_active);row.modified=Math.floor(Date.now()/1000);}
+function applyPushConfig(row:MockPushConfig,body:Record<string,unknown>){if('name'in body)row.name=String(body.name??'');if('group'in body)row.group=body.group==null?null:Number(body.group);if('default_sound'in body)row.default_sound=String(body.default_sound??'default');if('is_active'in body)row.is_active=Boolean(body.is_active);if('test_mode'in body)row.test_mode=Boolean(body.test_mode);if('fcm_service_account'in body){if(body.fcm_service_account==null){db.pushConfigSecrets.delete(row.id);row.fcm_project_id=null;}else if(isPlainObject(body.fcm_service_account)){db.pushConfigSecrets.set(row.id,{...body.fcm_service_account});row.fcm_project_id=typeof body.fcm_service_account.project_id==='string'?body.fcm_service_account.project_id:null;}}row.modified=Math.floor(Date.now()/1000);}
+export function getMockPushConfigCredentialState(id:number):{configured:boolean;project_id:string|null}{const value=db.pushConfigSecrets.get(id);return {configured:Boolean(value),project_id:typeof value?.project_id==='string'?value.project_id:null};}
+async function pushFetch(path:string,opts:MockFetchOpts):Promise<unknown|undefined>{
+    if(!path.startsWith('/api/account/devices/push'))return undefined;const method=(opts.method??'GET').toUpperCase();const caller=userFromBearer(opts.headers);if(!caller)return permissionDenied(401);
+    if(path==='/api/account/devices/push/stats'){if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const deliveries=db.pushDeliveries.filter(row=>row.user===caller.id);const devices=db.pushDevices.filter(row=>row.user===caller.id&&row.is_active);return {status:true,data:{total_sent:deliveries.filter(row=>row.status==='sent').length,total_failed:deliveries.filter(row=>row.status==='failed').length,total_pending:deliveries.filter(row=>row.status==='pending').length,registered_devices:devices.length,enabled_devices:devices.filter(row=>row.push_enabled).length}};}
+    const testMatch=path.match(/^\/api\/account\/devices\/push\/config\/(\d+)\/test$/);if(testMatch){if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};if(!hasGlobalPermission(caller,PUSH_CONFIG_TEST_GRANTS))return permissionDenied();const row=db.pushConfigs.find(item=>item.id===Number(testMatch[1]));if(!row)return {status:false,error:'Push configuration not found',error_code:404};if(row.test_mode)return {status:true,data:{success:true,message:'Config is in test mode - FCM not tested',test_mode:true}};if(!db.pushConfigSecrets.has(row.id))return {status:false,error:'No FCM service account configured',error_code:400,data:{success:false,message:'No FCM service account configured',error:'missing_credentials'}};return {status:true,data:{success:true,message:'FCM v1 credentials valid (dummy token rejected by FCM)',note:'Credentials are valid; the built-in dummy token was rejected as expected.',fcm_version:'v1'}};}
+    const deliveriesMatch=path.match(/^\/api\/account\/devices\/push\/deliveries(?:\/(\d+))?$/);if(deliveriesMatch){const id=deliveriesMatch[1]?Number(deliveriesMatch[1]):null;if(method==='DELETE')return {status:false,error:'DELETE not allowed: NotificationDelivery',error_code:403};const visible=pushOwnRows(caller,db.pushDeliveries,PUSH_DELIVERY_VIEW_GRANTS);if(id!=null){const row=visible.find(item=>item.id===id);if(!row)return db.pushDeliveries.some(item=>item.id===id)?permissionDenied():{status:false,error:'NotificationDelivery not found',error_code:404};if(method==='POST'){if(!hasGlobalPermission(caller,PUSH_DELIVERY_SAVE_GRANTS))return permissionDenied();for(const key of ['title','body','category','action_url','status','sent_at','delivered_at','error_message'] as const)if(key in(opts.body??{}))(row as unknown as Record<string,unknown>)[key]=opts.body?.[key];row.modified=Math.floor(Date.now()/1000);}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');return {status:true,data:pushDeliveryWire(row,graph),graph};}if(method==='POST')return {status:false,error:'CREATE not supported in Push Admin mock',error_code:403};if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');const params=messagingParams(opts.params??{},['status','category','user','device'],['created','status','category','sent_at','delivered_at'],graph,'-created',true);return messagingList(visible as unknown as Record<string,unknown>[],params,row=>`${row.title??''} ${row.category}` ,graph,row=>pushDeliveryWire(row as unknown as MockPushDelivery,graph),'-created');}
+    const templatesMatch=path.match(/^\/api\/account\/devices\/push\/templates(?:\/(\d+))?$/);if(templatesMatch){if(method==='DELETE')return {status:false,error:'DELETE not allowed: NotificationTemplate',error_code:403};if(!hasGlobalPermission(caller,PUSH_TEMPLATE_VIEW_GRANTS))return permissionDenied();const id=templatesMatch[1]?Number(templatesMatch[1]):null;if(id!=null){const row=db.pushTemplates.find(item=>item.id===id);if(!row)return {status:false,error:'NotificationTemplate not found',error_code:404};if(method==='POST'){if(!hasGlobalPermission(caller,PUSH_TEMPLATE_SAVE_GRANTS))return permissionDenied();applyPushTemplate(row,opts.body??{});}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');return {status:true,data:pushTemplateWire(row,graph),graph};}if(method==='POST'){if(!hasGlobalPermission(caller,PUSH_TEMPLATE_SAVE_GRANTS))return permissionDenied();const body=opts.body??{};const hasContent=Boolean(String(body.title_template??'').trim()||String(body.body_template??'').trim()||(isPlainObject(body.data_template)&&Object.keys(body.data_template).length));if(!hasContent)return {status:false,error:'Template must have at least one of: title_template, body_template, or data_template',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockPushTemplate={id:Math.max(0,...db.pushTemplates.map(item=>item.id))+1,created:now,modified:now,group:null,name:'',title_template:null,body_template:null,action_url:null,data_template:{},category:'general',priority:'normal',variables:{},is_active:true};applyPushTemplate(row,body);db.pushTemplates.push(row);return {status:true,data:pushTemplateWire(row,'default'),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');const params=messagingParams(opts.params??{},['category','priority','is_active','group'],['name','category','priority','is_active'],graph,'name');return messagingList(db.pushTemplates as unknown as Record<string,unknown>[],params,row=>`${row.name} ${row.category}`,graph,row=>pushTemplateWire(row as unknown as MockPushTemplate,graph),'name');}
+    const configsMatch=path.match(/^\/api\/account\/devices\/push\/config(?:\/(\d+))?$/);if(configsMatch){if(method==='DELETE')return {status:false,error:'DELETE not allowed: PushConfig',error_code:403};if(!hasGlobalPermission(caller,PUSH_CONFIG_GRANTS))return permissionDenied();const id=configsMatch[1]?Number(configsMatch[1]):null;if(id!=null){const row=db.pushConfigs.find(item=>item.id===id);if(!row)return {status:false,error:'PushConfig not found',error_code:404};if(method==='POST'){const nextGroup='group'in(opts.body??{})?(opts.body?.group==null?null:Number(opts.body?.group)):row.group;if(nextGroup!=null&&db.pushConfigs.some(item=>item.id!==id&&item.group===nextGroup))return {status:false,error:'A push configuration already exists for this group',error_code:400};applyPushConfig(row,opts.body??{});}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');return {status:true,data:pushConfigWire(row,graph),graph};}if(method==='POST'){const body=opts.body??{};const group=body.group==null?null:Number(body.group);if(group!=null&&db.pushConfigs.some(item=>item.group===group))return {status:false,error:'A push configuration already exists for this group',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockPushConfig={id:Math.max(0,...db.pushConfigs.map(item=>item.id))+1,created:now,modified:now,group,name:String(body.name??''),is_active:body.is_active!==false,test_mode:Boolean(body.test_mode),default_sound:String(body.default_sound??'default'),fcm_project_id:null};db.pushConfigs.push(row);applyPushConfig(row,body);return {status:true,data:pushConfigWire(row,'default'),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');const params=messagingParams(opts.params??{},['test_mode','is_active','group'],['name','test_mode','is_active','created','modified'],graph,'name');return messagingList(db.pushConfigs as unknown as Record<string,unknown>[],params,row=>String(row.name),graph,row=>pushConfigWire(row as unknown as MockPushConfig,graph),'name');}
+    const devicesMatch=path.match(/^\/api\/account\/devices\/push(?:\/(\d+))?$/);if(devicesMatch){if(method==='DELETE')return {status:false,error:'DELETE not allowed: RegisteredDevice',error_code:403};const visible=pushOwnRows(caller,db.pushDevices,PUSH_DEVICE_VIEW_GRANTS);const id=devicesMatch[1]?Number(devicesMatch[1]):null;if(id!=null){const row=visible.find(item=>item.id===id);if(!row)return db.pushDevices.some(item=>item.id===id)?permissionDenied():{status:false,error:'RegisteredDevice not found',error_code:404};if(method==='POST'){if(!hasGlobalPermission(caller,PUSH_DEVICE_SAVE_GRANTS)&&row.user!==caller.id)return permissionDenied();for(const key of ['device_id','platform','device_name','app_version','os_version','push_enabled','push_preferences','is_active'] as const)if(key in(opts.body??{}))(row as unknown as Record<string,unknown>)[key]=opts.body?.[key];row.modified=Math.floor(Date.now()/1000);row.last_seen=row.modified;}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');return {status:true,data:pushDeviceWire(row,graph),graph};}if(method==='POST')return {status:false,error:'Use the authenticated device registration endpoint',error_code:403};if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const graph=String(opts.params?.graph??'default');const params=messagingParams(opts.params??{},['platform','push_enabled','is_active','user'],['last_seen','platform','device_name','push_enabled'],graph,'-last_seen');return messagingList(visible as unknown as Record<string,unknown>[],params,row=>`${row.device_name} ${row.device_id}`,graph,row=>pushDeviceWire(row as unknown as MockPushDevice,graph),'-last_seen');}
+    return undefined;
+}
 const PHONE_NUMBER_VIEW_GRANTS=['view_phone_numbers','manage_phone_numbers','comms','manage_users'];
 const PHONE_NUMBER_SAVE_GRANTS=['manage_phone_numbers','comms','manage_users'];
 const SMS_VIEW_GRANTS=['view_sms','manage_sms','comms','owner','manage_notifications'];
@@ -7274,6 +7368,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         armedReauth = null;
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
+    const pushResult = await pushFetch(path, opts);
+    if (pushResult !== undefined) return pushResult;
     const phoneHubResult = await phoneHubFetch(path, opts);
     if (phoneHubResult !== undefined) return phoneHubResult;
     const messagingResult = await messagingFetch(path, opts);
@@ -8744,21 +8840,6 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         }
         rows = applyMockDateBounds(rows, opts.params ?? {});
         return { status: true, data: buildLoginAggregation(rows, opts.params ?? {}) };
-    }
-    // ── Push devices — /api/account/devices/push (RegisteredDevice) ──
-    if (path === '/api/account/devices/push') {
-        const result = listRows(
-            db.pushDevices as unknown as Record<string, unknown>[],
-            opts.params ?? {},
-            (d) => `${d.device_name} ${d.platform} ${d.device_id}`,
-            '-last_seen',
-        );
-        const rows = (result.data as unknown as MockPushDevice[]).map((d) => {
-            const owner = db.users.find((u) => u.id === d.user);
-            const { user: _uid, ...rest } = d;
-            return { ...rest, user: owner ? userBasic(owner) : null };
-        });
-        return { ...result, data: rows };
     }
     // ── Login events — /api/account/logins (+ /<pk>) ──
     // `uses_model_security(UserLoginEvent)`: VIEW_PERMS carries `owner`, so a
