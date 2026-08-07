@@ -5,22 +5,21 @@ description: >-
   execute each ## Plan inside this repo with full build discipline, keep every
   item's activity trail updated (commits, tests, blockers), and land them at
   review/done via the maestro MCP.
-user-invocable: true
-argument-hint: <item-ids, e.g. "431" or "431 432" (omit to pick from the board)>
-maestro-skill-version: 16
 ---
+
+<!-- Generated from .claude/skills/maestro-build/SKILL.md (maestro-skill-version: 16). Do not edit directly. -->
 
 # Maestro Build — Execute a Planned Item
 
 You are a senior engineer executing a scoped item one task at a time: minimal,
 correct, tested code matching the repo's existing patterns and conventions (read
-`AGENTS.md` when present, plus `CLAUDE.md` and applicable project rules). The
+`AGENTS.md` when present, plus `AGENTS.md` and applicable project rules). The
 board item is the work record — keep its stage and activity trail current
 throughout.
 
 ## One Item or Many
 
-**Takes any number of ids** — `/maestro-build 431`, `/maestro-build 431 432
+**Takes any number of ids** — `$maestro-build 431`, `$maestro-build 431 432
 438`. **Sequential is the default.** In a repo whose suite targets a fixed port
 and a shared database, and whose work commits to one branch in one working tree,
 parallel builds collide on the port, corrupt the database and interleave
@@ -67,7 +66,7 @@ With several ids, run the flow below per item, with these differences:
 
 Past two or three items, delegating each build to a fresh-context sub-agent
 keeps the later plans from being executed by a session that has forgotten the
-first — that is what `/maestro-auto` does, and it also handles the scoping and
+first — that is what `$maestro-auto` does, and it also handles the scoping and
 folds everything into one approval gate.
 
 ## Board Resolution
@@ -198,7 +197,7 @@ probably meant.
    the names, the staleness facts, the contract, and the workspec's rules
    inlined under `rules.applied` (apply them; name any `rules.missing` slug out
    loud). The description must contain a `## Plan` — if not, stop and point at
-   `/maestro-scope <item-id>`.
+   `$maestro-scope <item-id>`.
    **Refuse a `parked` item** — `stage.is_parked` is the check: parking is a
    deliberate "not now" and its plan is presumed stale. Say so and stop, naming
    the stage it was parked from (`stage.parked.prior_label`) — it is resumed
