@@ -242,7 +242,7 @@ async function boundedResponseBlob(response: Response, signal?: AbortSignal): Pr
         return blob;
     }
     const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
     let size = 0;
     try {
         while (true) {
@@ -251,7 +251,9 @@ async function boundedResponseBlob(response: Response, signal?: AbortSignal): Pr
             if (done) break;
             size += value.byteLength;
             assertImageSourceSize(size);
-            chunks.push(value);
+            const chunk = new Uint8Array(value.byteLength);
+            chunk.set(value);
+            chunks.push(chunk);
         }
     } catch (error) {
         void reader.cancel().catch(() => undefined);

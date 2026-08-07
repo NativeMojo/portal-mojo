@@ -37,7 +37,9 @@ export function projectAssistantThinking(value: unknown): AssistantThinkingEvent
 }
 
 export function projectAssistantText(value: unknown): AssistantTextEvent | null {
-    const raw = exact(value, 'assistant_text'); const id = raw && conversationId(raw.conversation_id); const turn = raw && requestId(raw.request_id); const content = raw && text(raw.text, MAX_TEXT);
+    const raw = exact(value, 'assistant_text');
+    if (!raw) return null;
+    const id = conversationId(raw.conversation_id); const turn = requestId(raw.request_id); const content = text(raw.text, MAX_TEXT);
     return id == null || turn == null || content == null ? null : { type: 'text', conversationId: id, requestId: turn, text: content, blocks: projectBlocks(raw.blocks) };
 }
 
@@ -71,7 +73,9 @@ export function projectAssistantPlanUpdate(value: unknown): AssistantPlanUpdateE
 }
 
 export function projectAssistantResponse(value: unknown): AssistantResponseEvent | null {
-    const raw = exact(value, 'assistant_response'); const id = raw && conversationId(raw.conversation_id); const turn = raw && requestId(raw.request_id); const response = raw && typeof raw.response === 'string' ? raw.response.slice(0, MAX_TEXT) : null;
+    const raw = exact(value, 'assistant_response');
+    if (!raw) return null;
+    const id = conversationId(raw.conversation_id); const turn = requestId(raw.request_id); const response = typeof raw.response === 'string' ? raw.response.slice(0, MAX_TEXT) : null;
     if (id == null || turn == null || response == null) return null;
     const messageId = typeof raw.message_id === 'number' && Number.isSafeInteger(raw.message_id) && raw.message_id > 0
         ? raw.message_id : typeof raw.message_id === 'string' && raw.message_id.length > 0 && raw.message_id.length <= 160 ? raw.message_id : null;
