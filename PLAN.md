@@ -269,6 +269,28 @@ is `npm run verify:admin-storage`; the showcase exposes all three pages plus
 playable/unsafe/rendition and cancellable destructive modal evidence for the
 central light/dark browser close.
 
+**2026-08-06, File Upload Platform foundation (#1468, #1470):** one shared
+imperative transport now implements django-mojo's initiate → direct PUT or
+provider/local multipart → completion → authoritative File refetch lifecycle.
+Provider fields precede the multipart file, signed third-party requests never
+receive API credentials, abort reaches the real transfer, uncertain completion
+is reconciled before retry, and upload-only capability values never enter Query
+or Mutation caches. The reusable `FileDrop`/`UploadQueue` layer adds an
+accessible picker/drop target, a bounded multi-file queue, transferred-byte
+progress through the existing toast API, cancellation/recovery, retry,
+duplicate suppression, and truthful partial-batch outcomes; reference docs and
+Showcase scenarios ship with it. Focused contracts are `verify:file-upload` and
+`verify:upload-ux`.
+
+The consuming children remain intentionally **not shipped** pending measured
+django-mojo contracts: Admin Files #1469 depends on manager authorization and
+policy enforcement #1485; forms/profile #1471 depends on relation clear/string
+ID/admin-on-behalf ownership semantics #1488; record and conversation
+attachments #1472 depends on completed/scoped File relation enforcement #1487,
+while Assistant's optional attachment shape is separately tracked in #1486.
+No attachment field or unsafe client-side authorization workaround is
+fabricated, and the parent epic #1467 remains open until those dependencies land.
+
 **2026-08-06, wave 8 Communications Admin (#1290):** the global/no-group
 Communications workspace now contributes Email Domains, Mailboxes, Sent
 Messages, Email Templates, and Contact Messages. Email administration uses the
