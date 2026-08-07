@@ -1,0 +1,8 @@
+.shortlink-page-alert { margin: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.shortlink-origin-note { margin: 10px 2px 0; color: var(--mute); font-size: .82rem; }
+.shortlink-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.shortlink-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.shortlink-counts > div { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface2); }
+.shortlink-counts b { display: block; color: var(--ink-strong); font-size: 1.35rem; }
+.shortlink-counts span { color: var(--mute); font-size: .8rem; }
+@media (max-width: 640px) { .shortlink-counts { grid-template-columns: 1fr; } .shortlink-page-alert { align-items: flex-start; flex-direction: column; } }

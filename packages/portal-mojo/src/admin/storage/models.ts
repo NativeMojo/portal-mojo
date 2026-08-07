@@ -75,10 +75,11 @@ export interface ShortLinkShareRow {
     url: string;
     source: string;
     hit_count: number;
-    expires_at: number | null;
+    expires_at: number | string | null;
     is_active: boolean;
     track_clicks?: boolean;
     metadata?: Record<string, unknown>;
+    note?: string | null;
     created: number;
     modified?: number;
     user?: RelationRow | number | null;
@@ -228,6 +229,18 @@ export const ShortLinkShareModel = defineModel<ShortLinkShareRow>({
         graph: 'default', source: 'fileman-share', file: params.file,
         start: params.start ?? 0, size: params.size ?? 25, sort: params.sort ?? '-created',
     }),
+    sanitizeRow: (input) => {
+        const row = input as unknown as Record<string, unknown>;
+        const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata) ? row.metadata as Record<string, unknown> : {};
+        return {
+            id: Number(row.id), code: String(row.code ?? '').slice(0, 10), url: String(row.url ?? ''),
+            source: String(row.source ?? '').slice(0, 50), hit_count: Math.max(0, Number(row.hit_count ?? 0) || 0),
+            expires_at: typeof row.expires_at === 'number' || typeof row.expires_at === 'string' ? row.expires_at : null,
+            is_active: Boolean(row.is_active), track_clicks: Boolean(row.track_clicks),
+            note: typeof metadata.note === 'string' ? metadata.note.slice(0, 512) : null,
+            created: Number(row.created ?? 0), modified: Number(row.modified ?? 0), user: relation(row.user), group: relation(row.group),
+        };
+    },
 });
 
 export function scrubFileManagerChanges(changes: Record<string, unknown>): Record<string, unknown> {
@@ -332,7 +345,7 @@ export async function saveFileAndReconcileGroup(queryClient: QueryClient, id: nu
 }
 
 export interface ShareOptions { expire_days?: number; track_clicks?: boolean; note?: string }
-export interface ShareCreateResult { url: string; code: string; expires_at: number | null; track_clicks: boolean }
+export interface ShareCreateResult { url: string; code: string; expires_at: string | null; track_clicks: boolean }
 export async function createFileShare(id: number, options: true | ShareOptions): Promise<ShareCreateResult> {
     const body = await mojoCall(`${FileModel.endpoint}/${id}`, { method: 'POST', body: { share: options } });
     const raw = body.data;
@@ -341,11 +354,21 @@ export async function createFileShare(id: number, options: true | ShareOptions):
     if (row.status === false) throw new Error(typeof row.error === 'string' ? row.error : 'Share creation failed');
     const url = typeof row.url === 'string' ? row.url : '';
     if (!isSafeCapabilityUrl(url)) throw new Error('The share service returned an unsafe URL');
-    return { url, code: String(row.code ?? ''), expires_at: row.expires_at == null ? null : Number(row.expires_at), track_clicks: Boolean(row.track_clicks) };
+    const expiresAt = row.expires_at == null ? null : String(row.expires_at);
+    if (expiresAt != null && !Number.isFinite(Date.parse(expiresAt))) throw new Error('The share service returned an invalid expiry');
+    return { url, code: String(row.shortlink_code ?? ''), expires_at: expiresAt, track_clicks: Boolean(row.track_clicks) };
 }
 
 export async function revokeFileShare(id: number): Promise<ShortLinkShareRow> {
     return mojoSave<ShortLinkShareRow>(ShortLinkShareModel.endpoint, id, { is_active: false });
+}
+
+export async function setFileShareActive(id: number, isActive: boolean): Promise<ShortLinkShareRow> {
+    return mojoSave<ShortLinkShareRow>(ShortLinkShareModel.endpoint, id, { is_active: isActive });
+}
+
+export async function deleteFileShare(id: number): Promise<void> {
+    return mojoDelete(ShortLinkShareModel.endpoint, id);
 }
 
 export function isSafeCapabilityUrl(value: unknown): value is string {

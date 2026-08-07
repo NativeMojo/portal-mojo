@@ -38,6 +38,7 @@ import { JOBS_ADMIN_SECTION } from './jobs';
 import { NETWORK_SECURITY_ADMIN_SECTION } from './network';
 import { DNS_ADMIN_SECTION } from './dns';
 import { STORAGE_ADMIN_SECTION } from './storage';
+import { SHORTLINKS_ADMIN_SECTION } from './shortlinks';
 import { EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION } from './messaging';
 import { ADMIN_DASHBOARD_PERMISSIONS, AdminDashboardPage } from './dashboard';
 
@@ -55,6 +56,7 @@ export * from './jobs';
 export * from './network';
 export * from './dns';
 export * from './storage';
+export * from './shortlinks';
 export * from './messaging';
 export * from './dashboard';
 
@@ -163,6 +165,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     NETWORK_SECURITY_ADMIN_SECTION,
     DNS_ADMIN_SECTION,
     STORAGE_ADMIN_SECTION,
+    SHORTLINKS_ADMIN_SECTION,
     EMAIL_ADMIN_SECTION,
     PUBLIC_MESSAGES_ADMIN_SECTION,
 ];

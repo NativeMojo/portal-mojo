@@ -31,6 +31,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-dns-records.md](admin-dns-records.md) | Domain inventory/KISS detail and id-less live DNS records — complete-set writes, explicit corrections, stale preflight, and provider behavior |
 | [admin-dns-certificates.md](admin-dns-certificates.md) | Certificate custody and ACME lifecycle — in-zone requests, delegation readiness, house gates, renewal-aware bounded polling, and the no-material boundary |
 | [admin-storage.md](admin-storage.md) | Global S3 buckets, masked storage backends, capability-safe FileView/shares, and finite rendition convergence |
+| [admin-shortlinks.md](admin-shortlinks.md) | Global shortlink operations, destination-free caches, bounded click history, and reconciled one-shot mutations |
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |

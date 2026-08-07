@@ -2496,6 +2496,7 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
         files: true,
         manage_aws: true,
         comms: true,
+        manage_shortlinks: true,
         view_support: true,
         manage_support: true,
     };
@@ -2543,6 +2544,13 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     storageMember.email = 'storage.member@nativemojo.com';
     storageMember.display_name = 'Storage Member Only';
     storageMember.permissions = {};
+    const shortlinkManager = at(35);
+    shortlinkManager.is_active = true;
+    shortlinkManager.is_superuser = false;
+    shortlinkManager.username = 'shortlink.manager';
+    shortlinkManager.email = 'shortlink.manager@nativemojo.com';
+    shortlinkManager.display_name = 'Shortlink Manager';
+    shortlinkManager.permissions = { manage_shortlinks: true };
     const metricsViewer = at(24);
     metricsViewer.is_active = true;
     metricsViewer.is_superuser = false;
@@ -3875,7 +3883,29 @@ interface MockStorageRendition {
 interface MockStorageShare {
     id: number; code: string; url: string; source: string; hit_count: number; expires_at: number | null;
     is_active: boolean; track_clicks: boolean; metadata: Record<string, unknown>; created: number; modified: number;
-    user: number; group: number | null; file: number;
+    user: number; group: number | null; file: number | null; is_protected: boolean; bot_passthrough: boolean;
+}
+
+interface MockShortlinkClick {
+    id: number; shortlink: number; ip: string | null; user_agent: string; referer: string; is_bot: boolean; created: number;
+}
+
+function buildShortlinks(): MockStorageShare[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 9101, code: 'launch7', url: 'https://product.example.test/launch?campaign=private-canary', source: 'campaign', hit_count: 42, expires_at: now + 14 * 86400, is_active: true, track_clicks: true, metadata: { note: 'Launch campaign', private: 'metadata-canary' }, created: now - 7 * 86400, modified: now - 3600, user: 14, group: null, file: null, is_protected: false, bot_passthrough: true },
+        { id: 9102, code: 'docs24', url: 'https://docs.example.test/internal/path#private', source: 'docs', hit_count: 9, expires_at: null, is_active: true, track_clicks: false, metadata: {}, created: now - 30 * 86400, modified: now - 86400, user: 14, group: 1, file: null, is_protected: true, bot_passthrough: false },
+        { id: 9103, code: 'retired', url: 'https://example.test/retired', source: 'legacy', hit_count: 3, expires_at: now - 86400, is_active: false, track_clicks: true, metadata: {}, created: now - 90 * 86400, modified: now - 2 * 86400, user: 32, group: 1, file: null, is_protected: false, bot_passthrough: false },
+    ];
+}
+
+function buildShortlinkClicks(): MockShortlinkClick[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 9201, shortlink: 9101, ip: '203.0.113.9', user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 private-ua-canary', referer: 'https://search.example.test/results?q=private#fragment', is_bot: false, created: now - 600 },
+        { id: 9202, shortlink: 9101, ip: '198.51.100.44', user_agent: 'Slackbot-LinkExpanding 1.0 private-bot-canary', referer: 'https://chat.example.test/private/channel?token=secret', is_bot: true, created: now - 500 },
+        { id: 9203, shortlink: 9103, ip: null, user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/125.0', referer: '', is_bot: false, created: now - 2 * 86400 },
+    ];
 }
 
 interface MockEmailDomain { id:number;created:number;modified:number;name:string;region:string;status:string;receiving_enabled:boolean;s3_inbound_bucket:string|null;s3_inbound_prefix:string;dns_mode:string;aws_key_masked:string|null;aws_secret_masked:string|null;sns_topic_bounce_arn:string|null;sns_topic_complaint_arn:string|null;sns_topic_delivery_arn:string|null;sns_topic_inbound_arn:string|null }
@@ -4007,7 +4037,8 @@ const db = {
     storageFiles: buildStorageFiles(),
     fileRenditions: buildStorageRenditions(),
     storageRenditionJobs: new Map<number, { roles: string[]; detailGets: number; finalStatus: 'completed' | 'failed' | 'expired' }>(),
-    storageShares: [] as MockStorageShare[],
+    storageShares: buildShortlinks(),
+    shortlinkClicks: buildShortlinkClicks(),
     emailDomains: messagingSeed.emailDomains,
     emailMailboxes: messagingSeed.emailMailboxes,
     sentMessages: messagingSeed.sentMessages,
@@ -5467,13 +5498,15 @@ function serializeStorageFile(row: MockStorageFile): Record<string, unknown> {
     };
 }
 
-function serializeStorageShare(row: MockStorageShare): Record<string, unknown> {
-    return {
+function serializeStorageShare(row: MockStorageShare, graph = 'default'): Record<string, unknown> {
+    const list = {
         id: row.id, code: row.code, url: row.url, source: row.source, hit_count: row.hit_count,
-        expires_at: row.expires_at, is_active: row.is_active, track_clicks: row.track_clicks,
-        metadata: { ...row.metadata }, created: row.created, modified: row.modified,
+        expires_at: row.expires_at, is_active: row.is_active, created: row.created,
         user: storageRelation('user', row.user), group: storageRelation('group', row.group),
     };
+    if (graph === 'list') return list;
+    if (graph === 'basic') return { id: row.id, code: row.code, url: row.url, source: row.source, hit_count: row.hit_count, is_active: row.is_active };
+    return { ...list, track_clicks: row.track_clicks, is_protected: row.is_protected, bot_passthrough: row.bot_passthrough, metadata: { ...row.metadata }, modified: row.modified };
 }
 
 function maskStorageCredential(value: unknown, prefix = ''): string | null {
@@ -5544,7 +5577,8 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
     if (!path.startsWith('/api/aws/s3/bucket')
         && !path.startsWith('/api/fileman/manager')
         && !path.startsWith('/api/fileman/file')
-        && !path.startsWith('/api/shortlink/link')) return undefined;
+        && !path.startsWith('/api/shortlink/link')
+        && !path.startsWith('/api/shortlink/history')) return undefined;
     const caller = userFromBearer(opts.headers);
     if (!caller) return permissionDenied(401);
     const method = (opts.method ?? 'GET').toUpperCase();
@@ -5698,18 +5732,30 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         if ('share' in body) {
             const options = isPlainObject(body.share) ? body.share : {};
             const now = Math.floor(Date.now() / 1000);
-            const days = Math.max(0, Math.min(3650, Number(options.expire_days ?? 30)));
+            const days = Math.max(0, Math.min(3650, Number(options.expire_days ?? 0)));
             const id = Math.max(0, ...db.storageShares.map((row) => row.id)) + 1;
             const code = `share${id}`;
-            const share: MockStorageShare = { id, code, url: `/s/${code}`, source: 'fileman-share', hit_count: 0, expires_at: days > 0 ? now + days * 86400 : null, is_active: true, track_clicks: Boolean(options.track_clicks), metadata: { note: String(options.note ?? '').slice(0, 512) }, created: now, modified: now, user: caller.id, group: file.group, file: file.id };
+            const share: MockStorageShare = { id, code, url: file.url ?? '', source: 'fileman-share', hit_count: 0, expires_at: days > 0 ? now + days * 86400 : null, is_active: true, track_clicks: Boolean(options.track_clicks), metadata: { note: String(options.note ?? '').slice(0, 512) }, created: now, modified: now, user: caller.id, group: file.group, file: file.id, is_protected: false, bot_passthrough: false };
             db.storageShares.push(share);
-            return { status: true, data: { url: share.url, code, expires_at: share.expires_at, track_clicks: share.track_clicks } };
+            return { status: true, data: { url: `/s/${code}`, shortlink_code: code, expires_at: share.expires_at == null ? null : new Date(share.expires_at * 1000).toISOString(), track_clicks: share.track_clicks } };
         }
         if ('filename' in body) file.filename = String(body.filename);
         if ('is_public' in body) file.is_public = Boolean(body.is_public);
         if ('group' in body && hasGlobalPermission(caller, STORAGE_GROUP_DIRECTORY_GRANTS)) file.group = body.group == null ? null : Number(body.group);
         file.modified = Math.floor(Date.now() / 1000);
         return { status: true, data: serializeStorageFile(file), graph: 'default' };
+    }
+
+    if (path === '/api/shortlink/link/create') {
+        if (method !== 'POST' || !hasGlobalPermission(caller, ['manage_shortlinks'])) return permissionDenied();
+        const body = opts.body ?? {};
+        const now = Math.floor(Date.now() / 1000);
+        const id = Math.max(9100, ...db.storageShares.map((row) => row.id)) + 1;
+        const code = `link${id}`.slice(-10);
+        const days = Math.max(0, Math.min(3650, Number(body.expire_days ?? 3) || 0));
+        const hours = Math.max(0, Math.min(87600, Number(body.expire_hours ?? 0) || 0));
+        db.storageShares.push({ id, code, url: String(body.url ?? ''), source: String(body.source ?? '').slice(0, 50), hit_count: 0, expires_at: days || hours ? now + days * 86400 + hours * 3600 : null, is_active: true, track_clicks: Boolean(body.track_clicks), metadata: {}, created: now, modified: now, user: caller.id, group: null, file: null, is_protected: Boolean(body.is_protected), bot_passthrough: Boolean(body.bot_passthrough) });
+        return { status: true, data: { short_link: `/s/${code}`, original_url: String(body.url ?? '') } };
     }
 
     const shareMatch = path.match(/^\/api\/shortlink\/link(?:\/(\d+))?$/);
@@ -5723,17 +5769,41 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
             && (requestedSource == null || row.source === requestedSource));
         if (id != null) {
             const share = visible.find((row) => row.id === id);
-            if (!share) return permissionDenied();
-            if (method === 'DELETE') return { status: false, error: 'Visible shares are retained for audit', error_code: 405 };
-            if (method === 'POST' && opts.body && opts.body.is_active === false) { share.is_active = false; share.modified = Math.floor(Date.now() / 1000); }
-            return { status: true, data: serializeStorageShare(share), graph: 'default' };
+            if (!share) return canManageAll
+                ? { status: false, code: 404, error: 'ShortLink not found', error_code: 'not_found' }
+                : permissionDenied();
+            if (method === 'DELETE') {
+                db.storageShares = db.storageShares.filter((row) => row.id !== share.id);
+                db.shortlinkClicks = db.shortlinkClicks.filter((row) => row.shortlink !== share.id);
+                return { status: 'deleted' } as unknown as Record<string, unknown>;
+            }
+            if (method === 'POST' && opts.body && 'is_active' in opts.body) { share.is_active = Boolean(opts.body.is_active); share.modified = Math.floor(Date.now() / 1000); }
+            return { status: true, data: serializeStorageShare(share, String(opts.params?.graph ?? 'default')), graph: String(opts.params?.graph ?? 'default') };
         }
-        const serialized = visible.map(serializeStorageShare);
+        const graph = String(opts.params?.graph ?? 'default');
+        const serialized = visible.map((row) => serializeStorageShare(row, graph));
         const params = { ...(opts.params ?? {}) };
         delete params.file;
         delete params.source;
         const result = listRows(serialized, params, (row) => `${row.code} ${row.source}`, '-created');
-        return { ...result, graph: 'default' };
+        return { ...result, graph };
+    }
+    const historyMatch = path.match(/^\/api\/shortlink\/history(?:\/(\d+))?$/);
+    if (historyMatch) {
+        if (!hasGlobalPermission(caller, ['manage_shortlinks'])) return permissionDenied();
+        if (method !== 'GET') return { status: false, code: 405, error: 'Click history is read-only', error_code: 'method_not_allowed' };
+        const serialize = (row: MockShortlinkClick) => {
+            const link = db.storageShares.find((candidate) => candidate.id === row.shortlink);
+            return { id: row.id, ip: row.ip, user_agent: row.user_agent, referer: row.referer, is_bot: row.is_bot, created: row.created, shortlink: link ? { id: link.id, code: link.code, url: link.url, source: link.source, hit_count: link.hit_count, is_active: link.is_active } : null };
+        };
+        const id = historyMatch[1] == null ? null : Number(historyMatch[1]);
+        if (id != null) {
+            const click = db.shortlinkClicks.find((row) => row.id === id);
+            return click ? { status: true, data: serialize(click), graph: 'default' } : { status: false, code: 404, error: 'Click not found', error_code: 'not_found' };
+        }
+        const params = opts.params ?? {};
+        const rows = db.shortlinkClicks.filter((row) => params.shortlink == null || row.shortlink === Number(params.shortlink)).map(serialize);
+        return { ...listRows(rows, params, (row) => String(row.id), '-created'), graph: 'default' };
     }
     return undefined;
 }

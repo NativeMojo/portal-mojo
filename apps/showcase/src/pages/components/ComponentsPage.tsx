@@ -57,6 +57,7 @@ import { AdminJobsDemo } from './demos-admin-jobs';
 import { AdminMembersDemo } from './demos-admin-members';
 import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
 import { AdminStorageDemo } from './demos-admin-storage';
+import { AdminShortlinksDemo } from './demos-admin-shortlinks';
 import { AdminMessagingDemo } from './demos-admin-messaging';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
@@ -349,6 +350,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
                 blurb: 'Global S3 buckets, masked storage backends, capability-safe files, sharing and finite rendition convergence — with explicit destructive confirmation and no upload or deletion shortcuts.',
                 render: () => <AdminStorageDemo />,
+            },
+            {
+                key: 'admin-shortlinks', title: 'Shortlinks', icon: 'bi-link-45deg',
+                blurb: 'Global shortlink inventory and privacy-bounded tracked-click history with destination-free Query caches and reconciled mutations.',
+                render: () => <AdminShortlinksDemo />,
             },
             {
                 key: 'admin-users', title: 'Users', icon: 'bi-people',
