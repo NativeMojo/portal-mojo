@@ -22,6 +22,7 @@ export interface RealtimeStatusSnapshot {
 export interface RealtimeEvent<T = unknown> {
     type: string;
     data: T;
+    source: 'direct' | 'wrapped';
     topic?: string;
     timestamp?: number;
 }
@@ -315,13 +316,13 @@ export class RealtimeClient {
                 this.suspend('forced-disconnect', 4003, 'Forced disconnect');
                 return;
             }
-            this.dispatch(data.type, data, typeof frame.topic === 'string' ? frame.topic : undefined,
+            this.dispatch(data.type, data, 'wrapped', typeof frame.topic === 'string' ? frame.topic : undefined,
                 typeof frame.timestamp === 'number' && Number.isFinite(frame.timestamp) ? frame.timestamp : undefined);
             return;
         }
 
         // Direct application frame. Framework frames above never leak here.
-        this.dispatch(frame.type, frame);
+        this.dispatch(frame.type, frame, 'direct');
     }
 
     private isTrustedForcedDisconnect(wrapper: Record<string, unknown>, data: Record<string, unknown>): boolean {
@@ -332,8 +333,8 @@ export class RealtimeClient {
             && data.type === 'disconnect' && data.reason === 'forced_disconnect';
     }
 
-    private dispatch(type: string, data: Record<string, unknown>, topic?: string, timestamp?: number): void {
-        const event: RealtimeEvent = { type, data, ...(topic ? { topic } : {}), ...(timestamp != null ? { timestamp } : {}) };
+    private dispatch(type: string, data: Record<string, unknown>, source: RealtimeEvent['source'], topic?: string, timestamp?: number): void {
+        const event: RealtimeEvent = { type, data, source, ...(topic ? { topic } : {}), ...(timestamp != null ? { timestamp } : {}) };
         this.eventListeners.get(type)?.forEach((listener) => listener(event));
     }
 

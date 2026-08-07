@@ -62,6 +62,48 @@ try {
     assert.deepEqual(math.operationOutputSize(pixels, transformThenCrop), { width: 1, height: 1 });
     assert.deepEqual(math.operationOutputSize(pixels, [...transformThenCrop].reverse()), { width: 2, height: 2 }, 'chronological action order changes composition');
 
+    // Browser-work limits reject before raster allocation. A tiny compressed
+    // source and its decoded dimensions are deliberately checked separately.
+    canvas.assertImageSourceSize(canvas.MAX_IMAGE_SOURCE_BYTES);
+    assert.throws(() => canvas.assertImageSourceSize(canvas.MAX_IMAGE_SOURCE_BYTES + 1), /source exceeds/);
+    let oversizedBitmapClosed = 0;
+    globalThis.createImageBitmap = async () => ({ width: 8_000, height: 8_000, close() { oversizedBitmapClosed += 1; } });
+    await assert.rejects(
+        () => canvas.decodeImageSource(new Blob(['compressed'], { type: 'image/png' })),
+        /decoded image exceeds/i,
+        'a small compressed body cannot bypass the decoded-pixel ceiling',
+    );
+    assert.equal(oversizedBitmapClosed, 1, 'rejected decoded bitmap closes immediately');
+    delete globalThis.createImageBitmap;
+    assert.throws(
+        () => math.assertImageEditorSize({ width: 8_000, height: 8_000 }, 'Decoded image'),
+        /safe pixel limits/,
+        'decoded dimensions are independently bounded',
+    );
+    assert.throws(
+        () => math.validateImageEditorPipeline({ width: 600, height: 600 }, [
+            { kind: 'transform', scale: 5, rotation: 0, translateX: 0, translateY: 0 },
+            { kind: 'transform', scale: 5, rotation: 0, translateX: 0, translateY: 0 },
+        ]),
+        /safe pixel limits/,
+        'compound transforms are checked at every intermediate output',
+    );
+    assert.throws(
+        () => math.validateImageEditorOperationRanges([{ kind: 'crop', rect: { x: 0, y: 0, width: 1, height: 1 }, output: { width: 5_000, height: 4_000 } }]),
+        /safe pixel limits/,
+        'oversized explicit crop output rejects',
+    );
+    assert.throws(
+        () => math.validateImageEditorOperationRanges([{ kind: 'filters', filters: { ...math.DEFAULT_FILTERS, blur: 11 }, preset: 'none' }]),
+        /blur filter/,
+        'naive blur cannot exceed the UI range',
+    );
+    assert.throws(
+        () => math.validateImageEditorOperationRanges(Array.from({ length: math.MAX_IMAGE_EDITOR_OPERATIONS + 1 }, () => ({ kind: 'transform', ...math.DEFAULT_TRANSFORM }))),
+        /at most/,
+        'operation sequences have a hard work bound',
+    );
+
     const [editorSource, portalCss, showcaseCss] = await Promise.all([
         readFile(new URL('../packages/portal-mojo/src/ui/image-editor/ImageEditor.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../apps/portal/src/theme/image-editor.css', import.meta.url), 'utf8'),
@@ -69,6 +111,7 @@ try {
     ]);
     assert.match(editorSource, /saveGeneration/);
     assert.match(editorSource, /loadGeneration/);
+    assert.match(editorSource, /controller\.abort\(\)/, 'source replacement and unmount abort URL work');
     assert.match(editorSource, /canvas\.toBlob|pixelSurfaceToBlob/);
     assert(!/download\s*=|\.click\(\)/.test(editorSource), 'save never auto-downloads');
     assert.equal(portalCss, showcaseCss, 'both themes carry byte-identical editor styles');

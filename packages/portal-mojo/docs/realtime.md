@@ -28,8 +28,10 @@ disable this shared provider.
   separately and is never explicitly subscribed by the client. That automatic
   topic is a delivery scope, not a presence feed.
 - Framework messages, one wrapped `{type:'message',data,topic?,timestamp?}`
-  layer, and direct application events share one dispatch boundary. Malformed
-  frames drop. No generic Query invalidation is performed.
+  layer, and direct application events share one dispatch boundary. Every
+  projected event carries `source: 'wrapped' | 'direct'` so consumers can keep
+  capability-bearing protocols on their exact wire source. Malformed frames
+  drop. No generic Query invalidation is performed.
 
 The transport does not invent application events. Current django-mojo has no
 canonical record-created/updated/deleted stream and no canonical presence

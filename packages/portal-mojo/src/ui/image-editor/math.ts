@@ -87,6 +87,20 @@ export const MAX_TRANSFORM_SCALE = 5;
 export const TRANSFORM_SCALE_STEP = 0.02;
 export const DEFAULT_MIN_CROP_SIZE = 50;
 export const DEFAULT_HISTORY_LIMIT = 20;
+/** Hard browser-work ceilings shared by the React and low-level raster APIs. */
+export const MAX_IMAGE_EDITOR_OPERATIONS = 20;
+export const MAX_IMAGE_DIMENSION = 8_192;
+export const MAX_IMAGE_PIXELS = 16_000_000;
+
+export const IMAGE_EDITOR_FILTER_RANGES: Readonly<Record<keyof FilterState, readonly [number, number]>> = Object.freeze({
+    brightness: Object.freeze([0, 200] as const),
+    contrast: Object.freeze([0, 200] as const),
+    saturation: Object.freeze([0, 200] as const),
+    hue: Object.freeze([0, 360] as const),
+    blur: Object.freeze([0, 10] as const),
+    grayscale: Object.freeze([0, 100] as const),
+    sepia: Object.freeze([0, 100] as const),
+});
 
 export const DEFAULT_TRANSFORM: Readonly<TransformState> = Object.freeze({
     scale: 1,
@@ -340,6 +354,70 @@ export function transformOutputSize(input: ImageSize, transform: TransformState)
         width: Math.max(1, Math.ceil((input.width * cos + input.height * sin) * transform.scale - 1e-10)),
         height: Math.max(1, Math.ceil((input.width * sin + input.height * cos) * transform.scale - 1e-10)),
     };
+}
+
+export function assertImageEditorSize(size: ImageSize, label = 'Image'): void {
+    if (!Number.isSafeInteger(size.width) || !Number.isSafeInteger(size.height)
+        || size.width < 1 || size.height < 1
+        || size.width > MAX_IMAGE_DIMENSION || size.height > MAX_IMAGE_DIMENSION
+        || size.width * size.height > MAX_IMAGE_PIXELS) {
+        throw new RangeError(`${label} exceeds the image editor's safe pixel limits.`);
+    }
+}
+
+export function validateImageEditorOperationRanges(operations: readonly ImageEditorOperation[]): void {
+    if (operations.length > MAX_IMAGE_EDITOR_OPERATIONS) {
+        throw new RangeError(`ImageEditor supports at most ${MAX_IMAGE_EDITOR_OPERATIONS} operations.`);
+    }
+    for (const operation of operations) {
+        if (operation.kind === 'transform') {
+            if (![operation.scale, operation.rotation, operation.translateX, operation.translateY].every(Number.isFinite)
+                || operation.scale < MIN_TRANSFORM_SCALE || operation.scale > MAX_TRANSFORM_SCALE
+                || operation.rotation < 0 || operation.rotation >= 360) {
+                throw new RangeError('ImageEditor transform operation is outside the supported control range.');
+            }
+        } else if (operation.kind === 'crop') {
+            if (![operation.rect.x, operation.rect.y, operation.rect.width, operation.rect.height].every(Number.isFinite)
+                || operation.rect.x < 0 || operation.rect.y < 0
+                || operation.rect.width <= 0 || operation.rect.height <= 0) {
+                throw new RangeError('ImageEditor crop operation is outside the supported control range.');
+            }
+            if (operation.output) assertImageEditorSize(operation.output, 'ImageEditor crop output');
+        } else if (operation.kind === 'filters') {
+            for (const name of FILTER_ORDER) {
+                const value = operation.filters[name];
+                const [min, max] = IMAGE_EDITOR_FILTER_RANGES[name];
+                if (!Number.isFinite(value) || value < min || value > max) {
+                    throw new RangeError(`ImageEditor ${name} filter is outside the supported control range.`);
+                }
+            }
+        } else {
+            throw new TypeError('ImageEditor received an unknown operation.');
+        }
+    }
+}
+
+/** Validate every intermediate size before any raster allocation is attempted. */
+export function validateImageEditorPipeline(source: ImageSize, operations: readonly ImageEditorOperation[]): ImageSize {
+    assertImageEditorSize(source, 'Image source');
+    validateImageEditorOperationRanges(operations);
+    let size = { ...source };
+    for (const operation of operations) {
+        if (operation.kind === 'transform') {
+            size = transformOutputSize(size, operation);
+        } else if (operation.kind === 'crop') {
+            if (operation.rect.x + operation.rect.width > size.width
+                || operation.rect.y + operation.rect.height > size.height) {
+                throw new RangeError('ImageEditor crop operation exceeds its input bounds.');
+            }
+            size = operation.output ?? {
+                width: Math.max(1, Math.floor(operation.rect.width)),
+                height: Math.max(1, Math.floor(operation.rect.height)),
+            };
+        }
+        assertImageEditorSize(size, 'ImageEditor operation output');
+    }
+    return size;
 }
 
 export function combinedFilters(filters: FilterState, preset: FilterPresetName): FilterState {

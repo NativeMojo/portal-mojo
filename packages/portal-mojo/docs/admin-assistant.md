@@ -16,10 +16,11 @@ Import from `portal-mojo/admin`.
 - `POST /api/assistant` sends `{message, conversation_id?, attachments?}`.
   `attachments` is omitted for text-only sends or contains 1–5 unique positive
   ids from completed authoritative queue references.
-- Realtime positively projects only `assistant_thinking`, `assistant_text`,
+- Realtime accepts these Assistant event shapes only as exact direct frames;
+  topic-wrapped or broadcast Assistant-shaped traffic is ignored. It positively
+  projects only `assistant_thinking`, `assistant_text`,
   `assistant_tool_call`, `assistant_plan`, `assistant_plan_update`,
-  `assistant_response`, and `assistant_error`, whether they arrive directly or
-  through the transport's one wrapper boundary. Thinking, text, tool, plan,
+  `assistant_response`, and `assistant_error`. Thinking, text, tool, plan,
   update, and response events require a positive `conversation_id` and are
   correlated to the active turn. `assistant_error` alone may omit it; such an
   uncorrelated server error terminates the active turn. Tool state retains
@@ -37,6 +38,10 @@ Import from `portal-mojo/admin`.
   reconnect; locally observed permission loss immediately clears this
   consumer's transient stream/subscriptions without disabling the shared
   provider.
+- Direct-source binding does not solve first-send or concurrent-turn
+  correlation: the current server protocol has no per-send acknowledgement id.
+  Consumers must retain the existing single-flight behavior until that wire
+  contract is designed.
 - `POST /api/assistant/context` sends only `{model, pk}`. The returned conversation id is immediately fetched from `/api/assistant/conversation/<id>?graph=detail`; the client never synthesizes or reposts context text.
 - Conversation and Skill lists/details/deletes are imperative and component-local. They do not use `defineModel`, Query cache, `ModelTable`, a `RecordFeed` adapter, persistence, or exports.
 - A foreign conversation visible to an administrator is inspect-only. Only `conversation.user.id === me.id` enables continuation.

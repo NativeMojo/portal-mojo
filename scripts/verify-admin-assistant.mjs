@@ -96,13 +96,15 @@ try {
         assert(seen.has(501));
     }
 
-    // Wrapped application path projects once (no double unwrap).
+    // Topic-wrapped Assistant-shaped traffic is not a trusted Assistant result.
     {
         const { client, wire } = readyClient(); const received = [];
         const turn = streaming.startAssistantRealtimeTurn(client, { message: 'wrapped', conversationId: 42, seenMessageIds: new Set() }, callbacks({ onResponse: (message) => received.push(message) }));
-        wire.wrapped({ type: 'assistant_response', conversation_id: 42, message_id: 502, response: 'wrapped response', blocks: [] }, undefined, 1);
+        wire.wrapped({ type: 'assistant_response', conversation_id: 42, message_id: 502, response: 'topic injection', blocks: [] }, 'group:1:events', 1);
+        assert.deepEqual(received, [], 'Assistant ignores same-shaped topic traffic');
+        wire.direct({ type: 'assistant_response', conversation_id: 42, message_id: 503, response: 'direct response', blocks: [] }, 1);
         await turn.promise;
-        assert.deepEqual(received.map((message) => message.content), ['wrapped response']);
+        assert.deepEqual(received.map((message) => message.content), ['direct response']);
     }
 
     // Known-conversation disconnect waits for reauth, then REST-detail reconcile.

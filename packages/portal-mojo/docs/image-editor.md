@@ -64,6 +64,19 @@ These helpers operate on logical pixels and do not mount UI, upload Files,
 persist state, or initiate a browser download. `decodeImageSource` is the one
 exception that performs the URL fetch described above.
 
+## Browser-work limits
+
+The public low-level constants make the editor's availability boundary explicit:
+`MAX_IMAGE_SOURCE_BYTES` is 25,000,000 bytes, `MAX_IMAGE_DIMENSION` is 8,192
+pixels, `MAX_IMAGE_PIXELS` is 16,000,000 pixels per decoded/intermediate/final
+surface, and `MAX_IMAGE_EDITOR_OPERATIONS` is 20. Every operation output is
+checked before raster allocation. Initial transforms and filters must remain
+inside the same ranges as the controls (scale 0.1–5; brightness, contrast, and
+saturation 0–200; hue 0–360; blur 0–10; grayscale and sepia 0–100). URL bodies
+are streamed to the byte ceiling, and source replacement or unmount aborts the
+fetch and `<img>` fallback where the browser permits; `createImageBitmap` itself
+is not abortable, so a stale result is closed immediately on resolution.
+
 ## Composition and history
 
 Operations are immutable and chronological. Transform creates a logical

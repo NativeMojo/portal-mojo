@@ -71,7 +71,9 @@ try {
     mock.wrapped({ type: 'order_changed', id: 7, secret: 'drop-by-projector' }, 'orders', 1);
     mock.direct({ type: 'order_changed', id: 8, secret: 'drop-by-projector' }, 1);
     mock.direct({ type: 'order_changed', id: 'malformed' }, 1);
-    assert.deepEqual(projected.map((entry) => entry.data), [{ id: 7 }, { id: 8 }]);
+    assert.deepEqual(projected.map((entry) => [entry.source, entry.data]), [
+        ['wrapped', { id: 7 }], ['direct', { id: 8 }],
+    ]);
 
     const firstGeneration = client.getStatus().generation;
     client.setToken('replacement-token');

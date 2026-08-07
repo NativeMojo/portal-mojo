@@ -14,7 +14,9 @@ import {
     lastCropData, moveCropBox, newCropBox, operationOutputSize, resizeCropBox,
     rotateTransform, type CropHandle, type CropOptions, type FilterPresetName,
     type FilterState, type ImageEditorMode, type ImageEditorOperation,
-    type ImageEditorSnapshot, type ImagePoint, type ImageRect, type TransformState,
+    assertImageEditorSize, MAX_IMAGE_EDITOR_OPERATIONS, validateImageEditorOperationRanges,
+    validateImageEditorPipeline, type ImageEditorSnapshot, type ImagePoint,
+    type ImageRect, type TransformState,
 } from './math';
 
 const ALL_MODES: readonly ImageEditorMode[] = ['transform', 'crop', 'filters'];
@@ -77,6 +79,7 @@ function validateSize(size: CropOptions['fixedCropSize'], label: string): void {
     if (!positiveFinite(size.width) || !positiveFinite(size.height) || !Number.isInteger(size.width) || !Number.isInteger(size.height)) {
         throw new TypeError(`${label} must use positive finite integer dimensions.`);
     }
+    assertImageEditorSize(size, label);
 }
 
 export function validateImageEditorOptions(source: ImageEditorSource, options: ImageEditorOptions): void {
@@ -94,23 +97,7 @@ export function validateImageEditorOptions(source: ImageEditorSource, options: I
     if (options.maxHistory != null && (!Number.isInteger(options.maxHistory) || options.maxHistory < 1 || options.maxHistory > DEFAULT_HISTORY_LIMIT)) {
         throw new TypeError(`ImageEditor maxHistory must be an integer from 1 to ${DEFAULT_HISTORY_LIMIT}.`);
     }
-    for (const operation of options.initialOperations ?? []) {
-        if (operation.kind === 'transform') {
-            if (![operation.scale, operation.rotation, operation.translateX, operation.translateY].every(Number.isFinite) || operation.scale <= 0) {
-                throw new TypeError('ImageEditor transform operations require finite values and a positive scale.');
-            }
-        } else if (operation.kind === 'crop') {
-            if (![operation.rect.x, operation.rect.y, operation.rect.width, operation.rect.height].every(Number.isFinite)
-                || operation.rect.width <= 0 || operation.rect.height <= 0) {
-                throw new TypeError('ImageEditor crop operations require finite coordinates and positive dimensions.');
-            }
-            validateSize(operation.output, 'ImageEditor crop output');
-        } else if (operation.kind === 'filters') {
-            if (!Object.values(operation.filters).every(Number.isFinite)) throw new TypeError('ImageEditor filter operations require finite values.');
-        } else {
-            throw new TypeError('ImageEditor received an unknown operation.');
-        }
-    }
+    validateImageEditorOperationRanges(options.initialOperations ?? []);
 }
 
 function normalizeModes(modes: ImageEditorOptions['modes']): readonly ImageEditorMode[] {
@@ -187,10 +174,13 @@ export function ImageEditor(props: ImageEditorProps) {
 
     useEffect(() => {
         const generation = ++loadGeneration.current;
+        const controller = new AbortController();
         let live = true;
-        void decodeImageSource(props.source).then((next) => {
+        void decodeImageSource(props.source, { signal: controller.signal }).then((next) => {
             if (!live || generation !== loadGeneration.current) { next.dispose(); return; }
             const operations = Object.freeze([...(props.initialOperations ?? [])]);
+            try { validateImageEditorPipeline(next.pixels, operations); }
+            catch { next.dispose(); setError('The image or edit sequence exceeds the editor safety limits.'); return; }
             const snapshot: ImageEditorSnapshot = Object.freeze({ mode: initialMode, operations });
             decodedRef.current?.dispose();
             decodedRef.current = next;
@@ -207,7 +197,7 @@ export function ImageEditor(props: ImageEditorProps) {
         }, () => {
             if (live && generation === loadGeneration.current) setError('The image could not be loaded. Your current edit is unchanged.');
         });
-        return () => { live = false; };
+        return () => { live = false; controller.abort(); };
     }, [cropOptions, initialMode, props.initialOperations, props.source]);
 
     useEffect(() => () => {
@@ -225,8 +215,11 @@ export function ImageEditor(props: ImageEditorProps) {
 
     const previewOperations = useMemo(() => {
         const draft = operationForMode(false);
-        return draft && draft.kind !== 'crop' ? appendOperation(committed, draft) : committed;
-    }, [committed, operationForMode]);
+        if (!draft || draft.kind === 'crop' || committed.length >= MAX_IMAGE_EDITOR_OPERATIONS) return committed;
+        const next = appendOperation(committed, draft);
+        try { validateImageEditorPipeline(sourceSize, next); return next; }
+        catch { return committed; }
+    }, [committed, operationForMode, sourceSize]);
     const preview = useMemo(() => decoded ? applyOperationsToPixels(decoded.pixels, previewOperations) : null, [decoded, previewOperations]);
 
     useEffect(() => {
@@ -241,6 +234,11 @@ export function ImageEditor(props: ImageEditorProps) {
         const operation = operationForMode(forceCrop);
         const nextOperations = operation ? appendOperation(committed, operation) : committed;
         if (operation) {
+            try { validateImageEditorPipeline(sourceSize, nextOperations); }
+            catch {
+                setError(`The edit exceeds the safe image or ${MAX_IMAGE_EDITOR_OPERATIONS}-operation limit.`);
+                return committed;
+            }
             setTimeline((current) => commitSnapshot(current.history, current.index, { mode: nextMode, operations: nextOperations }, maxHistory));
         }
         const nextSize = operationOutputSize(sourceSize, nextOperations);
@@ -286,6 +284,7 @@ export function ImageEditor(props: ImageEditorProps) {
         try {
             const draft = operationForMode(mode === 'crop');
             const finalOperations = draft ? appendOperation(committed, draft) : committed;
+            validateImageEditorPipeline(decoded.pixels, finalOperations);
             const pixels = applyOperationsToPixels(decoded.pixels, finalOperations);
             const blob = await pixelSurfaceToBlob(pixels);
             if (generation !== saveGeneration.current) return;

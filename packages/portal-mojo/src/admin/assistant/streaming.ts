@@ -159,33 +159,33 @@ export function startAssistantRealtimeTurn(
     };
     const progress = () => callbacks.onProgress({ tools: [...tools.values()].slice(0, MAX_TOOLS), plan });
 
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.thinking, ({ data }) => {
-        if (!active || !correlated(data.conversationId)) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.thinking, ({ data, source }) => {
+        if (source !== 'direct' || !active || !correlated(data.conversationId)) return;
         adopt(data.conversationId);
     }));
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.text, ({ data }) => {
-        if (!active || !correlated(data.conversationId)) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.text, ({ data, source }) => {
+        if (source !== 'direct' || !active || !correlated(data.conversationId)) return;
         adopt(data.conversationId);
         callbacks.onText({ id: `stream-${data.conversationId}-${++interimSequence}`, role: 'assistant', content: data.text, created: Math.floor(Date.now() / 1000), blocks: data.blocks });
     }));
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.tool, ({ data }) => {
-        if (!active || !correlated(data.conversationId)) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.tool, ({ data, source }) => {
+        if (source !== 'direct' || !active || !correlated(data.conversationId)) return;
         adopt(data.conversationId);
         const current = tools.get(data.name);
         tools.set(data.name, { name: data.name, status: 'running', count: Math.min(MAX_TOOLS, (current?.count ?? 0) + 1) });
         progress();
     }));
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.plan, ({ data }) => {
-        if (!active || !correlated(data.conversationId)) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.plan, ({ data, source }) => {
+        if (source !== 'direct' || !active || !correlated(data.conversationId)) return;
         adopt(data.conversationId); plan = data; progress();
     }));
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.planUpdate, ({ data }) => {
-        if (!active || !correlated(data.conversationId) || !plan || plan.planId !== data.planId) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.planUpdate, ({ data, source }) => {
+        if (source !== 'direct' || !active || !correlated(data.conversationId) || !plan || plan.planId !== data.planId) return;
         plan = { ...plan, steps: plan.steps.map((step) => step.id === data.stepId ? { ...step, status: data.status, ...(data.summary ? { summary: data.summary } : {}) } : step) };
         progress();
     }));
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.response, ({ data }) => {
-        if (!active || !correlated(data.conversationId)) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.response, ({ data, source }) => {
+        if (source !== 'direct' || !active || !correlated(data.conversationId)) return;
         adopt(data.conversationId);
         if (data.messageId == null) {
             void (input.reconcile ?? getAssistantConversation)(data.conversationId).then((conversation) => {
@@ -202,8 +202,8 @@ export function startAssistantRealtimeTurn(
         }
         finish();
     }));
-    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.error, ({ data }) => {
-        if (!active || (data.conversationId != null && !correlated(data.conversationId))) return;
+    cleanups.push(client.on(ASSISTANT_REALTIME_EVENTS.error, ({ data, source }) => {
+        if (source !== 'direct' || !active || (data.conversationId != null && !correlated(data.conversationId))) return;
         if (data.conversationId != null) adopt(data.conversationId);
         finish(new Error(data.error));
     }));

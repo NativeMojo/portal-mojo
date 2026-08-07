@@ -1,5 +1,6 @@
 import {
-    combinedFilters, cropDataFromBox, operationOutputSize, transformOutputSize,
+    assertImageEditorSize, combinedFilters, cropDataFromBox, operationOutputSize,
+    transformOutputSize, validateImageEditorOperationRanges, validateImageEditorPipeline,
     type FilterState, type ImageEditorOperation, type ImageSize, type TransformState,
 } from './math';
 
@@ -22,9 +23,20 @@ export class ImageEditorError extends Error {
     }
 }
 
+/** Matches the FileManager's normal upload ceiling while bounding URL sources too. */
+export const MAX_IMAGE_SOURCE_BYTES = 25_000_000;
+
+export function assertImageSourceSize(size: number): void {
+    if (!Number.isSafeInteger(size) || size < 0 || size > MAX_IMAGE_SOURCE_BYTES) {
+        throw new ImageEditorError('The image source exceeds the editor size limit.');
+    }
+}
+
 const clampByte = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
 
 function copySurface(surface: PixelSurface): PixelSurface {
+    assertImageEditorSize(surface, 'Pixel surface');
+    if (surface.data.length !== surface.width * surface.height * 4) throw new ImageEditorError();
     return { width: surface.width, height: surface.height, data: new Uint8ClampedArray(surface.data) };
 }
 
@@ -35,6 +47,7 @@ function pixelAt(surface: PixelSurface, x: number, y: number, channel: number): 
 
 function transformPixels(surface: PixelSurface, transform: TransformState): PixelSurface {
     const output = transformOutputSize(surface, transform);
+    assertImageEditorSize(output, 'Transform output');
     const data = new Uint8ClampedArray(output.width * output.height * 4);
     const radians = transform.rotation * Math.PI / 180;
     const cos = Math.cos(radians);
@@ -56,6 +69,7 @@ function cropPixels(surface: PixelSurface, rect: { x: number; y: number; width: 
     const crop = cropDataFromBox(rect, surface);
     const width = Math.max(1, Math.floor(output?.width ?? crop.width));
     const height = Math.max(1, Math.floor(output?.height ?? crop.height));
+    assertImageEditorSize({ width, height }, 'Crop output');
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y += 1) {
         for (let x = 0; x < width; x += 1) {
@@ -69,6 +83,10 @@ function cropPixels(surface: PixelSurface, rect: { x: number; y: number; width: 
 }
 
 function boxBlur(surface: PixelSurface, radius: number): PixelSurface {
+    validateImageEditorOperationRanges([{ kind: 'filters', filters: {
+        brightness: 100, contrast: 100, saturation: 100, hue: 0,
+        blur: radius, grayscale: 0, sepia: 0,
+    }, preset: 'none' }]);
     const size = Math.max(0, Math.round(radius));
     if (!size) return surface;
     const output = copySurface(surface);
@@ -91,6 +109,7 @@ function boxBlur(surface: PixelSurface, radius: number): PixelSurface {
 
 /** Deterministic, alpha-preserving implementation of the legacy CSS-filter order. */
 export function filterPixels(surface: PixelSurface, filters: FilterState): PixelSurface {
+    validateImageEditorOperationRanges([{ kind: 'filters', filters, preset: 'none' }]);
     let output = copySurface(surface);
     const brightness = filters.brightness / 100;
     const contrast = filters.contrast / 100;
@@ -144,6 +163,7 @@ export function filterPixels(surface: PixelSurface, filters: FilterState): Pixel
 }
 
 export function applyOperationsToPixels(source: PixelSurface, operations: readonly ImageEditorOperation[]): PixelSurface {
+    validateImageEditorPipeline(source, operations);
     return operations.reduce<PixelSurface>((surface, operation) => {
         if (operation.kind === 'transform') return transformPixels(surface, operation);
         if (operation.kind === 'crop') return cropPixels(surface, operation.rect, operation.output);
@@ -158,6 +178,7 @@ function canvas2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 }
 
 function pixelsFromDrawable(drawable: CanvasImageSource, size: ImageSize): PixelSurface {
+    assertImageEditorSize(size, 'Decoded image');
     const canvas = document.createElement('canvas');
     canvas.width = size.width;
     canvas.height = size.height;
@@ -171,25 +192,40 @@ function pixelsFromDrawable(drawable: CanvasImageSource, size: ImageSize): Pixel
     }
 }
 
-async function decodeBlob(blob: Blob): Promise<{ drawable: CanvasImageSource; width: number; height: number; dispose: () => void }> {
+function aborted(signal?: AbortSignal): void {
+    if (signal?.aborted) throw new ImageEditorError('The image load was cancelled.');
+}
+
+async function decodeBlob(blob: Blob, signal?: AbortSignal): Promise<{ drawable: CanvasImageSource; width: number; height: number; dispose: () => void }> {
+    aborted(signal);
     if (typeof createImageBitmap === 'function') {
+        let bitmap: ImageBitmap | null = null;
         try {
-            const bitmap = await createImageBitmap(blob);
-            if (!bitmap.width || !bitmap.height) { bitmap.close(); throw new ImageEditorError(); }
-            return { drawable: bitmap, width: bitmap.width, height: bitmap.height, dispose: () => bitmap.close() };
+            bitmap = await createImageBitmap(blob);
         } catch {
             // Some browsers expose createImageBitmap but do not decode every
             // image MIME it accepts through <img>; use the owned-URL fallback.
+        }
+        if (bitmap) {
+            if (signal?.aborted) { bitmap.close(); aborted(signal); }
+            try { assertImageEditorSize(bitmap, 'Decoded image'); }
+            catch { bitmap.close(); throw new ImageEditorError('The decoded image exceeds the editor pixel limit.'); }
+            return { drawable: bitmap, width: bitmap.width, height: bitmap.height, dispose: () => bitmap.close() };
         }
     }
     const ownedUrl = URL.createObjectURL(blob);
     try {
         const image = await new Promise<HTMLImageElement>((resolve, reject) => {
             const element = new Image();
-            element.onload = () => resolve(element);
-            element.onerror = () => reject(new ImageEditorError('The selected image could not be decoded.'));
+            const cleanup = () => signal?.removeEventListener('abort', onAbort);
+            const onAbort = () => { element.src = ''; cleanup(); reject(new ImageEditorError('The image load was cancelled.')); };
+            element.onload = () => { cleanup(); resolve(element); };
+            element.onerror = () => { cleanup(); reject(new ImageEditorError('The selected image could not be decoded.')); };
+            signal?.addEventListener('abort', onAbort, { once: true });
             element.src = ownedUrl;
         });
+        try { assertImageEditorSize({ width: image.naturalWidth, height: image.naturalHeight }, 'Decoded image'); }
+        catch { throw new ImageEditorError('The decoded image exceeds the editor pixel limit.'); }
         return { drawable: image, width: image.naturalWidth, height: image.naturalHeight, dispose: () => URL.revokeObjectURL(ownedUrl) };
     } catch (error) {
         URL.revokeObjectURL(ownedUrl);
@@ -197,14 +233,43 @@ async function decodeBlob(blob: Blob): Promise<{ drawable: CanvasImageSource; wi
     }
 }
 
-export async function decodeImageSource(source: ImageEditorSource): Promise<DecodedImage> {
+async function boundedResponseBlob(response: Response, signal?: AbortSignal): Promise<Blob> {
+    const contentLength = response.headers.get('content-length');
+    if (contentLength != null && contentLength !== '') assertImageSourceSize(Number(contentLength));
+    if (!response.body) {
+        const blob = await response.blob();
+        assertImageSourceSize(blob.size);
+        return blob;
+    }
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+        while (true) {
+            aborted(signal);
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            assertImageSourceSize(size);
+            chunks.push(value);
+        }
+    } catch (error) {
+        void reader.cancel().catch(() => undefined);
+        throw error;
+    }
+    return new Blob(chunks, { type: response.headers.get('content-type') ?? '' });
+}
+
+export async function decodeImageSource(source: ImageEditorSource, options: { signal?: AbortSignal } = {}): Promise<DecodedImage> {
+    const { signal } = options;
+    aborted(signal);
     let blob: Blob;
     let filename = 'edited-image.png';
     if (typeof source === 'string') {
         try {
-            const response = await fetch(source, { credentials: 'same-origin' });
+            const response = await fetch(source, { credentials: 'same-origin', signal });
             if (!response.ok) throw new ImageEditorError();
-            blob = await response.blob();
+            blob = await boundedResponseBlob(response, signal);
         } catch {
             throw new ImageEditorError('The image could not be loaded.');
         }
@@ -214,7 +279,8 @@ export async function decodeImageSource(source: ImageEditorSource): Promise<Deco
     } else {
         throw new ImageEditorError('Select a valid image source.');
     }
-    const decoded = await decodeBlob(blob);
+    assertImageSourceSize(blob.size);
+    const decoded = await decodeBlob(blob, signal);
     try {
         const pixels = pixelsFromDrawable(decoded.drawable, decoded);
         return { pixels, filename, dispose: decoded.dispose };
@@ -225,6 +291,7 @@ export async function decodeImageSource(source: ImageEditorSource): Promise<Deco
 }
 
 export function drawPixelSurface(canvas: HTMLCanvasElement, surface: PixelSurface): void {
+    assertImageEditorSize(surface, 'Pixel surface');
     canvas.width = surface.width;
     canvas.height = surface.height;
     const context = canvas2d(canvas);
@@ -234,6 +301,7 @@ export function drawPixelSurface(canvas: HTMLCanvasElement, surface: PixelSurfac
 }
 
 export function pixelSurfaceToBlob(surface: PixelSurface): Promise<Blob> {
+    assertImageEditorSize(surface, 'Pixel surface');
     const canvas = document.createElement('canvas');
     drawPixelSurface(canvas, surface);
     return new Promise((resolve, reject) => {
@@ -246,6 +314,7 @@ export function pixelSurfaceToBlob(surface: PixelSurface): Promise<Blob> {
 }
 
 export async function renderImageOperations(decoded: DecodedImage, operations: readonly ImageEditorOperation[]): Promise<{ pixels: PixelSurface; blob: Blob; width: number; height: number }> {
+    validateImageEditorPipeline(decoded.pixels, operations);
     const expected = operationOutputSize(decoded.pixels, operations);
     const pixels = applyOperationsToPixels(decoded.pixels, operations);
     if (pixels.width !== expected.width || pixels.height !== expected.height) throw new ImageEditorError();
