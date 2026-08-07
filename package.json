@@ -43,6 +43,7 @@
         "verify:file-upload": "node scripts/verify-file-upload.mjs",
         "verify:upload-ux": "node scripts/verify-upload-ux.mjs",
         "verify:record-attachments": "node scripts/verify-record-attachments.mjs",
-        "verify:form-uploads": "node scripts/verify-form-uploads.mjs"
+        "verify:form-uploads": "node scripts/verify-form-uploads.mjs",
+        "verify:image-editor": "node scripts/verify-image-editor.mjs"
     }
 }
