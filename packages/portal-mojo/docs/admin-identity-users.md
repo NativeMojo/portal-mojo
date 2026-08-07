@@ -81,6 +81,13 @@ relation to match the requested id/null exactly. A failed or mismatched owner
 save retains the uploaded candidate for attachment-only retry and reports an
 abandoned candidate without deleting it.
 
+Avatar selection opts into the shared editor before that upload begins. It
+starts on a square crop and emits an exact alpha-preserving 200×200 PNG. Cancel
+or edit failure leaves the original local selection available for retry or
+discard; this required editor path does not offer Use original. Only an editor save converts the Blob to the File passed
+into the existing personal-scope queue, so editing cannot create a File id or
+trigger owner attachment early.
+
 UserModel and `useMe` independently reduce expanded avatar relations to `{id}`
 before their separate Query caches. The modal resolves a stored preview only
 imperatively while mounted; capability URLs do not enter Query/Mutation cache,

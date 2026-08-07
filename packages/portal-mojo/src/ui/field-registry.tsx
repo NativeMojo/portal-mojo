@@ -174,7 +174,7 @@ registerFieldType('file', function FileRegistryField({ field, value, invalid, di
 });
 
 registerFieldType('image', function ImageRegistryField({ field, value, invalid, disabled, controlId, ariaDescribedBy, commit, onPendingChange, ownerResult }) {
-    return <ImageField value={value} onChange={commit} accept={field.accept} maxFileSize={field.maxFileSize} destination={field.uploadDestination} disabled={disabled || field.disabled} invalid={invalid} controlId={controlId} ariaDescribedBy={ariaDescribedBy} onPendingChange={onPendingChange} ownerResult={ownerResult} onOrphan={field.onUploadOrphan} />;
+    return <ImageField value={value} onChange={commit} accept={field.accept} maxFileSize={field.maxFileSize} destination={field.uploadDestination} disabled={disabled || field.disabled} invalid={invalid} controlId={controlId} ariaDescribedBy={ariaDescribedBy} onPendingChange={onPendingChange} ownerResult={ownerResult} onOrphan={field.onUploadOrphan} edit={field.imageEdit} requireEdit={field.imageEditRequired} />;
 });
 
 // tag | tags → TagInput. State/wire: CSV string (the load-bearing shape —

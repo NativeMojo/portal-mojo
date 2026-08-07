@@ -6,9 +6,10 @@ import { FileDropZone, type FileSelectionResult } from './FileDrop';
 import { useUploadQueue } from './UploadQueue';
 import { fileRelationId } from './field-wire';
 import { toast } from './toast';
+import { imageEditorModal, type ImageEditorModalOptions } from './image-editor';
 
 export type FileFieldState = 'keep' | 'clear' | 'replacement-in-progress' | 'replacement-failed'
-    | 'completed-awaiting-attach' | 'attach-failed';
+    | 'completed-awaiting-attach' | 'attach-failed' | 'edit-pending' | 'edit-ready' | 'edit-failed';
 
 export interface FileFieldOwnerResult {
     generation: number;
@@ -33,6 +34,10 @@ export interface FileFieldProps {
     onPendingChange?: (pending: boolean) => void;
     ownerResult?: FileFieldOwnerResult;
     onOrphan?: (fileId: number) => void;
+    /** Image-only, opt-in editor that runs before any File upload is initiated. */
+    edit?: boolean | ImageEditorModalOptions;
+    /** Require an editor result; Cancel retains the selection for retry/discard only. */
+    requireEdit?: boolean;
 }
 
 export function reconcileFileOwnerResult(expected: number | null, result: FileFieldOwnerResult, lastGeneration: number): 'ignore' | 'attached' | 'failed' {
@@ -72,6 +77,8 @@ export function FileField(props: FileFieldProps) {
     const desired = useRef<number | null | undefined>(undefined);
     const candidate = useRef<number | null>(null);
     const candidateFilename = useRef<string | null>(null);
+    const selectedOriginal = useRef<File | null>(null);
+    const editController = useRef<AbortController | null>(null);
     const generation = useRef(0);
     const ownerGeneration = useRef(0);
     const orphaned = useRef(new Set<number>());
@@ -82,6 +89,7 @@ export function FileField(props: FileFieldProps) {
     const [preview, setPreview] = useState<string | null>(null);
     const [filename, setFilename] = useState<string | null>(null);
     const [state, setState] = useState<FileFieldState>('keep');
+    const [editing, setEditing] = useState(false);
     const queue = useUploadQueue({ concurrency: 1, capacity: 1 });
 
     const revokeLocal = useCallback(() => {
@@ -103,20 +111,28 @@ export function FileField(props: FileFieldProps) {
     useEffect(() => () => {
         mounted.current = false;
         generation.current += 1;
+        editController.current?.abort();
         revokeLocal();
         if (desired.current !== undefined && candidate.current != null) reportOrphan(candidate.current);
         queue.cancelAll();
     }, [queue, reportOrphan, revokeLocal]);
 
     const active = queue.snapshot.activeCount > 0 || queue.snapshot.queuedCount > 0;
+    const pending = active || editing;
     useEffect(() => {
-        if (disabled && active) queue.cancelAll();
+        if (!disabled) return;
+        if (active) queue.cancelAll();
+        if (editController.current) {
+            editController.current.abort();
+            setEditing(false);
+            setState('edit-ready');
+        }
     }, [active, disabled, queue]);
 
     useEffect(() => {
-        onPendingChange?.(active);
+        onPendingChange?.(pending);
         return () => onPendingChange?.(false);
-    }, [active, onPendingChange]);
+    }, [onPendingChange, pending]);
 
     // Stored capabilities are fetched only while mounted, never returned to a
     // caller or written through Query. Failures intentionally reveal nothing.
@@ -179,12 +195,8 @@ export function FileField(props: FileFieldProps) {
         }
     }, [active, queue.snapshot.items, state]);
 
-    const select = (selection: FileSelectionResult) => {
-        selection.rejected.forEach((item) => toast.warning(item.message));
-        const file = selection.accepted[0];
-        if (!file) return;
-        generation.current += 1;
-        const acceptedGeneration = generation.current;
+    const enqueueFile = (file: File, acceptedGeneration: number) => {
+        selectedOriginal.current = null;
         reportOrphan(candidate.current);
         candidate.current = null;
         desired.current = undefined;
@@ -212,8 +224,64 @@ export function FileField(props: FileFieldProps) {
         if (!result.acceptedIds.length) setState('replacement-failed');
     };
 
+    const editSelected = async (file: File, acceptedGeneration: number) => {
+        editController.current?.abort();
+        const controller = new AbortController();
+        editController.current = controller;
+        setEditing(true);
+        setState('edit-pending');
+        try {
+            const configured: ImageEditorModalOptions = typeof props.edit === 'object' ? props.edit : {};
+            const result = await imageEditorModal(file, {
+                ...configured,
+                filename: configured.filename ?? file.name,
+                signal: controller.signal,
+            });
+            if (!mounted.current || controller.signal.aborted || generation.current !== acceptedGeneration) return;
+            if (!result) {
+                setState('edit-ready');
+                return;
+            }
+            const edited = new File([result.blob], result.filename, { type: 'image/png', lastModified: file.lastModified });
+            enqueueFile(edited, acceptedGeneration);
+        } catch {
+            if (mounted.current && !controller.signal.aborted && generation.current === acceptedGeneration) setState('edit-failed');
+        } finally {
+            if (mounted.current && editController.current === controller) {
+                editController.current = null;
+                setEditing(false);
+            }
+        }
+    };
+
+    const select = (selection: FileSelectionResult) => {
+        selection.rejected.forEach((item) => toast.warning(item.message));
+        const file = selection.accepted[0];
+        if (!file) return;
+        generation.current += 1;
+        const acceptedGeneration = generation.current;
+        editController.current?.abort();
+        reportOrphan(candidate.current);
+        candidate.current = null;
+        desired.current = undefined;
+        clearQueue();
+        revokeLocal();
+        localUrl.current = URL.createObjectURL(file);
+        setPreview(image ? localUrl.current : null);
+        setFilename(file.name);
+        if (image && props.edit) {
+            selectedOriginal.current = file;
+            setState('edit-ready');
+            void editSelected(file, acceptedGeneration);
+        } else {
+            enqueueFile(file, acceptedGeneration);
+        }
+    };
+
     const clear = () => {
         generation.current += 1;
+        editController.current?.abort();
+        selectedOriginal.current = null;
         reportOrphan(candidate.current);
         candidate.current = null;
         desired.current = null;
@@ -224,6 +292,8 @@ export function FileField(props: FileFieldProps) {
     };
     const removeCandidate = () => {
         generation.current += 1;
+        editController.current?.abort();
+        selectedOriginal.current = null;
         reportOrphan(candidate.current);
         candidate.current = null;
         desired.current = undefined;
@@ -239,6 +309,23 @@ export function FileField(props: FileFieldProps) {
         setState(desired.current == null ? 'clear' : 'completed-awaiting-attach');
         props.onChange(desired.current);
     };
+    const retryEdit = () => {
+        const file = selectedOriginal.current;
+        if (file) void editSelected(file, generation.current);
+    };
+    const useOriginal = () => {
+        const file = selectedOriginal.current;
+        if (file) enqueueFile(file, generation.current);
+    };
+    const discardSelection = () => {
+        generation.current += 1;
+        editController.current?.abort();
+        selectedOriginal.current = null;
+        revokeLocal();
+        setFilename(null);
+        setPreview(null);
+        setState('keep');
+    };
 
     const item = queue.snapshot.items[0];
     const hasStored = storedId.current != null;
@@ -247,7 +334,10 @@ export function FileField(props: FileFieldProps) {
             : state === 'replacement-in-progress' ? (item?.percent == null ? 'Uploading…' : `Uploading… ${item.percent}%`)
                 : state === 'replacement-failed' ? (item?.failure?.message ?? 'Upload failed')
                     : state === 'completed-awaiting-attach' ? 'Uploaded · awaiting save'
-                        : 'Uploaded · attachment failed';
+                        : state === 'attach-failed' ? 'Uploaded · attachment failed'
+                            : state === 'edit-pending' ? 'Editing before upload…'
+                                : state === 'edit-failed' ? 'Editing failed · original selection preserved'
+                                    : 'Selected · not uploaded';
 
     return (
         <div id={props.controlId} className={`file-field${image ? ' image-field' : ''}${invalid ? ' is-invalid' : ''}`} aria-describedby={props.ariaDescribedBy}>
@@ -257,10 +347,15 @@ export function FileField(props: FileFieldProps) {
                 <span className={`file-field-status is-${state}`}>{statusText}</span>
                 {item?.canRetry && <button type="button" className="btn btn-compact" disabled={disabled} onClick={() => queue.retry(item.id)}>Retry upload</button>}
                 {state === 'attach-failed' && <button type="button" className="btn btn-compact" disabled={disabled} onClick={retryAttach}>Retry attachment</button>}
+                {(state === 'edit-ready' || state === 'edit-failed') && <div className="file-field-edit-actions">
+                    <button type="button" className="btn btn-compact" disabled={disabled} onClick={retryEdit}>{state === 'edit-failed' ? 'Retry edit' : 'Edit'}</button>
+                    {!props.requireEdit && <button type="button" className="btn btn-compact" disabled={disabled} onClick={useOriginal}>Use original</button>}
+                    <button type="button" className="btn btn-compact" disabled={disabled} onClick={discardSelection}>Discard</button>
+                </div>}
             </div>
             <div className="file-field-actions">
-                <FileDropZone className="file-field-drop" label={hasStored || candidate.current ? 'Choose replacement file or drop it here' : 'Choose a file or drop it here'} multiple={false} accept={image ? props.accept ?? 'image/*' : props.accept} maxFileSize={props.maxFileSize} disabled={disabled || active} onSelection={select}>
-                    <span><i className="bi bi-cloud-arrow-up" /> {hasStored || candidate.current ? 'Replace' : 'Choose file'}</span>
+                <FileDropZone className="file-field-drop" label={hasStored || candidate.current || selectedOriginal.current ? 'Choose replacement file or drop it here' : 'Choose a file or drop it here'} multiple={false} accept={image ? props.accept ?? 'image/*' : props.accept} maxFileSize={props.maxFileSize} disabled={disabled || pending} onSelection={select}>
+                    <span><i className="bi bi-cloud-arrow-up" /> {hasStored || candidate.current || selectedOriginal.current ? 'Replace' : 'Choose file'}</span>
                 </FileDropZone>
                 {(hasStored || desired.current !== undefined) && <button type="button" className="btn btn-compact" disabled={disabled || active} onClick={desired.current !== undefined ? removeCandidate : clear}>{desired.current !== undefined ? 'Remove' : 'Clear'}</button>}
                 {item?.canCancel && <button type="button" className="btn btn-compact" disabled={disabled} onClick={() => queue.cancel(item.id)}>Cancel</button>}

@@ -99,6 +99,7 @@
 .file-field-preview{display:grid;place-items:center;inline-size:64px;block-size:64px;overflow:hidden;border-radius:9px;background:var(--surface2);color:var(--mute);font-size:24px}
 .file-field-preview img{inline-size:100%;block-size:100%;object-fit:cover}
 .file-field-main{display:grid;gap:3px;min-inline-size:0}.file-field-main>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-field-status{color:var(--mute);font-size:12px}.file-field-status.is-replacement-failed,.file-field-status.is-attach-failed{color:var(--bad)}.file-field-status.is-completed-awaiting-attach{color:var(--warn)}
+.file-field-status.is-edit-failed{color:var(--bad)}.file-field-status.is-edit-ready{color:var(--warn)}.file-field-edit-actions{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:4px}
 .file-field-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px}.file-field-drop{min-block-size:auto;padding:7px 10px;border-style:solid}.file-field-drop span{display:flex;gap:6px;white-space:nowrap}
 @media(max-width:640px){.file-field{grid-template-columns:auto minmax(0,1fr)}.file-field-actions{grid-column:1/-1;justify-content:flex-start;flex-wrap:wrap}}
 

@@ -49,6 +49,8 @@ export interface ImageEditorProps extends ImageEditorOptions {
 export interface ImageEditorModalOptions extends ImageEditorOptions {
     title?: string;
     size?: ModalSize;
+    /** Optional owner lifecycle signal; abort closes the editor with null. */
+    signal?: AbortSignal;
 }
 
 interface Timeline {
@@ -326,6 +328,7 @@ export function ImageEditor(props: ImageEditorProps) {
             else kind = 'new-crop';
         } else if (mode !== 'transform') return;
         drag.current = { pointerId: event.pointerId, kind, start, initialTransform: { ...transform }, initialCrop: { ...cropBox }, initialDirty: dirty, handle };
+        (element.closest('.image-editor') as HTMLElement | null)?.focus();
         element.setPointerCapture(event.pointerId);
         event.preventDefault();
     };
@@ -447,17 +450,35 @@ export function ImageEditor(props: ImageEditorProps) {
 export function imageEditorModal(source: ImageEditorSource, options: ImageEditorModalOptions = {}): Promise<ImageEditorResult | null> {
     validateImageEditorOptions(source, options);
     let pending = false;
-    const { title = 'Image editor', size = 'lg', ...editorOptions } = options;
+    const { title = 'Image editor', size = 'lg', signal, ...editorOptions } = options;
     return modal.open<ImageEditorResult | null>((close) => (
-        <div className="image-editor-modal">
-            <h2 className="image-editor-modal-title">{title}</h2>
-            <ImageEditor
-                {...editorOptions}
-                source={source}
-                onSave={(result) => close(result)}
-                onCancel={() => close(null)}
-                onBusyChange={(value) => { pending = value; }}
-            />
-        </div>
+        <ImageEditorModalBody source={source} title={title} signal={signal} options={editorOptions} close={close} onBusyChange={(value) => { pending = value; }} />
     ), { size, flush: true, canDismiss: () => !pending });
+}
+
+function ImageEditorModalBody({ source, title, signal, options, close, onBusyChange }: {
+    source: ImageEditorSource;
+    title: string;
+    signal?: AbortSignal;
+    options: ImageEditorOptions;
+    close: (result: ImageEditorResult | null) => void;
+    onBusyChange: (busy: boolean) => void;
+}) {
+    useEffect(() => {
+        if (!signal) return;
+        if (signal.aborted) { close(null); return; }
+        const abort = () => close(null);
+        signal.addEventListener('abort', abort, { once: true });
+        return () => signal.removeEventListener('abort', abort);
+    }, [close, signal]);
+    return <div className="image-editor-modal">
+        <h2 className="image-editor-modal-title">{title}</h2>
+        <ImageEditor
+            {...options}
+            source={source}
+            onSave={(result) => close(result)}
+            onCancel={() => close(null)}
+            onBusyChange={onBusyChange}
+        />
+    </div>;
 }
