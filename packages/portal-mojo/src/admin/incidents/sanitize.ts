@@ -1,3 +1,5 @@
+import { safeFileReference } from '../../client/record-feed';
+
 const REDACTED = '[redacted]';
 const MAX_SECURITY_TEXT = 32_000;
 const SENSITIVE_KEY = /^(?:authorization|proxy[-_]?authorization|cookie|set[-_]?cookie|password|passwd|passphrase|token|access[-_]?token|refresh[-_]?token|id[-_]?token|api[-_]?key|auth[-_]?key|client[-_]?secret|secret|credential|credentials|csrf|xsrf)(?:$|[-_])/i;
@@ -48,7 +50,10 @@ export function sanitizeSecurityValue<T>(value: T, seen = new WeakMap<object, un
 }
 
 function sanitizedRow<T extends Record<string, unknown>>(row: T): T {
-    const safe = sanitizeSecurityValue(row) as Record<string, unknown>;
+    // File relation objects are positively projected before recursive domain
+    // sanitization so browser/capability-bearing impostors never traverse it.
+    const rebuilt = 'media' in row ? { ...row, media: safeFileReference(row.media) } : row;
+    const safe = sanitizeSecurityValue(rebuilt) as Record<string, unknown>;
     for (const key of ['details', 'stack_trace', 'traceback']) {
         if (key in safe && safe[key] != null) safe[key] = boundedSecurityText(safe[key]);
     }

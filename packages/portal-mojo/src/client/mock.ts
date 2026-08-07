@@ -492,7 +492,7 @@ interface MockTicketNote {
     group: number | null;
     user: number | null;
     note: string | null;
-    media: null;
+    media: number | null;
     metadata: Record<string, unknown>;
     [field: string]: unknown;
 }
@@ -541,7 +541,7 @@ interface MockIncidentHistory {
     state: number;
     priority: number;
     note: string | null;
-    media: null;
+    media: number | null;
     metadata: Record<string, unknown>;
     [field: string]: unknown;
 }
@@ -749,7 +749,7 @@ function buildTicketNotes(): MockTicketNote[] {
         { id: 705, parent: 504, created: now - 240, group: 1, user: null, note: 'Approve blocking the suspicious client fingerprint?', media: null, metadata: { action: { handler: 'incident.rule_approval', label: 'Block suspicious fingerprint', context: { target: 'fp-headless', detail: 'Apply the reviewed bot signature to future requests.' }, references: ['signal:1003'], resolved: false } } },
         { id: 704, parent: 505, created: now - 3600, group: null, user: null, note: 'Previously reviewed action.', media: null, metadata: { action: { handler: 'incident.rule_approval', label: 'Escalate alert', context: { target: 'incident:603' }, resolved: true, resolution: 'approve' } } },
         { id: 703, parent: 501, created: now - 480, group: 1, user: null, note: 'Status changed from new to open.', media: null, metadata: { type: 'status_change', old_status: 'new', new_status: 'open' } },
-        { id: 701, parent: 501, created: now - 900, group: 1, user: 1, note: 'Confirmed the webhook failures began after the receiver deploy.', media: null, metadata: {} },
+        { id: 701, parent: 501, created: now - 900, group: 1, user: 1, note: 'Confirmed the webhook failures began after the receiver deploy.', media: 5101, metadata: {} },
         { id: 700, parent: 501, created: now - 7200, group: 1, user: null, note: '[LLM Agent] Five consecutive 503 responses observed.', media: null, metadata: { origin: 'agent' } },
         { id: 699, parent: 502, created: now - 86400, group: 2, user: 2, note: 'Customer supplied a fresh trace id.', media: null, metadata: {} },
     ];
@@ -778,7 +778,7 @@ function buildMaestroItemLinks(): MockMaestroItemLink[] {
 function buildIncidentHistory(): MockIncidentHistory[] {
     const now = Math.floor(Date.now() / 1000);
     return [
-        { id: 801, parent: 601, created: now - 600, group: 1, kind: 'note', to: null, user: 1, state: 2, priority: 7, note: 'Escalated after the fifth failed delivery.', media: null, metadata: {} },
+        { id: 801, parent: 601, created: now - 600, group: 1, kind: 'note', to: null, user: 1, state: 2, priority: 7, note: 'Escalated after the fifth failed delivery.', media: 5101, metadata: {} },
         { id: 800, parent: 601, created: now - 5400, group: 1, kind: 'state', to: null, user: 12, state: 1, priority: 5, note: 'Investigation opened.', media: null, metadata: { old_state: 0 } },
         { id: 799, parent: 602, created: now - 2 * 86400, group: 2, kind: 'note', to: 2, user: null, state: 1, priority: 3, note: 'Automated monitor linked related events.', media: null, metadata: {} },
         { id: 798, parent: 603, created: now - 7000, group: null, kind: 'created', to: null, user: null, state: 0, priority: 7, note: 'Bouncer created the incident. Authorization: Bearer sentinel-history-secret', media: null, metadata: { token: 'sentinel-history-token' } },
@@ -1011,8 +1011,14 @@ function serializeFeedUser(userId: number | null): Record<string, unknown> | nul
     return user ? userBasic(user) : null;
 }
 
+function serializeFileReference(fileId: number | null): Record<string, unknown> | null {
+    if (fileId == null) return null;
+    const file = db.storageFiles.find((candidate) => candidate.id === fileId);
+    return file ? { id: file.id, filename: file.filename, content_type: file.content_type, category: file.category } : null;
+}
+
 function serializeTicketNote(row: MockTicketNote): Record<string, unknown> {
-    return { ...row, user: serializeFeedUser(row.user), media: null };
+    return { ...row, user: serializeFeedUser(row.user), media: serializeFileReference(row.media) };
 }
 
 function serializeTicket(row: MockTicket): Record<string, unknown> {
@@ -1045,7 +1051,7 @@ function serializeIncidentHistory(row: MockIncidentHistory): Record<string, unkn
     return {
         ...row,
         user: serializeFeedUser(row.user),
-        media: null,
+        media: serializeFileReference(row.media),
         state_display: stateLabels[row.state] ?? String(row.state),
         priority_display: priorityLabels[row.priority] ?? String(row.priority),
     };
@@ -3936,7 +3942,7 @@ function buildAssistantState() {
     const now = Math.floor(Date.now() / 1000);
     const conversations: MockAssistantConversation[] = [
         { id: 8101, user: 14, group: null, title: 'Review deployment health', metadata: {}, created: now - 3600, modified: now - 3300, messages: [
-            { id: 8201, role: 'user', content: 'Summarize deployment health.', tool_calls: [], blocks: null, duration_ms: null, usage: {}, created: now - 3600 },
+            { id: 8201, role: 'user', content: 'Summarize deployment health.', tool_calls: [], blocks: [{ type: 'attachment', files: [{ id: 5104, filename: 'quarterly-report.pdf', content_type: 'application/pdf', category: 'document' }] }], duration_ms: null, usage: {}, created: now - 3600 },
             { id: 8202, role: 'assistant', content: 'The deployment is healthy; one security ticket needs review.', tool_calls: [], blocks: [{ type: 'stat', items: [{ label: 'Healthy services', value: 12 }, { label: 'Open tickets', value: 1 }] }], duration_ms: 420, usage: {}, created: now - 3300 },
         ] },
         { id: 8102, user: 47, group: null, title: 'Incident review', metadata: { context_model: 'incident.Incident', context_pk: 1 }, created: now - 7200, modified: now - 7100, messages: [
@@ -4108,6 +4114,7 @@ function buildStorageFiles(): MockStorageFile[] {
         { id: 5107, created: now - 500, modified: now - 500, filename: 'renderer-failure.pdf', file_size: 402114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5107', rendition_demo: 'failed' },
         { id: 5108, created: now - 400, modified: now - 400, filename: 'renderer-expired.pdf', file_size: 302114, content_type: 'application/pdf', category: 'document', upload_status: 'completed', is_active: true, is_public: false, group: 1, user: 14, file_manager: 4101, metadata: {}, url: '/mock-storage/files/5108', rendition_demo: 'expired' },
         { id: 5109, created: now - 300, modified: now - 300, filename: 'maya-avatar.png', file_size: 48122, content_type: 'image/png', category: 'image', upload_status: 'completed', is_active: true, is_public: false, group: null, user: 2, file_manager: 4107, metadata: { width: 512, height: 512 }, url: '/mock-storage/files/5109' },
+        { id: 5110, created: now - 120, modified: now - 120, filename: 'incomplete-evidence.txt', file_size: 42, content_type: 'text/plain', category: 'text', upload_status: 'uploading', is_active: true, is_public: false, group: 1, user: 1, file_manager: 4101, metadata: {}, url: null },
     ];
 }
 
@@ -5611,11 +5618,14 @@ const mockUploadObservations: MockUploadObservation[] = [];
 const mockUploadInitiationObservations: MockUploadInitiationObservation[] = [];
 let mockUploadMode: MockUploadMode = 'raw-put';
 let mockUploadFault: MockUploadFault | null = null;
+let mockRecordNoteFault: 'ambiguous' | null = null;
 
 /** Chooses an exact supported provider shape for the next mock initiations. */
 export function setMockUploadMode(mode: MockUploadMode): void { mockUploadMode = mode; }
 /** Arms a one-shot upload fault without recording provider values. */
 export function armMockUploadFault(fault: MockUploadFault): void { mockUploadFault = fault; }
+/** Drops one record-note response after the mock has committed it. */
+export function armMockRecordNoteFault(): void { mockRecordNoteFault = 'ambiguous'; }
 export function getMockUploadObservations(): MockUploadObservation[] {
     return mockUploadObservations.map((row) => ({ ...row, headerNames: [...row.headerNames], fieldOrder: [...row.fieldOrder] }));
 }
@@ -5764,6 +5774,15 @@ const STORAGE_MANAGE_GRANTS = ['manage_files', 'files'];
 const STORAGE_BUCKET_GRANTS = ['manage_aws', 'files'];
 const STORAGE_GROUP_DIRECTORY_GRANTS = ['view_groups', 'manage_groups', 'manage_group', 'groups'];
 const STORAGE_USER_DIRECTORY_GRANTS = ['users', 'view_users', 'manage_users'];
+
+function mockCompletedAttachment(fileId: unknown, groupId: number | null, caller: MockUser): MockStorageFile | null {
+    if (typeof fileId !== 'number' || !Number.isSafeInteger(fileId) || fileId <= 0) return null;
+    const file = db.storageFiles.find((candidate) => candidate.id === fileId);
+    const manager = file && db.fileManagers.find((candidate) => candidate.id === file.file_manager);
+    const visible = file && (file.user === caller.id || hasGlobalPermission(caller, STORAGE_VIEW_GRANTS));
+    return file && manager && visible && file.is_active && file.upload_status === 'completed'
+        && manager.is_active && file.group === groupId && manager.group === groupId ? file : null;
+}
 
 function storageRelation(kind: 'group' | 'user', id: number | null): Record<string, unknown> | null {
     if (id == null) return null;
@@ -7636,17 +7655,28 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
             const message = typeof opts.body?.message === 'string' ? opts.body.message.trim() : '';
             if (!message) return { status: false, error: 'message is required', error_code: 400 };
+            const attachmentsSupplied = Object.prototype.hasOwnProperty.call(opts.body ?? {}, 'attachments');
+            const attachmentIds = opts.body?.attachments;
+            if (attachmentsSupplied && (!Array.isArray(attachmentIds) || attachmentIds.length < 1 || attachmentIds.length > 5
+                || attachmentIds.some((id) => typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0)
+                || new Set(attachmentIds).size !== attachmentIds.length)) {
+                return { status: false, error: 'Invalid assistant attachments', conversation_id: null, error_code: 400 };
+            }
             let conversation: MockAssistantConversation | undefined;
             if (opts.body?.conversation_id != null) {
                 conversation = db.assistantConversations.find((row) => row.id === Number(opts.body?.conversation_id));
                 if (!conversation || conversation.user !== caller.id) return { status: false, error: 'Conversation not found', conversation_id: Number(opts.body.conversation_id), error_code: 404 };
-            } else {
+            }
+            const attachmentFiles = (Array.isArray(attachmentIds) ? attachmentIds : []).map((id) => mockCompletedAttachment(id, conversation?.group ?? null, caller));
+            if (attachmentFiles.some((file) => file == null)) return { status: false, error: 'Invalid assistant attachments', conversation_id: conversation?.id ?? null, error_code: 400 };
+            if (!conversation) {
                 const now = Math.floor(Date.now() / 1000);
                 conversation = { id: Math.max(8100, ...db.assistantConversations.map((row) => row.id)) + 1, user: caller.id, group: null, title: message.slice(0, 80), metadata: {}, created: now, modified: now, messages: [] };
                 db.assistantConversations.unshift(conversation);
             }
             const now = Math.floor(Date.now() / 1000);
-            conversation.messages.push({ id: nextMessageId(), role: 'user', content: message, tool_calls: [], blocks: null, duration_ms: null, usage: {}, created: now });
+            const attachmentBlock = attachmentFiles.length ? [{ type: 'attachment', files: attachmentFiles.map((file) => ({ id: file!.id, filename: file!.filename, content_type: file!.content_type, category: file!.category })) }] : null;
+            conversation.messages.push({ id: nextMessageId(), role: 'user', content: message, tool_calls: [], blocks: attachmentBlock, duration_ms: null, usage: {}, created: now });
             let response = `I received your request: ${message}`;
             let blocks: unknown[] = [];
             if (/confirm|block ip|action/i.test(message)) { response = 'Review the proposed action before continuing.'; blocks = [{ type: 'action', action_id: `mock-${conversation.id}-${now}`, title: 'Confirm operation', description: 'This deterministic mock action returns through ordinary chat.', actions: [{ label: 'Confirm', value: 'confirm' }, { label: 'Cancel', value: 'cancel' }] }]; }
@@ -8849,12 +8879,15 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             const parentId = Number(opts.body.parent ?? 0);
             const parent = db.tickets.find((candidate) => candidate.id === parentId);
             if (!parent) return { status: false, error: 'Ticket not found', error_code: 404 };
+            if (typeof opts.body.note !== 'string' || !opts.body.note.trim()) return { status: false, error: 'note is required', error_code: 400 };
             if (opts.body.group != null && Number(opts.body.group) !== parent.group) return permissionDenied();
+            const media = opts.body.media == null ? null : mockCompletedAttachment(opts.body.media, parent.group, caller);
+            if (opts.body.media != null && !media) return { status: false, error: 'Media must reference an active, completed File in the record scope', error_code: 400 };
             const now = Math.floor(Date.now() / 1000);
             const row: MockTicketNote = {
                 id: Math.max(0, ...db.ticketNotes.map((candidate) => candidate.id)) + 1,
                 parent: parentId, created: now, group: parent.group, user: caller.id,
-                note: opts.body.note == null ? null : String(opts.body.note), media: null,
+                note: opts.body.note == null ? null : String(opts.body.note), media: media?.id ?? null,
                 metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
             };
             db.ticketNotes.unshift(row);
@@ -8876,6 +8909,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                     parent.modified = now;
                 }
             }
+            if (mockRecordNoteFault === 'ambiguous') { mockRecordNoteFault = null; throw new TypeError('Mock connection closed after note commit'); }
             return { status: true, data: serializeTicketNote(row), graph: 'default' };
         }
         const requestedSize = Number(opts.params?.size ?? 100);
@@ -8902,6 +8936,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             const parentId = Number(opts.body.parent ?? 0);
             const parent = db.incidentRecords.find((candidate) => candidate.id === parentId);
             if (!parent) return { status: false, error: 'Incident not found', error_code: 404 };
+            if (typeof opts.body.note !== 'string' || !opts.body.note.trim()) return { status: false, error: 'note is required', error_code: 400 };
+            const media = opts.body.media == null ? null : mockCompletedAttachment(opts.body.media, parent.group_id, caller);
+            if (opts.body.media != null && !media) return { status: false, error: 'Media must reference an active, completed File in the record scope', error_code: 400 };
             const now = Math.floor(Date.now() / 1000);
             const row: MockIncidentHistory = {
                 id: Math.max(0, ...db.incidentHistory.map((candidate) => candidate.id)) + 1,
@@ -8909,10 +8946,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                 kind: opts.body.kind == null ? null : String(opts.body.kind),
                 to: opts.body.to == null ? null : Number(opts.body.to), user: caller.id,
                 state: Number(opts.body.state ?? 0), priority: Number(opts.body.priority ?? 0),
-                note: opts.body.note == null ? null : String(opts.body.note), media: null,
+                note: opts.body.note == null ? null : String(opts.body.note), media: media?.id ?? null,
                 metadata: isPlainObject(opts.body.metadata) ? { ...opts.body.metadata } : {},
             };
             db.incidentHistory.unshift(row);
+            if (mockRecordNoteFault === 'ambiguous') { mockRecordNoteFault = null; throw new TypeError('Mock connection closed after note commit'); }
             return { status: true, data: serializeIncidentHistory(row), graph: 'default' };
         }
         const requestedSize = Number(opts.params?.size ?? 100);

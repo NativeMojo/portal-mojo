@@ -12,6 +12,13 @@ incident save, merge, protection, and history create use
 Events remain immutable in this forensic UI, and event/history deletes are
 denied by Django.
 
+Incident comments require text and may atomically add one completed existing
+File id as `media`. The upload queue is capacity one and derives its immutable
+group from the loaded parent incident, never ambient or request-supplied group
+context. The completed File and manager must match that parent group; groupless
+parents use personal storage with no selector. Removing a candidate only
+detaches it from the composer and never deletes the File or history row.
+
 Lists allowlist parameters and force `graph=default`; graph-qualified detail
 keys request `graph=detailed`. Both models search only `details`, hence “Search
 incident details” and “Search event details.” Incident lifecycle is `pending`,
@@ -33,6 +40,11 @@ and parsed bodies; evidence/traces are explicitly bounded. Heuristic redaction
 cannot guarantee arbitrary opaque prose, so raw JSON is not rendered or
 exported. `createSafeExporter` sanitizes before accumulation and projects only
 declared fields.
+
+Before that recursive sanitizer runs, every history `media` value is positively
+rebuilt to exactly `id`, `filename`, `content_type`, and `category`; URLs,
+tokens, provider/manager details, transfer state, and browser File objects are
+discarded rather than redacted.
 
 Incident and event rows open the shared KISS `modal.detail` surface, composing
 DetailView, StatusPanel, KnownFieldsCard, StackTraceView, and RecordFeed.

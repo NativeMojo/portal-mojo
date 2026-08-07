@@ -59,6 +59,13 @@
 .record-feed-message-body .md { font-size: inherit; line-height: 1.52; }
 .record-feed-message-body .md p { margin-bottom: 6px; }
 .record-feed-addon { margin-top: 9px; }
+.record-feed-attachment {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 8px;
+    padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--ink); background: var(--surface2); font-size: 11.5px;
+}
+.record-feed-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-feed-attachment small { color: var(--mute); white-space: nowrap; }
 
 /* Structured events never enter the markdown/HTML path. */
 .record-feed-event { list-style: none; padding: 8px 15px; border-bottom: 1px solid var(--line-soft); }
@@ -103,11 +110,18 @@
 .record-feed-bubbles .record-feed-event-content { padding: 5px 10px; border-radius: 999px; background: var(--surface); }
 .record-feed-bubbles .record-feed-thinking { margin-left: 48px; }
 
-/* Composer: one pipeline, no attachment affordance. */
+/* Composer: attachment queue is opt-in and spans the text/send row. */
 .record-feed-composer {
     position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px; padding: 12px 13px 24px; background: var(--surface2); border-top: 1px solid var(--line);
 }
+.record-feed-composer > .attachment-queue { grid-column: 1 / -1; }
+.attachment-queue { display: grid; gap: 7px; min-width: 0; }
+.attachment-drop { min-block-size: 38px; padding: 7px 10px; border-style: solid; }
+.attachment-drop span { display: inline-flex; align-items: center; gap: 6px; }
+.attachment-queue .upload-queue { box-shadow: none; }
+.attachment-queue .upload-queue-head { padding: 7px 9px; font-size: 11px; }
+.attachment-queue .upload-item { min-block-size: 44px; padding: 7px 9px; }
 .record-feed-input {
     width: 100%; min-height: 38px; max-height: 144px; resize: none; box-sizing: border-box;
     padding: 8px 10px; color: var(--ink-strong); background: var(--field-bg);

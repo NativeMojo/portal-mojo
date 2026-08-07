@@ -110,6 +110,7 @@ export function RecordFeedDemo() {
                     currentUserId={1}
                     ariaLabel={`${adapterType} adapter feed`}
                     renderAddon={(item) => item.kind === 'assistant' ? <span className="chip chip-info">assistant-normalized</span> : null}
+                    attachmentUpload={{ destination: { groupId: 1, use: 'uploads' }, expectedGroupId: 1 }}
                 />
             </div>
 

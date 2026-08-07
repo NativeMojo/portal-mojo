@@ -12,5 +12,9 @@ try {
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     for (const name of ['ASSISTANT_ADMIN_SECTION', 'AssistantFeed', 'AssistantPanel', 'AssistantLauncher', 'AssistantContextLauncher', 'ConversationsPage', 'SkillsPage', 'MemoriesPage']) assert(admin[name] !== undefined, `portal-mojo/admin must export ${name}`);
     for (const name of ['FilesPage', 'FileUploadSurface', 'FileManagerUploadPolicyModel']) assert(admin[name] !== undefined, `portal-mojo/admin must export ${name}`);
+    const client = await server.ssrLoadModule('/packages/portal-mojo/src/client/index.ts');
+    const ui = await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
+    for (const name of ['safeFileReference', 'safeRecordFeedRow']) assert(client[name] !== undefined, `portal-mojo/client must export ${name}`);
+    for (const name of ['AttachmentQueue', 'RecordFeed']) assert(ui[name] !== undefined, `portal-mojo/ui must export ${name}`);
     console.log('portal-mojo package exports verified');
 } finally { await server.close(); }

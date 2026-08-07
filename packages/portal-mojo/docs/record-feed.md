@@ -22,8 +22,9 @@ activity. It has two deliberately separate ownership modes:
 - **Controlled mode** accepts `items` + `onSend`; a future streaming assistant
   can own its own state without pretending a stream is a django-mojo list.
 
-Attachments are not part of this component. `media` remains available only in
-the item's untouched `raw` row until the three-stage upload client lands.
+Adapter mode supports one optional completed File reference. Controlled mode
+keeps its existing `items`/`onSend(text)` contract and has no attachment policy;
+specialized owners may place the shared `AttachmentQueue` in `composerAddon`.
 
 ## Adapter mode
 
@@ -38,6 +39,10 @@ const adapter = useMemo(
     currentUser={{ id: me.id, name: me.display_name ?? me.username }}
     currentUserId={me.id}
     variant="compact"
+    attachmentUpload={{
+        destination: { groupId: ticket.group.id, use: 'uploads' },
+        expectedGroupId: ticket.group.id,
+    }}
 />
 ```
 
@@ -72,11 +77,32 @@ interface RecordFeedPage {
 }
 ```
 
-POST uses the same collection endpoint and `{parent, group, note}` when the
+POST uses the same collection endpoint and `{parent, group, note, media?}` when the
 adapter has a group (`group` is the bare ForeignKey primary key django-mojo's
 generic REST saver consumes). Incident posts also carry `kind: 'comment'`.
-No `media` field or attachment placeholder is sent. Failed saves reject at
-the shared client boundary.
+`media` is a single positive completed File id and never replaces required note
+text. Failed saves reject at the shared client boundary.
+
+Every incoming `media` value is positively rebuilt to exactly
+`{id, filename, content_type, category}` before domain sanitization,
+normalization, optimistic cache replacement, or rendering. Unknown fields,
+URLs, tokens, manager/provider details, transfer state, and browser `File`
+objects cannot enter RecordFeed state.
+
+The attachment queue has capacity/concurrency one. It is record-local,
+deduplicated, and exposes real progress/cancel/retry/recover/remove actions.
+Only a completed reference may be sent. Removal detaches queue state; it never
+deletes the File. Permission loss, logout, or any parent/group/destination
+change cancels and disposes the old queue.
+
+Grouped records use the authoritative parent group and immutable
+`{groupId, use:'uploads'}` initiation selectors. Groupless records send no
+selector. Parent payloads currently expose no exact FileManager upload
+capability, so the server resolves its authorized manager; the client then
+requires the completed lifecycle response to carry a positive manager id and
+the exact expected group before enabling association. A future parent contract
+may expose an explicit manager/readiness capability without changing the safe
+File-reference shape.
 
 The cache key is always:
 
@@ -125,10 +151,15 @@ the adapter's exact structural key:
 4. Append a client-only pending comment with a unique temporary ID.
 5. On success, replace that exact temporary row with the normalized server
    row. The composer stays clear and regains focus.
-6. On failure, restore the snapshot. If no cache existed, remove the exact
+6. On a deterministic failure, restore the snapshot. If no cache existed, remove the exact
    query instead of manufacturing stale state. Restore the exact submitted
    text, focus the composer, and surface the mutation error in `role=alert`.
-7. In all cases, invalidate only that exact record/group key.
+7. On a lost/ambiguous response, retain the draft and completed candidate,
+   mark delivery uncertain, and block blind replay while an authoritative
+   refetch looks for a newly-created exact text/media row. A snapshot id can
+   never satisfy reconciliation. If refetch also fails, changing the draft or
+   detaching the candidate is the explicit escape.
+8. In all cases, invalidate only that exact record/group key.
 
 The input is disabled during the request, so no second draft can be lost or
 silently overwritten by failure restoration.
@@ -164,6 +195,9 @@ surfaces local rejection through the same alert region.
 | `pending` | — | ReactNode after the list for thinking/streaming state. |
 | `showInput` | `true` | Hide the composer for read-only history. |
 | `disabled` | `false` | Disable sends while retaining history. |
+| `attachmentUpload` | — | Adapter-only immutable destination and expected parent group; enables the singular queue. |
+| `composerAddon` | — | Generic controlled-owner slot; RecordFeed itself assigns no attachment semantics. |
+| `submitBlocked` | `false` | Blocks text submission while a specialized composer owner is not ready. |
 | `placeholder` | `'Add a note…'` | Composer placeholder. |
 | `sendLabel` | `'Send'` | Visible/accessibility send label. |
 | `emptyLabel` | `'No activity yet.'` | Empty-state text. |
@@ -197,8 +231,8 @@ height with `--record-feed-height` on a wrapper/component class.
 - Do not use an endpoint-only query key; parent and group scope are required.
 - Do not fetch ascending and take the first 100 — that returns the oldest
   window. Fetch descending, take 100, then reverse the returned window.
-- Do not render or type attachments yet. `raw.media` is retained solely so a
-  later upload/attachment feature does not require a wire-boundary rewrite.
+- Do not read attachment data from `raw.media`; use the positively rebuilt
+  `item.attachment` reference.
 - Do not classify every null-user row as assistant or parse status prose.
 - Do not use server MarkdownView per row. Feeds use the secure React client
   renderer; richer domain UI belongs in `renderAddon` as ReactNode.

@@ -4,6 +4,18 @@ export type RecordFeedId = number | string;
 export type RecordFeedTimestamp = number | string;
 export type RecordFeedAdapterKind = 'ticket-note' | 'incident-history';
 
+export interface FileReference {
+    id: number;
+    filename: string;
+    content_type: string;
+    category: string | null;
+}
+
+export interface RecordFeedNoteDraft {
+    text: string;
+    attachment?: FileReference;
+}
+
 export interface RecordFeedAuthor {
     id: RecordFeedId | null;
     name: string;
@@ -18,6 +30,7 @@ export interface RecordFeedItemBase {
     metadata: Record<string, unknown>;
     /** Wire-shaped django-mojo row; sensitive-domain adapters may sanitize it. */
     raw: Record<string, unknown>;
+    attachment?: FileReference | null;
     /** Client-only marker used by adapter-mode optimistic rows. */
     pending?: boolean;
 }
@@ -68,7 +81,7 @@ export interface RecordFeedAdapter {
     /** Stable, structural and record-scoped. Safe for exact Query operations. */
     queryKey: RecordFeedQueryKey;
     fetch(): Promise<RecordFeedPage>;
-    addNote(text: string): Promise<RecordFeedItem>;
+    addNote(draft: RecordFeedNoteDraft): Promise<RecordFeedItem>;
     /** Sanitizes optimistic cache and mutation variables for sensitive domains. */
     sanitizeDraft?(text: string): string;
 }
@@ -100,6 +113,21 @@ function objectOrEmpty(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
         ? value as Record<string, unknown>
         : {};
+}
+
+export function safeFileReference(value: unknown): FileReference | null {
+    const raw = objectOrEmpty(value);
+    const id = raw.id;
+    if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0
+        || typeof raw.filename !== 'string' || !raw.filename
+        || typeof raw.content_type !== 'string' || !raw.content_type
+        || (raw.category !== null && raw.category !== undefined && typeof raw.category !== 'string')) return null;
+    return { id, filename: raw.filename, content_type: raw.content_type, category: raw.category == null ? null : raw.category };
+}
+
+/** Rebuild media before any domain sanitizer, normalizer, or cache sees it. */
+export function safeRecordFeedRow(raw: Record<string, unknown>): Record<string, unknown> {
+    return { ...raw, media: safeFileReference(raw.media) };
 }
 
 function optionalText(value: unknown): string | null {
@@ -159,7 +187,8 @@ function isLegacyAssistant(row: WireFeedRow, metadata: Record<string, unknown>):
  * structured status → canonical LLM → legacy null-user LLM → user → system.
  */
 export function normalizeRecordFeedItem(raw: Record<string, unknown>): RecordFeedItem {
-    const row = raw as WireFeedRow;
+    const safeRaw = safeRecordFeedRow(raw);
+    const row = safeRaw as WireFeedRow;
     const metadata = objectOrEmpty(row.metadata);
     const content = optionalText(row.note) ?? '';
     const id = typeof row.id === 'number' || typeof row.id === 'string'
@@ -172,7 +201,7 @@ export function normalizeRecordFeedItem(raw: Record<string, unknown>): RecordFee
 
     if (status) {
         return {
-            id, created, content, metadata, raw,
+            id, created, content, metadata, raw: safeRaw, attachment: safeFileReference(safeRaw.media),
             kind: 'status', from: status.from, to: status.to,
             author: normalizeAuthor(row.user, 'System'),
         };
@@ -180,7 +209,7 @@ export function normalizeRecordFeedItem(raw: Record<string, unknown>): RecordFee
 
     if (isCanonicalAssistant(row, metadata, content) || isLegacyAssistant(row, metadata)) {
         return {
-            id, created, content, metadata, raw,
+            id, created, content, metadata, raw: safeRaw, attachment: safeFileReference(safeRaw.media),
             kind: 'assistant',
             author: normalizeAuthor(row.user, 'AI Agent'),
         };
@@ -188,14 +217,14 @@ export function normalizeRecordFeedItem(raw: Record<string, unknown>): RecordFee
 
     if (row.user !== null && row.user !== undefined) {
         return {
-            id, created, content, metadata, raw,
+            id, created, content, metadata, raw: safeRaw, attachment: safeFileReference(safeRaw.media),
             kind: 'comment',
             author: normalizeAuthor(row.user, 'Unknown user'),
         };
     }
 
     return {
-        id, created, content, metadata, raw,
+        id, created, content, metadata, raw: safeRaw, attachment: safeFileReference(safeRaw.media),
         kind: 'system', event: optionalText(row.kind) ?? optionalText(metadata.type) ?? undefined,
         author: normalizeAuthor(null, 'System'),
     };
@@ -238,15 +267,18 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
                 start: 0,
                 size: 100,
             });
-            const newestFirst = page.rows.map((row) => normalizeRecordFeedItem(sanitizeRow ? sanitizeRow(row) : row));
+            const newestFirst = page.rows.map((row) => {
+                const rebuilt = safeRecordFeedRow(row);
+                return normalizeRecordFeedItem(sanitizeRow ? sanitizeRow(rebuilt) : rebuilt);
+            });
             return {
                 items: newestFirst.reverse(),
                 count: page.count,
                 hasEarlier: page.count > page.rows.length,
             };
         },
-        async addNote(text) {
-            const safeText = sanitizeText ? sanitizeText(text) : text;
+        async addNote(draft) {
+            const safeText = sanitizeText ? sanitizeText(draft.text) : draft.text;
             const raw = await mojoSave<Record<string, unknown>>(endpoint, null, {
                 parent: parentId,
                 // django-mojo's generic REST saver consumes ForeignKeys as a
@@ -255,9 +287,11 @@ function makeAdapter(config: AdapterConfig): RecordFeedAdapter {
                 // to the group-aware list/cache scope.
                 ...(groupId === null ? {} : { group: groupId }),
                 note: safeText,
+                ...(draft.attachment ? { media: draft.attachment.id } : {}),
                 ...(postKind ? { kind: postKind } : {}),
             });
-            const safeRaw = sanitizeRow ? sanitizeRow(raw) : raw;
+            const rebuilt = safeRecordFeedRow(raw);
+            const safeRaw = sanitizeRow ? sanitizeRow(rebuilt) : rebuilt;
             return normalizeRecordFeedItem(safeRaw);
         },
     };

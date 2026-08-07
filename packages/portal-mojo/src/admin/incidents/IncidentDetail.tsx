@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createIncidentHistoryAdapter, useCan, useMe } from '../../client';
 import { Badge, DetailView, Eyebrow, FlatRow, KnownFieldsCard, RecordFeed, StatusPanel, fmt, toast, type Tone } from '../../ui';
@@ -18,13 +17,16 @@ export function IncidentDetail({ id, onClose }: { id: number; onClose: () => voi
     const save = IncidentModel.useSave();
     const { can: canManage } = useCan(SECURITY_MANAGE_PERMS);
     const { data: me } = useMe();
-    const adapter = useMemo(() => createIncidentHistoryAdapter(id, {
-        sanitizeRow: sanitizeIncidentHistoryRow,
-        sanitizeText: sanitizeSecurityText,
-    }), [id]);
     if (query.isPending) return <div className="modal-pad dim">Loading incident…</div>;
     if (!query.data || query.error) return <div className="modal-pad text-bad">{query.error?.message ?? 'Incident not found'}</div>;
     const incident = query.data;
+    const groupId = Number.isSafeInteger(incident.group_id) && Number(incident.group_id) > 0
+        ? Number(incident.group_id) : null;
+    const adapter = createIncidentHistoryAdapter(id, {
+        groupId,
+        sanitizeRow: sanitizeIncidentHistoryRow,
+        sanitizeText: sanitizeSecurityText,
+    });
     const metadata = metadataOf(incident);
     const patchStatus = async (status: string) => {
         try {
@@ -57,7 +59,7 @@ export function IncidentDetail({ id, onClose }: { id: number; onClose: () => voi
             { key: 'events', label: 'Events', icon: 'bi-list-ul', render: () => events.isPending ? <p className="dim">Loading events…</p> : events.data?.rows.length ? <div className="incident-events-list">{events.data.rows.map((event) => <button type="button" className="incident-event-row" key={event.id} onClick={() => showEventDetail(event.id)}><Badge tone={event.level >= 8 ? 'danger' : event.level >= 4 ? 'warning' : 'muted'}>L{event.level}</Badge><span><strong>{event.title || event.category}</strong><small>{fmt.datetime(event.created)} · {event.details || 'No details'}</small></span></button>)}</div> : <p className="dim-italic">No events on this incident.</p> },
             { key: 'request', label: 'Request', icon: 'bi-globe2', render: () => <RequestResponseForensics metadata={metadata} /> },
             ...(trace ? [{ key: 'trace', label: 'Stack trace', icon: 'bi-code-square', render: () => <TraceForensics metadata={metadata} /> }] : []),
-            { key: 'history', label: 'History', icon: 'bi-chat-left-text', render: () => <RecordFeed adapter={adapter} variant="compact" showInput={canManage} currentUserId={me?.id ?? null} placeholder="Add an incident note…" /> },
+            { key: 'history', label: 'History', icon: 'bi-chat-left-text', render: () => <RecordFeed adapter={adapter} variant="compact" showInput={canManage} currentUserId={me?.id ?? null} placeholder="Add an incident note…" attachmentUpload={{ destination: groupId == null ? {} : { groupId, use: 'uploads' }, expectedGroupId: groupId }} /> },
             { key: 'metadata', label: 'Known fields', icon: 'bi-braces', render: () => <KnownFieldsCard data={metadata} known={[...INCIDENT_METADATA_FIELDS]} showRaw={false} emptyText="No curated forensic metadata." /> },
         ]}
         initialSection="overview"

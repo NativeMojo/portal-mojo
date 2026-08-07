@@ -6,12 +6,27 @@ Import from `portal-mojo/admin`.
 
 ## REST contract
 
-- `POST /api/assistant` sends `{message, conversation_id?}`. The controlled `AssistantFeed` permits one request at a time, shows only the generic “Responding…” state, and consumes the final response. There is no polling, cancellation, progress, tool trace, websocket, or streaming path.
+- `POST /api/assistant` sends `{message, conversation_id?, attachments?}`. `attachments` is omitted for text-only sends or contains 1–5 unique positive ids from completed authoritative queue references. The controlled `AssistantFeed` permits one request at a time, shows only the generic “Responding…” state, and consumes the final response. There is no polling, tool trace, websocket, or streaming path.
 - `POST /api/assistant/context` sends only `{model, pk}`. The returned conversation id is immediately fetched from `/api/assistant/conversation/<id>?graph=detail`; the client never synthesizes or reposts context text.
 - Conversation and Skill lists/details/deletes are imperative and component-local. They do not use `defineModel`, Query cache, `ModelTable`, a `RecordFeed` adapter, persistence, or exports.
 - A foreign conversation visible to an administrator is inspect-only. Only `conversation.user.id === me.id` enables continuation.
 
-`AssistantFeed` uses controlled `RecordFeed`. It positively projects only user and final assistant messages. Structured blocks have per-type schemas and caps; unknown/malformed blocks drop. File buttons reuse Storage's capability-URL policy. Context references are inert and allowlisted. Action choices require confirmation, then their bounded `value` is sent once through the ordinary chat POST.
+`AssistantFeed` uses controlled `RecordFeed` plus the shared attachment queue at
+capacity five. Its immutable groupless destination sends no manager/group/use
+selector. Partial upload batches retain completed references alongside
+failed/retryable rows; only completed ids are sent atomically with required
+text. Cancel/retry/recover/remove are real queue actions, duplicate local files
+collapse, and successful sends alone clear completed candidates. Permission
+loss, logout, owner/conversation change, or unmount disposes outstanding work.
+
+User history accepts only `type:'attachment'` blocks and positively rebuilds
+each File to `{id,filename,content_type,category}` before state/render. These
+chips have no URL or download action: they are metadata references and do not
+auto-ingest File contents. Assistant-generated `type:'file'` blocks remain a
+separate URL-bearing download-card schema. Other structured blocks retain their
+per-type schemas/caps; unknown/malformed blocks drop. Context references are
+inert and allowlisted. Action choices require confirmation, then their bounded
+value is sent attachment-free through the ordinary REST POST.
 
 ## Memory
 

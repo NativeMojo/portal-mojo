@@ -31,5 +31,5 @@ export {
     deleteMockPhoneGroupForTest,
     setMockDnsRegistrarMode, armMockRegistrarPurchaseFault,
     getMockPushConfigCredentialState,
-    armMockUploadFault, clearMockUploadObservations, getMockUploadObservations, setMockUploadMode,
+    armMockUploadFault, armMockRecordNoteFault, clearMockUploadObservations, getMockUploadObservations, setMockUploadMode,
 } from './mock';

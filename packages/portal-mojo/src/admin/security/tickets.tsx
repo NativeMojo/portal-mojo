@@ -341,7 +341,11 @@ function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) 
     }
 
     const ticket = ticketQuery.data;
-    const adapter = createTicketNoteAdapter(ticket.id, { groupId: relationId(ticket.group) });
+    const ticketGroup = relationId(ticket.group);
+    const groupIsValid = ticketGroup == null
+        || (typeof ticketGroup === 'number' && Number.isSafeInteger(ticketGroup) && ticketGroup > 0);
+    const uploadGroupId = typeof ticketGroup === 'number' ? ticketGroup : null;
+    const adapter = createTicketNoteAdapter(ticket.id, { groupId: ticketGroup });
     const llmEnabled = ticket.metadata.llm_enabled === true;
     const busy = save.isPending || enableLlm.isPending || disableLlm.isPending || pushToMaestro.isPending;
     const patch = async (changes: Record<string, unknown>, success: string) => {
@@ -495,6 +499,10 @@ function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) 
                                 showInput={canManage}
                                 currentUserId={me?.id ?? null}
                                 renderAddon={(item) => <TicketActionCard item={item} ticket={ticket} canManage={canManage} />}
+                                {...(groupIsValid ? { attachmentUpload: {
+                                    destination: uploadGroupId == null ? {} : { groupId: uploadGroupId, use: 'uploads' },
+                                    expectedGroupId: uploadGroupId,
+                                } } : {})}
                             />
                         </section>
                     ),

@@ -15,6 +15,9 @@
 .assistant-stat dt, .assistant-list dt, .assistant-skill-detail dt { color: var(--mute); }
 .assistant-alert-info { border-color: var(--info); }.assistant-alert-success { border-color: var(--ok); }.assistant-alert-warning { border-color: var(--warn); }.assistant-alert-error { border-color: var(--bad); }
 .assistant-file { display: flex; align-items: center; gap: 10px; }.assistant-file > span { flex: 1; min-width: 0; }.assistant-file small, .assistant-list small { display: block; color: var(--mute); }
+.assistant-attachments { display: flex; flex-wrap: wrap; gap: 6px; }
+.assistant-attachment-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 8px; border-radius: 999px; background: var(--surface); }
+.assistant-attachment-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.assistant-attachment-chip small { color: var(--mute); white-space: nowrap; }
 .assistant-action-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .assistant-context-launcher { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .assistant-list { overflow: auto; }.assistant-list .empty { padding: 24px; text-align: center; color: var(--mute); }

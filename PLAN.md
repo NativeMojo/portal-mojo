@@ -291,12 +291,17 @@ and ImageField bindings keep positive numeric id/null wire values, preserve the
 stored relation through upload + authoritative owner attachment, retain
 completed candidates for retry/orphan reporting without deleting File, and
 sanitize avatar capabilities independently before UserModel and Me caches.
-The remaining children stay intentionally **not shipped** pending measured
-django-mojo contracts: record and conversation attachments #1472 depends on
-completed/scoped File relation enforcement #1487,
-while Assistant's optional attachment shape is separately tracked in #1486.
-No attachment field or unsafe client-side authorization workaround is
-fabricated, and the parent epic #1467 remains open until those dependencies land.
+Record and conversation attachments #1472 now consume completed django-mojo
+#1487 and #1486. TicketNote/IncidentHistory use one completed, exact-parent-
+group `media` reference rebuilt to the four-field safe graph before every
+sanitizer/cache boundary; Assistant REST sends at most five completed
+groupless reference ids and renders user `type:attachment` separately from
+generated `type:file`. Both compose the shared truthful queue, preserve
+candidates across save failure, and tear down on auth/permission/scope change.
+Because parent records do not yet expose an exact manager readiness capability,
+grouped queues use immutable group+purpose selectors and validate the returned
+manager/group, while groupless queues send no selector. The focused executable
+contract is `verify:record-attachments`.
 
 **2026-08-06, wave 8 Communications Admin (#1290):** the global/no-group
 Communications workspace now contributes Email Domains, Mailboxes, Sent

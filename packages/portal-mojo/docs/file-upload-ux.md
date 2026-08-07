@@ -2,7 +2,7 @@
 
 ```tsx
 import {
-    FileDropZone, FilePicker, UploadQueue, useUploadQueue,
+    AttachmentQueue, FileDropZone, FilePicker, UploadQueue, useUploadQueue,
     validateFileSelection,
 } from 'portal-mojo/ui';
 ```
@@ -90,6 +90,13 @@ safe completed File references. It never contains browser `File` objects,
 transport tasks, callbacks, capabilities, abort controllers, toast handles,
 raw errors, or auth data.
 
+`AttachmentQueue` is the shared reference-only composition used by record
+notes and Assistant chat. It adds picker/drop UI to the same queue and emits
+only completed `{id,filename,content_type,category}` references after checking
+the authoritative lifecycle result has a positive manager id and the exact
+expected group. It never emits browser Files, deletes a File, or turns a failed
+or uncertain upload into an attachable reference.
+
 Admin Files composes this primitive in `FileUploadSurface`: Add File and a
 drag-only whole-page overlay share an explicit policy-backed destination modal,
 while the queue remains mounted outside it. The surface fabricates neither
@@ -128,6 +135,7 @@ Run the focused executable contract:
 ```bash
 npm run verify:upload-ux
 npm run verify:form-uploads
+npm run verify:record-attachments
 ```
 
 It covers pure validation, lazy concurrency, capacity, stable/safe snapshots,

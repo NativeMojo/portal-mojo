@@ -1,4 +1,4 @@
-import type { RecordFeedId } from '../../client/record-feed';
+import type { FileReference, RecordFeedId } from '../../client/record-feed';
 
 export type AssistantScalar = string | number | boolean | null;
 export type AssistantBlock =
@@ -9,6 +9,7 @@ export type AssistantBlock =
     | { type: 'action'; title?: string; description?: string; action_id?: string; actions: Array<{ label: string; value: string }> }
     | { type: 'alert'; level: 'info' | 'success' | 'warning' | 'error'; title?: string; message: string }
     | { type: 'file'; filename: string; url: string; size?: number; format?: string; row_count?: number; expires_in?: string }
+    | { type: 'attachment'; files: FileReference[] }
     | { type: 'context'; references: Array<{ model: 'incident.Incident' | 'incident.Ticket'; pk: RecordFeedId; label?: string }> };
 
 export interface AssistantUser { id: number; display_name: string }

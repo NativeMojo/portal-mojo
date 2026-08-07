@@ -1,5 +1,6 @@
 import {
     useLayoutEffect,
+    useEffect,
     useId,
     useMemo,
     useRef,
@@ -9,13 +10,17 @@ import {
     type ReactNode,
 } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MojoError } from '../client/client';
 import type {
     RecordFeedAdapter,
     RecordFeedAuthor,
+    FileReference,
     RecordFeedId,
     RecordFeedItem,
     RecordFeedPage,
 } from '../client/record-feed';
+import type { StartFileUploadOptions } from '../client/upload';
+import { AttachmentQueue, type AttachmentQueueState } from './AttachmentQueue';
 import { MarkdownView } from './MarkdownView';
 import { initials, relative } from './format';
 
@@ -34,6 +39,9 @@ interface RecordFeedCommonProps {
     /** Thinking/streaming state rendered after the item list. */
     pending?: ReactNode;
     disabled?: boolean;
+    /** Generic composer slot; controlled feeds remain attachment-agnostic. */
+    composerAddon?: ReactNode;
+    submitBlocked?: boolean;
 }
 
 export interface AdapterRecordFeedProps extends RecordFeedCommonProps {
@@ -42,6 +50,10 @@ export interface AdapterRecordFeedProps extends RecordFeedCommonProps {
     onSend?: never;
     isSending?: never;
     error?: never;
+    attachmentUpload?: {
+        destination: StartFileUploadOptions;
+        expectedGroupId: number | null;
+    };
 }
 
 export interface ControlledRecordFeedProps extends RecordFeedCommonProps {
@@ -50,6 +62,7 @@ export interface ControlledRecordFeedProps extends RecordFeedCommonProps {
     onSend: (text: string) => void | Promise<void>;
     isSending?: boolean;
     error?: ReactNode;
+    attachmentUpload?: never;
 }
 
 export type RecordFeedProps = AdapterRecordFeedProps | ControlledRecordFeedProps;
@@ -63,6 +76,8 @@ interface ComposerProps {
     placeholder: string;
     sendLabel: string;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+    addon?: ReactNode;
+    submitBlocked?: boolean;
 }
 
 function Composer({
@@ -74,6 +89,8 @@ function Composer({
     placeholder,
     sendLabel,
     textareaRef,
+    addon,
+    submitBlocked = false,
 }: ComposerProps) {
     const draftId = useId();
     useLayoutEffect(() => {
@@ -108,6 +125,7 @@ function Composer({
 
     return (
         <form className="record-feed-composer" onSubmit={submit}>
+            {addon}
             <label className="sr-only" htmlFor={draftId}>Add a note</label>
             <textarea
                 id={draftId}
@@ -116,14 +134,14 @@ function Composer({
                 rows={1}
                 value={draft}
                 placeholder={placeholder}
-                disabled={busy || disabled}
+                disabled={busy || disabled || submitBlocked}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={keyDown}
             />
             <button
                 className="record-feed-send"
                 type="submit"
-                disabled={busy || disabled || !draft.trim()}
+                disabled={busy || disabled || submitBlocked || !draft.trim()}
                 aria-label={busy ? 'Sending note' : sendLabel}
             >
                 <i className={`bi ${busy ? 'bi-arrow-repeat record-feed-spin' : 'bi-send-fill'}`} aria-hidden="true" />
@@ -226,6 +244,13 @@ function FeedItem({
                 <div className="record-feed-message-body">
                     <MarkdownView source={item.content} renderer="client" />
                 </div>
+                {item.attachment && (
+                    <div className="record-feed-attachment" aria-label="Attached file">
+                        <i className="bi bi-paperclip" aria-hidden="true" />
+                        <span>{item.attachment.filename}</span>
+                        <small>{item.attachment.content_type}</small>
+                    </div>
+                )}
                 {addon && <div className="record-feed-addon">{addon}</div>}
             </div>
         </li>
@@ -245,6 +270,8 @@ interface FeedFrameProps extends RecordFeedCommonProps {
     onSubmit: (text: string, originalDraft: string) => void;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     ownSendRef: React.MutableRefObject<boolean>;
+    composerAddon?: ReactNode;
+    submitBlocked?: boolean;
 }
 
 function FeedFrame({
@@ -271,6 +298,8 @@ function FeedFrame({
     onSubmit,
     textareaRef,
     ownSendRef,
+    composerAddon,
+    submitBlocked,
 }: FeedFrameProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const nearBottomRef = useRef(true);
@@ -347,6 +376,8 @@ function FeedFrame({
                     placeholder={placeholder}
                     sendLabel={sendLabel}
                     textareaRef={textareaRef}
+                    addon={composerAddon}
+                    submitBlocked={submitBlocked}
                 />
             )}
         </section>
@@ -356,10 +387,12 @@ function FeedFrame({
 interface MutationContext {
     snapshot: RecordFeedPage | undefined;
     tempId: string;
+    startedAt: number;
 }
 
 interface SendVariables {
     text: string;
+    attachment?: FileReference;
 }
 
 function AdapterFeed(props: AdapterRecordFeedProps) {
@@ -371,6 +404,23 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
     // The unsanitized restoration draft stays component-local. It never enters
     // MutationCache or Query cache for sensitive adapters.
     const restoreDraftRef = useRef('');
+    const [attachmentState, setAttachmentState] = useState<AttachmentQueueState>({ files: [], busy: false });
+    const [attachmentReset, setAttachmentReset] = useState(0);
+    const [uncertain, setUncertain] = useState<{ text: string; attachmentId: number | null } | null>(null);
+    const adapterScope = JSON.stringify(adapter.queryKey);
+    useEffect(() => {
+        setDraft('');
+        restoreDraftRef.current = '';
+        setAttachmentState({ files: [], busy: false });
+        setUncertain(null);
+    }, [adapterScope]);
+    useEffect(() => {
+        if (props.showInput !== false && !props.disabled) return;
+        setDraft('');
+        restoreDraftRef.current = '';
+        setAttachmentState({ files: [], busy: false });
+        setUncertain(null);
+    }, [props.disabled, props.showInput]);
     const query = useQuery({
         queryKey: adapter.queryKey,
         queryFn: () => adapter.fetch(),
@@ -381,11 +431,12 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
     };
 
     const mutation = useMutation<RecordFeedItem, Error, SendVariables, MutationContext>({
-        mutationFn: ({ text }) => adapter.addNote(text),
-        onMutate: async ({ text }) => {
+        mutationFn: ({ text, attachment }) => adapter.addNote({ text, attachment }),
+        onMutate: async ({ text, attachment }) => {
             await queryClient.cancelQueries({ queryKey: adapter.queryKey, exact: true });
             const snapshot = queryClient.getQueryData<RecordFeedPage>(adapter.queryKey);
             const tempId = `record-feed-temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const startedAt = Math.floor(Date.now() / 1000);
             const temporary: RecordFeedItem = {
                 id: tempId,
                 kind: 'comment',
@@ -394,6 +445,7 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
                 author,
                 metadata: {},
                 raw: {},
+                attachment: attachment ?? null,
                 pending: true,
             };
             queryClient.setQueryData<RecordFeedPage>(adapter.queryKey, (current) => ({
@@ -401,7 +453,7 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
                 count: (current?.count ?? 0) + 1,
                 hasEarlier: current?.hasEarlier ?? false,
             }));
-            return { snapshot, tempId };
+            return { snapshot, tempId, startedAt };
         },
         onSuccess: (saved, _variables, context) => {
             queryClient.setQueryData<RecordFeedPage>(adapter.queryKey, (current) => {
@@ -415,8 +467,10 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
                 };
             });
             requestAnimationFrame(() => textareaRef.current?.focus());
+            setAttachmentReset((value) => value + 1);
+            setUncertain(null);
         },
-        onError: (_error, _variables, context) => {
+        onError: async (error, variables, context) => {
             if (context?.snapshot) {
                 queryClient.setQueryData(adapter.queryKey, context.snapshot);
             } else {
@@ -424,6 +478,27 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
             }
             setDraft(restoreDraftRef.current);
             requestAnimationFrame(() => textareaRef.current?.focus());
+            const ambiguous = !(error instanceof MojoError) || error.status <= 0 || error.status >= 500;
+            if (!ambiguous || !context) return;
+            const pending = { text: variables.text, attachmentId: variables.attachment?.id ?? null };
+            setUncertain(pending);
+            try {
+                const page = await adapter.fetch();
+                queryClient.setQueryData(adapter.queryKey, page);
+                const previousIds = new Set(context.snapshot?.items.map((item) => item.id) ?? []);
+                const saved = page.items.find((item) => !previousIds.has(item.id)
+                    && wireTimestamp(item.created) >= context.startedAt - 1
+                    && item.content === variables.text
+                    && (item.attachment?.id ?? null) === pending.attachmentId);
+                if (saved) {
+                    setDraft('');
+                    setAttachmentReset((value) => value + 1);
+                }
+                setUncertain(null);
+            } catch {
+                // Keep the uncertain state and attachment candidate. Changing
+                // the draft/attachment is the explicit escape from blind replay.
+            }
         },
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: adapter.queryKey, exact: true });
@@ -432,6 +507,7 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
 
     const changeDraft = (value: string) => {
         if (mutation.error) mutation.reset();
+        if (uncertain && value !== restoreDraftRef.current) setUncertain(null);
         setDraft(value);
     };
     const submit = (text: string, originalDraft: string) => {
@@ -439,8 +515,29 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
         ownSendRef.current = true;
         restoreDraftRef.current = originalDraft;
         setDraft('');
-        mutation.mutate({ text: adapter.sanitizeDraft ? adapter.sanitizeDraft(text) : text });
+        mutation.mutate({
+            text: adapter.sanitizeDraft ? adapter.sanitizeDraft(text) : text,
+            attachment: attachmentState.files[0],
+        });
     };
+
+    const attachmentUpload = props.attachmentUpload;
+    useEffect(() => {
+        if (!uncertain) return;
+        if ((attachmentState.files[0]?.id ?? null) !== uncertain.attachmentId) setUncertain(null);
+    }, [attachmentState.files, uncertain]);
+    const attachment = attachmentUpload && props.showInput !== false ? (
+        <AttachmentQueue
+            key={`${adapter.kind}:${adapter.parentId}:${adapter.groupId ?? 'global'}:${attachmentUpload.destination.fileManagerId ?? 'default'}:${attachmentUpload.destination.groupId ?? 'global'}:${attachmentUpload.destination.use ?? ''}`}
+            consumerKey={`record:${adapter.kind}:${adapter.parentId}:${adapter.groupId ?? 'global'}:${attachmentUpload.destination.fileManagerId ?? 'default'}:${attachmentUpload.destination.groupId ?? 'global'}:${attachmentUpload.destination.use ?? ''}`}
+            capacity={1}
+            destination={attachmentUpload.destination}
+            expectedGroupId={attachmentUpload.expectedGroupId}
+            disabled={Boolean(props.disabled) || mutation.isPending}
+            resetKey={attachmentReset}
+            onChange={setAttachmentState}
+        />
+    ) : null;
 
     return (
         <FeedFrame
@@ -450,15 +547,25 @@ function AdapterFeed(props: AdapterRecordFeedProps) {
             loadError={query.error}
             onRetry={() => { void query.refetch(); }}
             hasEarlier={query.data?.hasEarlier}
-            mutationError={mutation.error?.message}
+            mutationError={uncertain
+                ? 'Delivery could not be confirmed. Refresh the activity, or change the draft or attachment before sending again.'
+                : mutation.error?.message}
             sending={mutation.isPending}
             draft={draft}
             setDraft={changeDraft}
             onSubmit={submit}
             textareaRef={textareaRef}
             ownSendRef={ownSendRef}
+            composerAddon={attachment}
+            submitBlocked={attachmentState.busy || Boolean(uncertain)}
         />
     );
+}
+
+function wireTimestamp(value: number | string): number {
+    if (typeof value === 'number') return value < 1e12 ? value : Math.floor(value / 1000);
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
 }
 
 function ControlledFeed(props: ControlledRecordFeedProps) {
@@ -500,6 +607,8 @@ function ControlledFeed(props: ControlledRecordFeedProps) {
             onSubmit={submit}
             textareaRef={textareaRef}
             ownSendRef={ownSendRef}
+            composerAddon={props.composerAddon}
+            submitBlocked={props.submitBlocked}
         />
     );
 }

@@ -9,7 +9,7 @@ The section and route use `sys.view_security` or `sys.security`. Mutating contro
 ## Wire contracts
 
 - Ticket collection/detail: `/api/incident/ticket`. List state uses the standard Django lookups, graph relations, paging, sorting, search, and `download_format=csv|json`. Saves accept title, description, arbitrary status/category strings, integer priority 1–10, and a nullable assignee ID.
-- Notes: `/api/incident/ticket/note`, always scoped with the ticket `parent` and, for grouped tickets, the ticket's own `group`. A status save creates a structured note with `metadata.type=status_change`, `old_status`, and `new_status`.
+- Notes: `/api/incident/ticket/note`, always scoped with the ticket `parent` and, for grouped tickets, the ticket's own `group`. Operator notes require text and may atomically add one completed existing File id as `media`. Responses expose only File's reference graph. A status save creates a structured note with `metadata.type=status_change`, `old_status`, and `new_status`.
 - Ticket actions: detail POST bodies use `enable_llm`, `disable_llm`, or `push_to_maestro`. Push success means queued, not linked.
 - Maestro links: `/api/incident/maestro/item-link?ticket=<id>`. The detail modal polls for at most 30 seconds after a queued push and always offers a manual check.
 
@@ -31,4 +31,10 @@ Nested edit and confirmation modals use the native dialog stack, and closing
 the detail returns to the unchanged queue. `RecordFeed` uses compact mode and
 receives `showInput={canManage}`.
 
-Attachments/media, Assistant chat, and incident-detail navigation remain deferred. Raw feed media is not rendered, and a remote Maestro URL becomes a link only when it parses as HTTP or HTTPS.
+Activity notes offer the shared capacity-one upload queue only while manage
+permission and an authoritative ticket/group are current. Grouped uploads use
+the ticket's group, groupless uploads use personal storage, and the completed
+manager/group lifecycle response must match before `media` can be sent. Queue
+removal never deletes File. Assistant chat and incident-detail navigation
+remain separate, and a remote Maestro URL becomes a link only when it parses as
+HTTP or HTTPS.
