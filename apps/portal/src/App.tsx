@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { ModalHost, ToastHost } from 'portal-mojo/ui';
+import { ModalHost, RightPanelProvider, RightPanelSlot, ToastHost, useRightPanel } from 'portal-mojo/ui';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
 
@@ -23,8 +23,9 @@ function AppShell() {
         });
     }
 
+    const rightPanel = useRightPanel();
     return (
-        <div className={`app${sidebarCollapsed ? ' app-sidebar-collapsed' : ''}`}>
+        <div className={`app${sidebarCollapsed ? ' app-sidebar-collapsed' : ''}${rightPanel.isOpen ? ' app-right-panel-open' : ''}`}>
             <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
             <div className="main">
                 <TopNav />
@@ -32,6 +33,7 @@ function AppShell() {
                     <Outlet />
                 </main>
             </div>
+            <RightPanelSlot />
             <ModalHost />
             <ToastHost />
         </div>
@@ -39,5 +41,5 @@ function AppShell() {
 }
 
 export default function App() {
-    return <AppShell />;
+    return <RightPanelProvider><AppShell /></RightPanelProvider>;
 }

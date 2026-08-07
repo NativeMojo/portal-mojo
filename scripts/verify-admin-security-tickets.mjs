@@ -17,6 +17,7 @@ try {
     assert.match(ticketPage, /modal\.detail\([\s\S]*<TicketDetail/, 'ticket rows must open the KISS detail modal');
     assert.match(ticketPage, /<DetailView/, 'ticket detail must use the standard DetailView chrome');
     assert.doesNotMatch(ticketPage, /useRightPanel|TicketPanel|ticket-panel-/, 'ticket detail must not retain RightPanel wiring');
+    assert.match(ticketPage, /AssistantContextLauncher model="incident\.Ticket"/, 'ticket detail must offer the separately gated Assistant context launcher');
 
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const menus = await server.ssrLoadModule('/packages/portal-mojo/src/ui/menu-registry.ts');

@@ -2564,6 +2564,23 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     phoneComms.is_active = true; phoneComms.is_superuser = false;
     phoneComms.username = 'phone.comms'; phoneComms.email = 'phone.comms@nativemojo.com';
     phoneComms.display_name = 'Phone Comms Operator'; phoneComms.permissions = { comms: true };
+    const assistantManager = at(39);
+    assistantManager.is_active = true; assistantManager.is_superuser = false;
+    assistantManager.username = 'assistant.manager'; assistantManager.email = 'assistant.manager@nativemojo.com';
+    assistantManager.display_name = 'Assistant Manager'; assistantManager.permissions = { assistant: true, view_admin: true, security: true };
+    const assistantOperator = at(40);
+    assistantOperator.is_active = true; assistantOperator.is_superuser = false;
+    assistantOperator.username = 'assistant.operator'; assistantOperator.email = 'assistant.operator@nativemojo.com';
+    assistantOperator.display_name = 'Assistant Operator'; assistantOperator.permissions = { assistant: true };
+    const assistantAdmin = at(41);
+    assistantAdmin.is_active = true; assistantAdmin.is_superuser = false;
+    assistantAdmin.username = 'assistant.admin'; assistantAdmin.email = 'assistant.admin@nativemojo.com';
+    assistantAdmin.display_name = 'Assistant Admin'; assistantAdmin.permissions = { view_admin: true };
+    const assistantMember = at(42);
+    assistantMember.is_active = true; assistantMember.is_superuser = false;
+    assistantMember.username = 'assistant.member'; assistantMember.email = 'assistant.member@nativemojo.com';
+    assistantMember.display_name = 'Assistant Group Member'; assistantMember.permissions = {};
+    showcaseOperator.permissions = { ...(showcaseOperator.permissions ?? {}), assistant: true };
     const metricsViewer = at(24);
     metricsViewer.is_active = true;
     metricsViewer.is_superuser = false;
@@ -3859,6 +3876,34 @@ members.push({
     user: 23, group: 1,
 });
 groups[0]!.member_count += 1;
+members.push({
+    id: 191, created: groups[0]!.created, modified: groups[0]!.modified,
+    is_active: true, permissions: { assistant: true }, metadata: {},
+    user: 42, group: 1,
+});
+groups[0]!.member_count += 1;
+
+interface MockAssistantMessage { id: number; role: 'user' | 'assistant'; content: string; tool_calls: unknown[]; blocks: unknown[] | null; duration_ms: number | null; usage: Record<string, unknown>; created: number }
+interface MockAssistantConversation { id: number; user: number; group: null; title: string; metadata: Record<string, unknown>; created: number; modified: number; messages: MockAssistantMessage[] }
+interface MockAssistantSkill { id: number; tier: 'global' | 'user' | 'group'; name: string; description: string; triggers: string[]; steps: Array<Record<string, unknown>>; auto_execute: boolean; is_active: boolean; metadata: Record<string, unknown>; user: number | null; group: number | null; created: number; modified: number }
+function buildAssistantState() {
+    const now = Math.floor(Date.now() / 1000);
+    const conversations: MockAssistantConversation[] = [
+        { id: 8101, user: 14, group: null, title: 'Review deployment health', metadata: {}, created: now - 3600, modified: now - 3300, messages: [
+            { id: 8201, role: 'user', content: 'Summarize deployment health.', tool_calls: [], blocks: null, duration_ms: null, usage: {}, created: now - 3600 },
+            { id: 8202, role: 'assistant', content: 'The deployment is healthy; one security ticket needs review.', tool_calls: [], blocks: [{ type: 'stat', items: [{ label: 'Healthy services', value: 12 }, { label: 'Open tickets', value: 1 }] }], duration_ms: 420, usage: {}, created: now - 3300 },
+        ] },
+        { id: 8102, user: 39, group: null, title: 'Incident review', metadata: { context_model: 'incident.Incident', context_pk: 1 }, created: now - 7200, modified: now - 7100, messages: [
+            { id: 8203, role: 'user', content: 'Review this incident.', tool_calls: [], blocks: null, duration_ms: null, usage: {}, created: now - 7200 },
+            { id: 8204, role: 'assistant', content: 'I loaded the incident context.', tool_calls: [], blocks: [{ type: 'context', references: [{ model: 'incident.Incident', pk: 1, label: 'Incident #1' }] }], duration_ms: 310, usage: {}, created: now - 7100 },
+        ] },
+    ];
+    const skills: MockAssistantSkill[] = [
+        { id: 8301, tier: 'global', name: 'deployment-health', description: 'Summarize deployment health and active operational risk.', triggers: ['deployment health', 'system health'], steps: [{ tool: 'query_metrics', description: 'Inspect service metrics.' }, { tool: 'query_incidents', description: 'Summarize active incidents.' }], auto_execute: false, is_active: true, metadata: {}, user: null, group: null, created: now - 86400, modified: now - 3600 },
+        { id: 8302, tier: 'user', name: 'my-open-work', description: 'Summarize work owned by the current operator.', triggers: ['my open work'], steps: [{ tool: 'query_tickets', description: 'Find owned tickets.' }], auto_execute: true, is_active: true, metadata: {}, user: 14, group: null, created: now - 72000, modified: now - 1800 },
+    ];
+    return { conversations, skills, memory: { global: { 'response:style': 'concise' }, users: new Map<number, Record<string, unknown>>([[14, { 'preferred:timezone': 'UTC' }]]), groups: new Map<number, Record<string, unknown>>([[1, { 'service:owner': 'Operations' }]]) } };
+}
 
 interface MockStorageBucket {
     id: string;
@@ -3984,10 +4029,14 @@ function buildStorageRenditions(): MockStorageRendition[] {
 
 const messagingSeed = buildMessaging();
 const phoneHubSeed = buildPhoneHub();
+const assistantSeed = buildAssistantState();
 const db = {
     users,
     groups,
     members,
+    assistantConversations: assistantSeed.conversations,
+    assistantSkills: assistantSeed.skills,
+    assistantMemory: assistantSeed.memory,
     apiKeys: buildApiKeys(),
     // #1287: firewall rows ride the same Log table the monitoring page reads.
     logs: [...buildFirewallLogs(), ...buildLogs(users, groups)],
@@ -7113,6 +7162,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         || path === '/api/dnsman/delegation'
         || path.startsWith('/api/metrics/')
         || path.startsWith('/api/aws/cloudwatch/')
+        || path.startsWith('/api/assistant/memory/')
         ? { ...(opts.params ?? {}) }
         : undefined;
     const locationObservables = path.startsWith('/api/location/') ? {
@@ -7130,6 +7180,84 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         ...(locationObservables ? { observables: locationObservables } : {}),
     });
     await new Promise((r) => setTimeout(r, LATENCY_MS));
+
+    // ── Admin Assistant — REST-only complete slice (#1299) ──────────
+    // Deliberately no websocket, polling, progress, cancel, or action route.
+    // Action choices return through the ordinary POST /api/assistant message.
+    if (path.startsWith('/api/assistant')) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const assistantGate = hasGlobalPermission(caller, ['view_admin', 'assistant']);
+        const canInspect = (row: MockAssistantConversation) => row.user === caller.id || assistantGate;
+        const canDelete = (row: MockAssistantConversation) => row.user === caller.id || hasGlobalPermission(caller, ['view_admin']);
+        const assistantUser = (userId: number) => { const row = db.users.find((user) => user.id === userId); return row ? { id: row.id, display_name: row.display_name } : { id: userId, display_name: `User #${userId}` }; };
+        const conversationWire = (row: MockAssistantConversation, detail = false) => ({ id: row.id, title: row.title, metadata: { ...row.metadata }, created: row.created, modified: row.modified, user: assistantUser(row.user), ...(detail ? { messages: row.messages.map((message) => ({ ...message, tool_calls: [...message.tool_calls], blocks: message.blocks == null ? null : structuredClone(message.blocks), usage: { ...message.usage } })) } : {}) });
+        const nextMessageId = () => Math.max(8200, ...db.assistantConversations.flatMap((row) => row.messages.map((message) => message.id))) + 1;
+        if (path === '/api/assistant') {
+            if (!assistantGate) return permissionDenied();
+            if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+            const message = typeof opts.body?.message === 'string' ? opts.body.message.trim() : '';
+            if (!message) return { status: false, error: 'message is required', error_code: 400 };
+            let conversation: MockAssistantConversation | undefined;
+            if (opts.body?.conversation_id != null) {
+                conversation = db.assistantConversations.find((row) => row.id === Number(opts.body?.conversation_id));
+                if (!conversation || conversation.user !== caller.id) return { status: false, error: 'Conversation not found', conversation_id: Number(opts.body.conversation_id), error_code: 404 };
+            } else {
+                const now = Math.floor(Date.now() / 1000);
+                conversation = { id: Math.max(8100, ...db.assistantConversations.map((row) => row.id)) + 1, user: caller.id, group: null, title: message.slice(0, 80), metadata: {}, created: now, modified: now, messages: [] };
+                db.assistantConversations.unshift(conversation);
+            }
+            const now = Math.floor(Date.now() / 1000);
+            conversation.messages.push({ id: nextMessageId(), role: 'user', content: message, tool_calls: [], blocks: null, duration_ms: null, usage: {}, created: now });
+            let response = `I received your request: ${message}`;
+            let blocks: unknown[] = [];
+            if (/confirm|block ip|action/i.test(message)) { response = 'Review the proposed action before continuing.'; blocks = [{ type: 'action', action_id: `mock-${conversation.id}-${now}`, title: 'Confirm operation', description: 'This deterministic mock action returns through ordinary chat.', actions: [{ label: 'Confirm', value: 'confirm' }, { label: 'Cancel', value: 'cancel' }] }]; }
+            else if (/export|file/i.test(message)) { response = 'The export is ready.'; blocks = [{ type: 'file', filename: 'assistant-export.csv', url: '/mock-storage/files/assistant-export.csv', size: 128, format: 'csv', row_count: 3, expires_in: '14 days' }]; }
+            else if (/incident/i.test(message)) { response = 'I found the referenced incident.'; blocks = [{ type: 'context', references: [{ model: 'incident.Incident', pk: 1, label: 'Incident #1' }] }]; }
+            conversation.messages.push({ id: nextMessageId(), role: 'assistant', content: response, tool_calls: [], blocks, duration_ms: 250, usage: {}, created: now + 1 });
+            conversation.modified = now + 1;
+            return { status: true, data: { response, conversation_id: conversation.id, tool_calls_made: 0, duration_ms: 250, ...(blocks.length ? { blocks } : {}) } };
+        }
+        if (path === '/api/assistant/context') {
+            if (!assistantGate) return permissionDenied();
+            if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+            const model = opts.body?.model; const pk = Number(opts.body?.pk);
+            if ((model !== 'incident.Incident' && model !== 'incident.Ticket') || !Number.isInteger(pk) || pk < 1) return { status: false, error: 'model and pk are required', error_code: 400 };
+            if (!hasGlobalPermission(caller, ['view_security', 'security'])) return permissionDenied();
+            const targetExists = model === 'incident.Incident' ? db.incidentRecords.some((row) => row.id === pk) : db.tickets.some((row) => row.id === pk);
+            if (!targetExists) return { status: false, error: 'Context record not found', error_code: 404 };
+            const existing = db.assistantConversations.find((row) => row.user === caller.id && row.metadata.context_model === model && row.metadata.context_pk === pk);
+            if (existing) return { status: true, data: { conversation_id: existing.id, existing: true } };
+            const now = Math.floor(Date.now() / 1000); const conversation: MockAssistantConversation = { id: Math.max(8100, ...db.assistantConversations.map((row) => row.id)) + 1, user: caller.id, group: null, title: `${model === 'incident.Incident' ? 'Incident' : 'Ticket'} #${pk}`, metadata: { context_model: model, context_pk: pk }, created: now, modified: now, messages: [{ id: nextMessageId(), role: 'user', content: `Review ${model} #${pk}.`, tool_calls: [], blocks: null, duration_ms: null, usage: {}, created: now }] };
+            db.assistantConversations.unshift(conversation); return { status: true, data: { conversation_id: conversation.id } };
+        }
+        const conversationMatch = path.match(/^\/api\/assistant\/conversation(?:\/(\d+))?$/);
+        if (conversationMatch) {
+            const id = conversationMatch[1] ? Number(conversationMatch[1]) : null;
+            if (id != null) { const row = db.assistantConversations.find((candidate) => candidate.id === id); if (!row || !canInspect(row)) return { status: false, error: 'Conversation not found', error_code: 404 }; if (method === 'DELETE') { if (!canDelete(row)) return permissionDenied(); db.assistantConversations = db.assistantConversations.filter((candidate) => candidate.id !== id); return { status: 'deleted' }; } if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; return { status: true, data: conversationWire(row, opts.params?.graph === 'detail'), graph: String(opts.params?.graph ?? 'default') }; }
+            if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+            const visible = db.assistantConversations.filter(canInspect).sort((a, b) => b.modified - a.modified); const start = Math.max(0, Number(opts.params?.start ?? 0)); const size = Math.min(100, Math.max(1, Number(opts.params?.size ?? 100))); return { status: true, data: visible.slice(start, start + size).map((row) => conversationWire(row)), count: visible.length, start, size, graph: 'default' };
+        }
+        const skillMatch = path.match(/^\/api\/assistant\/skill(?:\/(\d+))?$/);
+        if (skillMatch) {
+            if (!assistantGate) return permissionDenied(); const id = skillMatch[1] ? Number(skillMatch[1]) : null;
+            const skillWire = (row: MockAssistantSkill, detail = false) => ({ id: row.id, tier: row.tier, name: row.name, description: row.description, auto_execute: row.auto_execute, is_active: row.is_active, created: row.created, modified: row.modified, user: row.user == null ? null : assistantUser(row.user), ...(detail ? { triggers: [...row.triggers], steps: structuredClone(row.steps), metadata: { ...row.metadata } } : {}) });
+            if (id != null) { const row = db.assistantSkills.find((candidate) => candidate.id === id); if (!row) return { status: false, error: 'Skill not found', error_code: 404 }; if (method === 'DELETE') { db.assistantSkills = db.assistantSkills.filter((candidate) => candidate.id !== id); return { status: 'deleted' }; } if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; return { status: true, data: skillWire(row, opts.params?.graph === 'detail'), graph: String(opts.params?.graph ?? 'default') }; }
+            if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; const rows = [...db.assistantSkills].sort((a, b) => a.name.localeCompare(b.name)); return { status: true, data: rows.map((row) => skillWire(row)), count: rows.length, start: 0, size: rows.length, graph: 'default' };
+        }
+        const memoryMatch = path.match(/^\/api\/assistant\/memory\/(global|user|group)(?:\/([^/]+))?$/);
+        if (memoryMatch) {
+            if (!hasGlobalPermission(caller, ['assistant'])) return permissionDenied(); const tier = memoryMatch[1] as 'global' | 'user' | 'group'; const entryKey = memoryMatch[2] ? decodeURIComponent(memoryMatch[2]) : null; const groupId = tier === 'group' ? Number(opts.params?.group) : null;
+            if ('group' in (opts.body ?? {})) return { status: false, error: 'group belongs in request context, not the body', error_code: 400 };
+            if (tier === 'group') { const membership = db.members.find((member) => member.user === caller.id && member.group === groupId && member.is_active); if (!membership) return permissionDenied(); }
+            const store: Record<string, unknown> = tier === 'global' ? db.assistantMemory.global : tier === 'user' ? (db.assistantMemory.users.get(caller.id) ?? {}) : (db.assistantMemory.groups.get(groupId!) ?? {});
+            if (method === 'GET' && entryKey == null) return { status: true, data: { ...store } };
+            if (method === 'POST' && entryKey == null) { const key = typeof opts.body?.key === 'string' ? opts.body.key : ''; const value = typeof opts.body?.value === 'string' ? opts.body.value : ''; if (!/^[a-z0-9:_-]{1,64}$/.test(key) || value.length < 1 || value.length > 500) return { status: false, error: 'Invalid memory key or value', error_code: 400 }; store[key] = value; if (tier === 'user') db.assistantMemory.users.set(caller.id, store); if (tier === 'group') db.assistantMemory.groups.set(groupId!, store); return { status: true, data: { key, value } }; }
+            if (method === 'DELETE' && entryKey != null) { delete store[entryKey]; return { status: true, data: { deleted: entryKey } }; }
+            return { status: false, error: 'Method not allowed', error_code: 405 };
+        }
+        return { status: false, error: `No mock for ${path}`, error_code: 404 };
+    }
 
     // ── Public location — exact mixed django-mojo envelopes ──────────
     if (path === '/api/location/address/validate') {

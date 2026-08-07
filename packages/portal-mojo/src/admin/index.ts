@@ -40,6 +40,7 @@ import { DNS_ADMIN_SECTION } from './dns';
 import { STORAGE_ADMIN_SECTION } from './storage';
 import { EMAIL_ADMIN_SECTION, PUBLIC_MESSAGES_ADMIN_SECTION } from './messaging';
 import { PHONE_HUB_ADMIN_SECTION } from './phonehub';
+import { ASSISTANT_ADMIN_SECTION } from './assistant';
 import { ADMIN_DASHBOARD_PERMISSIONS, AdminDashboardPage } from './dashboard';
 
 export * from './credentials';
@@ -59,6 +60,7 @@ export * from './storage';
 export * from './messaging';
 export * from './phonehub';
 export * from './dashboard';
+export * from './assistant';
 
 export type AdminNavigationGroup =
     | 'overview'
@@ -168,6 +170,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     EMAIL_ADMIN_SECTION,
     PUBLIC_MESSAGES_ADMIN_SECTION,
     PHONE_HUB_ADMIN_SECTION,
+    ASSISTANT_ADMIN_SECTION,
 ];
 
 function relativePath(...parts: Array<string | undefined>): string {
