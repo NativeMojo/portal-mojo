@@ -79,6 +79,8 @@ smearing).
     loadSeries={exactLoader}                    // optional; default is mojoMetrics
     seriesCacheKey="caller-42:exact-history"   // required stable namespace for custom loaders
     preserveSeriesLabels                       // keep full-slug/child identity verbatim
+    allowedGranularities={['minutes','hours','days']} // optional backend subset; unsupported controls omitted
+    refreshSignal={refreshVersion}              // changed by a parent refresh owner; exactly one fetch
     // toggles, all default true:
     showGranularity showDateRange showTypeSwitch showRefresh showStats showDataTable
 />
@@ -94,8 +96,14 @@ smearing).
   day bounds 00:00:00–23:59:59 → epoch seconds), and re-points granularity
   at a bucket that fits the span (`granularitiesForSpanMs`).
 - Quick ranges anchor their window at pick time; **Refresh re-anchors at
-  now** (web-mojo kept the stale window — deliberate fix). Range switches
+  now** (web-mojo kept the stale window — deliberate fix). A quick-window
+  refresh changes the query key and does not also call `refetch`, preventing
+  the former duplicate request. `refreshSignal` follows the same one-request
+  path for a parent-owned refresh control. Range switches
   re-point granularity at the nearest sensible bucket.
+- `allowedGranularities` additively narrows the control vocabulary for a
+  backend such as CloudWatch. Values outside the supported subset are not
+  rendered; normal metrics callers retain all five granularities.
 - `loadSeries(params)` receives typed `slugs`, `account`, `granularity`,
   `dt_start`, `dt_end`, and optional fan-out fields. The loader namespace is
   part of the TanStack key, preventing a custom exact-identity loader from

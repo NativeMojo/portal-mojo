@@ -1,0 +1,23 @@
+.cloudwatch-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.cloudwatch-page-actions, .cloudwatch-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cloudwatch-page-actions .btn, .cloudwatch-detail-actions .btn { display: inline-flex; align-items: center; gap: 7px; }
+.cloudwatch-gap-note { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--mute); background: var(--surface2); font-size: 12.5px; }
+.cloudwatch-gap-note i { color: var(--info); }
+.cloudwatch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.cloudwatch-chart-slot { min-width: 0; }
+.cloudwatch-chart-placeholder { min-height: 284px; display: flex; align-items: stretch; }
+.cloudwatch-chart-placeholder .skel { flex: 1; }
+.cloudwatch-modal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cloudwatch-resource-loading { min-height: 240px; padding-top: 18px; }
+.cloudwatch-resource-groups { display: grid; gap: 18px; margin-top: 16px; }
+.cloudwatch-resource-groups h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; }
+.cloudwatch-resource-list { display: grid; gap: 6px; }
+.cloudwatch-resource-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
+.cloudwatch-resource-row:hover { border-color: var(--accent); background: var(--accent-soft); }
+.cloudwatch-resource-row > span:first-child { display: grid; min-width: 0; }
+.cloudwatch-resource-row b, .cloudwatch-resource-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloudwatch-resource-row small { color: var(--mute); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.cloudwatch-resource-row > i { color: var(--mute); }
+.cloudwatch-detail-actions { justify-content: flex-end; margin-bottom: 10px; }
+@media (max-width: 900px) { .cloudwatch-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .cloudwatch-page-heading { flex-direction: column; } .cloudwatch-page-actions { width: 100%; } }

@@ -62,6 +62,9 @@ try {
         'shipped Admin record details must not register child routes');
     const metricsRoutes = admin.MONITORING_ADMIN_SECTION.routes.filter((route) => route.path.startsWith('metrics/'));
     assert.equal(admin.ADMIN_SECTIONS[0].id, 'dashboard');
+    assert(admin.ADMIN_SECTIONS.includes(admin.CLOUDWATCH_ADMIN_SECTION));
+    assert(admin.adminSectionRoutes([admin.CLOUDWATCH_ADMIN_SECTION], { mount: '/system' })
+        .some((route) => route.path === 'system/cloudwatch'));
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS).some((route) => route.path === ''));
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS, { mount: '/system' }).some((route) => route.path === 'system'));
     assert.deepEqual(metricsRoutes.map((route) => route.path), ['metrics/explorer', 'metrics/permissions']);

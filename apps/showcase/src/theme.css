@@ -13,6 +13,7 @@
 @import "./theme/right-panel.css";
 @import "./theme/admin-security.css";
 @import "./theme/admin-dashboard.css";
+@import "./theme/admin-cloudwatch.css";
 @import "./theme/admin-monitoring.css";
 @import "./theme/admin-bouncer.css";
 @import "./theme/admin-incidents.css";

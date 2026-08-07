@@ -4931,6 +4931,64 @@ function fetchMetrics(params: Params, caller?: MockUser) {
     return { status: true, data: { data, labels } };
 }
 
+const CLOUDWATCH_RESOURCES = {
+    ec2: [
+        { id: 'i-0abc0001', name: 'api-prod', slug: 'api-prod', state: 'running', instance_type: 't3.large', private_ip: '10.0.1.14', public_ip: '203.0.113.14' },
+        { id: 'i-0abc0002', name: 'worker-prod', slug: 'worker-prod', state: 'running', instance_type: 'm6i.large', private_ip: '10.0.2.21', public_ip: '' },
+        { id: 'i-0abc0003', name: 'worker-prod', slug: 'worker-prod', state: 'stopped', instance_type: 'm6i.large', private_ip: '10.0.2.22', public_ip: '' },
+    ],
+    rds: [
+        { id: 'prod-postgres', slug: 'prod-postgres', engine: 'postgres 16.4', status: 'available', instance_class: 'db.r6g.large', endpoint: 'prod-postgres.example.invalid:5432' },
+        { id: 'audit-postgres', slug: 'audit-postgres', engine: 'postgres 16.4', status: 'available', instance_class: 'db.t4g.medium', endpoint: 'audit-postgres.example.invalid:5432' },
+    ],
+    redis: [
+        { id: 'prod-redis-001', slug: 'prod-redis-001', engine: 'redis 7.1', status: 'available', node_type: 'cache.r7g.large', num_nodes: 2 },
+        { id: 'session-redis-001', slug: 'session-redis-001', engine: 'redis 7.1', status: 'available', node_type: 'cache.t4g.medium', num_nodes: 1 },
+    ],
+} as const;
+
+const CLOUDWATCH_CATEGORIES: Record<string, readonly string[]> = {
+    ec2: ['cpu', 'net_in', 'net_out', 'disk_read', 'disk_write', 'status_check', 'memory', 'disk'],
+    rds: ['cpu', 'conns', 'free_storage', 'free_memory', 'read_iops', 'write_iops', 'read_latency', 'write_latency', 'net_in', 'net_out'],
+    redis: ['cpu', 'conns', 'cache_memory', 'cache_hits', 'cache_misses', 'replication_lag', 'net_in', 'net_out'],
+};
+
+function cloudWatchFetch(path: string, opts: MockFetchOpts): unknown | undefined {
+    if (path !== '/api/aws/cloudwatch/resources' && path !== '/api/aws/cloudwatch/fetch') return undefined;
+    const caller = userFromBearer(opts.headers);
+    if (!caller) return permissionDenied(401);
+    if (!hasGlobalPermission(caller, ['manage_aws'])) return permissionDenied();
+    if ((opts.method ?? 'GET') !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+    if (path.endsWith('/resources')) return { status: true, ec2: CLOUDWATCH_RESOURCES.ec2.map((row) => ({ ...row })), rds: CLOUDWATCH_RESOURCES.rds.map((row) => ({ ...row })), redis: CLOUDWATCH_RESOURCES.redis.map((row) => ({ ...row })) };
+
+    const params = opts.params ?? {};
+    const account = String(params.account ?? '');
+    const category = String(params.category ?? '');
+    if (!(account in CLOUDWATCH_RESOURCES)) return { status: false, error: `unknown account '${account}'. Valid values: ec2, rds, redis`, error_code: 400 };
+    if (!(CLOUDWATCH_CATEGORIES[account] ?? []).includes(category)) return { status: false, error: `category '${category}' is not supported for account type '${account}'`, error_code: 400 };
+    const granularity = String(params.granularity ?? 'hours');
+    if (!['minutes', 'hours', 'days'].includes(granularity)) return { status: false, error: `unsupported granularity '${granularity}'`, error_code: 400 };
+    const window = metricTimes(params, granularity);
+    if (!Array.isArray(window)) return { status: false, error: window.error, error_code: 400 };
+    const resources = CLOUDWATCH_RESOURCES[account as keyof typeof CLOUDWATCH_RESOURCES];
+    const slugToId = new Map<string, string>();
+    const idToSlug = new Map<string, string>();
+    for (const resource of resources) { slugToId.set(resource.slug, resource.id); slugToId.set(resource.id, resource.id); idToSlug.set(resource.id, resource.slug); }
+    const requested = Object.prototype.hasOwnProperty.call(params, 'slugs')
+        ? String(params.slugs ?? '').split(',').map((slug) => slug.trim()).filter(Boolean)
+        : resources.map((resource) => resource.id);
+    const ids = requested.map((slug) => slugToId.get(slug) ?? slug);
+    const labels = window.map((date) => bucketLabel(date, granularity));
+    const times = window.map((date) => date.getTime());
+    const data: Record<string, number[]> = {};
+    for (const id of ids) {
+        const salt = accountSalt(`${account}:${category}:${id}`);
+        const scale = category.includes('latency') ? 0.0001 : category.includes('cpu') || category === 'memory' || category === 'disk' ? 0.1 : 1;
+        data[idToSlug.get(id) ?? id] = times.map((time, index) => Math.round((sample(index + salt % 997, time + salt, 50 + salt % 120, 30) * scale) * 10_000) / 10_000);
+    }
+    return { status: true, data: { data, labels } };
+}
+
 function fetchMetricPoint(params: Params, caller?: MockUser) {
     const account = String(params.account ?? 'public');
     if (!canViewMetricsAccount(caller, account)) return permissionDenied(caller ? 403 : 401);
@@ -6957,6 +7015,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         || path === '/api/dnsman/registrar/discover'
         || path === '/api/dnsman/delegation'
         || path.startsWith('/api/metrics/')
+        || path.startsWith('/api/aws/cloudwatch/')
         ? { ...(opts.params ?? {}) }
         : undefined;
     const locationObservables = path.startsWith('/api/location/') ? {
@@ -7052,6 +7111,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (messagingResult !== undefined) return messagingResult;
     const storageResult = storageFetch(path, opts);
     if (storageResult !== undefined) return storageResult;
+    const cloudWatchResult = cloudWatchFetch(path, opts);
+    if (cloudWatchResult !== undefined) return cloudWatchResult;
     if (path === '/api/auth/generate_api_key') {
         // account/rest/user_api_key.py generate_api_key: mints a long-lived
         // key for the CALLER (@requires_auth — needs the bearer, unlike the
