@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import {
     FileDropZone, FilePicker, UploadQueue, toast, useUploadQueue, type FileSelectionResult,
-} from '@portal-mojo/ui';
-import type { FileUploadOutcome, FileUploadSnapshot, FileUploadTask } from '@portal-mojo/client';
+} from 'portal-mojo/ui';
+import type { FileUploadOutcome, FileUploadSnapshot, FileUploadTask } from 'portal-mojo/client';
 
 let demoFileId = 7000;
 
