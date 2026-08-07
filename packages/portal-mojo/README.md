@@ -9,16 +9,16 @@ npm install portal-mojo react react-dom react-router-dom @tanstack/react-query
 ```
 
 **Per-component reference docs (written for AI context): [`docs/`](docs/README.md).**
-Live demos for everything: run the portal → **Develop → Components**.
+Live demos for everything: run `npm run dev:showcase` → **Develop → Components**.
 
 ## Subpath surfaces
 
 | Subpath | Surface |
 |---|---|
-| `portal-mojo/client` | Typed django-mojo protocol layer: envelope unwrap at exactly one boundary (a failed save **rejects**), `start`/`size` paging, `'-field'` sort, Django lookups, the URL-synced `useTableParams` store (single source of truth for table state), TanStack Query hooks. Auth client: password / magic-link / passkey login, forgot/reset, cross-origin handoff (`?auth_code=` scrub-before-network), single-flight refresh + pre-request gate (synthetic-401 reject, `/api/token/refresh` recursion guard), `X-Mojo-UID` device header, `getAuthSnapshot`/`subscribeAuth` for React. Boot with `initAuth()`. The in-memory mock transport lives here too — it is the wire contract's executable spec and evolves in lockstep with the client (any seeded active user logs in with email + `"mojo"`). |
-| `portal-mojo/ui` | Mission-control UI: `ModelTable`, `FilterBar`/`FilterPills`, `SchemaForm`/`formModal`, `DetailView`, `RecordFeed`, `AttachmentQueue`/`UploadQueue`, awaitable native-`<dialog>` `modal`, `toast`, `ThemeProvider`, `Guarded` (permission slot), `GroupSwitcher` (searchable tree selector), `RequiresGroup`, the sidebar engine (`registerMenus`/`setDefaultMenu` registry + `SidebarNav` — static or searchable accordion with a compact icon rail; global and group scopes are explicit), `Badge`/`MetricCard`/`Spark`, `fmt` formatter namespace. |
+| `portal-mojo/client` | Typed django-mojo protocol layer: envelope unwrap at exactly one boundary (a failed save **rejects**), `start`/`size` paging, `'-field'` sort, Django lookups, the URL-synced `useTableParams` store (single source of truth for table state), TanStack Query hooks. Auth client: password / magic-link / passkey login, forgot/reset, cross-origin handoff (`?auth_code=` scrub-before-network), single-flight refresh + pre-request gate (synthetic-401 reject, `/api/token/refresh` recursion guard), `X-Mojo-UID` device header, `getAuthSnapshot`/`subscribeAuth` for React. Auth-challenged realtime transport: `RealtimeProvider`/`RealtimeClient`, refcounted topics, typed event projection, and a deterministic mock. Boot auth with `initAuth()`. The in-memory HTTP mock transport lives here too — it is the wire contract's executable spec and evolves in lockstep with the client (any seeded active user logs in with email + `"mojo"`). |
+| `portal-mojo/ui` | Mission-control UI: `ModelTable`, `FilterBar`/`FilterPills`, `SchemaForm`/`formModal`, `DetailView`, `RecordFeed`, `AttachmentQueue`/`UploadQueue`, `ImageEditor`/`imageEditorModal`, awaitable native-`<dialog>` `modal`, `toast`, `ThemeProvider`, `Guarded` (permission slot), `GroupSwitcher` (searchable tree selector), `RequiresGroup`, the sidebar engine (`registerMenus`/`setDefaultMenu` registry + `SidebarNav` — static or searchable accordion with a compact icon rail; global and group scopes are explicit), `Badge`/`MetricCard`/`Spark`, `fmt` formatter namespace. |
 | `portal-mojo/charts` | Dependency-free SVG charts: `SeriesChart` (line/bar/area, stacked bars, legend toggle, crosshair tooltip) and `MetricsChart` (granularity/range/type control bar for `/api/metrics/fetch`). |
-| `portal-mojo/admin` | Global Admin **section bundles**, dual-mount: the standalone back-office portal mounts all of them at root; a product portal embeds them under a global "System" area. `AdminSection` contract + `adminSectionsMenu()` (sections → domain-grouped sidebar menu, mount-point-relative, with section + route permission clauses). Admin scope masks active-group membership even when embedded. Reusable domains include credentials, monitoring, security operations, settings, Bouncer, Members, and the REST-only Assistant control plane. |
+| `portal-mojo/admin` | Global Admin **section bundles**, dual-mount: the standalone back-office portal mounts all of them at root; a product portal embeds them under a global "System" area. `AdminSection` contract + `adminSectionsMenu()` (sections → domain-grouped sidebar menu, mount-point-relative, with section + route permission clauses). Admin scope masks active-group membership even when embedded. Reusable domains include credentials, monitoring, security operations, settings, Bouncer, Members, and the Assistant control plane with narrow realtime streaming plus authoritative REST fallback/reconciliation. |
 
 ## What the consuming app must provide
 
@@ -36,11 +36,13 @@ Live demos for everything: run the portal → **Develop → Components**.
 - **Providers.** Every shell supplies `QueryClientProvider` (spread
   `mojoQueryDefaults()` into its defaults), a hash router (`useTableParams` is
   built on react-router's `useSearchParams`), `ThemeProvider`, `ModalHost`, and
-  `ToastHost`. Product portals additionally install `GroupProvider` so their
-  group-scoped pages and menus can fold active-member permissions into
-  `useCan`/`Guarded`. The standalone Admin shell deliberately does not install
-  group context; it does install one `RightPanelProvider`/`RightPanelSlot` for
-  the globally gated Assistant panel.
+  `ToastHost`. Mount one auth-owned `RealtimeProvider` before any realtime hook
+  or Assistant surface; individual permission-gated consumers own topic/event
+  lifetimes, not the shared connection. Product portals additionally install
+  `GroupProvider` so their group-scoped pages and menus can fold active-member
+  permissions into `useCan`/`Guarded`. The standalone Admin shell deliberately
+  does not install group context; it does install one
+  `RightPanelProvider`/`RightPanelSlot` for the globally gated Assistant panel.
 - **`VITE_MOJO_API`.** Unset → the in-package mock transport (dev default);
   set to a django-mojo origin → the real backend, same code path.
 

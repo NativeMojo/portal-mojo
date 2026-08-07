@@ -25,12 +25,22 @@ disable this shared provider.
   serialized because acknowledgements carry only the topic and denial is a
   generic uncorrelated `error`. Denial yields topic status `denied`; it does not
   reconnect the socket. The server's automatic `user:<id>` topic is reported
-  separately and is never explicitly subscribed by the client.
+  separately and is never explicitly subscribed by the client. That automatic
+  topic is a delivery scope, not a presence feed.
 - Framework messages, one wrapped `{type:'message',data,topic?,timestamp?}`
   layer, and direct application events share one dispatch boundary. Malformed
   frames drop. No generic Query invalidation is performed.
 
+The transport does not invent application events. Current django-mojo has no
+canonical record-created/updated/deleted stream and no canonical presence
+stream, so neither record cache invalidation nor online status can be derived
+from this client. `defineRealtimeEvent` and `useRealtimeTopic` are useful only
+when a backend producer defines and authorizes that exact event/topic contract;
+Assistant streaming is the package's current concrete application consumer.
+
 ```tsx
+// Hypothetical: this works only if the consuming backend publishes this
+// application-specific event and authorizes the `orders` topic.
 const orderChanged = defineRealtimeEvent('order_changed', (value) => {
   if (!value || typeof value !== 'object') return null;
   const id = (value as {id?: unknown}).id;

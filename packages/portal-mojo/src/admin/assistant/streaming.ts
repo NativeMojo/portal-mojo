@@ -101,7 +101,7 @@ export function chooseAssistantTransport(input: { owner: boolean; textOnly: bool
 
 export class AssistantOutcomeUnknownError extends Error {
     constructor() {
-        super('Outcome unknown: the connection ended before the server assigned a conversation. Conversation history was refreshed; the message was not resent.');
+        super('Outcome unknown: the connection ended before the server assigned a conversation. The conversation list was refreshed; the message was not resent.');
         this.name = 'AssistantOutcomeUnknownError';
     }
 }

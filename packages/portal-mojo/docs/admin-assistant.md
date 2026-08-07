@@ -19,16 +19,18 @@ Import from `portal-mojo/admin`.
 - Realtime positively projects only `assistant_thinking`, `assistant_text`,
   `assistant_tool_call`, `assistant_plan`, `assistant_plan_update`,
   `assistant_response`, and `assistant_error`, whether they arrive directly or
-  through the transport's one wrapper boundary. Every event correlates by
-  `conversation_id`. Tool state retains bounded name/status/count only; raw
-  input and the terminal `tool_calls_made` list never enter UI state, caches,
-  logs, or mock observations. Plans omit tool inputs. Terminal duplication is
-  checked only with the backend's authoritative `message_id` (never a guessed
-  local id).
+  through the transport's one wrapper boundary. Thinking, text, tool, plan,
+  update, and response events require a positive `conversation_id` and are
+  correlated to the active turn. `assistant_error` alone may omit it; such an
+  uncorrelated server error terminates the active turn. Tool state retains
+  bounded name/status/count only; raw input and the terminal `tool_calls_made`
+  list never enter UI state, caches, logs, or mock observations. Plans omit
+  tool inputs. Terminal duplication is checked only with the backend's
+  authoritative `message_id` (never a guessed local id).
 - A disconnect for a known conversation waits for reauthentication, then
   reconciles from `/api/assistant/conversation/<id>?graph=detail`. A disconnect
   during the first send before `assistant_thinking` supplies a conversation id
-  is explicitly **outcome unknown**: conversation history is refreshed, the
+  is explicitly **outcome unknown**: the conversation list is refreshed, the
   optimistic message remains visibly uncertain, and the client never resends
   or guesses a conversation. Server-side permission revocation remains
   authoritative but can only be observed by the socket on a handled request or

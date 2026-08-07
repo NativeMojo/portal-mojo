@@ -8,9 +8,12 @@ import { ImageEditor, imageEditorModal, type ImageEditorResult } from 'portal-mo
 
 `ImageEditor` is the dependency-free crop/transform/filter editor. It accepts a
 controlled `source` (`Blob`, `File`, or URL), reports only through `onSave`, and
-never downloads. `imageEditorModal(source, options)` is the awaitable native
-dialog form: it resolves an `ImageEditorResult` on save and `null` on Cancel,
-Escape, or backdrop dismissal.
+never triggers a browser file download. A URL source is fetched before decode:
+same-origin requests include same-origin credentials, while cross-origin URLs
+remain subject to CORS and receive no credentials. Source/capability URLs are
+never echoed in editor errors. `imageEditorModal(source, options)` is the
+awaitable native dialog form: it resolves an `ImageEditorResult` on save and
+`null` on Cancel, Escape, backdrop dismissal, or owner-signal abort.
 
 ```ts
 interface ImageEditorResult {
@@ -33,8 +36,33 @@ if (result) upload(new File([result.blob], result.filename, { type: 'image/png' 
 ```
 
 Options are `filename`, `startMode`, `modes`, `crop`, `initialOperations`,
-`maxHistory` (1–20), and `saveText`. Embedded use additionally supplies
-`onSave`, optional `onCancel`, `disabled`, and `onBusyChange`.
+`maxHistory` (1–20), and `saveText`. Modal use additionally accepts `title`,
+`size` (`sm`, `md`, or `lg`), and an `AbortSignal` as `signal`; abort resolves
+the modal with `null`. Embedded use additionally supplies `onSave`, optional
+`onCancel`, `disabled`, and `onBusyChange`.
+
+## Low-level exports
+
+The framework-free math and raster contracts are intentionally public from the
+same `portal-mojo/ui` subpath for non-React composition and deterministic
+verification:
+
+- Geometry/state types include `ImageSize`, `ImagePoint`, `ImageRect`,
+  `CropData`, `CropOptions`, `TransformState`, `FilterState`,
+  `ImageEditorOperation`, and `ImageEditorSnapshot`. The corresponding defaults,
+  limits, crop handles, presets, and filter order are exported constants.
+- Geometry helpers cover canvas/image mapping, crop initialize/constrain/move/
+  resize, transform clamp/rotate/zoom/output sizing, filter composition,
+  operation output/crop inspection, and immutable history commits.
+- Raster helpers expose `PixelSurface`, `filterPixels`,
+  `applyOperationsToPixels`, `decodeImageSource`, `drawPixelSurface`,
+  `pixelSurfaceToBlob`, and `renderImageOperations`. `decodeImageSource`, canvas
+  drawing, and Blob encoding require browser APIs; callers that retain a
+  returned `DecodedImage` must call its `dispose()`.
+
+These helpers operate on logical pixels and do not mount UI, upload Files,
+persist state, or initiate a browser download. `decodeImageSource` is the one
+exception that performs the URL fetch described above.
 
 ## Composition and history
 

@@ -560,9 +560,8 @@ autosave editing, permission-gated UI, live metrics dashboard.
   `portal-mojo/admin`.
 - user-profile sections as the DetailView/forms proving ground. Board #1261
   (parked).
-- Lightbox: extract canvas math (crop/transform/filters) to framework-free TS
-  first — the one place a naive rewrite loses institutional knowledge. Board
-  #1262 (parked).
+- Image editor: framework-free canvas math plus the controlled React
+  crop/transform/filter editor. Board #1262 — **DONE 2026-08-07**.
 - Distribution: `create-portal-mojo` scaffolder (thin shell: config + page
   registry + npm dep). **django-mojo dependency:** a capabilities endpoint
   (generalize dnsman `capabilities()`) so one admin build lights up only the
@@ -571,7 +570,8 @@ autosave editing, permission-gated UI, live metrics dashboard.
   item at activation).
 - Reusable WebSocket transport (`wss://…/ws/realtime/`, challenged bearer
   handshake, heartbeat, refcounted topics) + Assistant streaming consumer.
-  Board #1264. Upload transport/UX completed independently in #1468/#1470.
+  Board #1264 — **DONE 2026-08-07**. Upload transport/UX completed independently
+  in #1468/#1470.
 - Publishing: npm `portal-mojo` with TypeScript-source subpath exports;
   reviewed SemVer bumps land on `main`, and matching GitHub Releases publish
   through the verified OIDC workflow. `web-mojo` stays published
