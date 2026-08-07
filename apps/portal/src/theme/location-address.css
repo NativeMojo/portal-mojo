@@ -1,0 +1,32 @@
+/* AddressField — token-only light/dark styling; Popover owns positioning. */
+.address-field { position: relative; width: 100%; }
+.address-input-wrap { position: relative; }
+.address-input { padding-left: 34px; padding-right: 34px; }
+.address-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    z-index: 1; color: var(--mute); pointer-events: none;
+}
+.address-spinner {
+    position: absolute; right: 11px; top: calc(50% - 7px); width: 14px; height: 14px;
+    border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%;
+    animation: address-spin .7s linear infinite;
+}
+@keyframes address-spin { to { transform: rotate(360deg); } }
+.address-error { display: block; margin-top: 5px; color: var(--bad); font-size: 12px; }
+.address-pop {
+    width: min(480px, calc(100vw - 16px)); max-height: 320px;
+    padding: 5px; overflow-y: auto;
+}
+.address-option {
+    display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px;
+    border-radius: 7px; color: var(--ink); cursor: pointer;
+}
+.address-option:hover, .address-option-hot { background: var(--surface2); }
+.address-option > i { color: var(--mute); margin-top: 2px; }
+.address-option span { display: grid; gap: 2px; min-width: 0; }
+.address-option strong { color: var(--ink-strong); font-size: 13.5px; font-weight: 600; }
+.address-option small { color: var(--mute); font-size: 12px; }
+.address-demo-json {
+    margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface2); color: var(--ink); font-size: 12px; overflow: auto;
+}

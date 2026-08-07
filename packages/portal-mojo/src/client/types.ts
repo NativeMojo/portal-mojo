@@ -57,6 +57,7 @@ export type FieldType =
     | 'multiselect'
     | 'collection' | 'collectionmultiselect' | 'collection-multiselect'
     | 'combo' | 'combobox' | 'autocomplete'
+    | 'address'
     | 'datepicker' | 'monthpicker' | 'yearpicker'
     | 'daterange' | 'monthrange' | 'yearrange'
     | 'timepicker' | 'datetimepicker' | 'timezone'
@@ -170,6 +171,18 @@ export interface Field {
     showDescription?: boolean;
     /** combo/timezone: cap on rendered suggestions. */
     maxSuggestions?: number;
+
+    // address — provider details → declared form fields. address1 defaults
+    // to this field's own name; every other destination is opt-in.
+    addressFields?: Partial<Record<
+        'address1' | 'address2' | 'city' | 'state' | 'state_code' |
+        'postal_code' | 'country' | 'country_code' | 'latitude' |
+        'longitude' | 'formatted_address' | 'place_id', string
+    >>;
+    /** ISO country constraint for provider suggestions. Default US. */
+    country?: string;
+    /** Minimum characters before address suggestions. Default 3. */
+    minChars?: number;
 }
 
 /**

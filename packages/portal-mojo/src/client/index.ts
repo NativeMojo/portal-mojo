@@ -17,6 +17,7 @@ export * from './group';
 export * from './hooks';
 export * from './params';
 export * from './lookups';
+export * from './location';
 export * from './markdown';
 export * from './record-feed';
 export * from './safe-export';

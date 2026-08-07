@@ -12,6 +12,7 @@ export * from './armed-button';
 export * from './loading';
 export * from './CollectionMultiSelect';
 export * from './CollectionSelect';
+export * from './AddressField';
 export * from './ComboBox';
 export * from './date/Calendar';
 export * from './date/DatePicker';

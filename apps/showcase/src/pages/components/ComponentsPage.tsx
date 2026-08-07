@@ -58,6 +58,7 @@ import { AdminMessagingDemo } from './demos-admin-messaging';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
+import { LocationAddressDemo } from './demos-location-address';
 
 interface DemoSection {
     key: string;
@@ -166,6 +167,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Pickers',
         sections: [
+            {
+                key: 'location-address', title: 'AddressField', icon: 'bi-geo-alt',
+                blurb: 'django-mojo location autocomplete with a private provider session, stale-response guards, and one atomic declared-field details patch.',
+                render: () => <LocationAddressDemo />,
+            },
             {
                 key: 'collection-select', title: 'CollectionSelect', icon: 'bi-menu-button-wide',
                 blurb: 'Single record picker over any model — 400ms server search, bare-id → label hydration through the shared cache, commit-only change.',

@@ -39,6 +39,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |
+| [location-address.md](location-address.md) | Six-endpoint LocationClient, private provider sessions, stale guards, controlled AddressField, atomic form patching |
 | [calendar.md](calendar.md) | The picker engine + `dateFns` namespace — three precisions, range anchor/preview, drill-down zoom |
 | [datepicker.md](datepicker.md) | Single-value picker shell — precisions, display-format stripping, clear/required/inline states |
 | [daterange.md](daterange.md) | Range picker + PresetRail — quick ranges, precision modes, the FilterBar daterange dialog |

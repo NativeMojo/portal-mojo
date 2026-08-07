@@ -16,9 +16,10 @@
 // - Option identity never round-trips through DOM attributes — selection
 //   passes the option object in a closure, so numeric values survive
 //   (web-mojo strict-equalled `data-value` strings against numbers).
-// - The outside-click listener attaches only while open and is removed on
-//   close/unmount (web-mojo leaked a document listener per instance).
+// - Popover is the sole outside-click/Escape owner. ComboBox owns only the
+//   meaning of each dismissal (settle outside, revert on Escape).
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Popover } from './Popover';
 
 export type ComboValue = string | number;
 
@@ -186,20 +187,6 @@ export function ComboBox({
         if (allowCustom) { commitCustom(text); return; }
         revert();
     };
-    const settleRef = useRef(settle);
-    settleRef.current = settle;
-
-    // Outside mousedown while open → settle. Attached only while open,
-    // removed on close/unmount (the web-mojo leak, fixed).
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e: MouseEvent) => {
-            if (!wrapRef.current?.contains(e.target as Node)) settleRef.current();
-        };
-        document.addEventListener('mousedown', onDown);
-        return () => document.removeEventListener('mousedown', onDown);
-    }, [open]);
-
     // Keep the keyboard-highlighted option in view.
     useEffect(() => {
         if (highlight < 0) return;
@@ -233,15 +220,6 @@ export function ComboBox({
                     // the draft stays for further editing, blur settles it.
                     e.preventDefault();
                     close();
-                }
-                break;
-            case 'Escape':
-                // Only intercept while there is something to escape, so a
-                // settled combobox inside a <dialog> lets Escape cancel the
-                // dialog (web-mojo swallowed it unconditionally).
-                if (open || draftRef.current !== null) {
-                    e.preventDefault();
-                    revert();
                 }
                 break;
             case 'Tab':
@@ -317,10 +295,14 @@ export function ComboBox({
                     </button>
                 )}
             </div>
-            {/* MERGE-WIRE: consider Popover primitive (#1271) once it lands —
-                local absolute positioning clips inside overflow containers. */}
-            {open && (
-                <div id={listId} className="combo-pop" role="listbox">
+            <Popover
+                anchorRef={wrapRef}
+                open={open}
+                onClose={(reason) => reason === 'escape' ? revert() : settle()}
+                id={listId}
+                className="combo-pop"
+                role="listbox"
+            >
                     {visible.length === 0 ? (
                         <div className="combo-empty">
                             <i className={`bi ${emptyIcon}`} aria-hidden="true" />
@@ -348,8 +330,7 @@ export function ComboBox({
                             </div>
                         );
                     })}
-                </div>
-            )}
+            </Popover>
         </div>
     );
 }

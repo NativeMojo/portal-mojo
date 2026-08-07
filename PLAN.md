@@ -562,6 +562,12 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - Composed FormView permission tab presentation onto Tabs while retaining one autosave reducer over `allTabs`; legacy `.fv-*` styling remains for other callers.
 - Added both-theme CSS, the showcase variants/wizard/modal proof, AI reference docs, and `verify:form-wizard`. Consolidated typecheck/build/browser evidence is owned by the wave orchestrator and is intentionally not claimed here.
 
+### #1306 — LocationClient + AddressField (2026-08-06)
+
+- Added a plain six-endpoint LocationClient over the existing envelope boundary, preserving django-mojo's mixed response shapes. Autocomplete tokens are backend-created, JavaScript-private, reused only for suggestions/details, and protected by latest-generation guards across reset, disposal, and upstream replacement.
+- Added the controlled, commit-only AddressField and `address` registry binding. Selection fetches details privately, then applies one allowlisted declared-field patch through SchemaForm or FormView; FormView validates/queues/saves/reverts the patch as one transaction.
+- Moved ComboBox outside/Escape dismissal to the shared top-layer Popover, added exact public location mocks with derived-only history observability, both-theme styles, showcase proof, AI reference docs, and `verify:location-address` alongside the retained `verify:form-wizard` rider.
+
 ### #1300 — Admin Metrics Explorer (2026-08-06)
 
 - Added one global, no-group `/metrics/explorer` workspace under Observability with its exact `sys.view_metrics | sys.metrics` route clause, separate from the existing manage-only permission editor audience.
