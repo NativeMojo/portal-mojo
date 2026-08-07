@@ -56,6 +56,7 @@ import { AdminMembersDemo } from './demos-admin-members';
 import { AdminIdentityUsersDemo } from './demos-admin-identity-users';
 import { AdminStorageDemo } from './demos-admin-storage';
 import { AdminMessagingDemo } from './demos-admin-messaging';
+import { AdminPhoneHubDemo } from './demos-admin-phonehub';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
@@ -337,6 +338,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-messaging', title: 'Email & contact messages', icon: 'bi-envelope-at',
                 blurb: 'Global SES domains, mailboxes, immutable delivery history, templates and the public support queue — explicit side effects, offline previews, and secret-safe mock parity.',
                 render: () => <AdminMessagingDemo />,
+            },
+            {
+                key: 'admin-phonehub', title: 'Phone Hub', icon: 'bi-phone',
+                blurb: 'Global phone lookup, sanitized SMS audit history, and write-only Twilio, AWS, and Mojo provider configuration with exact operation gates.',
+                render: () => <AdminPhoneHubDemo />,
             },
             {
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',

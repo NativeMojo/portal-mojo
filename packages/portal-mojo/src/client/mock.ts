@@ -2470,6 +2470,22 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     storageMember.email = 'storage.member@nativemojo.com';
     storageMember.display_name = 'Storage Member Only';
     storageMember.permissions = {};
+    const phoneViewer = at(35);
+    phoneViewer.is_active = true; phoneViewer.is_superuser = false;
+    phoneViewer.username = 'phone.viewer'; phoneViewer.email = 'phone.viewer@nativemojo.com';
+    phoneViewer.display_name = 'Phone Viewer'; phoneViewer.permissions = { view_phone_numbers: true, view_sms: true };
+    const phoneManager = at(36);
+    phoneManager.is_active = true; phoneManager.is_superuser = false;
+    phoneManager.username = 'phone.manager'; phoneManager.email = 'phone.manager@nativemojo.com';
+    phoneManager.display_name = 'Phone Manager'; phoneManager.permissions = { manage_phone_numbers: true, manage_sms: true };
+    const phoneConfigManager = at(37);
+    phoneConfigManager.is_active = true; phoneConfigManager.is_superuser = false;
+    phoneConfigManager.username = 'phone.config'; phoneConfigManager.email = 'phone.config@nativemojo.com';
+    phoneConfigManager.display_name = 'Phone Config Manager'; phoneConfigManager.permissions = { manage_phone_config: true, view_groups: true };
+    const phoneComms = at(38);
+    phoneComms.is_active = true; phoneComms.is_superuser = false;
+    phoneComms.username = 'phone.comms'; phoneComms.email = 'phone.comms@nativemojo.com';
+    phoneComms.display_name = 'Phone Comms Operator'; phoneComms.permissions = { comms: true };
     const metricsViewer = at(24);
     metricsViewer.is_active = true;
     metricsViewer.is_superuser = false;
@@ -3810,6 +3826,25 @@ interface MockEmailMailbox { id:number;created:number;modified:number;email:stri
 interface MockSentMessage { id:number;created:number;modified:number;mailbox:number;to_addresses:string[];cc_addresses:string[];bcc_addresses:string[];subject:string;status:string;ses_message_id:string|null;status_reason:string|null;body_text:string|null;body_html:string|null }
 interface MockEmailTemplate { id:number;created:number;modified:number;name:string;subject_template:string;html_template:string|null;text_template:string|null }
 interface MockPublicMessage { id:number;created:number;modified:number;kind:string;status:string;name:string;email:string;subject:string;group:number|null;message:string;metadata:Record<string,unknown>;ip_address:string|null;user_agent:string|null }
+interface MockPhoneNumber { id:number;created:number;modified:number;phone_number:string;country_code:string|null;region:string|null;state:string|null;carrier:string|null;line_type:string|null;is_mobile:boolean;is_voip:boolean;is_valid:boolean;registered_owner:string|null;owner_type:string|null;address_line1:string|null;address_city:string|null;address_state:string|null;address_zip:string|null;address_country:string|null;lookup_provider:string|null;lookup_data:Record<string,unknown>;lookup_expires_at:number|null;lookup_count:number;last_lookup_at:number|null }
+interface MockSms { id:number;created:number;modified:number;direction:string;from_number:string;to_number:string;body:string;status:string;provider:string|null;provider_message_id:string|null;error_code:string|null;error_message:string|null;metadata:Record<string,unknown>;is_test:boolean;sent_at:number|null;delivered_at:number|null;user:number|null;group:number|null }
+interface MockPhoneConfig { id:number;created:number;modified:number;group:number|null;name:string;is_active:boolean;provider:'twilio'|'aws'|'mojo';twilio_from_number:string|null;aws_region:string|null;aws_sender_id:string|null;mojo_remote_url:string|null;lookup_enabled:boolean;lookup_cache_days:number;test_mode:boolean }
+function buildPhoneHub(){const now=Math.floor(Date.now()/1000);return {
+    phoneNumbers:[
+        {id:7601,created:now-120*86400,modified:now-3600,phone_number:'+14155550100',country_code:'US',region:'San Francisco',state:'CA',carrier:'Twilio Demo Mobile',line_type:'mobile',is_mobile:true,is_voip:false,is_valid:true,registered_owner:'Example Customer',owner_type:'consumer',address_line1:null,address_city:'San Francisco',address_state:'CA',address_zip:'94105',address_country:'US',lookup_provider:'twilio',lookup_data:{raw_provider_payload:'must-never-enter-query'},lookup_expires_at:now+40*86400,lookup_count:3,last_lookup_at:now-3600},
+        {id:7602,created:now-180*86400,modified:now-100*86400,phone_number:'+12025550120',country_code:'US',region:'Washington',state:'DC',carrier:'Twilio Demo VoIP',line_type:'voip',is_mobile:false,is_voip:true,is_valid:true,registered_owner:null,owner_type:null,address_line1:null,address_city:'Washington',address_state:'DC',address_zip:null,address_country:'US',lookup_provider:'twilio',lookup_data:{raw_provider_payload:'must-never-enter-query'},lookup_expires_at:now-86400,lookup_count:1,last_lookup_at:now-100*86400},
+    ] as MockPhoneNumber[],
+    sms:[
+        {id:7701,created:now-900,modified:now-850,direction:'outbound',from_number:'+14155550100',to_number:'+12025550120',body:'Your verification code is 123456',status:'delivered',provider:'twilio',provider_message_id:'SM-provider-secret',error_code:null,error_message:null,metadata:{raw_webhook:'must-never-enter-query'},is_test:false,sent_at:now-880,delivered_at:now-850,user:14,group:1},
+        {id:7702,created:now-600,modified:now-600,direction:'inbound',from_number:'+12025550120',to_number:'+14155550100',body:'Thanks!',status:'received',provider:'twilio',provider_message_id:'SM-inbound-secret',error_code:null,error_message:null,metadata:{signature:'must-never-enter-query'},is_test:false,sent_at:null,delivered_at:null,user:null,group:1},
+        {id:7703,created:now-300,modified:now-250,direction:'outbound',from_number:'NOTICE',to_number:'+442071838750',body:'=HYPERLINK("https://unsafe.invalid")',status:'failed',provider:'aws',provider_message_id:null,error_code:'MockFailure',error_message:'Provider rejected demo delivery',metadata:{request:{credential:'must-never-enter-query'}},is_test:true,sent_at:now-280,delivered_at:null,user:14,group:2},
+    ] as MockSms[],
+    configs:[
+        {id:7801,created:now-300*86400,modified:now-3600,group:null,name:'Platform Twilio',is_active:true,provider:'twilio',twilio_from_number:'+14155550100',aws_region:null,aws_sender_id:null,mojo_remote_url:null,lookup_enabled:true,lookup_cache_days:90,test_mode:false},
+        {id:7802,created:now-90*86400,modified:now-7200,group:1,name:'Acme Mojo relay',is_active:true,provider:'mojo',twilio_from_number:null,aws_region:null,aws_sender_id:null,mojo_remote_url:'https://relay.example.test',lookup_enabled:true,lookup_cache_days:30,test_mode:false},
+        {id:7803,created:now-30*86400,modified:now-1800,group:2,name:'Globex AWS test',is_active:true,provider:'aws',twilio_from_number:null,aws_region:'us-west-2',aws_sender_id:'GLOBEX',mojo_remote_url:null,lookup_enabled:false,lookup_cache_days:90,test_mode:true},
+    ] as MockPhoneConfig[],
+};}
 function buildMessaging(){const now=Math.floor(Date.now()/1000);return {
     emailDomains:[
         {id:7101,created:now-120*86400,modified:now-3600,name:'acme.example',region:'us-west-2',status:'verified',receiving_enabled:true,s3_inbound_bucket:'mojo-private-assets',s3_inbound_prefix:'inbound/',dns_mode:'route53',aws_key_masked:'****************9K2M',aws_secret_masked:'****************x7p',sns_topic_bounce_arn:'arn:aws:sns:us-west-2:123:bounce',sns_topic_complaint_arn:'arn:aws:sns:us-west-2:123:complaint',sns_topic_delivery_arn:'arn:aws:sns:us-west-2:123:delivery',sns_topic_inbound_arn:'arn:aws:sns:us-west-2:123:inbound'},
@@ -3870,6 +3905,7 @@ function buildStorageRenditions(): MockStorageRendition[] {
 }
 
 const messagingSeed = buildMessaging();
+const phoneHubSeed = buildPhoneHub();
 const db = {
     users,
     groups,
@@ -3939,6 +3975,14 @@ const db = {
     sentMessages: messagingSeed.sentMessages,
     emailTemplates: messagingSeed.emailTemplates,
     publicMessages: messagingSeed.publicMessages,
+    phoneNumbers: phoneHubSeed.phoneNumbers,
+    sms: phoneHubSeed.sms,
+    phoneConfigs: phoneHubSeed.configs,
+    phoneConfigSecrets: new Map<number,Partial<Record<'twilio_account_sid'|'twilio_auth_token'|'aws_access_key_id'|'aws_secret_access_key'|'mojo_api_key',string>>>([
+        [7801,{twilio_account_sid:'AC-mock',twilio_auth_token:'twilio-mock'}],
+        [7802,{mojo_api_key:'mojo-mock'}],
+        [7803,{aws_access_key_id:'AKIA-mock',aws_secret_access_key:'aws-mock'}],
+    ]),
     // The scheduler lock, as `control/force-scheduler-lead` sees it: a Redis
     // string key whose VALUE is the holder. Deleting it is the whole control.
     jobsSchedulerLock: 'runner-mojo-web-01-engine' as string | null,
@@ -6824,6 +6868,40 @@ function messagingParams(params:Params,filters:readonly string[],sorts:readonly 
 function messagingList(rows:Record<string,unknown>[],params:Params,search:(row:Record<string,unknown>)=>string,graph:string,serialize:(row:Record<string,unknown>,graph:string)=>Record<string,unknown>,defaultSort:string){const result=listRows(rows,params,search,defaultSort);return {...result,graph,data:(result.data as Record<string,unknown>[]).map(row=>serialize(row,graph))};}
 function mockEmailList(value:unknown):string[]{const values=Array.isArray(value)?value:[value];return values.flatMap(item=>item==null?[]:[String(item).trim()]).filter(Boolean);}
 function renderMockEmailTemplate(value:string|null,context:Record<string,unknown>):string|null{if(!value)return null;return value.replace(/{{\s*([a-zA-Z0-9_.]+)\s*}}/g,(_match,key:string)=>{let current:unknown=context;for(const part of key.split('.'))current=current&&typeof current==='object'?(current as Record<string,unknown>)[part]:undefined;return current==null?'':String(current);});}
+const PHONE_NUMBER_VIEW_GRANTS=['view_phone_numbers','manage_phone_numbers','comms','manage_users'];
+const PHONE_NUMBER_SAVE_GRANTS=['manage_phone_numbers','comms','manage_users'];
+const SMS_VIEW_GRANTS=['view_sms','manage_sms','comms','owner','manage_notifications'];
+const SMS_SAVE_GRANTS=['manage_sms','comms','manage_notifications'];
+const SMS_DELETE_GRANTS=['manage_sms','manage_notifications'];
+const PHONE_CONFIG_VIEW_GRANTS=['manage_phone_config','manage_groups','comms'];
+const PHONE_CONFIG_DELETE_GRANTS=['manage_phone_config','manage_groups'];
+const PHONE_SECRET_KEYS=['twilio_account_sid','twilio_auth_token','aws_access_key_id','aws_secret_access_key','mojo_api_key'] as const;
+function phoneGroupWire(id:number|null){if(id==null)return null;const row=db.groups.find(group=>group.id===id);return row?{id:row.id,name:row.name}:null;}
+function phoneUserWire(id:number|null){if(id==null)return null;const row=db.users.find(user=>user.id===id);return row?{id:row.id,name:row.display_name,display_name:row.display_name,email:row.email}:null;}
+function smsWire(row:MockSms){return {...row,user:phoneUserWire(row.user),group:phoneGroupWire(row.group)};}
+function phoneConfigWire(row:MockPhoneConfig){return {...row,group:phoneGroupWire(row.group)};}
+function refreshMockPhone(row:MockPhoneNumber):boolean{if(row.phone_number.endsWith('0000'))return false;const now=Math.floor(Date.now()/1000);row.modified=Math.max(now,row.modified+1);row.last_lookup_at=Math.max(now,(row.last_lookup_at??0)+1);row.lookup_expires_at=row.last_lookup_at+90*86400;row.lookup_count+=1;row.lookup_provider='twilio';row.lookup_data={raw_provider_payload:'must-never-enter-query',caller_name:{raw:'drop'}};row.carrier=row.carrier??'Twilio Lookup Demo';row.line_type=row.line_type??'mobile';row.is_mobile=row.line_type==='mobile';row.is_voip=row.line_type==='voip';row.is_valid=true;return true;}
+function applyPhoneConfig(row:MockPhoneConfig,body:Record<string,unknown>){for(const key of ['name','provider','twilio_from_number','aws_region','aws_sender_id','mojo_remote_url'] as const)if(key in body)(row as unknown as Record<string,unknown>)[key]=body[key]==null?null:String(body[key]);for(const key of ['is_active','lookup_enabled','test_mode'] as const)if(key in body)row[key]=Boolean(body[key]);if('lookup_cache_days'in body)row.lookup_cache_days=Number(body.lookup_cache_days)||90;if('group'in body)row.group=body.group==null?null:Number(body.group);if(row.mojo_remote_url)row.mojo_remote_url=row.mojo_remote_url.replace(/\/+$/,'');row.modified=Math.floor(Date.now()/1000);}
+function saveMockPhoneSecrets(id:number,body:Record<string,unknown>){const current={...(db.phoneConfigSecrets.get(id)??{})};for(const key of PHONE_SECRET_KEYS){if(!(key in body))continue;const value=body[key];if(value==null)delete current[key];else if(typeof value==='string'&&value)current[key]=value;}db.phoneConfigSecrets.set(id,current);}
+export function getMockPhoneConfigCredentialState(id:number):Record<string,boolean>{const values=db.phoneConfigSecrets.get(id)??{};return Object.fromEntries(PHONE_SECRET_KEYS.map(key=>[key,Boolean(values[key])]));}
+export function getMockEffectivePhoneConfigId(groupId:number|null):number|null{const grouped=groupId==null?undefined:db.phoneConfigs.find(row=>row.group===groupId&&row.is_active);return (grouped??db.phoneConfigs.filter(row=>row.group==null&&row.is_active).sort((a,b)=>a.name.localeCompare(b.name))[0])?.id??null;}
+export function deleteMockPhoneGroupForTest(groupId:number):void{db.groups=db.groups.filter(row=>row.id!==groupId);db.phoneConfigs=db.phoneConfigs.filter(row=>row.group!==groupId);db.sms=db.sms.filter(row=>row.group!==groupId);}
+async function phoneHubFetch(path:string,opts:MockFetchOpts):Promise<unknown|undefined>{
+    if(!path.startsWith('/api/phonehub/'))return undefined;
+    const method=(opts.method??'GET').toUpperCase();
+    if(path==='/api/phonehub/number/normalize'){if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};const normalized=normalizePhone(String(opts.body?.phone_number??''));return normalized?{status:true,data:{phone_number:normalized}}:{status:false,error:'Invalid phone number',error_code:400};}
+    const caller=userFromBearer(opts.headers);if(!caller)return permissionDenied(401);
+    if(path==='/api/phonehub/number/lookup'){
+        if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};const normalized=normalizePhone(String(opts.body?.phone_number??''));if(!normalized)return {status:false,error:'Invalid phone number',error_code:400};const now=Math.floor(Date.now()/1000);let row=db.phoneNumbers.find(item=>item.phone_number===normalized);if(!row){row={id:Math.max(0,...db.phoneNumbers.map(item=>item.id))+1,created:now,modified:now,phone_number:normalized,country_code:normalized.startsWith('+1')?'US':null,region:null,state:null,carrier:null,line_type:null,is_mobile:false,is_voip:false,is_valid:false,registered_owner:null,owner_type:null,address_line1:null,address_city:null,address_state:null,address_zip:null,address_country:null,lookup_provider:null,lookup_data:{},lookup_expires_at:null,lookup_count:0,last_lookup_at:null};db.phoneNumbers.push(row);}if(row.lookup_expires_at==null||row.lookup_expires_at<=now)refreshMockPhone(row);if(opts.body?.force_refresh)refreshMockPhone(row);return {status:true,data:{...row},graph:'default'};
+    }
+    const numberMatch=path.match(/^\/api\/phonehub\/number(?:\/(\d+))?$/);
+    if(numberMatch){const id=numberMatch[1]?Number(numberMatch[1]):null;if(method==='DELETE'){if(!hasGlobalPermission(caller,['manage_phone_numbers']))return permissionDenied();if(id==null)return {status:false,error:'Method not allowed',error_code:405};db.phoneNumbers=db.phoneNumbers.filter(row=>row.id!==id);return {status:'deleted'};}if(method==='POST'&&!hasGlobalPermission(caller,PHONE_NUMBER_SAVE_GRANTS))return permissionDenied();if(method==='GET'&&!hasGlobalPermission(caller,PHONE_NUMBER_VIEW_GRANTS))return permissionDenied();if(id!=null){const row=db.phoneNumbers.find(item=>item.id===id);if(!row)return {status:false,error:'Phone number not found',error_code:404};return {status:true,data:{...row},graph:'default'};}if(method==='POST'){const normalized=normalizePhone(String(opts.body?.phone_number??''));if(!normalized)return {status:false,error:'Invalid phone number',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockPhoneNumber={id:Math.max(0,...db.phoneNumbers.map(item=>item.id))+1,created:now,modified:now,phone_number:normalized,country_code:null,region:null,state:null,carrier:null,line_type:null,is_mobile:false,is_voip:false,is_valid:false,registered_owner:null,owner_type:null,address_line1:null,address_city:null,address_state:null,address_zip:null,address_country:null,lookup_provider:null,lookup_data:{},lookup_expires_at:null,lookup_count:0,last_lookup_at:null};db.phoneNumbers.push(row);return {status:true,data:{...row},graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['phone_number'],['phone_number','carrier','line_type','lookup_count','last_lookup_at','created','modified'],'default','phone_number');return messagingList(db.phoneNumbers as unknown as Record<string,unknown>[],params,row=>`${row.phone_number} ${row.carrier??''} ${row.registered_owner??''}`,'default',row=>({...row}),'phone_number');}
+    const smsMatch=path.match(/^\/api\/phonehub\/sms(?:\/(\d+))?$/);
+    if(smsMatch){const id=smsMatch[1]?Number(smsMatch[1]):null;if(method==='DELETE'){if(!hasGlobalPermission(caller,SMS_DELETE_GRANTS))return permissionDenied();if(id==null)return {status:false,error:'Method not allowed',error_code:405};db.sms=db.sms.filter(row=>row.id!==id);return {status:'deleted'};}if(method==='POST'&&!hasGlobalPermission(caller,SMS_SAVE_GRANTS))return permissionDenied();if(method==='GET'&&!hasGlobalPermission(caller,SMS_VIEW_GRANTS))return permissionDenied();if(id!=null){const row=db.sms.find(item=>item.id===id);if(!row)return {status:false,error:'SMS not found',error_code:404};if(method==='POST'){for(const key of ['status','error_message','delivered_at'] as const)if(key in (opts.body??{}))(row as unknown as Record<string,unknown>)[key]=opts.body?.[key];row.modified=Math.floor(Date.now()/1000);}return {status:true,data:smsWire(row),graph:'default'};}if(method==='POST'){const body=opts.body??{};const now=Math.floor(Date.now()/1000);const row:MockSms={id:Math.max(0,...db.sms.map(item=>item.id))+1,created:now,modified:now,direction:String(body.direction??'outbound'),from_number:String(body.from_number??''),to_number:String(body.to_number??''),body:String(body.body??''),status:String(body.status??'queued'),provider:body.provider?String(body.provider):null,provider_message_id:null,error_code:null,error_message:null,metadata:{},is_test:Boolean(body.is_test),sent_at:null,delivered_at:null,user:body.user==null?null:Number(body.user),group:body.group==null?null:Number(body.group)};db.sms.unshift(row);return {status:true,data:smsWire(row),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['direction','status','provider','group','user'],['created','direction','status','provider','sent_at','delivered_at'],'default','-created',true);return messagingList(db.sms as unknown as Record<string,unknown>[],params,row=>`${row.from_number} ${row.to_number} ${row.body}`,'default',row=>smsWire(row as unknown as MockSms),'-created');}
+    const configMatch=path.match(/^\/api\/phonehub\/config(?:\/(\d+))?$/);
+    if(configMatch){const id=configMatch[1]?Number(configMatch[1]):null;if(method==='DELETE'){if(!hasGlobalPermission(caller,PHONE_CONFIG_DELETE_GRANTS))return permissionDenied();if(id==null)return {status:false,error:'Method not allowed',error_code:405};db.phoneConfigs=db.phoneConfigs.filter(row=>row.id!==id);db.phoneConfigSecrets.delete(id);return {status:'deleted'};}if(!hasGlobalPermission(caller,PHONE_CONFIG_VIEW_GRANTS))return permissionDenied();if(id!=null){const row=db.phoneConfigs.find(item=>item.id===id);if(!row)return {status:false,error:'Phone config not found',error_code:404};if(method==='POST'&&opts.body?.test_connection){if(row.test_mode)return {status:true,message:'Config is in test mode - provider not tested'};const secrets=db.phoneConfigSecrets.get(id)??{};const ready=row.provider==='twilio'?Boolean(secrets.twilio_account_sid&&secrets.twilio_auth_token):row.provider==='aws'?Boolean(secrets.aws_access_key_id&&secrets.aws_secret_access_key):Boolean(secrets.mojo_api_key&&row.mojo_remote_url);return ready?{status:true,message:`${row.provider} connection succeeded`}:{status:false,error:`${row.provider} credentials are incomplete`,error_code:400};}if(method==='POST'){const nextGroup='group'in(opts.body??{})?(opts.body?.group==null?null:Number(opts.body.group)):row.group;if(nextGroup!=null&&db.phoneConfigs.some(item=>item.id!==id&&item.group===nextGroup))return {status:false,error:'A configuration already exists for this group',error_code:400};applyPhoneConfig(row,opts.body??{});saveMockPhoneSecrets(id,opts.body??{});}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};return {status:true,data:phoneConfigWire(row),graph:'default'};}if(method==='POST'){const body=opts.body??{};const group=body.group==null?null:Number(body.group);if(group!=null&&!db.groups.some(item=>item.id===group))return {status:false,error:'Group not found',error_code:404};if(group!=null&&db.phoneConfigs.some(item=>item.group===group))return {status:false,error:'A configuration already exists for this group',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockPhoneConfig={id:Math.max(0,...db.phoneConfigs.map(item=>item.id))+1,created:now,modified:now,group,name:String(body.name??''),is_active:body.is_active!==false,provider:['twilio','aws','mojo'].includes(String(body.provider))?String(body.provider) as MockPhoneConfig['provider']:'twilio',twilio_from_number:null,aws_region:null,aws_sender_id:null,mojo_remote_url:null,lookup_enabled:body.lookup_enabled!==false,lookup_cache_days:Number(body.lookup_cache_days??90),test_mode:Boolean(body.test_mode)};applyPhoneConfig(row,body);db.phoneConfigs.push(row);saveMockPhoneSecrets(row.id,body);return {status:true,data:phoneConfigWire(row),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['provider','is_active','group','test_mode'],['name','provider','is_active','created','modified'],'default','name');return messagingList(db.phoneConfigs as unknown as Record<string,unknown>[],params,row=>String(row.name),'default',row=>phoneConfigWire(row as unknown as MockPhoneConfig),'name');}
+    return undefined;
+}
 async function messagingFetch(path:string,opts:MockFetchOpts):Promise<unknown|undefined>{
     if(!path.startsWith('/api/aws/email/')&&!path.startsWith('/api/account/public_message'))return undefined;
     const method=(opts.method??'GET').toUpperCase();const caller=userFromBearer(opts.headers);if(!caller)return permissionDenied(401);
@@ -6967,6 +7045,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         armedReauth = null;
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
+    const phoneHubResult = await phoneHubFetch(path, opts);
+    if (phoneHubResult !== undefined) return phoneHubResult;
     const messagingResult = await messagingFetch(path, opts);
     if (messagingResult !== undefined) return messagingResult;
     const storageResult = storageFetch(path, opts);
@@ -9007,6 +9087,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const user = db.users.find((u) => u.id === id);
         if (!user) return { status: false, error: 'User not found', error_code: 404 };
         if (opts.method === 'DELETE') {
+            db.sms = db.sms.filter((row) => row.user !== id);
             db.users = db.users.filter((u) => u.id !== id);
             // Backend parity (mojo/models/rest.py on_rest_delete): status is
             // the STRING "deleted" — the envelope's one non-boolean status.

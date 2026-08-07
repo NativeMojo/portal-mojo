@@ -575,6 +575,13 @@ autosave editing, permission-gated UI, live metrics dashboard.
 - Preserves full colon-slug identity across the backend's intentionally lossy `/fetch` and `/value/get` responses by splitting duplicate tails, validating exact echoes, and reassembling request order. `/series?with_delta=true`, group fan-out, explicit scalar reads, and `dt_*` history are covered without adding any write or arbitrary model-aggregation surface.
 - Added the injectable `MetricsChart.loadSeries` + cache namespace seam, shared CSV formula neutralization, live-lossy central mock fixtures, both-theme token styles, showcase, AI reference docs, and `verify:admin-metrics-explorer`. Consolidated validation remains owned by the wave orchestrator and is intentionally not claimed here.
 
+### #1295 — Phone Hub admin (2026-08-06)
+
+- Added one global/no-group Phone Hub with permission-filtered Phone Numbers, SMS, and Provider Config tabs and KISS detail modals.
+- Lookup normalizes publicly to E.164, then uses authenticated global Twilio lookup with confirmation for paid fresh-row refreshes and timestamp/count advancement evidence. Phone and SMS rows are positively sanitized before Query; exports are bounded client projections.
+- Provider credentials use an imperative cache-free tri-state flow (untouched, non-empty replacement, confirmed null clear). Group choices have an independent global permission and 100-row bound. The UI states the current Mojo-only per-group send branch, stored/testable Twilio/AWS limitation, test-mode limitation, fallback order, and cascade behavior; it adds neither SMS sending nor API-key provisioning.
+- Added exact mock contracts and personas, both-theme styles, showcase proof, AI reference docs, and `verify:admin-phonehub`.
+
 ## Working agreements
 
 - **Port from source.** Before building any listed item, read its web-mojo file
