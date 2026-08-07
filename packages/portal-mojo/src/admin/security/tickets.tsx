@@ -6,6 +6,7 @@ import {
     Badge, CollectionSelect, DetailView, MarkdownView, ModelTable, RecordFeed, SchemaForm, fmt, modal, toast,
     type Column, type Field, type FilterDef, type FormData, type Tone,
 } from '../../ui';
+import { AssistantContextLauncher } from '../assistant/launchers';
 import { createTicketNoteAdapter } from '../../client/record-feed';
 import {
     MaestroItemLinkModel, TICKET_MANAGE_PERMS, TICKET_USER_LOOKUP_PERMS,
@@ -415,6 +416,7 @@ function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) 
                             <div className="ticket-description">
                                 <h4>Description</h4>
                                 {ticket.description ? <MarkdownView source={ticket.description} /> : <p className="dim">No description.</p>}
+                                <AssistantContextLauncher model="incident.Ticket" pk={ticket.id} />
                             </div>
                             <div className="ticket-maestro-link">
                                 <h4>Maestro</h4>

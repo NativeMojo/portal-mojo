@@ -62,6 +62,7 @@ import { AdminShortlinksDemo } from './demos-admin-shortlinks';
 import { AdminMessagingDemo } from './demos-admin-messaging';
 import { AdminPhoneHubDemo } from './demos-admin-phonehub';
 import { AdminPushDemo } from './demos-admin-push';
+import { AdminAssistantDemo } from './demos-admin-assistant';
 import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo } from './demos-charts-c2';
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
@@ -334,6 +335,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Admin',
         sections: [
+            {
+                key: 'admin-assistant', title: 'Assistant', icon: 'bi-stars',
+                blurb: 'Global REST-only Assistant conversations, strict structured blocks, owner-only continuation, skills, explicit tiered memory, and Incident/Ticket context reuse.',
+                render: () => <AdminAssistantDemo />,
+            },
             {
                 key: 'admin-dashboard', title: 'Admin dashboard', icon: 'bi-grid-1x2',
                 blurb: 'Global operational overview backed only by authoritative metric and count endpoints, with independent permission gates and safe root fallback.',

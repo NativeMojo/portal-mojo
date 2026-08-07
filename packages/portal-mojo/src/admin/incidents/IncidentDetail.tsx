@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createIncidentHistoryAdapter, useCan, useMe } from '../../client';
 import { Badge, DetailView, Eyebrow, FlatRow, KnownFieldsCard, RecordFeed, StatusPanel, fmt, toast, type Tone } from '../../ui';
 import { SECURITY_MANAGE_PERMS } from '../security-permissions';
+import { AssistantContextLauncher } from '../assistant/launchers';
 import { EvidenceCard, INCIDENT_METADATA_FIELDS, RequestResponseForensics, TraceForensics, metadataOf } from './forensics';
 import { INCIDENT_LIFECYCLE, IncidentModel, showEventDetail, useIncidentDetail, useIncidentEvents } from './models';
 import { sanitizeIncidentHistoryRow, sanitizeSecurityText } from './sanitize';
@@ -45,7 +46,7 @@ export function IncidentDetail({ id, onClose }: { id: number; onClose: () => voi
         ]}
         sections={[
             { key: 'overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <>
-                <StatusPanel tone={statusTone(incident.status)} state={incident.status.toUpperCase()} headline={incident.details || incident.title || 'No incident details'} meta={`${incident.category} · ${incident.scope}`} actions={canManage ? <select className="input input-compact" value={incident.status} disabled={save.isPending} onChange={(event) => void patchStatus(event.target.value)} aria-label="Incident lifecycle">{INCIDENT_LIFECYCLE.map((status) => <option key={status} value={status}>{status}</option>)}</select> : null} />
+                <StatusPanel tone={statusTone(incident.status)} state={incident.status.toUpperCase()} headline={incident.details || incident.title || 'No incident details'} meta={`${incident.category} · ${incident.scope}`} actions={<div className="assistant-action-row"><AssistantContextLauncher model="incident.Incident" pk={incident.id} />{canManage && <select className="input input-compact" value={incident.status} disabled={save.isPending} onChange={(event) => void patchStatus(event.target.value)} aria-label="Incident lifecycle">{INCIDENT_LIFECYCLE.map((status) => <option key={status} value={status}>{status}</option>)}</select>}</div>} />
                 <Eyebrow>Incident facts</Eyebrow>
                 <FlatRow label="State"><code>{incident.state || '—'}</code></FlatRow>
                 <FlatRow label="Source IP"><code>{incident.source_ip || '—'}</code></FlatRow>

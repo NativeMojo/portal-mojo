@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { hostedAuthUrl, logout, redirectToHostedAuth, useAuthSnapshot, useMe } from 'portal-mojo/client';
 import { useTheme, type ThemePref, fmt } from 'portal-mojo/ui';
+import { AssistantLauncher } from 'portal-mojo/admin';
 import { authMode } from '../pages/auth/config';
 
 const TITLES: Record<string, string> = { '/': 'Dashboard', '/users': 'Users', '/settings': 'Settings', '/group': 'Group' };
@@ -57,6 +58,7 @@ export function TopNav() {
         <header className="topnav">
             <h2 className="topnav-title">{TITLES[pathname] ?? 'Portal'}</h2>
             <div className="topnav-right">
+                <AssistantLauncher />
                 <button
                     className="btn-icon"
                     title={`Theme: ${pref} (click to change)`}

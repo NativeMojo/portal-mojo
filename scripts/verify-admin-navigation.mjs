@@ -31,8 +31,11 @@ try {
         readFile(new URL('../packages/portal-mojo/src/admin/settings/index.ts', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/admin/settings/SettingDetail.tsx', import.meta.url), 'utf8'),
     ]);
-    assert.doesNotMatch(appShell, /RightPanelProvider|RightPanelSlot|useRightPanel|app-right-panel-open/,
-        'the global Admin shell must not reserve a persistent record-detail panel');
+    assert.equal((appShell.match(/<RightPanelProvider>/g) ?? []).length, 1,
+        'the global Admin shell must own exactly one Assistant panel provider');
+    assert.equal((appShell.match(/<RightPanelSlot/g) ?? []).length, 1,
+        'the global Admin shell must own exactly one Assistant panel slot');
+    assert.match(appShell, /app-right-panel-open/);
     assert.doesNotMatch(`${settingsRoutes}\n${settingDetail}`, /SettingDetailPage|useNavigate|useParams|path:\s*['"]:id/,
         'Settings detail must be modal-owned, not route-owned');
 
@@ -63,6 +66,7 @@ try {
     const metricsRoutes = admin.MONITORING_ADMIN_SECTION.routes.filter((route) => route.path.startsWith('metrics/'));
     assert.equal(admin.ADMIN_SECTIONS[0].id, 'dashboard');
     assert(admin.ADMIN_SECTIONS.includes(admin.CLOUDWATCH_ADMIN_SECTION));
+    assert(admin.ADMIN_SECTIONS.includes(admin.ASSISTANT_ADMIN_SECTION));
     assert(admin.adminSectionRoutes([admin.CLOUDWATCH_ADMIN_SECTION], { mount: '/system' })
         .some((route) => route.path === 'system/cloudwatch'));
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS).some((route) => route.path === ''));

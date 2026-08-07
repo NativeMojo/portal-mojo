@@ -8,13 +8,15 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 
 try {
-    const [incidentPage, eventPage] = await Promise.all([
+    const [incidentPage, eventPage, incidentDetail] = await Promise.all([
         readFile(new URL('../packages/portal-mojo/src/admin/incidents/IncidentsPage.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/admin/incidents/EventsPage.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/incidents/IncidentDetail.tsx', import.meta.url), 'utf8'),
     ]);
     assert.match(incidentPage, /showIncidentDetail\(row\.id\)/);
     assert.match(eventPage, /showEventDetail\(row\.id\)/);
     assert.doesNotMatch(`${incidentPage}\n${eventPage}`, /useRightPanel|RightPanelSlot|RightPanelProvider/);
+    assert.match(incidentDetail, /AssistantContextLauncher model="incident\.Incident"/);
 
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const incidents = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/models.ts');
