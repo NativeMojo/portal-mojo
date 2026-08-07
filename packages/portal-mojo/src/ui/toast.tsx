@@ -5,7 +5,8 @@
 //     for a grace window (replaces confirm() for reversible actions). Undo
 //     dismisses at once and runs the handler; otherwise auto-dismisses.
 //   · toast.progress / progressToast (dom.js:41-79) — persistent card with a
-//     bar. Handle: update(0..100) / done(msg?) / fail(msg?) / remove();
+//     bar. Handle: update(0..100) / finalizing(msg?) / done(msg?) /
+//     fail(msg?) / remove();
 //     optional onCancel renders a ✕ that ABORTS the caller's operation (the
 //     caller then calls fail/remove — cancel itself never dismisses).
 //
@@ -28,7 +29,7 @@ interface ProgressToastItem {
     kind: 'progress';
     label: string;
     pct: number;
-    state: 'active' | 'done' | 'error';
+    state: 'active' | 'finalizing' | 'done' | 'error';
     onCancel?: () => void;
 }
 type ToastItem = BasicToast | UndoToastItem | ProgressToastItem;
@@ -81,6 +82,8 @@ export function undoToast(message: string, onUndo?: () => void, opts: { timeout?
 export interface ProgressToastHandle {
     /** Set the bar, clamped+rounded to 0–100. */
     update: (pct: number) => void;
+    /** 100% + non-cancellable finalization state; the operation is not settled yet. */
+    finalizing: (message?: string) => void;
     /** 100% + ✓, optional label swap, auto-removes after 1.4s. */
     done: (message?: string) => void;
     /** Error styling + ✕, optional label swap, auto-removes after 5s. */
@@ -104,6 +107,10 @@ export function progressToast(label: string, opts: { onCancel?: () => void } = {
         update: (pct: number) => {
             if (settled) return;
             patch(id, { pct: Math.max(0, Math.min(100, Math.round(pct || 0))) });
+        },
+        finalizing: (message?: string) => {
+            if (settled) return;
+            patch(id, { pct: 100, state: 'finalizing', ...(message ? { label: message } : {}), onCancel: undefined });
         },
         done: (message?: string) => {
             if (settled) return;
@@ -142,7 +149,7 @@ const ICONS: Record<Level, string> = {
 
 function ProgressCard({ t }: { t: ProgressToastItem }) {
     return (
-        <div className={`toast-card toast-progress${t.state === 'done' ? ' is-done' : ''}${t.state === 'error' ? ' toast-error is-failed' : ''}`}>
+        <div className={`toast-card toast-progress${t.state === 'finalizing' ? ' is-finalizing' : ''}${t.state === 'done' ? ' is-done' : ''}${t.state === 'error' ? ' toast-error is-failed' : ''}`}>
             <div className="progress-head">
                 <div className="progress-name" title={t.label}>{t.label}</div>
                 {t.onCancel && t.state === 'active' && (
@@ -168,7 +175,7 @@ function ProgressCard({ t }: { t: ProgressToastItem }) {
                     <div className="progress-fill" style={{ width: `${t.pct}%` }} />
                 </div>
                 <span className="progress-pct">
-                    {t.state === 'done' ? <i className="bi bi-check-lg" /> : t.state === 'error' ? <i className="bi bi-x-lg" /> : `${t.pct}%`}
+                    {t.state === 'done' ? <i className="bi bi-check-lg" /> : t.state === 'error' ? <i className="bi bi-x-lg" /> : t.state === 'finalizing' ? <i className="bi bi-arrow-repeat spin" /> : `${t.pct}%`}
                 </span>
             </div>
         </div>

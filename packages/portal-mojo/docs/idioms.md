@@ -71,6 +71,7 @@ handle.dismiss(); // optional early resolution
 ```ts
 const p = toast.progress('Uploading export.csv…', { onCancel: () => abort() });
 p.update(42);          // clamped + rounded to 0–100
+p.finalizing('Finishing upload'); // → 100% + spinner, cancel hidden; still unsettled
 p.done('Uploaded');    // → 100% + ✓, auto-removes after 1.4s
 p.fail('Cancelled');   // → red + ✕, auto-removes after 5s
 p.remove();            // immediate removal
@@ -82,6 +83,9 @@ p.remove();            // immediate removal
 - `onCancel` renders a ✕ **only while active**. Clicking it calls `onCancel`
   and nothing else — the CALLER aborts its operation and then settles the
   toast (usually `fail('Cancelled')`). Cancel is a request, not a dismissal.
+- `finalizing()` is additive and non-settling: it shows a spinner at 100% and
+  removes cancellation while an authoritative server read or consumer
+  callback completes. The caller must still finish with `done` or `fail`.
 - Basic toasts stay capped at 5; undo/progress cards are exempt from the cap
   (evicting a live progress bar would orphan the operation's only indicator).
 

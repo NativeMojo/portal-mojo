@@ -67,6 +67,7 @@ import { ChartsMetricsC2Demo, ChartsMiniWidgetDemo, ChartsKpiDemo, ChartsPieDemo
 import { WorldMapDemo, WorldMapRoutesDemo } from './demos-worldmap';
 import { FormWizardDemo, TabsDemo } from './demos-form-wizard';
 import { LocationAddressDemo } from './demos-location-address';
+import { FileUploadDemo } from './demos-file-upload';
 
 interface DemoSection {
     key: string;
@@ -175,6 +176,11 @@ const GROUPS: DemoGroup[] = [
     {
         title: 'Pickers',
         sections: [
+            {
+                key: 'file-upload', title: 'File upload', icon: 'bi-cloud-arrow-up',
+                blurb: 'Accessible picker and guarded drop zone feeding a lazy, bounded upload queue with truthful cancel, retry, recovery, and post-upload warning states.',
+                render: () => <FileUploadDemo />,
+            },
             {
                 key: 'location-address', title: 'AddressField', icon: 'bi-geo-alt',
                 blurb: 'django-mojo location autocomplete with a private provider session, stale-response guards, and one atomic declared-field details patch.',

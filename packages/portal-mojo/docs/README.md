@@ -43,6 +43,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
 | [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
 | [idioms.md](idioms.md) | ArmedButton (two-step confirm), `undoToast` (grace-period undo), `progressToast` — the dangerous-action trio |
+| [file-upload-ux.md](file-upload-ux.md) | Pure file validation, accessible picker/drop controls, bounded component-local upload queues, recovery, and completion callbacks |
 | [loading.md](loading.md) | `Spinner`, `busy()`/`busyWhile()` blocking overlay, `ViewLoader`, `InlineLoader`, `Busy` — the anti-flash delay rule and skeleton-vs-loader guidance |
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |

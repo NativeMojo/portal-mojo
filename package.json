@@ -40,6 +40,7 @@
         "verify:worldmap": "node scripts/verify-worldmap.mjs",
         "verify:form-wizard": "node scripts/verify-form-wizard.mjs",
         "verify:location-address": "node scripts/verify-location-address.mjs",
-        "verify:file-upload": "node scripts/verify-file-upload.mjs"
+        "verify:file-upload": "node scripts/verify-file-upload.mjs",
+        "verify:upload-ux": "node scripts/verify-upload-ux.mjs"
     }
 }
