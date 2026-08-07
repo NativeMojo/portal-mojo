@@ -26,6 +26,7 @@
         "verify:admin-network": "node scripts/verify-admin-network.mjs",
         "verify:admin-dns": "node scripts/verify-admin-dns.mjs",
         "verify:admin-dns-records": "node scripts/verify-admin-dns-records.mjs",
+        "verify:admin-dns-certificates": "node scripts/verify-admin-dns-certificates.mjs",
         "verify:admin-storage": "node scripts/verify-admin-storage.mjs",
         "verify:admin-messaging": "node scripts/verify-admin-messaging.mjs",
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",

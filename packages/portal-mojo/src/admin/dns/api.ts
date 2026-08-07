@@ -3,7 +3,7 @@ import {
     mojoCall, mojoList, withFreshAuth, type MojoList, type Params,
 } from '../../client';
 import {
-    DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
+    CertificateModel, DnsCredentialModel, DomainModel, sanitizeCertificateRow, sanitizeDnsCredentialRow, sanitizeDomainRow,
     sanitizeRegistrarDiscoveryResponse,
     type CertificateRow, type DnsCapabilities, type DnsCredentialRow,
     type DnsGroupChoice, type DnsProviderCapability, type DnsRecordRow,
@@ -11,6 +11,10 @@ import {
     type RegistrarDiscoveryResponse, type RegistrarSearchRow, type RegistrantContact, type RegistrantContactResponse,
     type WhoisResponse,
 } from './models';
+import {
+    sanitizeAcmeDelegationStatus, sanitizeCertificateLastError,
+    type AcmeDelegationStatus,
+} from './certificate-data';
 import { recordKey, sameRecordOwnerSnapshot, snapshotRecordOwner, type RecordOwnerSnapshot } from './dns-data';
 
 export const DNS_GROUP_CHOICE_ENDPOINT = '/api/dnsman/credential/group-choice';
@@ -21,6 +25,7 @@ export const dnsKeys = {
     groupChoices: (params: Params) => ['dnsman', 'credential-group-choice', params] as const,
     groupChoice: (id: number) => ['dnsman', 'credential-group-choice', 'one', id] as const,
     records: (domainId: number) => ['dnsman', 'records', domainId] as const,
+    delegations: (domainId: number) => ['dnsman', 'delegations', domainId] as const,
 };
 
 function object(value: unknown, where: string): Record<string, unknown> {
@@ -276,6 +281,20 @@ export function useDnsRecords(domain: number | null, enabled = true) {
     });
 }
 
+export async function fetchAcmeDelegations(domain: number): Promise<AcmeDelegationStatus[]> {
+    const response = await mojoCall('/api/dnsman/delegation', { params: { domain } });
+    if (!Array.isArray(response.data)) throw new Error('DNS administration unavailable: malformed delegation response');
+    return response.data.map(sanitizeAcmeDelegationStatus).filter((row) => row.id > 0 && row.state !== 'retired');
+}
+
+export function useAcmeDelegations(domain: number | null, enabled = true) {
+    return useQuery({
+        queryKey: dnsKeys.delegations(domain ?? 0),
+        queryFn: () => fetchAcmeDelegations(domain!),
+        enabled: enabled && domain != null,
+    });
+}
+
 export interface DnsWriteResponse { status: true; provider: string; change_id: string | null }
 export function parseDnsWriteResponse(value: unknown): DnsWriteResponse {
     const response = object(value, 'record write response');
@@ -418,14 +437,63 @@ export function setWhoisPrivacy(domain: number, enabled: boolean): Promise<{ nam
     return postData('/api/dnsman/whois/privacy', { domain, enabled });
 }
 
-export async function requestCertificate(domain: number, names?: string[]): Promise<CertificateRow> {
-    return sanitizeCertificateRow(await postData<CertificateRow>('/api/dnsman/certificate/request', {
-        domain, ...(names ? { names } : {}),
-    }));
+const certificateFlights = new Map<string, Promise<CertificateRow>>();
+
+async function reconcileCertificates(queryClient: QueryClient, row?: CertificateRow): Promise<void> {
+    if (row) queryClient.setQueryData(CertificateModel.keys.one(row.id), row);
+    await CertificateModel.invalidate(queryClient);
+    await queryClient.refetchQueries({
+        type: 'active',
+        predicate: (query) => query.queryKey[0] === CertificateModel.endpoint,
+    });
 }
 
-export async function revokeCertificate(certificate: number): Promise<CertificateRow> {
-    return sanitizeCertificateRow(await postData<CertificateRow>('/api/dnsman/certificate/revoke', { certificate }));
+async function certificateOperation(
+    queryClient: QueryClient,
+    key: string,
+    path: string,
+    body: Record<string, unknown>,
+): Promise<CertificateRow> {
+    const existing = certificateFlights.get(key);
+    if (existing) return existing;
+    const flight = (async () => {
+        let row: CertificateRow | undefined;
+        let failure: unknown;
+        let reconcileFailure: unknown;
+        try {
+            // Deliberately imperative and non-retrying: both ACME operations
+            // can reach external state and must never live in MutationCache.
+            row = sanitizeCertificateRow(await postData<CertificateRow>(path, body));
+        } catch (error) {
+            failure = error;
+        } finally {
+            try {
+                await reconcileCertificates(queryClient, row);
+            } catch (error) {
+                reconcileFailure = error;
+            }
+        }
+        if (failure) {
+            const message = sanitizeCertificateLastError(failure instanceof Error ? failure.message : failure) ?? 'Certificate operation failed';
+            throw new Error(`${message}${reconcileFailure ? ' Authoritative refresh also failed; refresh before trying another certificate operation.' : ''}`);
+        }
+        if (!row || reconcileFailure) {
+            throw new Error('The certificate operation may have persisted, but authoritative refresh failed. Refresh before trying another certificate operation.');
+        }
+        return row;
+    })().finally(() => certificateFlights.delete(key));
+    certificateFlights.set(key, flight);
+    return flight;
+}
+
+export function requestCertificate(queryClient: QueryClient, domain: number, names?: string[]): Promise<CertificateRow> {
+    return certificateOperation(queryClient, `request:${domain}`, '/api/dnsman/certificate/request', {
+        domain, ...(names?.length ? { names } : {}),
+    });
+}
+
+export function revokeCertificate(queryClient: QueryClient, certificate: number): Promise<CertificateRow> {
+    return certificateOperation(queryClient, `revoke:${certificate}`, '/api/dnsman/certificate/revoke', { certificate });
 }
 
 export async function invalidateDnsCredentials(queryClient: QueryClient): Promise<void> {

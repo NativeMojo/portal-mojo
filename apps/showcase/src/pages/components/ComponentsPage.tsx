@@ -49,6 +49,7 @@ import { AdminBouncerDemo } from './demos-admin-bouncer';
 import { AdminDevicesDemo } from './demos-admin-devices';
 import { AdminNetworkDemo } from './demos-admin-network';
 import { AdminDnsDemo } from './demos-admin-dns';
+import { AdminDnsCertificatesDemo } from './demos-admin-dns-certificates';
 import { AdminIncidentsDemo } from './demos-admin-incidents';
 import { AdminRulesDemo } from './demos-admin-rules';
 import { AdminJobsDemo } from './demos-admin-jobs';
@@ -392,6 +393,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-dns', title: 'DNS domains & records', icon: 'bi-globe2',
                 blurb: 'Global DNS credentials, domain inventory/KISS detail, and safe live complete-set records with explicit corrections, stale preflight, and provider-specific refusal states.',
                 render: () => <AdminDnsDemo />,
+            },
+            {
+                key: 'admin-dns-certificates', title: 'DNS certificates & ACME', icon: 'bi-patch-check',
+                blurb: 'Global certificate custody, in-zone ACME requests, renewal-aware bounded polling, delegation readiness, and literal platform gates for house assets without exposing private material.',
+                render: () => <AdminDnsCertificatesDemo />,
             },
             {
                 key: 'admin-incidents', title: 'Incidents & events', icon: 'bi-shield-exclamation',

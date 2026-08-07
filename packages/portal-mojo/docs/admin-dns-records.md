@@ -12,9 +12,9 @@ import {
 
 ## Routes and permissions
 
-The one canonical DNS section is `id: "dns"`, `basePath: "dns"`, in Infrastructure. Its routes are ordered `domains`, `records`, `credentials`. All three accept the global, system-pinned any-of view clause `sys.view_dns | sys.manage_dns | sys.security`; record mutation controls use `sys.manage_dns | sys.security`. Group/member grants never open Admin.
+The one canonical DNS section is `id: "dns"`, `basePath: "dns"`, in Infrastructure. Its routes are ordered `domains`, `records`, `certificates`, `credentials`. All four accept the global, system-pinned any-of view clause `sys.view_dns | sys.manage_dns | sys.security`; record mutation controls use `sys.manage_dns | sys.security`. Group/member grants never open Admin.
 
-Domains uses the server-backed `DomainModel` list and `modal.detail`. Detail has exactly Overview and DNS Records; Records is the same `DnsRecordsPanel` used by the standalone page. That page owns only `domain` and `record_type` in the URL. It may select the first active domain only when `domain` is absent. Invalid, denied, missing, and inactive deep links are preserved and shown as errors.
+Domains uses the server-backed `DomainModel` list and `modal.detail`. Detail composes Overview, DNS Records, and the bounded Certificates section; Records is the same `DnsRecordsPanel` used by the standalone page. That page owns only `domain` and `record_type` in the URL. It may select the first active domain only when `domain` is absent. Invalid, denied, missing, and inactive deep links are preserved and shown as errors.
 
 ## Wire contract
 
@@ -56,7 +56,7 @@ Confirmation shows identity, TTL, unchanged/removed/added values, and contextual
 
 `dns-integration.ts` is dependency-free and HMR-safe. Partial registrations merge: production supplies exact-name resolution and `dns/records?domain=<id>`; the central mock supplies `applyManagedDnsRecords` against its sole DNS store. Absence is `null`, so permission is never mistaken for feature availability.
 
-`registerDnsDomainLinks` is the reverse registry for later certificate, WHOIS, or purchase children. Stable keys replace on HMR. Each entry owns label/icon, mount-relative route, optional system permission, and capability/domain predicate. This package registers no speculative links.
+`registerDnsDomainLinks` is the reverse registry for certificate, WHOIS, or purchase children. Stable keys replace on HMR. Each entry owns label/icon, mount-relative route, optional system permission, capability/domain predicate, and optional order. Built-in related links are deterministically ordered Domains, DNS Records, Certificates, Provider Credentials.
 
 ## Mock and verification
 
