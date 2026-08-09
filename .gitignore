@@ -158,3 +158,9 @@ vite.config.ts.timestamp-*
 # ON PURPOSE: it holds no secrets (a localhost API URL + the auth-mode flag)
 # and it is how `npm run dev:live` is configured.
 !apps/portal/.env.live
+
+# Work-item records live on the maestro board, never in the repo
+# (workspace rule no-work-item-history-in-repos; planning/.cache/ is
+# already covered by `.cache/` above)
+planning/built/
+planning/building/
