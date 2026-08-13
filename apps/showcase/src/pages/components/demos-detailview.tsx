@@ -79,6 +79,7 @@ const KEBAB: DetailMenuEntry<DemoRecord>[] = [
 
 export function DetailViewFullDemo() {
     const [activeOn, setActiveOn] = useState(true);
+    const [withClose, setWithClose] = useState(true);
     const [events, setEvents] = useState(3);
     const [showDot, setShowDot] = useState(true);
     const [includeBilling, setIncludeBilling] = useState(true);
@@ -109,6 +110,10 @@ export function DetailViewFullDemo() {
                         admin dot badge
                     </label>
                     <label className="demo-row" style={{ gap: 6 }}>
+                        <input type="checkbox" checked={withClose} onChange={(e) => setWithClose(e.target.checked)} />
+                        provide <code>onClose</code> (✕) — uncheck = page mode, no close affordance
+                    </label>
+                    <label className="demo-row" style={{ gap: 6 }}>
                         <input type="checkbox" checked={includeBilling} onChange={(e) => setIncludeBilling(e.target.checked)} />
                         include Billing section (uncheck while it's active → self-heal)
                     </label>
@@ -126,7 +131,7 @@ export function DetailViewFullDemo() {
                     subtitle="demo@nativemojo.com"
                     chips={[{ icon: 'bi-patch-check-fill', text: 'Email', tone: 'success' }, { text: 'C1', tone: 'info' }]}
                     active={{ value: activeOn, onChange: (next) => { setActiveOn(next); toast.info(`active → ${String(next)}`); } }}
-                    onClose={() => toast.info('close clicked (demo)')}
+                    onClose={withClose ? () => toast.info('close clicked (demo)') : undefined}
                     menuContext={record}
                     contextMenu={KEBAB}
                     badges={{

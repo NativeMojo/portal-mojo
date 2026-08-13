@@ -99,7 +99,15 @@ export interface DetailViewProps<TCtx = unknown> {
     /** Handed to every `when(ctx)` predicate — by convention the record on
      *  display (web-mojo's `this.context`). */
     menuContext?: TCtx;
-    onClose: () => void;
+    /**
+     * Renders the header ✕ and receives its click. OMIT for page/embedded
+     * hosts — no close affordance renders, no CSS overrides needed. A routed
+     * page may instead pass a history-back handler to keep the ✕ as "back".
+     * MODAL hosts must pass it: inside `modal.detail` this ✕ is the modal's
+     * only visible dismiss (the envelope has no header X — Escape/backdrop
+     * only), and TypeScript no longer enforces it.
+     */
+    onClose?: () => void;
 }
 
 // ── Config validation ─────────────────────────────────────────────────
@@ -359,9 +367,11 @@ export function DetailView<TCtx = unknown>({
                             </Popover>
                         </>
                     )}
-                    <button className="btn-icon" onClick={onClose} title="Close" aria-label="Close">
-                        <i className="bi bi-x-lg" />
-                    </button>
+                    {onClose && (
+                        <button className="btn-icon" onClick={onClose} title="Close" aria-label="Close">
+                            <i className="bi bi-x-lg" />
+                        </button>
+                    )}
                 </div>
             </header>
             <div className="detail-body">

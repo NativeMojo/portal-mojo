@@ -8,7 +8,7 @@ import {
 ```
 
 The record-detail surface: identity header (avatar, title, subtitle,
-chips, optional active switch, kebab menu, close) over a left rail of
+chips, optional active switch, kebab menu, optional close) over a left rail of
 sections with side-label dividers. Open it inside `modal.detail(...)` for
 the standard row-click experience. Ported from web-mojo `SideNavView.js`
 (sections, gating, badges) + `ContextMenu.js` (the kebab).
@@ -31,7 +31,7 @@ of the toolkit it must render inside the app's `QueryClientProvider`
     title={...} subtitle={u.email}
     chips={[{ icon: 'bi-patch-check-fill', text: 'Email', tone: 'success' }]}
     active={{ value: u.is_active, onChange: (next) => ... }}
-    onClose={onClose}
+    onClose={onClose}   // optional — omit for page hosts (no ✕ renders)
     badges={{ sessions: openSessions }}
     menuContext={u}
     contextMenu={[
@@ -53,6 +53,27 @@ of the toolkit it must render inside the app's `QueryClientProvider`
 - `sections` mixes `{key, label, icon, render, permissions?}` entries with
   `{divider: 'Label'}` side-labels.
 - `initialSection` picks the starting rail entry.
+
+## Page embedding — `onClose` is optional
+
+The ✕ is the component's only modal coupling (no Escape handling, no focus
+trap — those belong to the host dialog). The affordance follows the callback:
+
+- **Omit `onClose`** for a routed-page/embedded host — no close affordance
+  renders and no CSS overrides are needed.
+- **Pass a history-back handler** when a routed record page should keep the
+  ✕ as "back" (`onClose={() => navigate(-1)}` — linkable record routes read
+  well this way).
+- **Modal hosts MUST pass it.** Inside `modal.detail` this ✕ is the modal's
+  only visible dismiss — the envelope has no header X of its own, only
+  Escape/backdrop — and TypeScript no longer enforces the prop. Omitting it
+  in a modal yields an Escape-only dialog.
+
+Sizing is the consuming app's concern: `.detail` carries
+`min-height`/`max-height: 82vh` in the app `theme.css` (base at
+`apps/portal/src/theme.css`) — page hosts relax it there. This is distinct
+from the C1 chrome (`.rail-badge`, `.dv-menu*`, `.dv-keep`) that lives in
+`theme/detailview.css` (see Pitfalls).
 
 ## Permission-gated sections (fail-closed)
 
@@ -90,7 +111,7 @@ follows. There is no imperative handle.
 ## Header kebab menu
 
 `contextMenu?: Array<{ label, icon?, permissions?, when?, onSelect, danger? } | { divider: true }>`
-renders a three-dot button in the header gutter (before the close X) that
+renders a three-dot button in the header gutter (before the close X, when one renders) that
 opens a `Popover` menu (`placement: bottom-end`, top-layer — works inside
 `modal.detail`). Filtering is `ContextMenu.visibleItems` parity:
 
