@@ -28,6 +28,7 @@ import { FilterBar, FilterPills, type FilterDef } from './FilterBar';
 import { busyWhile } from './loading';
 import { modal } from './modal';
 import { RenderGuard } from './safe-node';
+import { fixedParamKeys, mergeFixedParams } from './fixed-params';
 import { toast } from './toast';
 import * as fmt from './format';
 import { warnOnce } from './warn-once';
@@ -216,7 +217,7 @@ export type RowId = number | string;
 
 export function ModelTable<T extends { id: RowId }>({
     model, endpoint, columns, filters = [], presets = [], eyebrow, title,
-    searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort, defaultParams,
+    searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort, defaultParams, fixedParams,
     selectable = false, batchActions = [],
     columnChooser = false, persistState = false, persistKey,
     autoRefresh = 0,
@@ -247,6 +248,16 @@ export function ModelTable<T extends { id: RowId }>({
      * shorthand and wins over `defaultParams.sort` when both are supplied.
      */
     defaultParams?: Params;
+    /**
+     * Locked request scope: merged into every wire request AFTER filter
+     * state and model normalization. Never a pill, never removable, not
+     * persisted, not URL-visible; Clear all leaves it intact. Pass `null`
+     * while scope is still resolving — the table renders its skeleton and
+     * fetches nothing (an async-scoped table must never fire an unscoped
+     * first request). Scope (tenant/group/graph) belongs here; user-editable
+     * filter DEFAULTS belong in `defaultParams`.
+     */
+    fixedParams?: Params | null;
     /** Checkbox selection — independent of batchActions by construction. */
     selectable?: boolean;
     batchActions?: BatchAction<T>[];
@@ -293,7 +304,16 @@ export function ModelTable<T extends { id: RowId }>({
         }
         return out;
     }, [defaultParams]);
-    const p = useTableParams(paramDefaults, defaultFilters);
+    // Render-stable scrub set (memo dependency inside useTableParams).
+    const fixedSignature = JSON.stringify(fixedParams ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by value, not identity
+    const fixedKeys = useMemo(() => fixedParamKeys(fixedParams), [fixedSignature]);
+    for (const key of fixedKeys) {
+        if (key in defaultFilters) {
+            warnOnce(`ModelTable: "${key}" is in both fixedParams and defaultParams — the defaultParams copy is dead (fixed wins on the wire); remove it`);
+        }
+    }
+    const p = useTableParams(paramDefaults, defaultFilters, fixedKeys);
 
     // ── View persistence (WM-035): restore once BEFORE the first fetch ──
     const storageKey = persistKey ?? `${(typeof location !== 'undefined' ? location.hash.split('?')[0] : '') || '#/'}::${resolvedEndpoint}`;
@@ -322,11 +342,17 @@ export function ModelTable<T extends { id: RowId }>({
     const tableParams = searchable
         ? p.wire
         : Object.fromEntries(Object.entries(p.wire).filter(([key]) => key !== 'search'));
-    const listParams = model?.normalizeListParams
-        ? model.normalizeListParams(tableParams)
-        : tableParams;
+    // Locked scope merges AFTER model normalization: admin normalizers are
+    // positive-projection and would silently DROP an un-allowlisted scope
+    // key — the request would go out unscoped, the fail-open #1634 closes.
+    const listParams = mergeFixedParams(
+        model?.normalizeListParams ? model.normalizeListParams(tableParams) : tableParams,
+        fixedParams,
+    );
+    // fixedParams === null means "scope pending" — hold the query so no
+    // unscoped request is ever fired or cached. undefined = unscoped table.
     const query = useModelList<T>(resolvedEndpoint, listParams, {
-        enabled: hydrated,
+        enabled: hydrated && fixedParams !== null,
         sanitizeRow: model?.sanitizeRow,
     });
     const rows = useMemo(() => query.data?.rows ?? [], [query.data]);
@@ -391,6 +417,19 @@ export function ModelTable<T extends { id: RowId }>({
             setSelected((prev) => (prev.size > 0 ? new Set() : prev));
         }
     }, [wireSignature]);
+
+    // A scope flip (fixedParams change) is a filter change to the user:
+    // reset to page 1 (a stranded page-5 of the previous scope must not
+    // show) and clear selection (a batch action must never fire against row
+    // ids selected under the previous scope).
+    const prevFixedSignature = useRef(fixedSignature);
+    useEffect(() => {
+        if (prevFixedSignature.current === fixedSignature) return;
+        prevFixedSignature.current = fixedSignature;
+        if (p.page > 1) p.setPage(1);
+        setSelected((prev) => (prev.size > 0 ? new Set() : prev));
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- signature is the trigger
+    }, [fixedSignature]);
 
     const toggleSelected = (id: RowId) => {
         setSelected((prev) => {

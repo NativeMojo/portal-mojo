@@ -132,6 +132,13 @@ export function clearTableState(key: string): void {
 export function useTableParams(
     defaults: Partial<TableParams> = {},
     defaultFilters: Readonly<Record<string, string>> = {},
+    // Keys that must NEVER become filter state (ModelTable's fixedParams —
+    // locked scope). Excluded on every read path: a bookmarked `?group=9`,
+    // a persisted view saved before the page was scope-migrated, and a
+    // defaultFilters seed all get silently dropped, so a fixed key cannot
+    // resurface as a removable pill. Pass a render-stable Set — it is a
+    // memo dependency.
+    excludeKeys?: ReadonlySet<string>,
 ): TableParamsApi {
     const [sp, setSp] = useSearchParams();
     // Defaults seed only the untouched route. Once this table writes params,
@@ -143,12 +150,17 @@ export function useTableParams(
         // Defaults are real params-store state: shared URLs override them,
         // and applySaved() overwrites them when no URL key is present.
         // This is the same URL > persisted > defaults precedence as sort.
-        const out: Record<string, string> = wroteParams.current ? {} : { ...defaultFilters };
+        const out: Record<string, string> = {};
+        if (!wroteParams.current) {
+            for (const [key, value] of Object.entries(defaultFilters)) {
+                if (!excludeKeys?.has(key)) out[key] = value;
+            }
+        }
         for (const [key, value] of sp.entries()) {
-            if (!RESERVED.has(key) && !NON_FILTER.has(key)) out[key] = value;
+            if (!RESERVED.has(key) && !NON_FILTER.has(key) && !excludeKeys?.has(key)) out[key] = value;
         }
         return out;
-    }, [sp, defaultFilters]);
+    }, [sp, defaultFilters, excludeKeys]);
 
     const state = useMemo<TableParams>(() => ({
         search: sp.get('search') ?? defaults.search ?? '',
@@ -284,7 +296,7 @@ export function useTableParams(
             if (saved.search !== undefined && !urlKeys.has('search')) next.search = saved.search;
             if (saved.size !== undefined && PAGE_SIZES.includes(saved.size)) next.size = saved.size;
             for (const [key, value] of Object.entries(saved.filters ?? {})) {
-                if (!urlKeys.has(key)) nextFilters[key] = value;
+                if (!urlKeys.has(key) && !excludeKeys?.has(key)) nextFilters[key] = value;
             }
             write(next, nextFilters);
         },
