@@ -16,6 +16,7 @@
 // With VITE_MOJO_API unset the transport is the in-memory mock; set it to a
 // django-mojo origin and the same code talks to the real backend.
 import { MojoError } from './errors';
+import { assertScoped } from './endpoint-scope';
 import { DUID_HEADER, getDuid } from './duid';
 import type { MojoList, Params } from './types';
 
@@ -80,6 +81,9 @@ export interface FetchOpts {
     body?: Record<string, unknown>;
     /** Cancels the selected transport request. */
     signal?: AbortSignal;
+    /** Explicit opt-out from a registered endpoint scope (scoped.ts) — for
+     *  genuinely global calls inside a scoped family. Greppable, never silent. */
+    unscoped?: boolean;
 }
 
 export interface Envelope {
@@ -152,6 +156,10 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
 
 /** The single envelope-unwrap boundary. */
 async function unwrap(path: string, opts: FetchOpts): Promise<Envelope> {
+    // Dev tripwire: a scope-registered path with the scope missing from both
+    // params and body throws before the request leaves (endpoint-scope.ts,
+    // board #1936).
+    assertScoped(path, opts);
     const body = await transport(path, opts);
     if (body.status === false) {
         const legacyStatus = typeof body.error_code === 'number' ? body.error_code : 0;

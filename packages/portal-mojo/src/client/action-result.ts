@@ -16,6 +16,8 @@
 import { mojoCall } from './client';
 import { withFreshAuth } from './auth';
 import { MojoError } from './errors';
+import { getActiveGroupId } from './active-group';
+import { endpointScopeFor, endpointScopeValue } from './endpoint-scope';
 
 export interface ActionResult {
     /** False when the handler refused inside the 200. */
@@ -76,9 +78,16 @@ export async function mojoAction(
     action: string,
     payload?: unknown,
 ): Promise<ActionResult> {
-    const body = await withFreshAuth(() => mojoCall(`${endpoint}/${id}`, {
+    // Scope-registered families (endpoint-scope.ts, #1936) get the group
+    // injected into the action body — the wallet-verbs class: actions the
+    // backend refuses for brand-scoped operators without it.
+    const path = `${endpoint}/${id}`;
+    const reg = endpointScopeFor(path);
+    const gid = reg ? getActiveGroupId() : null;
+    const scope = reg && gid != null ? { [reg.key]: endpointScopeValue(reg, gid) } : {};
+    const body = await withFreshAuth(() => mojoCall(path, {
         method: 'POST',
-        body: { [action]: payload ?? true },
+        body: { ...scope, [action]: payload ?? true },
     }));
     const result = readActionResult(body);
     if (!result.ok) throw new ActionRefusedError(action, result);

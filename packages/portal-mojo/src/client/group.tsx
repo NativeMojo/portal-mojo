@@ -14,6 +14,7 @@ import { mojoCall, mojoGet } from './client';
 import { useAuthSnapshot } from './me';
 import type { MemberLike } from './me';
 import { GroupContext, type Group, type GroupContextValue } from './group-context';
+import { setActiveGroupSignal } from './active-group';
 
 const STORAGE_KEY = 'active_group_id';
 
@@ -87,6 +88,14 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     }, [groupQuery.isError, groupId]);
 
     const group = groupId != null ? (groupQuery.data ?? null) : null;
+
+    // Mirror the RESOLVED group into the module signal (scoped.ts's plain-fn
+    // consumers). The loaded id, not the candidate — a failing/loading group
+    // must not scope requests. Cleared on unmount.
+    useEffect(() => {
+        setActiveGroupSignal(group?.id ?? null);
+    }, [group?.id]);
+    useEffect(() => () => setActiveGroupSignal(null), []);
 
     const memberQuery = useQuery({
         queryKey: ['group-member', group?.id, auth.uid],

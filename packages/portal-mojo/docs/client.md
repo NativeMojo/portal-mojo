@@ -89,6 +89,87 @@ call site. Diagnostics whose flag is a result datum (connection testers)
 either declare `refusal:'return'` on the model or stay as bespoke raw
 readers with a comment.
 
+## Endpoint scoping — the middle tier
+
+The model layer scopes reliably; everything hand-rolled with `useQuery` +
+`mojoCall` historically forgot the scope param — the largest bug class in the
+first consumer audit (eight files, every one a raw read or verb missing its
+`group`). The middle tier makes the raw path as safe as the blessed one:
+apps *declare* their scoped endpoint families once, and every helper —
+plus a dev tripwire in the transport itself — enforces the declaration.
+
+### `registerEndpointScope(prefix | prefix[], {key?, required?, format?})`
+
+App-side, at boot (before the first fetch). Longest registered prefix wins;
+re-registering a prefix replaces it. `key` defaults to `'group'`, `required`
+defaults to `true`; `format` maps the group id to the wire value for
+spellings like `account=group-<pk>`:
+
+```ts
+registerEndpointScope('/api/wallet/', { key: 'group' });
+registerEndpointScope('/api/mojoverify/', { key: 'group' });
+registerEndpointScope('/api/store/order', { key: 'gid' });
+registerEndpointScope('/api/billing/', { key: 'account', format: (id) => `group-${id}` });
+```
+
+The base admin portal registers none — it is deliberately no-group. A
+`required` scope that cannot be resolved fails loudly (throw or disabled
+query, below); `required: false` families only inject when a group is active.
+
+### Where the group id comes from
+
+`GroupProvider` **owns** the active group — context stays the React-side
+source of truth — and mirrors its *resolved* group into a module-level
+signal (`setActiveGroupSignal` / `getActiveGroupId`) so plain functions can
+read it. Do not read `localStorage.active_group_id` yourself instead: the
+URL `?group=` param BEATS the stored id (group.tsx resolution order), and
+only the provider computes that resolution — the signal always reflects it.
+An explicit `group` option on any helper beats the signal.
+
+### `useScopedQuery<T>(path, params?, {read?, group?, ...queryOpts})`
+
+`useQuery` over a scoped GET. The registered spelling is injected into the
+request params, and the group id rides the query key —
+`[path, params, gid]` — so a brand switch can never serve another brand's
+cached rows, while invalidation by `[path]` prefix keeps working. Keep that
+key discipline if you write a raw scoped query by hand.
+
+When a REQUIRED scope has no active group, the query renders **disabled** —
+and a disabled query has *neither data nor error*. Do not draw an empty box
+or a spinner that never resolves: state the wait honestly at the call site
+("select a brand to load …").
+
+### `mojoScopedCall` / `mojoRpc`
+
+- `mojoScopedCall(path, opts)` — `mojoCall` with the registered scope
+  injected: into `params` for parameter-only requests, into the `body` when
+  a body is present. Throws in dev when a REQUIRED scope cannot be resolved
+  — an unscoped write to a scoped family must never leave the machine.
+- `mojoRpc<T>(path, body, opts?)` — the scoped RPC verb: POST `body` under
+  `withFreshAuth` with the scope injected; resolves `env.data as T`.
+  Action-shaped `{key: payload}` saves belong to `mojoAction`, not here.
+
+### `mojoAction` body injection
+
+`mojoAction(endpoint, id, action, payload?)` consults the same registry:
+for a scope-registered family with an active group, the scope key is
+injected into the action POST body alongside `{[action]: payload}` — the
+wallet-verbs class: actions the backend refuses for brand-scoped operators
+without `group`. With nothing registered (the base admin) the injection is
+inert.
+
+### The dev tripwire — and `unscoped: true`
+
+`assertScoped` runs inside the unwrap boundary on **every** dev request: a
+registered-REQUIRED path whose params *and* body both lack the scope key
+throws before the request leaves the machine, naming the registration and
+the fix. So even a raw `mojoCall` that bypasses every helper still fails at
+the desk, not in production data. Passing the scope explicitly satisfies it;
+for the rare genuinely-global call to a scoped family, mark it
+`{ unscoped: true }` — an explicit, greppable opt-out. Production builds
+skip the check (`import.meta.env.DEV` only); it is a development tripwire,
+not a runtime gate.
+
 ## Mock admin contracts
 
 The mock carries measured GroupView/admin transports, not UI-shaped
