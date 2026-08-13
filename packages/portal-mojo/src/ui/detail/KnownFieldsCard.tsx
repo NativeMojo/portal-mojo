@@ -16,6 +16,8 @@
 // value rather than rendering nothing (architecture rule 4).
 import type { ReactNode } from 'react';
 import * as fmt from '../format';
+import { safeNode } from '../safe-node';
+import { warnOnce } from '../warn-once';
 
 /** The `fmt.*` formatters a spec may name as a string. */
 const NAMED_FORMATTERS = {
@@ -55,7 +57,17 @@ function lookup(data: Record<string, unknown>, key: string): unknown {
 
 function formatValue(value: unknown, spec: KnownField, data: Record<string, unknown>): ReactNode {
     const { format } = spec;
-    if (typeof format === 'function') return format(value, spec.key, data);
+    if (typeof format === 'function') {
+        // Same contract as DataView's renderer hook: a formatter is the last
+        // thing allowed to take a card down — throws and returned raw objects
+        // both degrade loudly instead of crashing React.
+        try {
+            return safeNode(format(value, spec.key, data), `KnownFieldsCard field "${spec.key}"`);
+        } catch (err) {
+            warnOnce(`[KnownFieldsCard] formatter for "${spec.key}" threw — falling back to the plain value. ${err instanceof Error ? err.message : String(err)}`);
+            return String(value);
+        }
+    }
     if (typeof format === 'string') {
         const named = NAMED_FORMATTERS[format];
         if (named) return named(value);

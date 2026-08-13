@@ -41,6 +41,7 @@ import type { Tone } from './format';
 import { hasPermission, useMe } from '../client/me';
 import { GroupContext } from '../client/group-context';
 import { Popover } from './Popover';
+import { RenderGuard, safeNode } from './safe-node';
 
 export interface Chip {
     icon?: string;
@@ -374,14 +375,27 @@ export function DetailView<TCtx = unknown>({
                             onClick={() => setActiveKey(entry.key)}
                         >
                             <i className={`bi ${entry.icon}`} /> {entry.label}
-                            {railBadge(badges?.[entry.key])}
+                            {railBadge(safeNode(badges?.[entry.key], `DetailView badge "${entry.key}"`))}
                         </button>
                     ))}
                 </nav>
                 <div className="detail-content">
                     {mountedSections.map((s) => (
                         <div key={s.key} className="dv-keep" hidden={s.key !== effectiveKey}>
-                            {s.render()}
+                            <RenderGuard
+                                label={`DetailView section "${s.key}"`}
+                                fallback={
+                                    <div className="panel">
+                                        <div className="empty">
+                                            <i className="bi bi-bug" />
+                                            <h2>Section failed to render</h2>
+                                            <p className="dim">See the console for the error.</p>
+                                        </div>
+                                    </div>
+                                }
+                            >
+                                {() => s.render()}
+                            </RenderGuard>
                         </div>
                     ))}
                 </div>

@@ -40,6 +40,7 @@
 // DataView for the record, KnownFieldsCard for its `metadata` column.
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import * as fmt from '../format';
+import { safeNode } from '../safe-node';
 import { Badge } from '../ui';
 import { toast } from '../toast';
 
@@ -659,7 +660,7 @@ export function DataView({
             // A formatter is the last thing allowed to take a record down: any
             // throw degrades to the plain string, loudly (same contract as fmt).
             try {
-                node = spec.format ? spec.format(value, spec.name, record) : renderTyped(value, type, ctx);
+                node = safeNode(spec.format ? spec.format(value, spec.name, record) : renderTyped(value, type, ctx), `DataView field "${spec.name}"`);
             } catch (err) {
                 warnOnce(`[DataView] renderer for "${spec.name}" threw — falling back to the plain value.`, err);
                 node = String(value);

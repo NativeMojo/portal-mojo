@@ -27,7 +27,10 @@ import type { Params } from '../client/types';
 import { FilterBar, FilterPills, type FilterDef } from './FilterBar';
 import { busyWhile } from './loading';
 import { modal } from './modal';
+import { RenderGuard } from './safe-node';
 import { toast } from './toast';
+import * as fmt from './format';
+import { warnOnce } from './warn-once';
 
 export interface Column<T> {
     key: string;                       // server field; drives the sort param
@@ -74,6 +77,21 @@ export type GroupHeaderStyle = (typeof GROUP_HEADER_STYLES)[number];
 // Cell widths echo the real columns (web-mojo _buildSkeletonHtml's cycled
 // w-* classes) so the shimmer silhouette lines up with the eventual rows.
 const SKEL_WIDTHS = ['skel-w-90', 'skel-w-75', 'skel-w-60', 'skel-w-40', 'skel-w-25'];
+
+/**
+ * Default cell text for a column with no `render`. Objects reach here when a
+ * django-mojo graph expands an FK the column expected as a scalar — degrade
+ * to the FK display string (fmt.code) or a visible marker, warn once naming
+ * the column, never React-crash and never the old silent "[object Object]".
+ */
+function defaultCell(value: unknown, key: string): string {
+    if (value == null) return '—';
+    if (typeof value === 'object' && !Array.isArray(value)) {
+        warnOnce(`[portal-mojo] ModelTable column "${key}" received an object — the graph expanded an FK; add a render or use fmt.code()`);
+        return fmt.code(value) || '[object]';
+    }
+    return String(value);
+}
 
 /** Page-number window: {1, total, current±1} with … for the gaps. */
 function pageWindow(current: number, total: number): (number | '…')[] {
@@ -527,7 +545,7 @@ export function ModelTable<T extends { id: RowId }>({
                         <tr key={`grp:${key}:${row.id}`} className={`group-header-row group-header--${groupHeaderStyle}`}>
                             {/* Sticky span: the label stays inside the visible
                                 scroll viewport however wide the table is. */}
-                            <th colSpan={totalCols}><span className="group-header-label">{groupHeaderLabel ? groupHeaderLabel(key) : key}</span></th>
+                            <th colSpan={totalCols}><span className="group-header-label">{groupHeaderLabel ? <RenderGuard label="ModelTable groupHeaderLabel">{() => groupHeaderLabel(key)}</RenderGuard> : key}</span></th>
                         </tr>,
                     );
                     prevKey = key;
@@ -572,7 +590,9 @@ export function ModelTable<T extends { id: RowId }>({
                     )}
                     {visibleColumns.map((col) => (
                         <td key={col.key} className={col.align ? `text-${col.align}` : undefined}>
-                            {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '—')}
+                            {col.render
+                                ? <RenderGuard label={`ModelTable column "${col.key}"`}>{() => col.render!(row)}</RenderGuard>
+                                : defaultCell((row as Record<string, unknown>)[col.key], col.key)}
                         </td>
                     ))}
                 </tr>,
@@ -581,7 +601,14 @@ export function ModelTable<T extends { id: RowId }>({
                 out.push(
                     <tr key={`detail:${row.id}`} className="detail-row">
                         <td colSpan={totalCols}>
-                            <div className="detail-panel">{rowExpand!(row)}</div>
+                            <div className="detail-panel">
+                                <RenderGuard
+                                    label={`ModelTable rowExpand (row ${row.id})`}
+                                    fallback={<div className="dim-italic">Row detail failed to render — see console.</div>}
+                                >
+                                    {() => rowExpand!(row)}
+                                </RenderGuard>
+                            </div>
                         </td>
                     </tr>,
                 );
