@@ -5,6 +5,14 @@
 // (it used to be two paragraphs of prose here, which is not a test bed).
 import { type Group } from 'portal-mojo/client/runtime';
 import { Badge, fmt, groupByField, ModelTable, type Column, type FilterDef } from 'portal-mojo/ui';
+import { registerNonFilterParams } from 'portal-mojo/client/runtime';
+
+// `?demo=` selects the playground section — it must never become a filter
+// pill on the tables in this chunk. Module side effect: runs at chunk load,
+// before any table's first render. (demo-wire.tsx does the same for the
+// filters demo; ComponentsPage itself must stay free of portal-mojo/client
+// imports — the eager chunk rides a byte ceiling.)
+registerNonFilterParams('demo');
 import { GroupModel, GROUP_KIND_OPTIONS } from '../../models';
 
 type GroupRow = Group & { id: number };

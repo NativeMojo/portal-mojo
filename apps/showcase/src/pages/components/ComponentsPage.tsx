@@ -8,17 +8,10 @@
 // (wire params, django-mojo answers) — the Groups demo below runs against
 // /api/group on whichever transport the app is using (mock or live).
 import {
-import { registerNonFilterParams } from 'portal-mojo/client';
-
     Component, Suspense, lazy, useEffect, useMemo, useState,
     type ComponentType, type ReactNode,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
-// `?demo=` selects the playground section — it must never become a table
-// filter pill. Registered here (the page that owns the param), not in a
-// lazily-loaded demo chunk where the side effect may never run.
-registerNonFilterParams('demo');
 
 class DemoLoadBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
     state = { failed: false };
