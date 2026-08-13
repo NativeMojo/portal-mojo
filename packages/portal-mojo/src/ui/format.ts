@@ -12,6 +12,7 @@
 //      thing allowed to take a row down.
 //   2. Fixed 'en-US' locale — the portal's house style, not the browser's.
 import { toDateSmart } from './date/fns';
+import { warnOnce } from './warn-once';
 
 const DASH = '—';
 
@@ -19,15 +20,6 @@ const DASH = '—';
 type Numeric = number | string | null | undefined;
 /** Value shapes that arrive on the wire for a text field. */
 type Textual = string | number | null | undefined;
-
-// Rule-4 warnings (unknown value → default + console.warn) fire from render
-// paths, so a table would flood the console. One warning per distinct message.
-const warned = new Set<string>();
-function warnOnce(message: string): void {
-    if (warned.has(message)) return;
-    warned.add(message);
-    console.warn(message);
-}
 
 /**
  * Strict numeric parse — unlike the source's parseFloat, "12 items" is NOT 12.
@@ -335,6 +327,33 @@ export function phone(value: Textual, fallback = DASH): string {
         return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
     }
     return trimmed;
+}
+
+/**
+ * FK-safe display for coded wire fields. django-mojo graphs expand FK fields
+ * per-graph: the same field is `"GC"` on one graph, `{id, code, name, …}` on
+ * another, and the bare pk when the graph omits it. Render such fields through
+ * this — a raw object as a React child crashes the page.
+ *   string → itself · expanded row → `.code` ?? `.name` · pk number → `"3"`
+ * Documented fallback is `''` (like `slug`): the result composes into template
+ * strings without a stray dash. Cells that want `—` pass it explicitly.
+ * Deviation from the wmx-admin-v2 `codeOf` source: a finite number renders as
+ * its digits instead of `''` — an unexpanded FK pk is data, hiding it isn't.
+ */
+export function code(value: unknown, fallback = ''): string {
+    if (value == null) return fallback;
+    if (typeof value === 'string') return value === '' ? fallback : value;
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : fallback;
+    if (typeof value === 'object' && !Array.isArray(value)) {
+        const o = value as { code?: unknown; name?: unknown };
+        for (const k of [o.code, o.name]) {
+            if (typeof k === 'string' && k !== '') return k;
+            if (typeof k === 'number' && Number.isFinite(k)) return String(k);
+        }
+        warnOnce('fmt.code: object with no usable code/name — returning fallback');
+        return fallback;
+    }
+    return fallback;
 }
 
 // ============================ time ============================

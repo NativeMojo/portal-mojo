@@ -25,6 +25,7 @@
         "verify:admin-entrypoints": "node scripts/verify-admin-entrypoints.mjs",
         "verify:admin-contracts": "node scripts/verify-admin-contracts.mjs",
         "verify:admin-bundles": "node scripts/verify-admin-bundles.mjs",
+        "verify:fmt": "node scripts/verify-fmt.mjs",
         "verify:realtime": "node scripts/verify-realtime.mjs",
         "verify:admin-assistant": "node scripts/verify-admin-assistant.mjs",
         "verify:admin-dashboard": "node scripts/verify-admin-dashboard.mjs",
