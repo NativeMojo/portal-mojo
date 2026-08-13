@@ -140,13 +140,13 @@ function stringCards(): FmtCard[] {
     return [
         {
             sig: "fmt.code(v, fallback='')",
-            note: 'FK-safe display for graph-shaped wire fields: the same field arrives as "GC", {id, code, name, …}, or the bare pk depending on the graph. An object with no usable code/name warns once and falls back.',
+            note: 'FK-safe display for graph-shaped wire fields: the same field arrives as "GC", {id, code, name, …}, or the bare pk depending on the graph. An object with NO usable code/name warns once and falls back — described, not fired, to keep this page console-clean.',
             samples: [
                 { call: "code('GC')", out: fmt.code('GC') },
                 { call: "code({id: 1, code: 'GC', name: 'Gold Coin'})", out: fmt.code({ id: 1, code: 'GC', name: 'Gold Coin' }) },
                 { call: "code({name: 'Gold Coin'})", out: fmt.code({ name: 'Gold Coin' }) },
                 { call: 'code(3)', out: fmt.code(3) },
-                { call: "code({id: 7}, '—')", out: fmt.code({ id: 7 }, '—') },
+                { call: "code(null, '—')", out: fmt.code(null, '—') },
                 { call: 'code(null)', out: fmt.code(null) },
             ],
         },
