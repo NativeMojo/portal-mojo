@@ -75,7 +75,11 @@ try {
         assert(closureBytes <= budget.closure, `${app} entry + default route closure ${closureBytes} exceeds ${budget.closure}`);
         for (const key of defaultClosure) {
             const file = manifest[key]?.file;
-            if (file?.endsWith('.js')) assert((await stat(resolve(outDir, file))).size <= 500_000, `${app} eager/default chunk ${file} exceeds 500000 bytes`);
+            // 520_000: bumped from 500_000 on 2026-08-13 (#1604) — the route-level
+            // RouteError card is deliberately EAGER (a lazy error card cannot
+            // display chunk-load failures) and put the portal entry chunk at
+            // 502,515 (was 499,007, already 99.8% of the old cap).
+            if (file?.endsWith('.js')) assert((await stat(resolve(outDir, file))).size <= 520_000, `${app} eager/default chunk ${file} exceeds 520000 bytes`);
         }
         for (const sourcePath of budget.representatives) {
             const key = moduleKey(manifest, app, sourcePath);
