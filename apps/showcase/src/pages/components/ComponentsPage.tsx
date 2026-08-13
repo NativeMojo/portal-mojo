@@ -33,6 +33,7 @@ function lazyDemo<TModule, TKey extends keyof TModule>(load: () => Promise<TModu
 
 const TableDemo = lazyDemo(() => import('./demos-data'), 'TableDemo');
 const ScopedTableDemo = lazyDemo(() => import('./demos-data'), 'ScopedTableDemo');
+const RouteErrorDemo = lazyDemo(() => import('./demos-route-error'), 'RouteErrorDemo');
 const FiltersDemo = lazyDemo(() => import('./demos-filters'), 'FiltersDemo');
 const SearchDemo = lazyDemo(() => import('./demos-search'), 'SearchDemo');
 const ChartsDemo = lazyDemo(() => import('./demos-charts'), 'ChartsDemo');
@@ -289,6 +290,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'toasts', title: 'Toasts', icon: 'bi-chat-square-dots',
                 blurb: 'success / error / info / warning — the batch bar uses warning for partial results.',
                 render: () => <ToastsDemo />,
+            },
+            {
+                key: 'route-error', title: 'RouteError', icon: 'bi-bug',
+                blurb: 'The route-level last-resort card: real message + stack for crashes (never "[object Object]"), a Page-not-found branch for 404s, Reload + Back-to-home. Behind safeNode/RenderGuard and the chunk-only LazyPageBoundary in the error ladder.',
+                render: () => <RouteErrorDemo />,
             },
             {
                 key: 'loading', title: 'Loaders', icon: 'bi-hourglass-split',

@@ -30,6 +30,7 @@
         "verify:admin-bundles": "node scripts/verify-admin-bundles.mjs",
         "verify:fmt": "node scripts/verify-fmt.mjs",
         "verify:fixed-params": "node scripts/verify-fixed-params.mjs",
+        "verify:route-error": "node scripts/verify-route-error.mjs",
         "verify:realtime": "node scripts/verify-realtime.mjs",
         "verify:admin-assistant": "node scripts/verify-admin-assistant.mjs",
         "verify:admin-dashboard": "node scripts/verify-admin-dashboard.mjs",

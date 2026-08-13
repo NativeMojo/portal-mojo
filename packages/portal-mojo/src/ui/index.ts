@@ -30,6 +30,8 @@ export * as dateFns from './date/fns';
 export * from './detail';
 export * from './modal';
 export * from './safe-node';
+export * from './RouteError';
+export * from './route-error';
 export * from './password';
 export * from './Popover';
 export * from './TagInput';

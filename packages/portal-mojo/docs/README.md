@@ -62,6 +62,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [collection-multiselect.md](collection-multiselect.md) | Server-backed multi-pick dropdown (panel variant available) — model binding, 400ms search, select/deselect-all, shift-click ranges |
 | [detail-primitives.md](detail-primitives.md) | StatusPanel, FlowStrip, Timeline, KnownFieldsCard, MetadataSection, StackTraceView — the detail-page pack |
 | [dataview.md](dataview.md) | Auto-inferring key/value grid + safe JSON viewer — schema or inference, nested records |
+| [route-error.md](route-error.md) | `RouteError`/`RouteErrorCard` — the route-level last-resort error card, the error-handling ladder, two-level `errorElement` wiring |
 | [markdown.md](markdown.md) | MarkdownView — server render via docit, allowlist sanitizer trust model, client fallback |
 | [record-feed.md](record-feed.md) | RecordFeed — ticket/incident adapters, chronological latest-window normalization, optimistic sends, controlled mode |
 | [right-panel.md](right-panel.md) | Explicit opt-in persistent shell slot — provider state, focus/Escape semantics, route preservation, responsive layout |

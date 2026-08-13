@@ -25,7 +25,7 @@ handleAuthTokenLanding();
 if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__mojo = mojo;
 }
-import { ThemeProvider } from 'portal-mojo/ui/shell';
+import { RouteError, ThemeProvider } from 'portal-mojo/ui/shell';
 
 // This artifact is the fleet-wide Admin, never a group-scoped product portal.
 // Remove stale deep-link scope without erasing another portal's remembered
@@ -42,12 +42,22 @@ if (adminSearch.has('group')) {
 // SIBLINGS of the App route (full-screen, no Sidebar/TopNav chrome); the
 // RequireAuth guard sends unauthenticated visits to in-app login or the
 // hosted /auth pages per VITE_MOJO_AUTH.
+// Two errorElement levels on purpose: the pathless child wrapper renders a
+// crash INSIDE the app shell (Sidebar/TopNav stay alive); the root one is
+// the last resort — it catches 404s and shell crashes and, by router
+// semantics, replaces the shell entirely, so the card stands alone.
 const router = createHashRouter([
     {
         path: '/',
         element: <RequireAuth><App /></RequireAuth>,
+        errorElement: <RouteError />,
         children: [
-            ...adminRoutes,
+            {
+                errorElement: <RouteError />,
+                children: [
+                    ...adminRoutes,
+                ],
+            },
         ],
     },
     ...authRoutes,

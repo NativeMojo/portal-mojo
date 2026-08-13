@@ -4,6 +4,8 @@ export * from './Guarded';
 export * from './menu-registry';
 export * from './SidebarNav';
 export * from './RightPanel';
+export * from './RouteError';
+export * from './route-error';
 export * from './modal';
 export * from './password';
 export * from './toast';

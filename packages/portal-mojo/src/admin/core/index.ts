@@ -3,6 +3,7 @@ import {
     type ComponentType, type ErrorInfo, type ReactNode,
 } from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
+import { isChunkLoadError } from '../../ui/route-error';
 import { GroupContext } from '../../client/group-context';
 import { hasPermission, useMe } from '../../client/me';
 import type { PermSpec } from '../../client/model';
@@ -67,6 +68,11 @@ class LazyPageBoundary extends Component<LazyPageBoundaryProps, LazyPageBoundary
     componentDidCatch(_error: Error, _info: ErrorInfo): void { /* visible recovery is the contract */ }
     render(): ReactNode {
         if (!this.state.error) return this.props.children;
+        // Only a CHUNK failure earns the Retry card — anything else is a real
+        // page crash, and labeling it "bundle unavailable" hides the truth.
+        // Rethrow so it reaches the route-level errorElement (#1604), which
+        // shows the actual message and stack.
+        if (!isChunkLoadError(this.state.error)) throw this.state.error;
         return createElement('div', { className: 'panel panel-pad admin-route-error', role: 'alert' },
             createElement('h2', null, 'Admin page could not load'),
             createElement('p', { className: 'dim' }, 'The page bundle was unavailable. Check your connection and try again.'),

@@ -15,6 +15,7 @@
 // deployments to '#/auth/login' instead of the console-login hint.
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Navigate, useLocation, type RouteObject } from 'react-router-dom';
+import { RouteError } from 'portal-mojo/ui/shell';
 import { redirectToHostedAuth, useAuthSnapshot } from 'portal-mojo/client/runtime';
 import { AuthIndexRoute, AuthLayout } from './AuthLayout';
 import { FreshAuthHost } from './FreshAuthHost';
@@ -34,6 +35,9 @@ export const authRoutes: RouteObject[] = [
     {
         path: '/auth',
         element: <AuthLayout />,
+        // Chunk failures on the lazy auth pages (stale deploy) land here and
+        // render the standalone card instead of the router's white default.
+        errorElement: <RouteError />,
         children: [
             { index: true, element: <AuthIndexRoute /> },
             { path: 'login', lazy: loadLoginPage },
