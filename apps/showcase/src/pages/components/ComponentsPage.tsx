@@ -100,6 +100,7 @@ const TabsDemo = lazyDemo(() => import('./demos-form-wizard'), 'TabsDemo');
 const LocationAddressDemo = lazyDemo(() => import('./demos-location-address'), 'LocationAddressDemo');
 const FileUploadDemo = lazyDemo(() => import('./demos-file-upload'), 'FileUploadDemo');
 const ImageEditorDemo = lazyDemo(() => import('./demos-image-editor'), 'ImageEditorDemo');
+const PersonasDemo = lazyDemo(() => import('./demos-personas'), 'PersonasDemo');
 
 interface DemoDescriptor {
     key: string;
@@ -502,6 +503,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'access', title: 'Permissions', icon: 'bi-shield-lock',
                 blurb: 'useCan / <Guarded> against the live session — category rollup, member context, fail-closed.',
                 render: () => <AccessDemo />,
+            },
+            {
+                key: 'personas', title: 'Personas', icon: 'bi-person-badge',
+                blurb: 'Hats and gated roles: switcher + availability gating, live data-persona/data-density stamping, persona-scoped menus resolving a shared route, and auditPersonas catching a leaked gate key. Presentation only — Guarded stays the security boundary.',
+                render: () => <PersonasDemo />,
             },
         ],
     },

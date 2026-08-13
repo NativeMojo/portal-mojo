@@ -57,6 +57,15 @@ export interface MenuConfig {
      * fallback group menu).
      */
     groupKind?: string | string[] | 'any' | null;
+    /**
+     * Persona slugs this menu belongs to. Unset → persona-agnostic (eligible
+     * under every persona and in apps that use none). Set → eligible only
+     * while `MenuContext.persona` matches, and the first registered match is
+     * that persona's default menu in the fallback chain. Menus stay declared
+     * ONCE at import time — the persona is a resolution input, never
+     * re-registration (see portal-mojo/personas).
+     */
+    personas?: string[];
     items: MenuItem[];
 }
 
@@ -64,6 +73,8 @@ export interface MenuContext {
     me: Me | null;
     member: MemberLike | null;
     group: Group | null;
+    /** Active persona slug, when the app runs portal-mojo/personas. */
+    persona?: string | null;
 }
 
 // ── Registry (insertion-ordered; subscribable so late registration — lazy
@@ -160,10 +171,20 @@ export function menuContainsRoute(menu: MenuConfig, pathname: string, ctx: MenuC
     return menu.items.some((item) => itemContainsRoute(item, pathname, ctx));
 }
 
+/** Is a menu persona-eligible? Persona-scoped menus need a matching persona. */
+function personaMenuEligible(menu: MenuConfig, ctx: MenuContext): boolean {
+    if (!menu.personas || menu.personas.length === 0) return true;
+    return ctx.persona != null && menu.personas.includes(ctx.persona);
+}
+
 /** Is a group menu eligible at all under the current context? */
 function groupMenuEligible(menu: MenuConfig, ctx: MenuContext): boolean {
     if (!menu.groupKind) return true;
     return ctx.group != null && groupKindMatches(menu.groupKind, ctx.group.kind);
+}
+
+function menuEligible(menu: MenuConfig, ctx: MenuContext): boolean {
+    return personaMenuEligible(menu, ctx) && groupMenuEligible(menu, ctx);
 }
 
 /**
@@ -171,20 +192,36 @@ function groupMenuEligible(menu: MenuConfig, ctx: MenuContext): boolean {
  * _applyFallbackMenu chain, as one pure resolution.
  */
 export function resolveActiveMenu(pathname: string, ctx: MenuContext): MenuConfig | null {
-    // 1. Route containment, registration order.
+    // 1. Route containment, registration order. Persona- and group-scoped
+    //    menus compete only while eligible, so two personas may both carry
+    //    /players and the active persona's menu wins deterministically.
     for (const menu of menus.values()) {
-        if (!groupMenuEligible(menu, ctx)) continue;
+        if (!menuEligible(menu, ctx)) continue;
         if (menuContainsRoute(menu, pathname, ctx)) return menu;
     }
-    // 2. defaultMenu.
+    // 2a. The active persona's own menu (first registered match, preferring
+    //     one with visible items) beats the global default.
+    if (ctx.persona != null) {
+        let firstPersonaMenu: MenuConfig | null = null;
+        for (const menu of menus.values()) {
+            if (!menu.personas?.includes(ctx.persona)) continue;
+            if (!groupMenuEligible(menu, ctx)) continue;
+            firstPersonaMenu ??= menu;
+            if (menuHasVisibleItems(menu, ctx)) return menu;
+        }
+        if (firstPersonaMenu) return firstPersonaMenu;
+    }
+    // 2b. defaultMenu.
     if (defaultMenuName) {
         const dm = menus.get(defaultMenuName);
-        if (dm) return dm;
+        if (dm && personaMenuEligible(dm, ctx)) return dm;
     }
-    // 3. First non-group menu with visible items; else first non-group.
+    // 3. First non-group, persona-eligible menu with visible items; else the
+    //    first such menu at all.
     let firstNonGroup: MenuConfig | null = null;
     for (const menu of menus.values()) {
         if (menu.groupKind) continue;
+        if (!personaMenuEligible(menu, ctx)) continue;
         firstNonGroup ??= menu;
         if (menuHasVisibleItems(menu, ctx)) return menu;
     }

@@ -14,10 +14,12 @@ import {
     routesMatch, subscribeMenus, visibleMenuChildren,
     type MenuConfig, type MenuContext, type MenuItem,
 } from './menu-registry';
+import { getActivePersona, subscribeActivePersona } from './active-persona';
 
 /** The active menu + context, derived — no menu state to desync. */
 export function useSidebarMenu(): { menu: MenuConfig | null; ctx: MenuContext } {
     useSyncExternalStore(subscribeMenus, menusVersion, menusVersion);
+    const persona = useSyncExternalStore(subscribeActivePersona, getActivePersona, getActivePersona);
     const { pathname } = useLocation();
     const { data: me } = useMe();
     const groupCtx = useContext(GroupContext);
@@ -25,6 +27,7 @@ export function useSidebarMenu(): { menu: MenuConfig | null; ctx: MenuContext } 
         me: me ?? null,
         member: groupCtx?.member ?? null,
         group: groupCtx?.group ?? null,
+        persona,
     };
     return { menu: resolveActiveMenu(pathname, ctx), ctx };
 }

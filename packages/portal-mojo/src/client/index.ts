@@ -16,6 +16,7 @@ export * from './group-context';
 export * from './group';
 export * from './hooks';
 export * from './params';
+export * from './persist';
 export * from './lookups';
 export * from './location';
 export * from './markdown';

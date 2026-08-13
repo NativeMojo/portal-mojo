@@ -17,7 +17,7 @@ for (const mode of ['core', 'legacy', 'email-first']) {
     execFileSync(process.execPath, [resolve(root, 'scripts/verify-admin-side-effects.mjs'), mode], { cwd: root, stdio: 'inherit' });
 }
 const manifest = JSON.parse(await readFile(resolve(root, 'packages/portal-mojo/package.json'), 'utf8'));
-const expectedEntrypoints = ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './ui', './ui/shell'];
+const expectedEntrypoints = ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './ui', './ui/shell'];
 assert.deepEqual(Object.keys(manifest.exports).sort(), expectedEntrypoints);
 const [coreSource, showcaseSource] = await Promise.all([
     readFile(resolve(root, 'packages/portal-mojo/src/admin/core/index.ts'), 'utf8'),

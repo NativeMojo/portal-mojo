@@ -30,6 +30,7 @@
         "./ui": "./src/ui/index.ts",
         "./ui/shell": "./src/ui/shell.ts",
         "./charts": "./src/charts/index.ts",
+        "./personas": "./src/personas/index.ts",
         "./admin": "./src/admin/index.ts",
         "./admin/core": "./src/admin/core/index.ts",
         "./admin/registry": "./src/admin/registry.ts",

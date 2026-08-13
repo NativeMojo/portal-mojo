@@ -125,7 +125,7 @@ try {
     const installed = JSON.parse(await readFile(join(consumerDir, 'node_modules/portal-mojo/package.json'), 'utf8'));
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
-    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './ui', './ui/shell']);
+    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './ui', './ui/shell']);
     const installedRoot = join(consumerDir, 'node_modules/portal-mojo');
     const program = ts.createProgram(await typeScriptFiles(join(installedRoot, 'src')), {
         target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
