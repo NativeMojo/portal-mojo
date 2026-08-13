@@ -66,6 +66,7 @@ export function useUserAdminActions(
     const sendInvite = UserModel.useAction('send_invite');
     const revokeSessions = UserModel.useAction('revoke_sessions');
     const changeUsername = UserModel.useAction('change_username');
+    const disableTotpAction = UserModel.useAction('disable_totp');
 
     const fail = (err: unknown, fallback: string) =>
         toast.error(err instanceof Error ? err.message : fallback);
@@ -356,7 +357,11 @@ export function useUserAdminActions(
         });
         if (!data) return;
         // One POST carries the action + the optional field, exactly like the
-        // source (fields save before action handlers run server-side).
+        // source (fields save before action handlers run server-side). Raw
+        // mojoCall on purpose: mojoAction/useAction post `{action: payload}`
+        // ONLY — they cannot carry the sibling plain field. An inside-the-200
+        // refusal here would need readActionResult; today this route refuses
+        // at the envelope level (status:false), which already rejects.
         const body: Record<string, unknown> = { disable_totp: true };
         if (data.clear_requirement === true) body.requires_mfa = false;
         try {
@@ -388,9 +393,10 @@ export function useUserAdminActions(
         });
         if (!ok) return;
         try {
-            await withFreshAuth(() => mojoCall(`/api/user/${user.id}`, { method: 'POST', body: { disable_totp: true } }));
+            // The declared POST_SAVE_ACTION — rides the shared refusal
+            // normalizer and invalidates the model caches itself.
+            await disableTotpAction.mutateAsync({ id: user.id, payload: true });
             toast.success('Authenticator disabled');
-            await UserModel.invalidate(qc);
         } catch (err) {
             fail(err, 'Failed to disable authenticator');
         }
@@ -421,9 +427,12 @@ export function useUserAdminActions(
     const revokeAllSessions = async () => {
         try {
             // A `response:'payload'` action — the toast text IS the server's
-            // action response, not client copy.
+            // action response, not client copy. `result.payload` absorbs both
+            // wire shapes (flat and `{status:true, data:{…}}`-wrapped); the
+            // resolved payload's `status` is truthy — `status:false` would
+            // have rejected as ActionRefusedError before this line.
             const outcome = await revokeSessions.mutateAsync({ id: user.id });
-            toast.success(String(outcome.body.message ?? 'Sessions revoked'));
+            toast.success(String(outcome.result.payload.message ?? 'Sessions revoked'));
         } catch (err) {
             fail(err, 'Failed to revoke sessions');
         }

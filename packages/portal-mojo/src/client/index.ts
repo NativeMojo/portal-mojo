@@ -8,6 +8,7 @@
 export * from './client';
 export * from './errors';
 export * from './model';
+export * from './action-result';
 export * from './auth';
 export * from './jwt';
 export * from './duid';

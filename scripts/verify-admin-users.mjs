@@ -71,10 +71,15 @@ try {
         method: 'POST', headers: manager, body: { disable: { reason: 'admin' } },
     });
     assert.equal(disabled.data.is_active, false);
+    // A duplicate disable is the contract's flat INSIDE-THE-200 refusal:
+    // `success:false` + code, with NO envelope-level `status:false` — unwrap
+    // passes it through and client/action-result rejects it.
     const duplicateDisable = await mock.mockFetch(`/api/user/${target.id}`, {
         method: 'POST', headers: manager, body: { disable: { reason: 'admin' } },
     });
-    assert.equal(duplicateDisable.error_code, 400);
+    assert.equal(duplicateDisable.success, false);
+    assert.equal(duplicateDisable.code, 'ALREADY_DISABLED');
+    assert.notEqual(duplicateDisable.status, false, 'the refusal must ride inside the 200, not the envelope');
     const reactivated = await mock.mockFetch(`/api/user/${target.id}`, {
         method: 'POST', headers: manager, body: { reactivate: {} },
     });

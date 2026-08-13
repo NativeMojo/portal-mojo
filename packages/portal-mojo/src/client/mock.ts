@@ -4455,7 +4455,13 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
             // pending inactivity warning.
             const reason = String(dict.reason ?? '');
             if (!user.is_active) {
-                return { status: false, error: 'User is already inactive', error_code: 400 };
+                // The INSIDE-THE-200 refusal shape (flat): the handler's dict
+                // reaches the wire verbatim with `success:false` — no
+                // envelope-level `status:false`, so unwrap passes it through
+                // and client/action-result normalizes it into
+                // ActionRefusedError. This is the contract's executable
+                // refusal fixture; keep it flat.
+                return { success: false, code: 'ALREADY_DISABLED', error: 'User is already disabled' };
             }
             if (!USER_DISABLE_REASONS.has(reason)) {
                 return { status: false, error: `reason must be one of: ${[...USER_DISABLE_REASONS].sort().join(', ')}`, error_code: 400 };

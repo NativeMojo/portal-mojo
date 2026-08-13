@@ -363,6 +363,10 @@ export function storageRefreshFailure(error: unknown): unknown {
     return storageRefreshFailures.get(error as object) ?? (error as Record<string, unknown>)[STORAGE_REFRESH_FAILURE];
 }
 
+// Deliberately NOT client/action-result's `mojoAction`: these per-key testers
+// hand-normalize the wrapped `{data:{status:false, error}}` shape themselves
+// and answer a caller-shaped `{status, id, result}` evidence dict — migrating
+// would change both the thrown type and the resolved shape for no gain.
 export async function runFileManagerAction(id: number, action: 'test_connection' | 'check_cors' | 'fix_cors' | 'clone', value: unknown = true): Promise<Record<string, unknown>> {
     const body = await mojoCall(`${FileManagerModel.endpoint}/${id}`, { method: 'POST', body: { [action]: value } });
     const data = body.data;
@@ -390,6 +394,8 @@ export async function saveFileAndReconcileGroup(queryClient: QueryClient, id: nu
 
 export interface ShareOptions { expire_days?: number; track_clicks?: boolean; note?: string }
 export interface ShareCreateResult { url: string; code: string; expires_at: string | null; track_clicks: boolean }
+// Deliberately NOT `mojoAction`: the reply is a one-shot capability URL with
+// its own strict validation (safe-URL + expiry checks), not act-toast-refresh.
 export async function createFileShare(id: number, options: true | ShareOptions): Promise<ShareCreateResult> {
     const body = await mojoCall(`${FileModel.endpoint}/${id}`, { method: 'POST', body: { share: options } });
     const raw = body.data;

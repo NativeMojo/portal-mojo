@@ -61,6 +61,34 @@ Mock-only contract controls are exported in development: call
 `armMockReauth(method, path)` to make one authenticated method+path match
 answer 440. Ordinary requests and real transports are unaffected.
 
+## Actions — `mojoAction` / `readActionResult`
+
+django-mojo POST_SAVE_ACTION handlers can refuse **inside an HTTP 200**, in
+two wire shapes — flat `{success:false, code, error}` or wrapped
+`{status:true, data:{success:false, …}}` — which the unwrap boundary
+deliberately passes through (envelope `status:false` is a different failure
+and already rejects). Never hand-sniff these shapes; there is one reader:
+
+- `readActionResult(body)` → `{ok, code, error, payload}`. `payload` merges
+  the envelope with the action dict (action fields win), so one-shot
+  secrets/counters read from one place whichever direction they rode.
+  Payload `status:false` (the `revoke_sessions` spelling) also refuses;
+  bodies with no flag resolve `ok: true`.
+- `mojoAction(endpoint, id, action, payload?)` — the raw-path primitive:
+  POSTs `{[action]: payload ?? true}` to `endpoint/<id>` under
+  `withFreshAuth`, normalizes the reply, and **REJECTS with
+  `ActionRefusedError`** (a `MojoError` with `status: 200`, `errorCode` =
+  the refusal code, `message` = the server's text) on an inside-the-200
+  refusal. Returns the `ActionResult` on success.
+
+Which to use: **model-bound → `defineModel(...).useAction`** (same
+normalizer + cache maintenance; see defineModel.md "Action refusals" for
+`refusal: 'reject' | 'return'`); **raw one-off action POST →
+`mojoAction`**; **never** parse `success`/`status` off an action body at a
+call site. Diagnostics whose flag is a result datum (connection testers)
+either declare `refusal:'return'` on the model or stay as bespoke raw
+readers with a comment.
+
 ## Mock admin contracts
 
 The mock carries measured GroupView/admin transports, not UI-shaped

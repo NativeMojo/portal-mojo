@@ -55,13 +55,52 @@ action-specific payload. **Which one is DECLARED, never sniffed:**
 
 - `response: 'row'` (default) → `ActionOutcome.row` is the refreshed record
   (written through to the cache).
-- `response: 'payload'` → `row` is null; read `outcome.body` (e.g.
-  `body.message` for `revoke_sessions` — toast the server's text).
+- `response: 'payload'` → `row` is null; read `outcome.result.payload`
+  (e.g. `result.payload.message` for `revoke_sessions` — toast the
+  server's text). `outcome.body` remains the raw unwrapped envelope.
 
 Invoke: `await disableAction.mutateAsync({ id, payload: { reason: 'abuse' } })`.
 `payload` defaults to `{}`; handlers treat the value as a dict. Errors
 (e.g. `"reason must be one of: abuse, admin"`) REJECT with the server's
 message.
+
+## Action refusals
+
+django-mojo action handlers can refuse **inside an HTTP 200**. The reply
+reaches the client in one of two wire shapes:
+
+```jsonc
+{"success": false, "code": "ALREADY_DISABLED", "error": "…"}          // flat (JsonResponse verbatim)
+{"status": true, "data": {"success": false, "code": "…", "error": "…"}} // wrapped (save-and-respond)
+```
+
+This is NOT the envelope failure: envelope-level `status:false` already
+rejects at the unwrap boundary (`MojoError`). The action-refusal layer sits
+above it and is handled by `useAction` automatically:
+
+- **`refusal: 'reject'` (default)** — a `success:false` (or payload
+  `status:false`) reply REJECTS with **`ActionRefusedError`**, so a refusal
+  can never read as done. The error extends `MojoError` with `status: 200`
+  (the HTTP layer succeeded — the HANDLER said no), `message` = the server's
+  `error` text, `errorCode` = the semantic refusal `code`, and
+  `result`/`data` = the merged payload (may hold evidence such as the
+  current row state). Call sites need only their ordinary
+  `catch (err) { toast.error(err.message) }`.
+- **`refusal: 'return'`** — declare this when the flag is a DIAGNOSTIC
+  RESULT, not a refusal (e.g. a connection test answering
+  `{success, key_count}`). The mutation resolves either way; read
+  `outcome.result` (`{ok, code, error, payload}`). Declared, never sniffed.
+
+`ActionOutcome.result` is the normalized reply for every action:
+`result.payload` merges the envelope with the action dict (action fields
+win), so one-shot secrets and counters read from one place regardless of
+which wire shape arrived. For `refusal:'reject'` actions `result.ok` is
+always `true` on the resolved path — a refusal already rejected.
+
+Oddball: `User.revoke_sessions` spells the flag `status` inside its payload
+(`{status: true, message}` on success). Only `status === false` refuses, so
+its truthy success value — and payloads with no flag at all — resolve
+normally.
 
 ## Pitfalls
 

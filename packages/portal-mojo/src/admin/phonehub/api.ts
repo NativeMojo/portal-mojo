@@ -36,6 +36,9 @@ export async function savePhoneConfigImperative(qc:QueryClient,id:number|null,sc
     const row=sanitizePhoneConfigRow(response.data as PhoneConfigRow);
     qc.setQueryData(PhoneConfigModel.keys.one(row.id),row);await qc.invalidateQueries({queryKey:PhoneConfigModel.keys.root});return row;
 }
+// Deliberately NOT client/action-result's `mojoAction`: `status` here is the
+// connection test's VERDICT (a result datum), not an action refusal — a failed
+// test must resolve so the panel can render it.
 export async function testPhoneConfigImperative(id:number):Promise<{status:boolean;message:string}>{
     const response=await mojoCall(`${PhoneConfigModel.endpoint}/${id}`,{method:'POST',body:{test_connection:1}});
     const data=(response.data??response) as Record<string,unknown>;

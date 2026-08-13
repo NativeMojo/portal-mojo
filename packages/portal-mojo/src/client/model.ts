@@ -23,6 +23,7 @@
 // sniffed from the body — the resp.data heuristics class ends at this layer.
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { mojoCall, mojoDelete, mojoGet, mojoSave, type Envelope } from './client';
+import { ActionRefusedError, readActionResult, type ActionResult } from './action-result';
 import { withFreshAuth } from './auth';
 import { useModel, useModelList } from './hooks';
 import type { ModelForm, Params } from './types';
@@ -41,6 +42,14 @@ export interface ModelActionDef {
      * action-specific body → returned verbatim, caches invalidated only.
      */
     response?: 'row' | 'payload';
+    /**
+     * 'reject' (default): a `success:false` (or payload `status:false`)
+     * reply REJECTS with ActionRefusedError — a refusal cannot read as done.
+     * 'return': the flag is a DIAGNOSTIC RESULT, not a refusal (e.g. a
+     * connection test's `{success, key_count}`) — never thrown, read it from
+     * `outcome.result`. Declared, never sniffed.
+     */
+    refusal?: 'reject' | 'return';
 }
 
 export interface ModelConfig<T> {
@@ -84,6 +93,10 @@ export interface ActionOutcome<T> {
     row: T | null;
     /** The unwrapped envelope — message + any action-specific fields. */
     body: Envelope;
+    /** The normalized action reply (both wire shapes absorbed). For
+     *  `refusal: 'reject'` actions `result.ok` is always true here — a
+     *  refusal already rejected with ActionRefusedError. */
+    result: ActionResult;
 }
 
 export interface ModelDef<T extends { id: number | string }> {
@@ -189,6 +202,7 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
             }
             const bodyKey = def.key ?? action;
             const returnsRow = (def.response ?? 'row') === 'row';
+            const rejectsRefusal = (def.refusal ?? 'reject') === 'reject';
             const qc = useQueryClient();
             return useMutation({
                 mutationFn: async ({ id, payload = {} }: ActionVars): Promise<ActionOutcome<T>> => {
@@ -196,7 +210,11 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
                         method: 'POST',
                         body: { [bodyKey]: payload },
                     }));
-                    const row = returnsRow ? (body.data as T) : null;
+                    // Handlers refuse INSIDE the 200 — normalize, and reject
+                    // unless this action declared the flag a diagnostic.
+                    const result = readActionResult(body);
+                    if (!result.ok && rejectsRefusal) throw new ActionRefusedError(action, result);
+                    const row = returnsRow && result.ok ? (body.data as T) : null;
                     const safeRow = row && sanitizeRow ? sanitizeRow(row) : row;
                     // MutationCache retains the entire outcome. Keep its two
                     // row representations consistent so body.data cannot hold
@@ -204,7 +222,13 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
                     const safeBody = safeRow && sanitizeRow
                         ? { ...body, data: safeRow }
                         : body;
-                    return { row: safeRow, body: safeBody };
+                    // result.payload merges body.data, so re-read it off the
+                    // sanitized body — the cache must never hold the raw row.
+                    return {
+                        row: safeRow,
+                        body: safeBody,
+                        result: safeBody === body ? result : readActionResult(safeBody),
+                    };
                 },
                 onSuccess: (outcome, { id }) => {
                     if (outcome.row) qc.setQueryData(keys.one(id), outcome.row);

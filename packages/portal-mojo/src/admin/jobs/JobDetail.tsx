@@ -428,7 +428,9 @@ export function JobDetail({ jobId, onClose }: { jobId: string; onClose: () => vo
     const runCancel = async () => {
         try {
             const outcome = await cancelAction.mutateAsync({ id: job.id, payload: true });
-            const body = outcome.body as { message?: string; forced?: boolean };
+            // `result.payload` is the normalized action reply — shape-robust
+            // to flat vs wrapped; a refusal already rejected into the catch.
+            const body = outcome.result.payload as { message?: string; forced?: boolean };
             // A running job on a DEAD runner is force-canceled server-side and
             // is already over — saying "cancellation requested" would be a lie.
             toast.success(body.forced
@@ -462,7 +464,7 @@ export function JobDetail({ jobId, onClose }: { jobId: string; onClose: () => vo
                         id: job.id,
                         payload: delay == null ? { retry: true } : { retry: true, delay },
                     });
-                    const body = outcome.body as { new_job_id?: string; delayed?: boolean };
+                    const body = outcome.result.payload as { new_job_id?: string; delayed?: boolean };
                     const newJobId = body.new_job_id ?? '';
                     toast.success(`Retry published as job ${fmt.truncateMiddle(newJobId, 16)}`);
                     refresh();
