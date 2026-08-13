@@ -126,7 +126,7 @@ grids stops being readable.
 | `email` | `<a href="mailto:…">` |
 | `url` / `file` | `<a target="_blank" rel="noopener noreferrer">` + external-link icon |
 | `phone` | `<a href="tel:…">` around `fmt.phone` (digits + `+` only in the href) |
-| `currency` | `fmt.currency`; `EUR`/`GBP` from the key, else `USD`. **Integer → cents, fractional → major units** |
+| `currency` | `fmt.currency`; `EUR`/`GBP` from the key, else `USD`. **Integer (or integer-string) → cents; fractional (number or string) → major units** |
 | `filesize` | `fmt.filesize` (decimal KB/MB/GB) |
 | `percent` | `fmt.percent`; **`\|v\| ≤ 1` is scaled ×100**, anything larger is already a percentage |
 | `number` | `count`/`total`/`followers`/`views` → `fmt.compact` at ≥1000 else `fmt.number`; `score`/`rating` → `fmt.number(v, 1)` when fractional; `version` / the word `id` → verbatim; else `fmt.number` |
@@ -182,8 +182,11 @@ Truncated text keeps the full value on a `title` attribute.
 
 - **Money is CENTS when it's an integer.** django-mojo stores minor units,
   so `plan_amount: 129900` → `$1,299.00` while `overage_price: 4.75` →
-  `$4.75`. A record that breaks that convention needs an explicit
-  `format`.
+  `$4.75` — and wire decimal STRINGS classify the same way, so
+  `overage_price: '4.75'` (the DecimalField shape) is also `$4.75`. A
+  whole-dollar decimal string (`'12.00'`) parses to an integer and reads as
+  cents (`$0.12`) — inherently ambiguous; a record that breaks the
+  convention needs an explicit `format`.
 - **Percent auto-scales below 1.** `error_rate: 0.0182` → `2%`;
   `error_rate: 12` → `12%`. A ratio that legitimately exceeds 1 needs an
   explicit `format`.

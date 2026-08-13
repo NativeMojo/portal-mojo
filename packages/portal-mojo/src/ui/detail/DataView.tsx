@@ -499,10 +499,15 @@ function renderCurrency(value: unknown, ctx: RenderCtx): ReactNode {
         : keyLower.includes('gbp') || keyLower.includes('pound') ? 'GBP'
             : 'USD';
     // django-mojo stores money as integer MINOR units so it never touches a
-    // float; a fractional value is therefore already in major units. Pass an
-    // explicit `format` when a record breaks that convention.
+    // float; a fractional value is therefore already in major units. Wire
+    // decimals arrive as STRINGS ('4.75' — the DecimalField shape), so
+    // coerce before classifying or they'd fall through to cents and render
+    // 100x small. Pass an explicit `format` when a record breaks the
+    // convention (a whole-dollar decimal string like '12.00' parses to an
+    // integer and stays ambiguous — no heuristic can save it).
     const n = asFmt(value);
-    const unit = typeof n === 'number' && !Number.isInteger(n) ? 'major' : 'cents';
+    const num = typeof n === 'string' ? Number(n.trim()) : n;
+    const unit = typeof num === 'number' && Number.isFinite(num) && !Number.isInteger(num) ? 'major' : 'cents';
     return fmt.currency(n, code, { unit, fallback: ctx.emptyValueText });
 }
 

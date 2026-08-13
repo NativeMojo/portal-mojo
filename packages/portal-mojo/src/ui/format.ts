@@ -155,7 +155,10 @@ export interface CurrencyOptions {
      * `'cents'` (default) matches BOTH the source formatter and django-mojo's
      * integer-minor-unit storage (`cents_to_currency` in serializers) — money
      * crosses the wire as whole cents so it never touches a float. Assumes a
-     * 100-minor-unit currency; pass `'major'` for JPY-style zero-decimal ones.
+     * 100-minor-unit currency; pass `'major'` for JPY-style zero-decimal ones
+     * or for values already converted to dollars. Troubleshooting: amounts
+     * rendering 100× small mean you passed dollars; 100× large means you
+     * passed cents with `unit: 'major'`.
      */
     unit?: 'cents' | 'major';
     /** Force fraction digits; omit to use the currency's own convention. */
@@ -164,7 +167,10 @@ export interface CurrencyOptions {
 }
 
 /**
- * `currency(129900)` → `$1,299.00`; `currency(129900, 'EUR')` → `€1,299.00`.
+ * `value` is integer CENTS by default — `currency(129900)` → `$1,299.00`.
+ * Passing pre-converted dollars renders 100× small (`currency(10)` → `$0.10`);
+ * pass `{unit: 'major'}` for major-unit values. ALL django-mojo money crosses
+ * the wire as integer minor units — format at the edge, never pre-convert.
  * Deviation: the source's second arg was a literal SYMBOL, so its own callers
  * passing `currency("EUR")` rendered `EUR1,299.00`. This takes an ISO code and
  * lets Intl pick the symbol; an unknown code warns once and falls back to USD.

@@ -58,6 +58,13 @@ daterange triple — `/api/metrics/fetch` ignores it silently. web-mojo sent
 />
 ```
 
+> **Money in charts:** metric values reach `valueFormatter` (and the KPITile
+> `formatter`) as plain numbers with no unit semantics. If a series carries
+> money, keep it in integer minor units end-to-end and write
+> `(n) => fmt.currency(n)` — never pre-convert to dollars (renders 100×
+> small). Avg/Median stats and "nice" Y-ticks pass DERIVED, possibly
+> fractional cents; `fmt.currency` rounds them for display.
+
 Legend entries toggle series; hover shows the crosshair index tooltip;
 ticks are "nice"-rounded; container width is measured (no viewBox
 smearing).

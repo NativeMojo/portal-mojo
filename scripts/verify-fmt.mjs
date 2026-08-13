@@ -75,13 +75,32 @@ try {
     const siteWarns = degrade.seen.filter((m) => m.includes('non-renderable object'));
     assert.equal(siteWarns.length, 3, 'one warn per distinct site, repeats collapse');
 
+    // ── fmt.currency: the cents default is the contract (#1605) ──
+    assert.equal(fmt.currency(129900), '$1,299.00');
+    assert.equal(fmt.currency('129900'), '$1,299.00', 'string cents coerce');
+    assert.equal(fmt.currency(129900, 'EUR'), '€1,299.00');
+    assert.equal(fmt.currency(1050), '$10.50', 'ten-fifty as cents');
+    assert.equal(fmt.currency(10.5, 'USD', { unit: 'major' }), '$10.50', 'ten-fifty as explicit major');
+    assert.equal(fmt.currency(1299, 'JPY', { unit: 'major' }), '¥1,299', 'zero-decimal currency, own convention');
+    assert.equal(fmt.currency(0), '$0.00');
+    assert.equal(fmt.currency(-4999), '-$49.99');
+    assert.equal(fmt.currency(null), '—');
+    assert.equal(fmt.currency(null, 'USD', { fallback: '' }), '', 'explicit fallback honored');
+    assert.equal(fmt.currency(129900, 'USD', { decimals: 0 }), '$1,299', 'decimals clamp');
+    // A MALFORMED code (Intl RangeError) warns ONCE and falls back to USD.
+    // (Well-formed unknown codes like 'ZZZ' render verbatim by Intl design.)
+    // First touch of this message string in the run — warn-once.ts has no reset.
+    const badCode = warnings(() => [fmt.currency(129900, 'not a code'), fmt.currency(129900, 'not a code')]);
+    assert.deepEqual(badCode.result, ['$1,299.00', '$1,299.00']);
+    assert.equal(badCode.seen.filter((m) => m.includes('unknown currency code')).length, 1, 'bad code warns once, falls back to USD');
+
     // ── RenderGuard: boundary shape (behavior is the browser pass's job) ──
     assert.equal(typeof safe.RenderGuard, 'function');
     assert.ok(safe.RenderGuard.prototype instanceof React.Component, 'boundaries must be class components');
     assert.deepEqual(safe.RenderGuard.getDerivedStateFromError(new Error('x')), { failed: true });
     assert.equal(typeof safe.RenderGuard.prototype.componentDidCatch, 'function');
 
-    console.log('verify:fmt OK — fmt.code table, safeNode passthrough/degrade, RenderGuard shape');
+    console.log('verify:fmt OK — fmt.code table, fmt.currency units, safeNode passthrough/degrade, RenderGuard shape');
 } finally {
     await server.close();
 }

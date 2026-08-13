@@ -76,12 +76,13 @@ function numberCards(): FmtCard[] {
         },
         {
             sig: "fmt.currency(v, code='USD', opts?)",
-            note: 'Input is CENTS by default — django-mojo stores money as integer minor units so it never touches a float. Arg 2 is an ISO code, not a symbol.',
+            note: 'Input is CENTS by default — pre-converted dollars render 100× small (currency(10) → $0.10). Keep minor units to the edge; pass {unit:\'major\'} for dollar values. Arg 2 is an ISO code, not a symbol.',
             samples: [
                 { call: 'currency(129900)', out: fmt.currency(129900) },
-                { call: 'currency(0)', out: fmt.currency(0) },
+                { call: "currency('129900')", out: fmt.currency('129900') },
                 { call: 'currency(-4999)', out: fmt.currency(-4999) },
                 { call: "currency(129900, 'EUR')", out: fmt.currency(129900, 'EUR') },
+                { call: "currency(10.5, 'USD', {unit:'major'})", out: fmt.currency(10.5, 'USD', { unit: 'major' }) },
                 { call: "currency(1299, 'JPY', {unit:'major'})", out: fmt.currency(1299, 'JPY', { unit: 'major' }) },
                 { call: 'currency(null)', out: fmt.currency(null) },
             ],
