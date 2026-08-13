@@ -34,6 +34,18 @@ unless `defaults.sort`), `page` (1-based), `size`.
 Every write goes through the URL (`replace`), so table state deep-links and
 survives reloads by construction.
 
+## `excludeKeys` — the fixedParams scrub
+
+`useTableParams(defaults, defaultFilters, excludeKeys?)`: keys in the set
+never become filter state — dropped from the URL-derived filters memo, the
+`defaultFilters` seed, and `applySaved`'s persisted filters. ModelTable
+passes its `fixedParams` keys here so locked scope cannot re-enter as a
+removable pill via a bookmark or a stale persisted view. This does not
+bend the store's rule: the store remains the single source of truth for
+table STATE (what the user did); `fixedParams` is table IDENTITY (what
+the table is) and deliberately lives outside it, merged onto the wire
+after normalization. Pass a render-stable Set — it is a memo dependency.
+
 ## `registerNonFilterParams(...keys)` — params the PAGE owns
 
 Everything in the query string that isn't `search/sort/page/size` is treated

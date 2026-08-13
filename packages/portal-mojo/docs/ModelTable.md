@@ -57,6 +57,38 @@ error]` marker instead of white-screening. `rowExpand` and
 `fmt.code()` (see grouping-and-fmt.md) so the cell shows the code instead
 of a marker.
 
+## fixedParams — locked scope
+
+`fixedParams?: Params | null` is table IDENTITY, not table state: tenant /
+group / graph scope merged into every wire request (list, export, exporter
+callback) AFTER filter state and model normalization. It never renders a
+pill, survives Clear all, is excluded from view persistence and the URL —
+a bookmarked `?group=9` or a persisted view saved before the page was
+scope-migrated is silently dropped rather than resurrected as a removable
+filter.
+
+- **Scope belongs in `fixedParams`; user-editable filter DEFAULTS belong
+  in `defaultParams`.** A tenant key in `defaultParams` is one click from
+  an un-scoped table — the bug class this prop closes. Passing the same
+  key in both warns once (the `defaultParams` copy is dead).
+- **The merge runs after `normalizeListParams`** — positive-projection
+  normalizers would otherwise silently strip an un-allowlisted scope key
+  and the request would go out unscoped. Consequence: `fixedParams.graph`
+  overrides a normalizer-pinned graph (that's the documented
+  `graph: 'full'` use).
+- **`null` means "scope pending"**: the table renders its skeleton and
+  fetches nothing until scope resolves — an async-scoped table must never
+  fire (and cache) an unscoped first request. `undefined` means the table
+  is unscoped by design and fetches normally.
+- **Reserved keys can't be locked** (`start`/`size`/`page`/`sort`/
+  `search`) — they'd fight the pager/sort/search UI; ignored with one
+  console.warn.
+- **A scope flip is a filter change to the user**: changing `fixedParams`
+  resets to page 1 and clears row selection (a batch action must never
+  fire against ids selected under the previous scope).
+- **Presets must not carry fixed keys** — their writes are scrubbed from
+  filter state, so such a preset never matches as active.
+
 ## Filters (see also forms.md dialog types)
 
 `FilterDef` types: `text` (`__icontains`), `select`, `multiselect`

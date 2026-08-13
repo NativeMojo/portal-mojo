@@ -77,3 +77,25 @@ export function TableDemo() {
         />
     );
 }
+
+/**
+ * fixedParams — locked scope (board #1634). The `kind: 'team'` scope is
+ * table IDENTITY: no pill, Clear all keeps it, a bookmarked `?kind=org`
+ * is scrubbed, and every wire request (incl. export) carries it. Scope in
+ * `defaultParams` instead would render a removable pill — one click from
+ * an un-scoped tenant table, which is the security gap the prop closes.
+ */
+export function ScopedTableDemo() {
+    return (
+        <ModelTable<GroupRow>
+            model={GroupModel}
+            title="Teams only"
+            eyebrow="Playground · fixedParams"
+            fixedParams={{ kind: 'team' }}
+            searchPlaceholder="Search teams…"
+            defaultSort="name"
+            columns={COLUMNS.filter((c) => c.key !== 'kind')}
+            filters={FILTERS.filter((f) => f.key !== 'kind')}
+        />
+    );
+}

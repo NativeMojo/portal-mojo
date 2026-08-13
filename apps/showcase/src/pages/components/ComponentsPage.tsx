@@ -32,6 +32,7 @@ function lazyDemo<TModule, TKey extends keyof TModule>(load: () => Promise<TModu
 }
 
 const TableDemo = lazyDemo(() => import('./demos-data'), 'TableDemo');
+const ScopedTableDemo = lazyDemo(() => import('./demos-data'), 'ScopedTableDemo');
 const FiltersDemo = lazyDemo(() => import('./demos-filters'), 'FiltersDemo');
 const SearchDemo = lazyDemo(() => import('./demos-search'), 'SearchDemo');
 const ChartsDemo = lazyDemo(() => import('./demos-charts'), 'ChartsDemo');
@@ -123,6 +124,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'table', title: 'ModelTable', icon: 'bi-table',
                 blurb: 'Server-driven table: every sort, filter, search and page is a wire param. Chooser, persistState, expand, groupBy, export.',
                 render: () => <TableDemo />,
+            },
+            {
+                key: 'scoped-table', title: 'Scoped table', icon: 'bi-lock',
+                blurb: 'fixedParams — locked scope: tenant/group keys merged into every request after normalization. No pill, Clear all keeps it, bookmarks cannot un-scope it. Scope in defaultParams would be one removable pill from an un-scoped table.',
+                render: () => <ScopedTableDemo />,
             },
             {
                 key: 'filters', title: 'Filters', icon: 'bi-funnel',
