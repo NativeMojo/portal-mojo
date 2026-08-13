@@ -9,7 +9,7 @@ import {
 import { NavLink, useLocation } from 'react-router-dom';
 import { useMe } from '../client/me';
 import { GroupContext } from '../client/group-context';
-import {
+import { flattenMenuItems,
     itemContainsRoute, itemVisible, menusVersion, resolveActiveMenu,
     routesMatch, subscribeMenus, visibleMenuChildren,
     type MenuConfig, type MenuContext, type MenuItem,
@@ -83,6 +83,32 @@ function filterTree(item: MenuItem, query: string): MenuItem | null {
     return item.children ? { ...item, children: selfMatch ? item.children : children } : item;
 }
 
+/**
+ * Search keeps a divider when ANY item of its run survived the filter, so
+ * flat-section results keep their group headings (filterTree itself drops
+ * every divider). Pending-divider idiom: hold the last divider seen, flush
+ * it the first time a surviving row follows.
+ */
+function retainRunDividers(original: MenuItem[], filtered: (MenuItem | null)[]): MenuItem[] {
+    const out: MenuItem[] = [];
+    let pending: MenuItem | null = null;
+    original.forEach((item, i) => {
+        if (item.divider) {
+            pending = item;
+            return;
+        }
+        const kept = filtered[i];
+        if (kept) {
+            if (pending) {
+                out.push(pending);
+                pending = null;
+            }
+            out.push(kept);
+        }
+    });
+    return out;
+}
+
 function countDestinations(items: MenuItem[]): number {
     return items.reduce((total, item) => total
         + (item.route ? 1 : 0)
@@ -90,7 +116,7 @@ function countDestinations(items: MenuItem[]): number {
 }
 
 function treeOwnsRoute(item: MenuItem, pathname: string): boolean {
-    if (item.route && routesMatch(item.route, pathname)) return true;
+    if (item.route && routesMatch(item.route, pathname, item.exact)) return true;
     return (item.children ?? []).some((child) => treeOwnsRoute(child, pathname));
 }
 
@@ -103,7 +129,7 @@ function NavRow({
     collapsed?: boolean;
 }) {
     if (!item.route) return null;
-    const active = routesMatch(item.route, pathname);
+    const active = routesMatch(item.route, pathname, item.exact);
     const label = item.label ?? item.route;
     return (
         <NavLink
@@ -256,7 +282,9 @@ export function SidebarNav({ collapsed = false, onRequestExpand }: SidebarNavPro
     const [query, setQuery] = useState('');
 
     const items = useMemo(
-        () => menu ? visibleRootItems(menu.items, ctx) : [],
+        // Flat sections hoist before the visibility pass (presentation only —
+        // resolution walks the original tree; see flattenMenuItems).
+        () => menu ? visibleRootItems(flattenMenuItems(menu.items, ctx), ctx) : [],
         [menu, ctx.me, ctx.member, ctx.group],
     );
     const activeKey = useMemo(() => {
@@ -270,7 +298,7 @@ export function SidebarNav({ collapsed = false, onRequestExpand }: SidebarNavPro
 
     const normalizedQuery = query.trim().toLocaleLowerCase();
     const filteredItems = useMemo(() => normalizedQuery
-        ? items.map((item) => filterTree(item, normalizedQuery)).filter((item): item is MenuItem => item != null)
+        ? retainRunDividers(items, items.map((item) => filterTree(item, normalizedQuery)))
         : items, [items, normalizedQuery]);
     const resultCount = countDestinations(filteredItems);
 

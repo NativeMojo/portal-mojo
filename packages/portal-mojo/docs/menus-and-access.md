@@ -72,6 +72,49 @@ The infrastructure entry installs the optional managed-DNS adapter
 synchronously, which makes Email-first navigation safe even before any DNS page
 chunk has loaded. `admin/core` performs neither DNS nor field registration.
 
+### Flat sections (`presentation: 'flat'`)
+
+A section whose children should render as FLAT top-level sidebar rows under
+labeled group dividers — no accordion (the persona-lens shape: a Settings
+lens whose sidebar reads Brand / Access / Activity as divider groups):
+
+```ts
+{
+    id: 'settings', label: 'Settings', icon: 'bi-gear', route: '/settings',
+    presentation: 'flat', group: 'Brand',       // labels the hoisted home row
+    children: [
+        { label: 'Brand profile', route: '/settings/brand', group: 'Brand' },
+        { label: 'Members', route: '/settings/members', group: 'Access' },
+        // a nested child stays an accordion among the flat rows
+        { label: 'Reports', group: 'Access', children: [/* … */] },
+    ],
+}
+```
+
+`SidebarNav` applies the exported pure `flattenMenuItems(items, ctx)`
+automatically; flag-less menus pass through by identity. Semantics:
+
+- **Divider on group CHANGE** (run semantics) — a repeated non-consecutive
+  label is two runs. A registry divider immediately followed by the first
+  group divider collapses (later wins).
+- **The section's `route` hoists first** as its home row, `exact`-matched so
+  it never prefix-lights over deep routes. The label stays the section's own
+  (no auto-"Overview" — name it what you mean).
+- **Nested children hoist as accordions** and RESET the run, so the next
+  flat row re-emits its divider.
+- **Icons fall back to the section's**; a child's `group` label joins its
+  search `keywords`.
+- **Gates compose section ∧ child** — a child's own `permissions` never
+  bypass the section gate (stricter than the wmx source, deliberately: it
+  matches the admin nav's clause idiom). An invisible flat parent drops its
+  whole section.
+- **Flat is presentation only.** Route resolution (`resolveActiveMenu`)
+  walks the original tree, so active-menu selection cannot disagree with
+  what renders. Rail density is an authoring concern — nest a long group.
+
+The personas layer's `sectionMenuEntries` still pre-flattens its own menus;
+converging it onto flat sections is a named follow-up.
+
 ## Permissions (A2) — client gates, server authority
 
 `Me.permissions` is a dict; truthy `true` OR `1` grants. Semantics

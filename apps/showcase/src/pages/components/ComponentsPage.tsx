@@ -34,6 +34,7 @@ function lazyDemo<TModule, TKey extends keyof TModule>(load: () => Promise<TModu
 const TableDemo = lazyDemo(() => import('./demos-data'), 'TableDemo');
 const ScopedTableDemo = lazyDemo(() => import('./demos-data'), 'ScopedTableDemo');
 const RouteErrorDemo = lazyDemo(() => import('./demos-route-error'), 'RouteErrorDemo');
+const MenusDemo = lazyDemo(() => import('./demos-menus'), 'MenusDemo');
 const FiltersDemo = lazyDemo(() => import('./demos-filters'), 'FiltersDemo');
 const SearchDemo = lazyDemo(() => import('./demos-search'), 'SearchDemo');
 const ChartsDemo = lazyDemo(() => import('./demos-charts'), 'ChartsDemo');
@@ -515,6 +516,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'access', title: 'Permissions', icon: 'bi-shield-lock',
                 blurb: 'useCan / <Guarded> against the live session — category rollup, member context, fail-closed.',
                 render: () => <AccessDemo />,
+            },
+            {
+                key: 'menus', title: 'Flat menus', icon: 'bi-list-nested',
+                blurb: "presentation: 'flat' — one section's children hoisted to top-level sidebar rows under labeled group dividers (run semantics, exact home row, nested accordions reset the run). SidebarNav applies flattenMenuItems automatically.",
+                render: () => <MenusDemo />,
             },
             {
                 key: 'personas', title: 'Personas', icon: 'bi-person-badge',

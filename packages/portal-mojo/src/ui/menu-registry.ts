@@ -43,6 +43,20 @@ export interface MenuItem {
     /** Only visible when the active group's kind matches. */
     requiresGroupKind?: string | string[];
     badge?: { text: string; tone?: 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'primary' };
+    /**
+     * On a parent with children: `'flat'` hoists the children to top level
+     * as divider-grouped rows (each child's `group` labels its divider; a
+     * child without one falls to the parent's label). The parent's own
+     * `route`, when present, hoists first as an exact-matched home row.
+     * Flattening is presentation-only (`flattenMenuItems`, applied by
+     * SidebarNav) — route resolution walks the original tree.
+     */
+    presentation?: 'flat';
+    /** Divider label this item sorts under when its section is flat. */
+    group?: string;
+    /** End-match this item's route (no prefix lighting). Stamped on hoisted
+     *  flat home rows so they don't steal `activeKey` from deep routes. */
+    exact?: boolean;
 }
 
 export interface MenuConfig {
@@ -129,9 +143,9 @@ export function groupKindMatches(menuKind: MenuConfig['groupKind'], kind: string
     return menuKind === kind;
 }
 
-/** Route match: exact for '/', prefix (param-aware) otherwise. */
-export function routesMatch(itemRoute: string, pathname: string): boolean {
-    return matchPath({ path: itemRoute, end: itemRoute === '/' }, pathname) != null;
+/** Route match: exact for '/' and `exact` items, prefix (param-aware) otherwise. */
+export function routesMatch(itemRoute: string, pathname: string, exact = false): boolean {
+    return matchPath({ path: itemRoute, end: exact || itemRoute === '/' }, pathname) != null;
 }
 
 /** Permission + group-kind visibility for one item (dividers always show). */
@@ -153,7 +167,7 @@ export function visibleMenuChildren(item: MenuItem, ctx: MenuContext): MenuItem[
 /** Does this item's visible subtree own the current route? */
 export function itemContainsRoute(item: MenuItem, pathname: string, ctx: MenuContext): boolean {
     if (!itemVisible(item, ctx)) return false;
-    if (item.route && routesMatch(item.route, pathname)) return true;
+    if (item.route && routesMatch(item.route, pathname, item.exact)) return true;
     return visibleMenuChildren(item, ctx).some((child) => itemContainsRoute(child, pathname, ctx));
 }
 
@@ -247,4 +261,72 @@ export function resetMenus(): void {
     menus.clear();
     defaultMenuName = null;
     bump();
+}
+
+// ── Flat sections (board #1606) ───────────────────────────────────────
+// wmx-admin-v2's persona lenses needed one section's children rendered as
+// FLAT top-level rows under labeled dividers (no accordion); it built the
+// hoisting app-side, and the personas layer re-implemented it again. The
+// registry owns the shape once now. Semantics ported from wmx menus.ts
+// flatSectionItems: divider on group CHANGE (run semantics — a repeated
+// non-consecutive label is two runs), nested children hoist as-is (one
+// accordion among flat rows) and RESET the run, icons fall back to the
+// parent's, and a final static pass drops a divider immediately followed
+// by another (keep the later). Divergences from wmx, both deliberate:
+// gates compose section AND child (a child's own permissions never bypass
+// the section gate), and the hoisted home row keeps the parent's label
+// (no auto-"Overview").
+
+/**
+ * Presentation-only flatten applied by SidebarNav before rendering. Items
+ * without `presentation: 'flat'` pass through unchanged — the grouped
+ * admin nav and the personas layer's pre-flattened menus are untouched.
+ * Route RESOLUTION always walks the original tree, so active-menu
+ * selection can never disagree with what is rendered.
+ */
+export function flattenMenuItems(items: MenuItem[], ctx: MenuContext): MenuItem[] {
+    if (!items.some((item) => item.presentation === 'flat')) return items;
+    const out: MenuItem[] = [];
+    for (const item of items) {
+        if (item.presentation !== 'flat' || !item.children?.length) {
+            out.push(item);
+            continue;
+        }
+        // Section gate: an invisible flat parent drops WHOLE — the same
+        // section AND route composition itemContainsRoute applies.
+        if (!itemVisible(item, ctx)) continue;
+        const parentId = item.id ?? item.label ?? 'flat';
+        let run: string | null = null;
+        let dividerSeq = 0;
+        const emit = (group: string) => {
+            if (run === group) return;
+            run = group;
+            out.push({ id: `${parentId}:grp:${group}:${dividerSeq++}`, divider: group });
+        };
+        if (item.route) {
+            emit(item.group ?? item.children[0]?.group ?? item.label ?? '');
+            const { children: _c, presentation: _p, ...home } = item;
+            out.push({ ...home, exact: true });
+        }
+        for (const child of item.children) {
+            if (child.divider) continue; // flat sections group via `group`, not inline dividers
+            if (child.children?.length) {
+                // Nested group: hoist as ONE accordion among the flat rows,
+                // and reset the run so the next flat row re-emits its divider.
+                out.push({ ...child, icon: child.icon ?? item.icon });
+                run = null;
+                continue;
+            }
+            emit(child.group ?? item.label ?? '');
+            out.push({
+                ...child,
+                icon: child.icon ?? item.icon,
+                keywords: child.group ? [...(child.keywords ?? []), child.group] : child.keywords,
+            });
+        }
+    }
+    // Static hygiene: a divider immediately followed by another divider is
+    // dead — keep the later. SidebarNav's visibleRootItems remains the
+    // authoritative visibility-aware collapse at render time.
+    return out.filter((item, i) => !(item.divider && out[i + 1]?.divider));
 }
