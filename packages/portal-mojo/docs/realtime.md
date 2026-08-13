@@ -33,6 +33,46 @@ disable this shared provider.
   capability-bearing protocols on their exact wire source. Malformed frames
   drop. No generic Query invalidation is performed.
 
+## Error frames
+
+A top-level `{type:'error'}` frame is attributed in order:
+
+1. **During authentication** — auth failure: the client closes and suspends
+   until the token value changes. Surfaces through the lifecycle status only;
+   no `error` event is dispatched.
+2. **While a subscribe/unsubscribe is pending** — that operation's denial
+   (acknowledgements are uncorrelated, so denial is a generic `error`); the
+   topic reports `denied`. Surfaces through the topic status only; no `error`
+   event is dispatched.
+3. **Otherwise** — a backend answer to an application frame (chat rate limit,
+   room rules, moderation block). Dispatched as an observable `error` event
+   with `source: 'direct'`.
+
+Application error frames carry the message in `error` and may carry a
+`reasons` array: `{type:'error', error:'Rate limit exceeded'}`,
+`{type:'error', error:'Message blocked by moderation', reasons:[...]}`.
+
+Known ambiguity, inherent to the uncorrelated wire: an application error
+landing while a subscribe/unsubscribe is pending is still read as that
+operation's denial.
+
+Consumer pattern — a chat composer listens for `error` alongside its ack event
+and surfaces the backend's message instead of guessing from a timeout:
+
+```tsx
+const chatError = defineRealtimeEvent('error', (value) => {
+  const frame = value as {error?: unknown; reasons?: unknown};
+  return typeof frame?.error === 'string'
+    ? {error: frame.error, reasons: Array.isArray(frame.reasons) ? frame.reasons : undefined}
+    : null;
+});
+
+useRealtimeEvent(chatError, ({data}) => showSendFailure(data.error, data.reasons));
+```
+
+The may-not-have-sent timeout heuristic remains the right fallback for the
+no-frame-at-all case — a socket drop mid-send produces no error frame at all.
+
 The transport does not invent application events. Current django-mojo has no
 canonical record-created/updated/deleted stream and no canonical presence
 stream, so neither record cache invalidation nor online status can be derived

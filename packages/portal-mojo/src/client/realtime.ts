@@ -305,6 +305,19 @@ export class RealtimeClient {
                 this.suspend('auth-failed', 4003, 'Authentication failed');
             } else if (this.topicOperation) {
                 this.denyCurrentTopic();
+            } else {
+                // Not attributable to an in-flight framework op — this is a
+                // backend answer to an APPLICATION frame (chat rate-limit,
+                // room rules, moderation block: {type:'error', error,
+                // reasons?}). These were silently dropped before #1905, which
+                // forced consumers into may-not-have-sent timeout heuristics.
+                // Dispatch as a direct 'error' event; auth/topic attribution
+                // above stays internal (those already surface through the
+                // lifecycle and topic-denial paths — dispatching them too
+                // would double-report). Known ambiguity, unchanged from the
+                // old behavior: an application error landing DURING a pending
+                // subscribe/unsubscribe is still read as that op's denial.
+                this.dispatch('error', frame, 'direct');
             }
             return;
         }

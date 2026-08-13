@@ -120,6 +120,44 @@ try {
     strictMock.open(2); strictMock.authRequired(2);
     assert.equal(strictClient.getStatus().status, 'ready', 'StrictMode remount owns exactly the replacement socket');
 
+    const attributionMock = createRealtimeMock({ autoOpen: false });
+    const attribution = new RealtimeClient({ socketFactory: attributionMock.factory, clock: new FakeClock() });
+    const observedErrors = [];
+    const errorEvent = defineRealtimeEvent('error', (value) => value != null && typeof value === 'object' ? value : null);
+    attribution.on(errorEvent, (received) => observedErrors.push(received));
+    attribution.connect('token'); attributionMock.open(1); attributionMock.authRequired(1);
+    assert.equal(attribution.getStatus().status, 'ready');
+    attributionMock.direct({ type: 'error', error: 'Rate limit exceeded' }, 1);
+    assert.equal(observedErrors.length, 1, 'idle-state error frame must dispatch as an observable event');
+    assert.equal(observedErrors[0].source, 'direct');
+    assert.equal(observedErrors[0].data.error, 'Rate limit exceeded');
+
+    attributionMock.deniedTopics.add('locked');
+    attribution.retainTopic('locked');
+    assert.equal(attribution.topicStatus('locked'), 'denied', 'error during a pending subscribe still resolves as that op denial');
+    assert.equal(observedErrors.length, 1, 'topic-denial error must not double-report through the error event');
+
+    attribution.retainTopic('chat');
+    assert.equal(attribution.topicStatus('chat'), 'subscribed');
+    attributionMock.direct({ type: 'error', error: 'Message blocked by moderation', reasons: ['profanity'] }, 1);
+    assert.equal(observedErrors.length, 2, 'the attribution window closes when the pending op completes');
+    assert.deepEqual(observedErrors[1].data, { type: 'error', error: 'Message blocked by moderation', reasons: ['profanity'] });
+
+    const authErrorMock = createRealtimeMock({ autoOpen: false, authMode: 'fail-open' });
+    const authErrorClient = new RealtimeClient({ socketFactory: authErrorMock.factory, clock: new FakeClock() });
+    const authErrors = [];
+    authErrorClient.on(errorEvent, (received) => authErrors.push(received));
+    authErrorClient.connect('bad-token'); authErrorMock.open(1); authErrorMock.authRequired(1);
+    assert.equal(authErrorClient.getStatus().status, 'auth-failed', 'auth-failure error still suspends');
+    assert.equal(authErrors.length, 0, 'auth-failure error must not dispatch through the error event');
+
+    const errorBranch = source.slice(source.indexOf("if (frame.type === 'error')"), source.indexOf("if (frame.type === 'message')"));
+    const attributionArms = errorBranch.slice(0, errorBranch.indexOf('} else {'));
+    assert(attributionArms.includes('suspend') && attributionArms.includes('denyCurrentTopic'), 'auth and topic attribution arms precede the dispatch arm');
+    assert.equal((attributionArms.match(/this\.dispatch\(/g) ?? []).length, 0, 'auth/topic attribution arms contain no dispatch call');
+    assert.equal((errorBranch.match(/this\.dispatch\(/g) ?? []).length, 1, 'the error branch dispatches exactly once, in the else arm');
+    assert.match(errorBranch, /this\.dispatch\('error', frame, 'direct'\)/);
+
     const multi = createRealtimeMock({ autoOpen: false });
     const multiOne = new RealtimeClient({ socketFactory: multi.factory, clock: new FakeClock() });
     const multiTwo = new RealtimeClient({ socketFactory: multi.factory, clock: new FakeClock() });
