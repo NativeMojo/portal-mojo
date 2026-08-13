@@ -69,6 +69,7 @@ the type checker and was the source's silent-failure vector) and the
 | `fmt.truncateFront(v, length=8, prefix='...', fallback='—')` | keeps only the TAIL: `...2eZvKY` |
 | `fmt.mask(v, char='*', showLast=4, fallback='—')` | all-but-last-4: `************1111`. Values no longer than `showLast` return intact. *Fixes a source bug:* `showLast:0` masked the string and re-appended it whole (`slice(-0)` is `slice(0)`) |
 | `fmt.slug(v, separator='-')` | **fallback is `''`**, not `—` (a slug of nothing is nothing). *Deviations:* accents fold to ASCII (`Café` → `cafe`, matching django-mojo's `strip_accents`) instead of being dropped (`caf`); the separator is regex-escaped — the source interpolated it raw, so `slug(v,'.')` misbehaved and `slug(v,'')` threw on an empty quantifier |
+| `fmt.code(v, fallback='')` | **FK-safe display for coded wire fields.** django-mojo graphs expand FK fields per-graph — the same field is `"GC"` on one graph, `{id, code, name, …}` on another, and the bare pk when the graph omits it. `code()` renders every shape: string → itself, expanded row → `.code` ?? `.name`, pk number → `"3"`. **Fallback is `''`** (like `slug`) so it composes into template strings; cells that want `—` pass it explicitly. An object with no usable code/name warns once and returns the fallback. *Deviation from the wmx-admin-v2 `codeOf` source:* a pk number renders as its digits, not `''` — an unexpanded FK is data |
 | `fmt.phone(v, fallback='—')` | **DISPLAY ONLY.** E.164 (`+15555550142`) stays the wire shape — django-mojo REJECTS pretty formats on save, so never round-trip this into a field. US 10/11-digit → `(555) 555-0142` / `+1 (555) 555-0142`; anything else (a real international number) is returned trimmed and unchanged. *Deviation:* the source stripped the leading `+`, turning valid E.164 into digit soup. No `<a href="tel:">` — links are components |
 
 ### Duration + booleans
@@ -84,6 +85,21 @@ the type checker and was the source's silent-failure vector) and the
 |---|---|
 | `fmt.initials(name)` | 1–2 letters; null-safe (`'?'` for empty — live rows carry `display_name: null`) |
 | `fmt.inferTone(value)` | status text → Badge tone ('active'→success, 'banned'→danger, booleans, …) |
+
+### FK fields change shape per graph — render them through `fmt.code`
+
+A raw object rendered as a React child crashes the page (`Objects are not
+valid as a React child`), and django-mojo makes that a live hazard: the
+backend controls graph definitions, so a field your column renders as a
+string can start arriving as an expanded row object without any frontend
+change. wmx-admin-v2 white-screened a production table exactly this way.
+Any FK-ish field (`currency`, `group`, `owner`, …) rendered in JSX goes
+through `fmt.code(value)` — or a `render` callback that handles both
+shapes. The shared primitives (ModelTable cells, DetailView sections and
+badges, the card formatter hooks) degrade to a readable value plus one
+`console.warn` instead of crashing (see `safeNode`/`RenderGuard` in the
+ModelTable doc), but app-composed JSX outside those paths is on its own —
+use the formatter.
 
 Formatters NEVER throw on bad input — they degrade (rule: a formatter is
 the last thing allowed to take down a row). Every one is null/undefined-safe,

@@ -65,6 +65,14 @@ message.
 
 ## Pitfalls
 
+**FK fields are graph-shaped.** The backend controls graph definitions, so
+an FK field your UI reads as a scalar (`row.currency === "GC"`) can start
+arriving expanded (`{id, code, name, …}`) — or as the bare pk — when a
+graph changes. Render such fields through `fmt.code(value)` or a `render`
+callback that handles all three shapes; never hand the raw field to JSX.
+The shared primitives degrade instead of crashing (`safeNode`/`RenderGuard`),
+but app JSX outside them is unguarded.
+
 - Don't build a second store around these hooks — pages read query state.
 - The action-name union isn't typed; an undeclared name throws in dev the
   first time the hook renders (fail loud, not a 404 later).

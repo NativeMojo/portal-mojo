@@ -45,6 +45,18 @@ drives the sort param. `render` is the ONE cell prop (no formatter/template
 aliases). `hideable: false` locks a column in the chooser (identity
 columns).
 
+**Cells never crash the page.** django-mojo graphs expand FK fields
+per-graph, so a cell value can flip from `"GC"` to `{id, code, name, …}`
+without a frontend change. The default (no-`render`) leg degrades an object
+to `fmt.code(value)` or a visible `[object]` marker plus one `console.warn`
+naming the column. A custom `render` runs inside `RenderGuard` — a per-cell
+error boundary — so a callback that throws on the new shape, or returns an
+element with the raw object nested inside, degrades to a dim `[render
+error]` marker instead of white-screening. `rowExpand` and
+`groupHeaderLabel` are guarded the same way. Render FK-ish fields through
+`fmt.code()` (see grouping-and-fmt.md) so the cell shows the code instead
+of a marker.
+
 ## Filters (see also forms.md dialog types)
 
 `FilterDef` types: `text` (`__icontains`), `select`, `multiselect`
