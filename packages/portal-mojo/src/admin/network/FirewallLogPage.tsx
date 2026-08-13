@@ -101,7 +101,9 @@ export function FirewallLogPage() {
                 { key: 'whitelists', label: 'Whitelists', params: { kind: FIREWALL_LOG_KINDS.whitelist } },
                 { key: 'unwhitelists', label: 'Unwhitelists', params: { kind: FIREWALL_LOG_KINDS.unwhitelist } },
             ]}
-            defaultParams={{ kind__startswith: 'firewall:' }}
+            // Locked scope: this page IS the firewall log. As a defaultParams
+            // pill this was one click from "every log row in the system".
+            fixedParams={{ kind__startswith: 'firewall:' }}
             defaultSort="-created"
             columnChooser
             persistState

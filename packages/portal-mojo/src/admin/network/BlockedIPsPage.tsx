@@ -173,12 +173,15 @@ export function BlockedIPsPage() {
                 { key: 'permanent', label: 'Permanent', params: { blocked_until__isnull: 'true' } },
                 { key: 'whitelisted', label: 'Whitelisted', params: { is_whitelisted: 'true' } },
             ]}
-            // `is_blocked` is the projection; `dr_field` names the column a
-            // daterange lands on so a picked window filters the BLOCK, not
-            // last_seen. No window is preset: a Blocked IPs page whose default
-            // view hides every permanent block older than a week answers the
-            // wrong question (the source defaulted to 7d).
-            defaultParams={{ is_blocked: 'true', dr_field: 'blocked_at' }}
+            // `is_blocked` is locked scope — this page IS the blocked list; as
+            // a removable pill it flipped into "every GeoIP row". `dr_field`
+            // stays a USER default: it names the column a daterange lands on
+            // so a picked window filters the BLOCK, not last_seen. No window
+            // is preset: a Blocked IPs page whose default view hides every
+            // permanent block older than a week answers the wrong question
+            // (the source defaulted to 7d).
+            fixedParams={{ is_blocked: 'true' }}
+            defaultParams={{ dr_field: 'blocked_at' }}
             defaultSort="-modified"
             selectable={canManage}
             batchActions={canManage ? batchActions : []}
