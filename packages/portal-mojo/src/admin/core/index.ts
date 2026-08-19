@@ -127,7 +127,16 @@ function guardedElement(section: AdminSection, route: AdminRoute, sections: read
     const routeGuarded = route.permissions
         ? createElement(Guarded, { permission: route.permissions, fallback, children: page })
         : page;
-    return createElement(AdminGlobalScope, { children: createElement(Guarded, {
+    // Keyed per route: every packaged route renders the SAME element tree
+    // (AdminGlobalScope > Guarded > Guarded > AdminLazyPage) at the same
+    // outlet position, so without a key React reconciles route A's tree into
+    // route B's in place instead of remounting. AdminLazyPage then swaps its
+    // lazy() inside a Suspense that already holds committed content, and
+    // React keeps showing the OLD page while the new one suspends — hash
+    // navigation between packaged admin pages silently stopped rendering
+    // (reproduced in both the reference portal and a consumer). The key
+    // forces a fresh mount, and a fresh Suspense, per route.
+    return createElement(AdminGlobalScope, { key: relativePath(mount, section.basePath ?? section.id, route.path), children: createElement(Guarded, {
         permission: section.permissions, fallback, children: routeGuarded,
     }) });
 }
@@ -166,7 +175,7 @@ export function adminSectionRoutes(sections: readonly AdminSection[], opts: { mo
     const rootHasIndex = rootSections.some((section) => section.routes.some((route) => relativePath(route.path) === ''));
     if (mount && rootSections.length > 0 && !rootHasIndex) routes.push({
         path: mount,
-        element: createElement(AdminGlobalScope, { children: createElement(AdminMountLanding, { sections: rootSections, mount }) }),
+        element: createElement(AdminGlobalScope, { key: `landing:${mount}`, children: createElement(AdminMountLanding, { sections: rootSections, mount }) }),
     });
     for (const section of sections) {
         const base = relativePath(section.basePath ?? section.id);
@@ -174,7 +183,7 @@ export function adminSectionRoutes(sections: readonly AdminSection[], opts: { mo
         const hasIndex = section.routes.some((route) => relativePath(route.path) === '');
         if (base && landing && !hasIndex) routes.push({
             path: landing,
-            element: createElement(AdminGlobalScope, { children: createElement(AdminLanding, { section, mount }) }),
+            element: createElement(AdminGlobalScope, { key: `landing:${landing}`, children: createElement(AdminLanding, { section, mount }) }),
         });
         for (const route of section.routes) routes.push({
             path: relativePath(mount, base, route.path),

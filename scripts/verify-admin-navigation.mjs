@@ -70,6 +70,20 @@ try {
     assert(admin.adminSectionRoutes([admin.CLOUDWATCH_ADMIN_SECTION], { mount: '/system' })
         .some((route) => route.path === 'system/cloudwatch'));
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS).some((route) => route.path === ''));
+
+    // Regression: every packaged route element must carry a DISTINCT React
+    // key. All of them render the same tree (AdminGlobalScope > Guarded >
+    // Guarded > AdminLazyPage) at the same outlet position; without a key
+    // React reconciles route A into route B in place, the lazy page swaps
+    // inside a Suspense that already holds committed content, and hash
+    // navigation between admin pages silently keeps showing the old page.
+    const keyedRoutes = admin.adminSectionRoutes(admin.ADMIN_SECTIONS).filter((route) => route.element?.key != null);
+    const elementRoutes = admin.adminSectionRoutes(admin.ADMIN_SECTIONS).filter((route) => route.element != null && route.path !== '');
+    assert(elementRoutes.length > 0, 'expected packaged routes with elements');
+    const keys = elementRoutes.map((route) => route.element.key);
+    assert(keys.every((k) => typeof k === 'string' && k.length > 0), 'every packaged route element must be keyed');
+    assert.equal(new Set(keys).size, keys.length, 'packaged route element keys must be unique');
+    assert(keyedRoutes.length >= elementRoutes.length, 'keyed route count regressed');
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS, { mount: '/system' }).some((route) => route.path === 'system'));
     assert.deepEqual(metricsRoutes.map((route) => route.path), ['metrics/explorer', 'metrics/permissions']);
     assert.deepEqual(metricsRoutes[0].permissions, ['sys.view_metrics', 'sys.metrics']);
