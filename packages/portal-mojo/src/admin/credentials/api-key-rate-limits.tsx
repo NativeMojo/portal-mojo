@@ -1,5 +1,6 @@
 import { useCan, type PermSpec } from '../../client/runtime';
 import { Badge, SchemaForm, modal, toast, type Field, type FormData } from '../../ui';
+import { z } from 'zod';
 import {
     GROUP_CREDENTIAL_PERMS, GroupApiKeyModel,
     buildApiKeyLimitPatch, readApiKeyRateLimits, validateApiKeyRateLimitInput,
@@ -65,15 +66,25 @@ export function ApiKeyLimitsSummary({ limits, maxEntries = 2 }: {
     );
 }
 
+const positiveIntegerSchema = (label: string) => z.any().refine((value) => {
+    if (typeof value === 'boolean') return false;
+    const text = String(value ?? '').trim();
+    if (!text) return false;
+    const parsed = Number(text);
+    return Number.isInteger(parsed) && parsed > 0;
+}, { message: `${label} must be a positive integer.` });
+
 const LIMIT_FIELDS: Field[] = [
     {
-        name: 'limit', type: 'number', label: 'Request limit', required: true,
+        name: 'limit', type: 'text', label: 'Request limit', required: true,
         min: 1, step: 1, columns: 6,
+        schema: positiveIntegerSchema('Request limit'),
         help: 'Positive whole number; there is no fixed maximum.',
     },
     {
-        name: 'window', type: 'number', label: 'Window (minutes)', required: true,
+        name: 'window', type: 'text', label: 'Window (minutes)', required: true,
         min: 1, step: 1, columns: 6,
+        schema: positiveIntegerSchema('Window in minutes'),
         help: 'Positive whole number of minutes.',
     },
 ];
