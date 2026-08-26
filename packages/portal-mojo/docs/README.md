@@ -13,7 +13,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [auth.md](auth.md) | Login flows, token upkeep, hosted-auth (bouncer page) bridge, auth events |
 | [realtime.md](realtime.md) | Auth-challenged WebSocket lifecycle, heartbeat/backoff, refcounted topics, typed event projection, deterministic mock |
 | [auth-pages.md](auth-pages.md) | The in-app auth pages: routes + guard, `VITE_MOJO_AUTH` switch, fresh-auth (440 step-up) modal, MFA panel, password tools |
-| [admin-credentials.md](admin-credentials.md) | Group API keys and webhook subscriptions — dual-mount pages, permission registry, secret-safe create/reveal/rotation |
+| [admin-credentials.md](admin-credentials.md) | Group API keys and webhook subscriptions — dual-mount pages, lossless per-endpoint rate limits, permission registry, secret-safe create/reveal/rotation |
 | [admin-dashboard.md](admin-dashboard.md) | Package-owned global Admin landing, authoritative signals, independent gates, caller-isolated caches, and root fallback |
 | [admin-cloudwatch.md](admin-cloudwatch.md) | Global EC2/RDS/Redis CloudWatch charts, exact resource/fetch wires, constrained controls, refresh ownership, and modal details |
 | [admin-monitoring.md](admin-monitoring.md) | Monitoring Admin registration, logs, and exact Redis-backed metrics-permission mutations |

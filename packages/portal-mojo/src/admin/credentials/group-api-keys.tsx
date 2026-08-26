@@ -14,9 +14,10 @@ import {
     GroupApiKeyModel, fetchApiKeyToken,
     getGroupApiKeyPermissions, grantedPermissions,
     groupApiKeyPermissionsVersion, subscribeGroupApiKeyPermissions,
-    useCreateGroupApiKey,
+    readApiKeyRateLimits, useCreateGroupApiKey,
     type ApiKeyPermissionDef, type CredentialGroup, type GroupApiKeyRow,
 } from './models';
+import { ApiKeyLimitsSummary, ApiKeyRateLimitsEditor } from './api-key-rate-limits';
 import { showSecretDialog } from './secret-dialog';
 
 function groupLabel(group: GroupApiKeyRow['group']): string {
@@ -257,6 +258,7 @@ function ApiKeyCard({ row, actions }: {
                         ? permissions.map((permission) => <Badge key={permission} tone="info">{permission}</Badge>)
                         : <span className="dim-italic">No permissions granted</span>}
                 </div>
+                <ApiKeyLimitsSummary limits={row.limits} />
                 <div className="dim ga-card-meta">
                     Last used <b>{fmt.relative(row.last_used, 'never')}</b> · Created {fmt.date(row.created)}
                     {row.expires_at != null && <> · Expires {fmt.date(row.expires_at)}</>}
@@ -315,12 +317,18 @@ export function GroupApiKeysSection({ group, permission = GROUP_CREDENTIAL_PERMS
     return <GroupApiKeysContent group={group} permission={permission} />;
 }
 
-export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => void }) {
+function AuthorizedGroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const { data: row, isPending, error } = GroupApiKeyModel.useOne(id);
     const actions = useGroupApiKeyActions(GLOBAL_CREDENTIAL_PERMS);
     if (isPending) return <div className="modal-pad dim">Loading API key…</div>;
     if (!row || error) return <div className="modal-pad text-bad">{error?.message ?? 'API key not found'}</div>;
     const permissions = grantedPermissions(row.permissions);
+    const limits = readApiKeyRateLimits(row.limits);
+    const limitsChip = limits.isEmpty
+        ? { text: 'Unlimited (default)', tone: 'muted' as const }
+        : limits.hasUnsafe || !limits.isObject
+            ? { text: 'Limits review required', tone: 'warning' as const }
+            : { text: `${limits.entries.length} rate limit${limits.entries.length === 1 ? '' : 's'}`, tone: 'info' as const };
     return (
         <DetailView
             icon="bi-key"
@@ -329,6 +337,7 @@ export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => 
             chips={[
                 { text: row.is_active ? 'Active' : 'Inactive', tone: row.is_active ? 'success' : 'muted' },
                 { text: `${permissions.length} grants`, tone: 'info' },
+                limitsChip,
             ]}
             sections={[
                 {
@@ -339,22 +348,24 @@ export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => 
                             <FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow>
                             <FlatRow label="Last used">{fmt.relative(row.last_used, 'never')}</FlatRow>
                             <FlatRow label="Expires">{row.expires_at ? fmt.datetime(row.expires_at) : 'Never'}</FlatRow>
-                            <div className="ga-toolbar" style={{ marginTop: 16 }}>
-                                <button className="btn btn-compact" onClick={() => void actions.editKey(row)}>
-                                    <i className="bi bi-pencil" /> Edit
-                                </button>
-                                <button className="btn btn-compact" onClick={() => void actions.revealToken(row)}>
-                                    <i className="bi bi-eye" /> Reveal audited token
-                                </button>
-                                <ArmedButton
-                                    className="btn-compact"
-                                    label="Delete"
-                                    armedLabel="Click again — delete now"
-                                    onConfirm={async () => {
-                                        if (await actions.deleteKey(row)) onClose();
-                                    }}
-                                />
-                            </div>
+                            {actions.canManage && (
+                                <div className="ga-toolbar" style={{ marginTop: 16 }}>
+                                    <button className="btn btn-compact" onClick={() => void actions.editKey(row)}>
+                                        <i className="bi bi-pencil" /> Edit
+                                    </button>
+                                    <button className="btn btn-compact" onClick={() => void actions.revealToken(row)}>
+                                        <i className="bi bi-eye" /> Reveal audited token
+                                    </button>
+                                    <ArmedButton
+                                        className="btn-compact"
+                                        label="Delete"
+                                        armedLabel="Click again — delete now"
+                                        onConfirm={async () => {
+                                            if (await actions.deleteKey(row)) onClose();
+                                        }}
+                                    />
+                                </div>
+                            )}
                         </>
                     ),
                 },
@@ -371,11 +382,22 @@ export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => 
                         </>
                     ),
                 },
+                {
+                    key: 'limits', label: 'Rate Limits', icon: 'bi-speedometer2', render: () => (
+                        <ApiKeyRateLimitsEditor row={row} permission={GLOBAL_CREDENTIAL_PERMS} />
+                    ),
+                },
             ]}
             initialSection="permissions"
             onClose={onClose}
         />
     );
+}
+
+export function GroupApiKeyDetail({ id, onClose }: { id: number; onClose: () => void }) {
+    const { can } = useCan(GLOBAL_CREDENTIAL_PERMS);
+    if (!can) return <div className="modal-pad dim">API key details are unavailable for this account.</div>;
+    return <AuthorizedGroupApiKeyDetail id={id} onClose={onClose} />;
 }
 
 const API_KEY_COLUMNS: Column<GroupApiKeyRow>[] = [
@@ -390,6 +412,7 @@ const API_KEY_COLUMNS: Column<GroupApiKeyRow>[] = [
     { key: 'group', label: 'Group', render: (row) => groupLabel(row.group) },
     { key: 'is_active', label: 'Status', render: (row) => <Badge tone={row.is_active ? 'success' : 'muted'}>{row.is_active ? 'Active' : 'Inactive'}</Badge> },
     { key: 'permissions', label: 'Grants', align: 'center', render: (row) => String(grantedPermissions(row.permissions).length) },
+    { key: 'limits', label: 'Limits', hideable: false, render: (row) => <ApiKeyLimitsSummary limits={row.limits} /> },
     { key: 'last_used', label: 'Last used', sortable: true, render: (row) => fmt.relative(row.last_used, 'never') },
     { key: 'created', label: 'Created', sortable: true, render: (row) => fmt.date(row.created) },
 ];

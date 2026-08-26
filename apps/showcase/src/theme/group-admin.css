@@ -234,3 +234,69 @@
     padding-bottom: 4px;
     border-bottom: 1px solid var(--line-soft);
 }
+
+/* ── API-key rate-limit overrides ───────────────────────────────────── */
+.ga-limit-summary {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-width: 360px;
+    color: var(--ink-strong);
+    font-size: 12px;
+}
+.ga-limit-summary code {
+    padding: 2px 5px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--surface2);
+    color: inherit;
+    white-space: nowrap;
+}
+.ga-limit-summary-empty { color: var(--mute); }
+.ga-limit-summary-configured { color: var(--accent); }
+.ga-limit-summary-review { color: var(--warn); }
+.ga-limit-summary-note { color: var(--mute); }
+.ga-limit-editor { display: grid; gap: 14px; min-width: 0; }
+.ga-limit-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.ga-limit-head h3 { margin: 0; color: var(--ink-strong); font-size: 15px; }
+.ga-limit-head p { margin: 4px 0 0; }
+.ga-limit-empty,
+.ga-limit-review,
+.ga-limit-policy-note {
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface2);
+    font-size: 13px;
+}
+.ga-limit-empty b { display: flex; align-items: center; gap: 7px; color: var(--ink-strong); }
+.ga-limit-empty p,
+.ga-limit-review p { margin: 4px 0 0; }
+.ga-limit-review {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    border-color: var(--warn);
+    background: var(--warn-soft);
+    color: var(--warn);
+}
+.ga-limit-policy-note { color: var(--mute); }
+.ga-limit-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }
+.ga-limit-table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13px; }
+.ga-limit-table th,
+.ga-limit-table td { padding: 9px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+.ga-limit-table th { color: var(--mute); background: var(--surface2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.ga-limit-table tbody tr:last-child td { border-bottom: 0; }
+.ga-limit-table td > code { color: var(--ink-strong); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ga-limit-issue,
+.ga-limit-raw { display: block; max-width: 360px; margin-top: 5px; color: var(--mute); overflow-wrap: anywhere; }
+.ga-limit-raw { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ga-limit-actions { display: inline-flex; gap: 6px; white-space: nowrap; }

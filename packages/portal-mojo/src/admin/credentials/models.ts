@@ -35,6 +35,166 @@ export interface GroupApiKeyRow {
     user: unknown | null;
 }
 
+export interface ApiKeyRateLimitOverride {
+    /** Requests permitted inside `window`. Positive whole number, no fixed maximum. */
+    limit: number;
+    /** Window length in minutes. Positive whole number, no fixed maximum. */
+    window: number;
+}
+
+export type ApiKeyRateLimitEntryKind = 'valid' | 'repairable' | 'scalar' | 'reserved';
+
+/** A derived view of one raw `ApiKey.limits` entry. The source value is never rewritten. */
+export interface ApiKeyRateLimitEntry {
+    rawEndpoint: string;
+    rawValue: unknown;
+    kind: ApiKeyRateLimitEntryKind;
+    override: ApiKeyRateLimitOverride | null;
+    issue: string | null;
+    canEdit: boolean;
+    canClear: boolean;
+}
+
+export interface ApiKeyRateLimitsRead {
+    /** False when the top-level wire value is not a JSON object. */
+    isObject: boolean;
+    /** True only for a valid, genuinely empty object. */
+    isEmpty: boolean;
+    /** Unsafe top-level or entry data prevents an unlimited/configured-safe claim. */
+    hasUnsafe: boolean;
+    entries: ApiKeyRateLimitEntry[];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+    return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+/**
+ * Derive editable and review-required entries without normalizing raw endpoint
+ * identity or discarding extension-owned values.
+ */
+export function readApiKeyRateLimits(raw: unknown): ApiKeyRateLimitsRead {
+    if (!isPlainObject(raw)) {
+        return { isObject: false, isEmpty: false, hasUnsafe: true, entries: [] };
+    }
+    const entries = Object.entries(raw)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map<ApiKeyRateLimitEntry>(([rawEndpoint, rawValue]) => {
+            const reserved = rawEndpoint === '__replace';
+            const blank = rawEndpoint.trim().length === 0;
+            const objectValue = isPlainObject(rawValue);
+            const validValue = objectValue
+                && isPositiveInteger(rawValue.limit)
+                && isPositiveInteger(rawValue.window);
+
+            if (reserved) {
+                return {
+                    rawEndpoint, rawValue, kind: 'reserved', override: null,
+                    issue: 'Reserved __replace data cannot be changed or cleared by a generic JSON update. Repair the full stored value outside this editor.',
+                    canEdit: false, canClear: false,
+                };
+            }
+            if (blank) {
+                return {
+                    rawEndpoint, rawValue, kind: objectValue ? 'repairable' : 'scalar', override: null,
+                    issue: 'The stored endpoint key is empty or whitespace-only. It may only be cleared using its exact raw identity.',
+                    canEdit: false, canClear: true,
+                };
+            }
+            if (validValue) {
+                return {
+                    rawEndpoint, rawValue, kind: 'valid',
+                    override: { limit: rawValue.limit as number, window: rawValue.window as number },
+                    issue: null, canEdit: true, canClear: true,
+                };
+            }
+            if (objectValue) {
+                const usesDecoratorWindow = isPositiveInteger(rawValue.limit)
+                    && !Object.prototype.hasOwnProperty.call(rawValue, 'window');
+                return {
+                    rawEndpoint, rawValue, kind: 'repairable', override: null,
+                    issue: usesDecoratorWindow
+                        ? 'Legacy override has no explicit window. The server uses the endpoint decorator default; repair it to store a positive whole-minute window.'
+                        : 'Invalid stored override: limit and window must both be positive integers in minutes. This entry does not create a per-key hard ceiling.',
+                    canEdit: true, canClear: true,
+                };
+            }
+            return {
+                rawEndpoint, rawValue, kind: 'scalar', override: null,
+                issue: 'Stored override is not an object. It may be cleared, but cannot be edited as a structured limit.',
+                canEdit: false, canClear: true,
+            };
+        });
+    return {
+        isObject: true,
+        isEmpty: entries.length === 0,
+        hasUnsafe: entries.some((entry) => entry.kind !== 'valid'),
+        entries,
+    };
+}
+
+export interface ApiKeyRateLimitInput {
+    endpoint?: unknown;
+    limit?: unknown;
+    window?: unknown;
+}
+
+function parsePositiveInteger(value: unknown, label: string): number {
+    if (typeof value === 'boolean') throw new Error(`${label} must be a positive integer.`);
+    const parsed = typeof value === 'number' ? value : Number(String(value ?? '').trim());
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`${label} must be a positive integer.`);
+    }
+    return parsed;
+}
+
+/** Validate normalized Add input or an immutable existing endpoint Edit. */
+export function validateApiKeyRateLimitInput(
+    input: ApiKeyRateLimitInput,
+    options: { existing?: unknown; fixedEndpoint?: string } = {},
+): { endpoint: string; override: ApiKeyRateLimitOverride } {
+    const adding = options.fixedEndpoint === undefined;
+    const endpoint = adding ? String(input.endpoint ?? '').trim() : options.fixedEndpoint!;
+    if (!endpoint) throw new Error('Endpoint key is required.');
+    if (endpoint === '__replace') throw new Error('__replace is reserved and cannot be used as an endpoint key.');
+    if (adding && isPlainObject(options.existing)
+        && Object.prototype.hasOwnProperty.call(options.existing, endpoint)) {
+        throw new Error('That endpoint key already has an override. Edit the existing row instead.');
+    }
+    return {
+        endpoint,
+        override: {
+            limit: parsePositiveInteger(input.limit, 'Request limit'),
+            window: parsePositiveInteger(input.window, 'Window in minutes'),
+        },
+    };
+}
+
+/**
+ * Build one narrow JSONField patch. `currentValue` is optional for Add; Edit
+ * passes the exact raw object so extension-owned nested siblings survive the
+ * backend's recursive merge. Null is an exact-key tombstone after django-mojo
+ * 3105. The reserved root signal is deliberately impossible to target.
+ */
+export function buildApiKeyLimitPatch(
+    rawEndpoint: string,
+    override: ApiKeyRateLimitOverride | null,
+    currentValue?: unknown,
+): Record<string, unknown> {
+    if (rawEndpoint === '__replace') {
+        throw new Error('__replace is a reserved JSON update signal and cannot be edited or cleared here.');
+    }
+    if (override === null) return { [rawEndpoint]: null };
+    const limit = parsePositiveInteger(override.limit, 'Request limit');
+    const window = parsePositiveInteger(override.window, 'Window in minutes');
+    const preserved = isPlainObject(currentValue) ? currentValue : {};
+    return { [rawEndpoint]: { ...preserved, limit, window } };
+}
+
 interface GroupApiKeyCreateResponse extends GroupApiKeyRow {
     /** Present on the create echo only. Never written to Query cache. */
     token?: string;

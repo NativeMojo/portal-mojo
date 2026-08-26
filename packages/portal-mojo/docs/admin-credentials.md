@@ -30,8 +30,12 @@ the current operator can see.
 
 ```tsx
 import {
+  ApiKeyLimitsSummary,
+  ApiKeyRateLimitsEditor,
   GroupApiKeysSection,
   GroupApiKeysPage,
+  buildApiKeyLimitPatch,
+  readApiKeyRateLimits,
   registerGroupApiKeyPermissions,
 } from 'portal-mojo/admin';
 
@@ -84,6 +88,66 @@ registerGroupApiKeyPermissions([
 Registration replaces the same permission name and appends new names. Mounted
 editors subscribe to changes. `grantPermissions` gates the control itself; the
 backend remains authoritative on every save.
+
+### Rate-limit overrides
+
+Group API keys expose the raw django-mojo JSONField shape without normalizing
+endpoint identity:
+
+```ts
+const limits = {
+  orders: { limit: 500, window: 5, extension_owned: { burst: 20 } },
+};
+
+const state = readApiKeyRateLimits(limits);
+const patch = buildApiKeyLimitPatch(
+  'orders',
+  { limit: 750, window: 10 },
+  limits.orders, // preserves extension_owned and every other nested sibling
+);
+```
+
+`limit` and `window` are positive integers with no fixed maximum. `window` is
+always measured in **minutes** in `ApiKey.limits`; django-mojo converts it to
+seconds at enforcement time. `ApiKeyLimitsSummary` is the bounded card/table
+presentation. `ApiKeyRateLimitsEditor` is the controlled detail editor and
+keeps saves on the rejecting `GroupApiKeyModel.useSave()` path.
+
+This UI depends on django-mojo 1.20.0 / item 3105. A genuinely empty object is
+shown as **Unlimited (default)** because ordinary API-key throughput has no
+built-in hard ceiling. Strict endpoint limits, a positive decorator fallback,
+or an enabled deployment ceiling may still apply. When safe overrides exist,
+unlisted ordinary endpoint buckets remain unlimited. Any malformed top-level
+or nested value shows **Review required** instead of either safe claim.
+
+Add trims the new endpoint name and rejects blank, duplicate, and reserved
+`__replace` names. Edit keeps the stored endpoint identity immutable. Clear
+sends one narrow null tombstone, for example `{limits: {orders: null}}`; the
+authoritative complete row returned by django-mojo replaces Query state while
+every unrelated endpoint remains intact.
+
+Legacy data is lossless:
+
+- empty and whitespace-only keys are quoted distinctly and clear only by their
+  exact raw key;
+- scalar entries may be cleared but not edited as structured limits;
+- partial object entries may be repaired, preserving extra nested siblings. A
+  positive limit with no `window` currently uses the endpoint decorator's
+  default window; other malformed/non-positive entries fail open;
+- valid entries with extra siblings retain them on edit;
+- a stored `__replace` root key is read-only. django-mojo consumes that name as
+  a JSON replacement signal, so generic edit/clear controls would be dishonest;
+  repair the full stored value outside this editor.
+
+Mutation controls are fail-closed behind the supplied `PermSpec`. The global
+detail uses `GLOBAL_CREDENTIAL_PERMS`; embedded group surfaces default to
+`GROUP_CREDENTIAL_PERMS`. Denied viewers receive no mutation controls or extra
+credential queries. Limit mutations never request the token graph and retain
+the existing pre-cache token scrubber.
+
+Pitfalls: do not clone the raw object into a typed-only map, trim an existing
+key, send `__replace`, label malformed data unlimited, measure windows in
+seconds, or replace the full JSONField to clear one endpoint.
 
 ## Webhooks
 

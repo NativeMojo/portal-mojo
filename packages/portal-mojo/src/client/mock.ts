@@ -639,6 +639,20 @@ function buildGroupApiKeys(): MockGroupApiKey[] {
         { id: 201, group: 1, user: 1, created: now - 80 * 86400, modified: now - 2 * 86400, name: 'Acme deploy', is_active: true, permissions: { member: true, view_metrics: true }, limits: { assess: { limit: 500, window: 60 } }, last_used: now - 1800, expires_at: null, metadata: { owner: 'platform' }, override_user: false, token: 'mock_gk_acme_deploy' },
         { id: 202, group: 1, user: null, created: now - 30 * 86400, modified: now - 4 * 86400, name: 'Webhook worker', is_active: true, permissions: { manage_webhooks: true }, limits: {}, last_used: now - 86400, expires_at: now + 180 * 86400, metadata: {}, override_user: false, token: 'mock_gk_webhook_worker' },
         { id: 203, group: 2, user: null, created: now - 120 * 86400, modified: now - 20 * 86400, name: 'Legacy importer', is_active: false, permissions: { member: true }, limits: {}, last_used: now - 40 * 86400, expires_at: now + 10 * 86400, metadata: {}, override_user: false, token: 'mock_gk_legacy_importer' },
+        {
+            id: 204, group: 1, user: null, created: now - 150 * 86400, modified: now - 30 * 86400,
+            name: 'Legacy mixed limits', is_active: true, permissions: { view_logs: true },
+            limits: {
+                orders: { limit: 120, window: 5, extension: { burst: 20, source: 'legacy' } },
+                partial: { limit: 8, extension: { keep: true } },
+                scalar: 'legacy-unstructured',
+                '': { limit: 2, window: 1 },
+                '   ': { window: 3 },
+                __replace: { limit: 999, window: 1 },
+            },
+            last_used: now - 3 * 86400, expires_at: null, metadata: { owner: 'legacy' },
+            override_user: false, token: 'mock_gk_legacy_mixed',
+        },
     ];
 }
 
@@ -4562,6 +4576,25 @@ function mergeDicts(existing: Record<string, unknown>, incoming: Record<string, 
     for (const [key, value] of Object.entries(incoming)) {
         const prev = out[key];
         out[key] = isPlainObject(prev) && isPlainObject(value) ? mergeDicts(prev, value) : value;
+    }
+    return out;
+}
+
+/** ApiKey.limits narrow merge: null deletes one exact endpoint identity. */
+function mergeApiKeyLimits(existing: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
+    const out = { ...existing };
+    for (const [key, value] of Object.entries(incoming)) {
+        // django-mojo consumes this root key as a replace signal before merge.
+        // The mock intentionally offers no destructive replacement surface.
+        if (key === '__replace') continue;
+        if (value === null) {
+            delete out[key];
+            continue;
+        }
+        const previous = out[key];
+        out[key] = isPlainObject(previous) && isPlainObject(value)
+            ? mergeDicts(previous, value)
+            : value;
     }
     return out;
 }
@@ -9565,7 +9598,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                 if ('name' in opts.body) row.name = String(opts.body.name ?? '');
                 if ('is_active' in opts.body) row.is_active = Boolean(opts.body.is_active);
                 if (isPlainObject(opts.body.permissions)) row.permissions = mergeDicts(row.permissions, opts.body.permissions);
-                if (isPlainObject(opts.body.limits)) row.limits = mergeDicts(row.limits, opts.body.limits);
+                if (isPlainObject(opts.body.limits)) row.limits = mergeApiKeyLimits(row.limits, opts.body.limits);
                 if (isPlainObject(opts.body.metadata)) row.metadata = mergeDicts(row.metadata, opts.body.metadata);
                 row.modified = Math.floor(Date.now() / 1000);
             }
