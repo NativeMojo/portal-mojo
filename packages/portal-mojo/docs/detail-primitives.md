@@ -109,6 +109,7 @@ value. They coexist happily — `<DataView data={record} />` for the record,
 <MetadataSection
     endpoint="/api/user" id={user.id} metadata={user.metadata}
     onSaved={(next) => qc.setQueryData<User>(['/api/user', 'one', user.id], (p) => p && { ...p, metadata: next })}
+    beforeSave={async (next, prev) => …}   // optional owner gate — see below
 />
 ```
 
@@ -133,7 +134,17 @@ Invariants:
    Object values then display **read-only** — a string editor round-trips
    them lossily; remove and re-add to change one.
 
-Deletion confirms through `modal.confirm`; success toasts.
+**Removing a top-level key stops on a guardrail** (`confirmGuardrail`), not a
+plain confirm: the POST carries the whole blob, so one write can wipe
+`auth_config` / `geofence` / `redemption_policy`. The stop names every key
+about to leave and how many remain; removing more than one key at once asks
+the operator to type the count. `commit()` computes the removed set from
+`metadata` vs `next` — every write path, not just the trash button, hits it.
+
+`beforeSave(next, prev)` runs after that built-in stop and before the POST.
+Resolve `false` to cancel — nothing posts, no error, the editor keeps its
+draft. Owners diff their own protected keys here (a `changedKeys`-style
+compare on the values of `auth_config`, say). Success toasts.
 
 ## StackTraceView — JS **and** Python tracebacks
 

@@ -1,7 +1,9 @@
 // Feedback demos: SchemaForm field language, the awaitable modal manager,
 // toasts, and the DetailView house style.
 import { useState } from 'react';
-import { Badge, DetailView, Eyebrow, FlatRow, SchemaForm, SecurityItem, formModal, modal, toast, type Field } from 'portal-mojo/ui';
+import { Badge, DetailView, Eyebrow, FlatRow, ModelTable, SchemaForm, SecurityItem, confirmGuardrail, formModal, modal, toast, type Column, type Field } from 'portal-mojo/ui';
+import type { Group } from 'portal-mojo/client/runtime';
+import { GroupModel } from '../../models';
 
 const ALL_FIELDS: Field[] = [
     { name: 'display_name', type: 'text', label: 'Display name', required: true, placeholder: 'Jane Cooper' },
@@ -74,6 +76,127 @@ export function ModalsDemo() {
         </div>
     );
 }
+
+// The "are you sure, and here is why" stop — three tiers, nothing is actually
+// changed. Copy is the house shape: effect · why (backend facts) · undo.
+export function GuardrailDemo() {
+    const report = (ok: boolean) => toast.info(`confirmGuardrail resolved: ${String(ok)}`);
+    const typed = async () => report(await confirmGuardrail({
+        title: 'Disable Alea for Club Axo?',
+        effect: <>Every Alea game on Club Axo returns <b>503</b> to players the moment this saves.</>,
+        why: [
+            <>Open sessions are cut mid-round — wagers already placed settle on the provider's terms, not ours.</>,
+            <>The lobby keeps listing Alea titles until the next catalogue sync (up to 15 minutes); players see errors, not a notice.</>,
+            <>Bonuses restricted to Alea titles stop being redeemable, and their expiry clocks keep running.</>,
+        ],
+        undo: 'Re-enable it here; sessions do not resume — players start new ones.',
+        confirmText: 'Disable Alea',
+        typeToConfirm: 'Club Axo',
+    }));
+    const danger = async () => report(await confirmGuardrail({
+        title: 'Deactivate API key "Webhook worker"?',
+        effect: <>The key stops authenticating the moment this saves.</>,
+        why: [
+            <>Every integration holding this key gets <b>401</b> on its next call — the caller sees an auth failure, not a notice.</>,
+            <>The key is <b>not rotated</b>: the same secret stays on file, so anyone who holds it regains access the instant it is re-enabled.</>,
+        ],
+        undo: 'Re-enabling restores the same key; no integration needs a new secret.',
+        confirmText: 'Deactivate key',
+    }));
+    const warn = async () => report(await confirmGuardrail({
+        title: 'Switch Club Axo to the EU tax profile?',
+        effect: <>Every quote issued from now on carries EU VAT lines instead of US sales tax.</>,
+        why: [
+            <>Invoices already issued are not restated — reports mix two regimes for the current period.</>,
+            <>Price lists that hard-code tax-inclusive amounts show the old totals until re-imported.</>,
+        ],
+        undo: 'Switch back here; the same caveats apply in reverse.',
+        confirmText: 'Switch profile',
+        cancelText: 'Keep US',
+        danger: false,
+    }));
+    // The guardrail opens from INSIDE the form's submit, so the form stays
+    // open behind it: Cancel returns the operator to their edits; confirm
+    // closes both. This is the shape for identity fields (uuid, auth_domain).
+    const stacked = async () => {
+        const data = await modal.open<Record<string, unknown> | null>((close) => (
+            <div className="modal-pad">
+                <h2 className="modal-title">Edit identity</h2>
+                <p className="modal-message">Saving opens the guardrail ON TOP of this form — the form stays open behind it.</p>
+                <SchemaForm
+                    fields={[{ name: 'auth_domain', type: 'text', label: 'Auth domain', required: true, help: 'A typo here kills player sign-in.' }]}
+                    initial={{ auth_domain: 'login.clubaxo.com' }}
+                    submitText="Save"
+                    onCancel={() => close(null)}
+                    onSubmit={async (form) => {
+                        const ok = await confirmGuardrail({
+                            title: `Change the auth domain to ${String(form.auth_domain)}?`,
+                            effect: <>White-label sign-in resolves against <b>{String(form.auth_domain)}</b> on the next request.</>,
+                            why: [<>If that host does not serve the sign-in page, every player login on this brand fails until it is corrected.</>],
+                            confirmText: 'Change domain',
+                            danger: false,
+                        });
+                        if (ok) close(form);
+                    }}
+                />
+            </div>
+        ), { size: 'md' });
+        toast.info(data ? `saved: ${JSON.stringify(data)}` : 'form cancelled → null');
+    };
+    return (
+        <div className="panel panel-pad" style={{ display: 'grid', gap: 14 }}>
+            <p className="dim" style={{ margin: 0 }}>
+                <code>modal.confirm</code> for the reversible; <code>ArmedButton</code> for the inline irreversible;
+                <code> confirmGuardrail</code> for anything that takes a tenant dark, moves money, or can't be undone —
+                the operator reads <em>why</em> before the button arms. Resolves <code>false</code> on Escape / backdrop / Cancel.
+            </p>
+            <div className="demo-row">
+                <button className="btn btn-danger-ghost" onClick={() => void typed()}>typeToConfirm (button disabled until typed)</button>
+                <button className="btn btn-danger-ghost" onClick={() => void danger()}>danger (default)</button>
+                <button className="btn" onClick={() => void warn()}>danger: false (warn tint)</button>
+                <button className="btn" onClick={() => void stacked()}>stacked over a formModal</button>
+            </div>
+            <div>
+                <div className="eyebrow">ModelTable batch action — <code>confirm</code> as a function</div>
+                <p className="dim" style={{ margin: '4px 0 10px' }}>
+                    Select rows and run <b>Archive</b>: the function form REPLACES <code>modal.confirm</code> with a guardrail
+                    (five or more rows → type the count). Cancel mutates nothing; confirm runs the per-row no-op and toasts.
+                    Permission lives in <code>confirm</code>, input collection in <code>prepare</code>.
+                </p>
+                <ModelTable<GroupRow>
+                    model={GroupModel}
+                    title="Groups"
+                    eyebrow="Playground · confirm: fn"
+                    searchPlaceholder="Search groups…"
+                    defaultSort="name"
+                    columns={GUARD_COLUMNS}
+                    selectable
+                    batchActions={[{
+                        key: 'archive', label: 'Archive', icon: 'bi-archive', danger: true,
+                        confirm: (rows) => confirmGuardrail({
+                            title: `Archive ${rows.length} group${rows.length === 1 ? '' : 's'}?`,
+                            effect: <>{rows.slice(0, 4).map((g) => g.name).join(', ')}{rows.length > 4 ? `, +${rows.length - 4} more` : ''} disappear from every member's group switcher the moment each call lands.</>,
+                            why: [
+                                <>Members keep their rows but lose the group in every scoped page — API keys, webhooks and events under it stop resolving.</>,
+                                <>Sub-groups are archived with their parent; nothing re-parents them.</>,
+                            ],
+                            undo: 'Restore from the Archived preset; membership and keys come back as they were.',
+                            confirmText: `Archive ${rows.length}`,
+                            typeToConfirm: rows.length >= 5 ? String(rows.length) : undefined,
+                        }),
+                        run: async () => { /* demo: nothing is archived */ },
+                    }]}
+                />
+            </div>
+        </div>
+    );
+}
+
+type GroupRow = Group & { id: number };
+const GUARD_COLUMNS: Column<GroupRow>[] = [
+    { key: 'name', label: 'Group', sortable: true },
+    { key: 'kind', label: 'Kind', sortable: true },
+];
 
 export function ToastsDemo() {
     return (

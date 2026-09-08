@@ -18,9 +18,14 @@
 //   · Controlled on `metadata` (architecture rule 5): the component never
 //     mirrors server state. `onSaved` is REQUIRED — it is how the owner
 //     (TanStack cache, parent state) learns about the write.
+//   · Every save posts the WHOLE blob, so one bad write can wipe a protected
+//     key (auth_config / geofence / redemption_policy) in a single POST.
+//     Removing a top-level key therefore stops on a guardrail that lists
+//     the keys about to vanish; owners add `beforeSave(next, prev)` to diff
+//     their own protected keys on top.
 import { useState } from 'react';
 import { mojoCall } from '../../client/client';
-import { modal } from '../modal';
+import { confirmGuardrail } from '../guardrail';
 import { toast } from '../toast';
 
 type Draft =
@@ -49,13 +54,42 @@ function parseValue(raw: string): unknown {
     }
 }
 
-export function MetadataSection({ endpoint, id, metadata, onSaved, title = 'Metadata' }: {
+/**
+ * Default stop: a top-level key is about to leave the blob. Names every key
+ * so a wipe of `auth_config` reads as exactly that, not "Remove entry?".
+ */
+function confirmRemovedKeys(removed: string[], next: Record<string, unknown>): Promise<boolean> {
+    const one = removed.length === 1;
+    const remaining = Object.keys(next).length;
+    return confirmGuardrail({
+        title: one ? `Remove metadata key ${removed[0]}?` : `Remove ${removed.length} metadata keys?`,
+        effect: <>
+            {removed.map((key, i) => <span key={key}>{i > 0 ? ', ' : ''}<code>{key}</code></span>)}
+            {one ? ' leaves' : ' leave'} the record the moment this saves — the POST carries the whole blob, {remaining === 0 ? 'and it will be empty' : `${remaining} key${remaining === 1 ? '' : 's'} remain`}.
+        </>,
+        why: [
+            <>Anything that reads {one ? 'this key' : 'these keys'} (policy, auth configuration, geofences, redemption rules) sees it missing on its next read, with no error raised here.</>,
+            <>The value is not kept anywhere in this portal — re-adding the key means re-entering it by hand.</>,
+        ],
+        undo: 'There is no undo; re-add the key with its previous value.',
+        confirmText: one ? 'Remove key' : `Remove ${removed.length} keys`,
+        typeToConfirm: removed.length > 1 ? String(removed.length) : undefined,
+    });
+}
+
+export function MetadataSection({ endpoint, id, metadata, onSaved, beforeSave, title = 'Metadata' }: {
     /** Collection endpoint — the save posts to `<endpoint>/<id>`. */
     endpoint: string;
     id: number | string;
     metadata: Record<string, unknown>;
     /** Called with the new blob after the server accepted it. */
     onSaved: (next: Record<string, unknown>) => void;
+    /**
+     * Owner gate, after the built-in removed-key stop: resolve false to
+     * cancel the write (no error, editor state kept). Diff protected keys
+     * between `next` and `prev` here.
+     */
+    beforeSave?: (next: Record<string, unknown>, prev: Record<string, unknown>) => Promise<boolean> | boolean;
     title?: string;
 }) {
     const [draft, setDraft] = useState<Draft>(null);
@@ -65,8 +99,16 @@ export function MetadataSection({ endpoint, id, metadata, onSaved, title = 'Meta
     const keys = Object.keys(metadata).sort();
     const busy = pending !== null;
 
-    /** The one write path. Resolves true only when the server accepted it. */
+    /**
+     * The one write path. Resolves true only when the server accepted it;
+     * false when a gate declined (nothing posted, no error) or the POST
+     * rejected (banner). Gates run BEFORE pending so the dialog is not
+     * stacked over disabled controls.
+     */
     async function commit(next: Record<string, unknown>, token: string, message: string): Promise<boolean> {
+        const removed = Object.keys(metadata).filter((key) => !Object.prototype.hasOwnProperty.call(next, key));
+        if (removed.length > 0 && !(await confirmRemovedKeys(removed, next))) return false;
+        if (beforeSave && !(await beforeSave(next, metadata))) return false;
         setPending(token);
         setError(null);
         try {
@@ -101,13 +143,7 @@ export function MetadataSection({ endpoint, id, metadata, onSaved, title = 'Meta
     }
 
     async function removeKey(key: string) {
-        const confirmed = await modal.confirm({
-            title: 'Remove entry',
-            message: <>Remove metadata key <b>{key}</b>?</>,
-            confirmText: 'Remove',
-            danger: true,
-        });
-        if (!confirmed) return;
+        // The removed-key guardrail inside commit() is the confirm.
         const next = { ...metadata };
         delete next[key];
         await commit(next, `delete:${key}`, 'Metadata entry removed');

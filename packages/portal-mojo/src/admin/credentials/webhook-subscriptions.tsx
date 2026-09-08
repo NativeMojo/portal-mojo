@@ -8,6 +8,7 @@ import {
     FlatRow,
     ModelTable,
     SchemaForm,
+    confirmGuardrail,
     fmt,
     modal,
     toast,
@@ -135,6 +136,23 @@ const WEBHOOK_FIELDS: Field[] = [
     { name: 'is_active', type: 'switch', label: 'Active', help: 'Inactive subscriptions are skipped.' },
 ];
 
+/** The stop in front of `is_active: false` — copy states what the backend does. */
+function confirmDisableSubscription(row: WebhookSubscriptionRow): Promise<boolean> {
+    let host = row.url;
+    try { host = new URL(row.url).host || row.url; } catch { /* keep the raw url */ }
+    const events = row.events.length ? row.events.join(', ') : 'all events';
+    return confirmGuardrail({
+        title: `Disable webhook to ${host}?`,
+        effect: <>Deliveries of <b>{events}</b> to <b>{row.url}</b> stop the moment this saves.</>,
+        why: [
+            <>Deliveries stop for these events and nothing re-registers them — the subscription stays off until someone switches it back on here.</>,
+            <>Consumers see <b>silence, not an error</b>: the receiver gets no failed delivery and no notice, so anything downstream that depends on these events degrades quietly.</>,
+        ],
+        undo: 'Re-enable it here to resume deliveries for new events.',
+        confirmText: 'Disable webhook',
+    });
+}
+
 function useWebhookActions(permission: PermSpec) {
     const save = WebhookSubscriptionModel.useSave();
 
@@ -206,6 +224,7 @@ function useWebhookActions(permission: PermSpec) {
         if (events.join('\u0000') !== row.events.join('\u0000')) changes.events = events;
         if (isActive !== row.is_active) changes.is_active = isActive;
         if (!Object.keys(changes).length) return;
+        if (changes.is_active === false && !(await confirmDisableSubscription(row))) return;
         try {
             await save.mutateAsync({ id: row.id, changes });
             toast.success('Webhook subscription updated');
@@ -216,6 +235,8 @@ function useWebhookActions(permission: PermSpec) {
 
     const toggleSubscription = async (row: WebhookSubscriptionRow, next: boolean) => {
         if (!can) return;
+        // Only the OFF direction is guarded — re-enabling restores deliveries.
+        if (!next && !(await confirmDisableSubscription(row))) return;
         try {
             await save.mutateAsync({ id: row.id, changes: { is_active: next } });
         } catch (error) {

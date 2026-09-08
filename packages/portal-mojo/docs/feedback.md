@@ -1,7 +1,7 @@
 # feedback — awaitable modals + toasts
 
 ```ts
-import { modal, formModal, toast, ModalHost, ToastHost } from 'portal-mojo/ui';
+import { modal, formModal, toast, confirmGuardrail, ModalHost, ToastHost } from 'portal-mojo/ui';
 ```
 
 Mount `<ModalHost />` and `<ToastHost />` once in the app shell. Modals are
@@ -23,6 +23,51 @@ Patterns:
 - Batch prepare: open a `formModal` INSIDE a flow to collect once-per-batch
   input; resolve null to cancel the whole thing.
 - Stacked dialogs are fine (disable-reason form over a detail modal).
+
+## confirmGuardrail — the "are you sure, and here is why" stop
+
+```tsx
+if (!(await confirmGuardrail({
+    title: 'Disable webhook to hooks.example.com?',        // question form, names the target
+    effect: <>Deliveries of <b>order.paid</b> stop the moment this saves.</>,
+    why: [                                                  // one concrete consequence per bullet
+        <>Nothing re-registers them — it stays off until someone turns it back on.</>,
+        <>Consumers see silence, not an error.</>,
+    ],
+    undo: 'Re-enable it here to resume deliveries.',        // or say that you can't
+    confirmText: 'Disable webhook',
+    typeToConfirm: 'DISABLE',                               // optional: button disabled until typed
+    danger: true,                                           // default; false = primary button + warn tint
+}))) return;
+```
+
+Resolves `true` only on the armed confirm button — `false` on Escape,
+backdrop and Cancel. Opens on `modal.open(…, { size: 'sm' })`, so it stacks
+over a `formModal` that is still open. `typeToConfirm` compares trimmed and
+case-insensitively; Enter in that input confirms once it matches.
+
+**Which stop.** Three idioms, one rule each:
+
+| Idiom | When |
+|---|---|
+| `modal.confirm` | Reversible / low blast radius: a yes-no is enough. |
+| `ArmedButton` | Irreversible, needs no input, inline (row actions) — see idioms.md. |
+| `confirmGuardrail` | Anything that **takes a tenant dark, moves money, or can't be undone** — the operator must read *why* before the button arms. |
+
+Copy is written from what the backend does, not adjectives: "every
+integration holding this key gets 401 on its next call", not "this is
+dangerous". Where it is wired in the package: API-key deactivate, webhook
+disable, member `manage_group` / `manage_members` grants (through
+`FormView.beforeSave`), and MetadataSection's removed-key stop.
+
+`changedKeys(initial, next, watch)` is the diff helper for config-form saves:
+which of the watched keys changed (null/'' normalised), so a save confirms
+ONLY the fields that break things and passes silently otherwise.
+
+Styles: `apps/portal/src/theme/guardrail.css` (`.guardrail`,
+`.guardrail-effect/-why/-why-head/-undo/-type`, `.guardrail-icon`) over
+`--bad/--bad-soft` (danger) and `--warn/--warn-soft` (`danger: false`). The
+package ships no CSS — a consuming app carries that block (README).
 
 ## modal.drawer
 

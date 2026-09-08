@@ -12,9 +12,12 @@
 //   · a permission tabset from the registry — gated tabs resolve fail-closed
 //     against the signed-in me (registry replaces web-mojo's live-mutated
 //     permission arrays)
+//   · beforeSave on that tabset: flipping manage_group / manage_members ON
+//     opens a guardrail BEFORE the POST — Cancel drops the batch (the switch
+//     reverts, no toast, nothing posted); everything else stays one click
 import { useState } from 'react';
 import { z } from 'zod';
-import { FormView, registerFormTabs } from 'portal-mojo/ui';
+import { FormView, confirmGuardrail, registerFormTabs } from 'portal-mojo/ui';
 import type { Field } from 'portal-mojo/ui';
 import { UserModel } from '../../models';
 
@@ -164,7 +167,28 @@ export function AutosaveDemo() {
                 <code>System</code> (needs <code>admin</code>). Signed out or unprivileged, the gated tabs simply
                 don't exist — same fail-closed rule as <code>&lt;Guarded&gt;</code>.
             </p>
+            <p className="dim" style={{ margin: '2px 0 6px', fontSize: 12.5 }}>
+                <code>beforeSave</code>: switching <code>Manage Group</code> or <code>Manage Members</code> ON opens a guardrail
+                before the POST. Cancel → the switch reverts, no toast, nothing posted (the log shows the veto). Other switches save on the click.
+            </p>
             <FormView model={UserModel} row={user} tabs="demo.user-permissions"
+                beforeSave={async ({ changes, names }) => {
+                    const perms = changes.permissions as Record<string, unknown> | undefined;
+                    const granting = ['manage_group', 'manage_members'].filter((key) => perms?.[key] === true);
+                    if (granting.length === 0) return true;
+                    const ok = await confirmGuardrail({
+                        title: `Grant ${granting.join(' + ')} to ${user.display_name || user.email}?`,
+                        effect: <>The grant is live the moment this saves — there is no save button and no second step.</>,
+                        why: [
+                            <><code>manage_group</code> unlocks the group record, its policy metadata, API keys, webhooks and integrations.</>,
+                            <><code>manage_members</code> lets the holder grant itself and others — a grant that can reproduce itself.</>,
+                        ],
+                        undo: 'Switch it off here to revoke; anything done while it was held stays done.',
+                        confirmText: `Grant ${granting.join(' + ')}`,
+                    });
+                    if (!ok) push(false, `VETO ${JSON.stringify(changes)} — ${names.length} field${names.length === 1 ? '' : 's'} reverted, nothing posted`);
+                    return ok;
+                }}
                 onSaved={(info) => push(true, `POST ${JSON.stringify(info.changes)} — ${info.fields.length} field${info.fields.length === 1 ? '' : 's'}`)}
                 onSaveError={(info) => push(false, `POST ${JSON.stringify(info.changes)} → ${info.error.message}`)}
             />

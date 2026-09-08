@@ -1,0 +1,29 @@
+/* ── Guardrail (portal-mojo/ui confirmGuardrail) — the "are you sure, and here is why" stop.
+   Tokens only: --bad/--bad-soft for the danger tier (default), --warn/--warn-soft
+   when `danger: false` (class .guardrail-warn, also matched via :has(.btn-primary)
+   so the wmx-admin-v2 markup keeps styling). Both themes come from the tokens. */
+.guardrail .modal-title { display: flex; align-items: center; gap: 8px; }
+.guardrail-icon { color: var(--bad); font-size: 18px; }
+.guardrail-warn .guardrail-icon,
+.guardrail:has(.btn-primary) .guardrail-icon { color: var(--warn); }
+.guardrail-effect { margin: 0 0 12px; color: var(--ink); font-size: 14px; line-height: 1.45; }
+.guardrail-why {
+    padding: 10px 12px 8px;
+    border-left: 3px solid var(--bad);
+    border-radius: 0 8px 8px 0;
+    background: var(--bad-soft);
+}
+.guardrail-warn .guardrail-why,
+.guardrail:has(.btn-primary) .guardrail-why { border-left-color: var(--warn); background: var(--warn-soft); }
+.guardrail-why-head {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-strong); margin-bottom: 4px;
+}
+.guardrail-why ul { margin: 0; padding-left: 18px; }
+.guardrail-why li { margin: 3px 0; font-size: 13.5px; line-height: 1.4; color: var(--ink); }
+.guardrail-undo { margin: 12px 0 0; font-size: 13px; color: var(--mute); }
+.guardrail-undo .bi { color: var(--mute); }
+.guardrail-type { display: block; margin-top: 14px; font-size: 13px; color: var(--ink); }
+.guardrail-type span { display: block; margin-bottom: 6px; }
+.guardrail-type b { color: var(--ink-strong); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.guardrail-type .input { width: 100%; }
