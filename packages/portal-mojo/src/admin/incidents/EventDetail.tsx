@@ -1,6 +1,9 @@
-import { DetailView, Eyebrow, FlatRow, KnownFieldsCard, StatusPanel, fmt, type KnownField } from '../../ui';
+import { useQuery } from '@tanstack/react-query';
+import { mojoCall } from '../../client/runtime';
+import { DetailView, Eyebrow, FlatRow, JsonBlock, KnownFieldsCard, StatusPanel, fmt, type KnownField } from '../../ui';
 import { EvidenceCard, INCIDENT_METADATA_FIELDS, RequestResponseForensics, TraceForensics, first, metadataOf } from './forensics';
-import { showIncidentDetail, useEventDetail } from './models';
+import { sanitizeEventRow } from './sanitize';
+import { EventModel, showIncidentDetail, type EventRow } from './models';
 
 const MOJOSEC_SUMMARY_FIELDS: KnownField[] = [
     { key: 'kind', label: 'Detection kind', hideEmpty: true },
@@ -128,11 +131,25 @@ function incidentId(value: unknown): number | null {
     if (value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'number') return (value as { id: number }).id;
     return null;
 }
+
+function prepareEventDetailRecord(rawEvent: EventRow): { rawEvent: EventRow; event: EventRow } {
+    return { rawEvent, event: sanitizeEventRow(rawEvent) };
+}
+
+/** Keep the authorized raw record isolated from every sanitized event cache. */
+function useRawEventDetail(id: number | null) {
+    return useQuery({
+        queryKey: [EventModel.endpoint, 'raw-one', id, { graph: 'detailed' }],
+        queryFn: async () => (await mojoCall(`${EventModel.endpoint}/${id!}`, { params: { graph: 'detailed' } })).data as EventRow,
+        enabled: id != null,
+    });
+}
+
 export function EventDetail({ id, onClose }: { id: number; onClose: () => void }) {
-    const query = useEventDetail(id);
+    const query = useRawEventDetail(id);
     if (query.isPending) return <div className="modal-pad dim">Loading event…</div>;
     if (!query.data || query.error) return <div className="modal-pad text-bad">{query.error?.message ?? 'Event not found'}</div>;
-    const event = query.data;
+    const { rawEvent, event } = prepareEventDetailRecord(query.data);
     const metadata = metadataOf(event);
     const mojosec = extractMojosecDetails(metadata);
     const linkedIncident = incidentId(event.incident);
@@ -159,6 +176,8 @@ export function EventDetail({ id, onClose }: { id: number; onClose: () => void }
             ...(hasBouncer ? [{ key: 'bouncer', label: 'Bouncer', icon: 'bi-shield-shaded', render: () => <KnownFieldsCard data={metadata} showRaw={false} known={[{ key: 'decision', hideEmpty: true }, { key: 'risk_score', hideEmpty: true }, { key: 'page', hideEmpty: true }, { key: 'page_type', hideEmpty: true }, { key: 'muid', hideEmpty: true }, { key: 'duid', hideEmpty: true }, { key: 'triggered_signals', hideEmpty: true }]} /> }] : []),
             ...(hasPermissions ? [{ key: 'permissions', label: 'Auth evidence', icon: 'bi-key', render: () => <KnownFieldsCard data={metadata} showRaw={false} known={[{ key: 'permission_keys', hideEmpty: true }, { key: 'perms', hideEmpty: true }, { key: 'auth_result', hideEmpty: true }, { key: 'user_email', hideEmpty: true }]} /> }] : []),
             { key: 'metadata', label: 'Known fields', icon: 'bi-braces', render: () => <KnownFieldsCard data={metadata} known={[...INCIDENT_METADATA_FIELDS, { key: 'alert_id', hideEmpty: true }, { key: 'logfile', hideEmpty: true }, { key: 'error_code', hideEmpty: true }, { key: 'error_message', hideEmpty: true }]} showRaw={false} /> },
+            { divider: 'Raw' },
+            { key: 'raw', label: 'Raw data', icon: 'bi-filetype-json', render: () => <><Eyebrow>Complete API response</Eyebrow><p className="dim">The complete event record returned by Django, including all metadata.</p><JsonBlock value={rawEvent} label="Event API record" collapsible={false} /></> },
         ]}
         initialSection="overview"
         onClose={onClose}

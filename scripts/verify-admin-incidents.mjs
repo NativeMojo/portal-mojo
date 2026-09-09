@@ -20,6 +20,10 @@ try {
     assert.match(incidentDetail, /AssistantContextLauncher model="incident\.Incident"/);
     assert.match(eventDetailSource, /key: 'mojosec'.*label: 'MojoSec'/s,
         'MojoSec event metadata must have a dedicated detail section');
+    assert.match(eventDetailSource, /key: 'raw'.*label: 'Raw data'.*JsonBlock value=\{rawEvent\}/s,
+        'Event detail must expose the complete authorized API record in a Raw data section');
+    assert.match(eventDetailSource, /queryKey: \[EventModel\.endpoint, 'raw-one'.*queryFn: async \(\) => \(await mojoCall/s,
+        'raw event detail must use its own unsanitized query cache');
 
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const incidents = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/models.ts');
@@ -58,6 +62,7 @@ try {
 
     const source = { authorization: 'Bearer abcdefghijklmnop', nested: { password: 'sentinel-password', ok: 'keep' }, url: 'https://example.test/?token=sentinel-query', trace: 'token sentinel-trace-secret' };
     const safe = sanitize.sanitizeSecurityValue(source);
+    assert.equal(source.authorization, 'Bearer abcdefghijklmnop', 'sanitizer must retain the original raw record');
     assert.equal(source.nested.password, 'sentinel-password', 'sanitizer must not mutate input');
     assert.equal(safe.authorization, '[redacted]');
     assert.equal(safe.nested.password, '[redacted]');

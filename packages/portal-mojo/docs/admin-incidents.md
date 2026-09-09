@@ -37,9 +37,15 @@ Rows, history, optimistic notes, mutation variables, curated copy surfaces, and
 exports pass through a recursive non-mutating sanitizer. It redacts normalized
 secret keys, auth/header blocks, JWT/Bearer values, sensitive URL/form params,
 and parsed bodies; evidence/traces are explicitly bounded. Heuristic redaction
-cannot guarantee arbitrary opaque prose, so raw JSON is not rendered or
-exported. `createSafeExporter` sanitizes before accumulation and projects only
-declared fields.
+cannot guarantee arbitrary opaque prose, so exports remain sanitized and
+project only declared fields through `createSafeExporter`.
+
+Event detail has one intentional operator-facing exception: **Raw data** shows
+the exact record returned by Django's authenticated detailed-event endpoint,
+including every top-level field and the complete metadata object. It uses a
+separate TanStack Query cache key so the raw record cannot replace sanitized
+rows used by tables, drill-ins, exports, or formatted sections. Django remains
+the authorization boundary for what that endpoint returns.
 
 Before that recursive sanitizer runs, every history `media` value is positively
 rebuilt to exactly `id`, `filename`, `content_type`, and `category`; URLs,
@@ -53,12 +59,13 @@ the child reveals the parent. Ticket/rule/AI/network-response/dashboard controls
 remain excluded. Bouncer discovery stays category-prefix plus MUID search
 because its reporter writes MUID into incident details.
 
-MojoSec events add a dedicated detail section over the backend's fixed,
+MojoSec events add a dedicated formatted section over the backend's fixed,
 server-derived `metadata.mojosec` projection. It promotes the detection and
 sensor identity, timing, policy revision, recommendation, and every currently
 validated evidence field—including sudo command provenance and receipt
-semantics—without reopening arbitrary raw event metadata. The top-level
-`geo_ip` display string is shown in Source when Django supplies it.
+semantics. The separate Raw data section preserves the complete response for
+operator investigation. The top-level `geo_ip` display string is shown in
+Source when Django supplies it.
 
 ## Backend evidence
 
