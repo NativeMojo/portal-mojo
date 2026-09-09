@@ -1,25 +1,38 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { createIncidentHistoryAdapter, useCan, useMe } from '../../client/runtime';
-import { Badge, DetailView, Eyebrow, FlatRow, KnownFieldsCard, RecordFeed, StatusPanel, fmt, toast, type Tone } from '../../ui';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createIncidentHistoryAdapter, mojoCall, useCan, useMe } from '../../client/runtime';
+import { Badge, DetailView, Eyebrow, FlatRow, JsonBlock, KnownFieldsCard, RecordFeed, StatusPanel, fmt, toast, type Tone } from '../../ui';
 import { SECURITY_MANAGE_PERMS } from '../security-permissions';
 import { AssistantContextLauncher } from '../assistant/launchers';
 import { EvidenceCard, INCIDENT_METADATA_FIELDS, RequestResponseForensics, TraceForensics, metadataOf } from './forensics';
-import { INCIDENT_LIFECYCLE, IncidentModel, showEventDetail, useIncidentDetail, useIncidentEvents } from './models';
-import { sanitizeIncidentHistoryRow, sanitizeSecurityText } from './sanitize';
+import { INCIDENT_LIFECYCLE, IncidentModel, showEventDetail, useIncidentEvents, type IncidentRow } from './models';
+import { sanitizeIncidentHistoryRow, sanitizeIncidentRow, sanitizeSecurityText } from './sanitize';
 
 function priorityTone(priority: number): Tone { return priority >= 8 ? 'danger' : priority >= 5 ? 'warning' : 'info'; }
 function statusTone(status: string): Tone { return ['resolved', 'closed'].includes(status) ? 'success' : ['new', 'open'].includes(status) ? 'danger' : status === 'investigating' ? 'warning' : 'muted'; }
 
+function prepareIncidentDetailRecord(rawIncident: IncidentRow): { rawIncident: IncidentRow; incident: IncidentRow } {
+    return { rawIncident, incident: sanitizeIncidentRow(rawIncident) };
+}
+
+/** Keep the authorized raw record isolated from every sanitized incident cache. */
+function useRawIncidentDetail(id: number | null) {
+    return useQuery({
+        queryKey: [IncidentModel.endpoint, 'raw-one', id, { graph: 'detailed' }],
+        queryFn: async () => (await mojoCall(`${IncidentModel.endpoint}/${id!}`, { params: { graph: 'detailed' } })).data as IncidentRow,
+        enabled: id != null,
+    });
+}
+
 export function IncidentDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const queryClient = useQueryClient();
-    const query = useIncidentDetail(id);
+    const query = useRawIncidentDetail(id);
     const events = useIncidentEvents(id);
     const save = IncidentModel.useSave();
     const { can: canManage } = useCan(SECURITY_MANAGE_PERMS);
     const { data: me } = useMe();
     if (query.isPending) return <div className="modal-pad dim">Loading incident…</div>;
     if (!query.data || query.error) return <div className="modal-pad text-bad">{query.error?.message ?? 'Incident not found'}</div>;
-    const incident = query.data;
+    const { rawIncident, incident } = prepareIncidentDetailRecord(query.data);
     const groupId = Number.isSafeInteger(incident.group_id) && Number(incident.group_id) > 0
         ? Number(incident.group_id) : null;
     const adapter = createIncidentHistoryAdapter(id, {
@@ -61,6 +74,8 @@ export function IncidentDetail({ id, onClose }: { id: number; onClose: () => voi
             ...(trace ? [{ key: 'trace', label: 'Stack trace', icon: 'bi-code-square', render: () => <TraceForensics metadata={metadata} /> }] : []),
             { key: 'history', label: 'History', icon: 'bi-chat-left-text', render: () => <RecordFeed adapter={adapter} variant="compact" showInput={canManage} currentUserId={me?.id ?? null} placeholder="Add an incident note…" attachmentUpload={{ destination: groupId == null ? {} : { groupId, use: 'uploads' }, expectedGroupId: groupId }} /> },
             { key: 'metadata', label: 'Known fields', icon: 'bi-braces', render: () => <KnownFieldsCard data={metadata} known={[...INCIDENT_METADATA_FIELDS]} showRaw={false} emptyText="No curated forensic metadata." /> },
+            { divider: 'Raw' },
+            { key: 'raw', label: 'Raw data', icon: 'bi-filetype-json', render: () => <><Eyebrow>Complete API response</Eyebrow><p className="dim">The complete incident record returned by Django, including all metadata and IP information.</p><JsonBlock value={rawIncident} label="Incident API record" collapsible={false} /></> },
         ]}
         initialSection="overview"
         onClose={onClose}

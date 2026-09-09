@@ -40,12 +40,13 @@ and parsed bodies; evidence/traces are explicitly bounded. Heuristic redaction
 cannot guarantee arbitrary opaque prose, so exports remain sanitized and
 project only declared fields through `createSafeExporter`.
 
-Event detail has one intentional operator-facing exception: **Raw data** shows
-the exact record returned by Django's authenticated detailed-event endpoint,
-including every top-level field and the complete metadata object. It uses a
-separate TanStack Query cache key so the raw record cannot replace sanitized
-rows used by tables, drill-ins, exports, or formatted sections. Django remains
-the authorization boundary for what that endpoint returns.
+Incident and Event detail have one intentional operator-facing exception:
+**Raw data** shows the exact record returned by Django's authenticated detailed
+endpoint. That includes every top-level field, complete metadata, and expanded
+relations such as an Incident's `ip_info`. Each uses a separate TanStack Query
+cache key so the raw record cannot replace sanitized rows used by tables,
+drill-ins, exports, activity, or formatted sections. Django remains the
+authorization boundary for what those endpoints return.
 
 Before that recursive sanitizer runs, every history `media` value is positively
 rebuilt to exactly `id`, `filename`, `content_type`, and `category`; URLs,

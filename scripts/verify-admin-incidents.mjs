@@ -18,6 +18,10 @@ try {
     assert.match(eventPage, /showEventDetail\(row\.id\)/);
     assert.doesNotMatch(`${incidentPage}\n${eventPage}`, /useRightPanel|RightPanelSlot|RightPanelProvider/);
     assert.match(incidentDetail, /AssistantContextLauncher model="incident\.Incident"/);
+    assert.match(incidentDetail, /key: 'raw'.*label: 'Raw data'.*JsonBlock value=\{rawIncident\}/s,
+        'Incident detail must expose the complete authorized API record in a Raw data section');
+    assert.match(incidentDetail, /queryKey: \[IncidentModel\.endpoint, 'raw-one'.*queryFn: async \(\) => \(await mojoCall/s,
+        'raw incident detail must use its own unsanitized query cache');
     assert.match(eventDetailSource, /key: 'mojosec'.*label: 'MojoSec'/s,
         'MojoSec event metadata must have a dedicated detail section');
     assert.match(eventDetailSource, /key: 'raw'.*label: 'Raw data'.*JsonBlock value=\{rawEvent\}/s,
