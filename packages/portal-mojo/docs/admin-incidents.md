@@ -53,6 +53,13 @@ the child reveals the parent. Ticket/rule/AI/network-response/dashboard controls
 remain excluded. Bouncer discovery stays category-prefix plus MUID search
 because its reporter writes MUID into incident details.
 
+MojoSec events add a dedicated detail section over the backend's fixed,
+server-derived `metadata.mojosec` projection. It promotes the detection and
+sensor identity, timing, policy revision, recommendation, and every currently
+validated evidence field—including sudo command provenance and receipt
+semantics—without reopening arbitrary raw event metadata. The top-level
+`geo_ip` display string is shown in Source when Django supplies it.
+
 ## Backend evidence
 
 The contract was checked against django-mojo source rather than inferred from

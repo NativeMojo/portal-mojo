@@ -18,7 +18,7 @@ export interface EventRow {
     source_ip: string | null; hostname: string | null; uid: number | null;
     country_code: string | null; title: string | null; details: string | null;
     model_name: string | null; model_id: number | null; metadata: Record<string, unknown>;
-    group_id: number | null; incident?: Relation; geo_ip?: Record<string, unknown> | null;
+    group_id: number | null; incident?: Relation; geo_ip?: string | Record<string, unknown> | null;
 }
 
 const COMMON = new Set(['start', 'size', 'sort', 'search', 'dr_field', 'dr_start', 'dr_end']);

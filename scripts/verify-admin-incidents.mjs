@@ -8,18 +8,22 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 
 try {
-    const [incidentPage, eventPage, incidentDetail] = await Promise.all([
+    const [incidentPage, eventPage, incidentDetail, eventDetailSource] = await Promise.all([
         readFile(new URL('../packages/portal-mojo/src/admin/incidents/IncidentsPage.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/admin/incidents/EventsPage.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/admin/incidents/IncidentDetail.tsx', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/admin/incidents/EventDetail.tsx', import.meta.url), 'utf8'),
     ]);
     assert.match(incidentPage, /showIncidentDetail\(row\.id\)/);
     assert.match(eventPage, /showEventDetail\(row\.id\)/);
     assert.doesNotMatch(`${incidentPage}\n${eventPage}`, /useRightPanel|RightPanelSlot|RightPanelProvider/);
     assert.match(incidentDetail, /AssistantContextLauncher model="incident\.Incident"/);
+    assert.match(eventDetailSource, /key: 'mojosec'.*label: 'MojoSec'/s,
+        'MojoSec event metadata must have a dedicated detail section');
 
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     const incidents = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/models.ts');
+    const eventDetail = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/EventDetail.tsx');
     const sanitize = await server.ssrLoadModule('/packages/portal-mojo/src/admin/incidents/sanitize.ts');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
 
@@ -34,6 +38,23 @@ try {
     assert.equal(incidents.normalizeEventListParams({ sort: '-level', category__not: 'ossec' }).sort, '-created');
     assert.deepEqual(incidents.buildIncidentMerge([{ id: 1 }, { id: 2 }, { id: 3 }], 2).sourceIds, [1, 3]);
     assert.throws(() => incidents.buildIncidentMerge([{ id: 1 }], 1));
+
+    const mojosec = eventDetail.extractMojosecDetails({
+        mojosec: {
+            kind: 'auth.sudo_command', count: 1, sensor_id: 'prod-web-i-04aab759def924cdd',
+            first_seen: '2026-09-09T22:53:46.490459Z', last_seen: '2026-09-09T22:53:46.490459Z',
+            evidence: {
+                actor: 'ec2-user', target_user: 'root', command: '/usr/local/sbin/mojo-firewall-broker',
+                command_path: '/usr/local/sbin/mojo-firewall-broker', proof_status: 'partial',
+                receipt_semantics: ['normalize exact IPv4 DROP rules'],
+            },
+        },
+    });
+    assert.equal(mojosec?.summary.kind, 'auth.sudo_command');
+    assert.equal(mojosec?.summary.sensor_id, 'prod-web-i-04aab759def924cdd');
+    assert.equal(mojosec?.evidence.command_path, '/usr/local/sbin/mojo-firewall-broker');
+    assert.deepEqual(mojosec?.evidence.receipt_semantics, ['normalize exact IPv4 DROP rules']);
+    assert.equal(eventDetail.extractMojosecDetails({ mojosec: 'invalid' }), null);
 
     const source = { authorization: 'Bearer abcdefghijklmnop', nested: { password: 'sentinel-password', ok: 'keep' }, url: 'https://example.test/?token=sentinel-query', trace: 'token sentinel-trace-secret' };
     const safe = sanitize.sanitizeSecurityValue(source);
@@ -61,6 +82,12 @@ try {
     assert.equal(bouncer.count, 1);
     const ranges = await mock.mockFetch('/api/incident/event', { headers: manager, params: { category__not: 'ossec', level__gt: 4, level__lt: 9 } });
     assert(ranges.data.every((row) => row.category !== 'ossec' && row.level > 4 && row.level < 9));
+    const mojosecFixture = (await mock.mockFetch('/api/incident/event/8985', { headers: manager, params: { graph: 'detailed' } })).data;
+    const projectedMojosec = eventDetail.extractMojosecDetails(mojosecFixture.metadata);
+    assert.equal(mojosecFixture.geo_ip, '88.184.56.101 (Saint-Julien-du-Sault, FR)');
+    assert.equal(projectedMojosec?.summary.sensor_severity, 'high');
+    assert.equal(projectedMojosec?.evidence.proof_status, 'partial');
+    assert.deepEqual(projectedMojosec?.evidence.receipt_semantics, ['normalize exact IPv4 DROP rules']);
 
     const deniedSave = await mock.mockFetch('/api/incident/incident/601', { method: 'POST', headers: viewer, body: { status: 'open' } });
     assert.equal(deniedSave.error_code, 403);
