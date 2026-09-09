@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rename, rm, lstat } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inventory, verifyArtifact } from './verify-admin-artifact.mjs';
+import { inventory, verifyArtifact } from './admin-artifact.mjs';
 
 export const root = fileURLToPath(new URL('..', import.meta.url));
 export const TOOLCHAIN = Object.freeze({ node: '24.21.0', npm: '11.19.0' });
