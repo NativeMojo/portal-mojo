@@ -11,10 +11,11 @@ import {
 } from '../../ui';
 import {
     GLOBAL_CREDENTIAL_PERMS, GROUP_CREDENTIAL_PERMS,
-    GroupApiKeyModel, fetchApiKeyToken,
+    GroupApiKeyModel, buildApiKeyPermissionChanges, customApiKeyPermissionNames,
+    fetchApiKeyToken,
     getGroupApiKeyPermissions, grantedPermissions,
     groupApiKeyPermissionsVersion, subscribeGroupApiKeyPermissions,
-    readApiKeyRateLimits, useCreateGroupApiKey,
+    normalizeApiKeyPermissionNames, readApiKeyRateLimits, useCreateGroupApiKey,
     type ApiKeyPermissionDef, type CredentialGroup, type GroupApiKeyRow,
 } from './models';
 import { ApiKeyLimitsSummary, ApiKeyRateLimitsEditor } from './api-key-rate-limits';
@@ -59,6 +60,14 @@ function permissionSeed(
         granted.has(permission.name),
     ]));
 }
+
+const CUSTOM_PERMISSION_FIELD: Field = {
+    name: 'custom_permissions',
+    type: 'tags',
+    label: 'Additional permission names',
+    placeholder: 'Type a permission and press Enter',
+    help: 'Add permission strings that are not listed above. Remove a tag to revoke it when editing; the server authorizes every change.',
+};
 
 function TokenFooter({ permissions }: { permissions: string[] }) {
     return (
@@ -106,6 +115,7 @@ function useGroupApiKeyActions(permission: PermSpec) {
                             placeholder: 'Search groups…',
                         } satisfies Field] : []),
                         ...permissionFields(renderedPermissions),
+                        CUSTOM_PERMISSION_FIELD,
                     ]}
                     submitText="Create key"
                     onCancel={() => close(null)}
@@ -116,8 +126,16 @@ function useGroupApiKeyActions(permission: PermSpec) {
         if (!result) return;
 
         const permissions: Record<string, true> = {};
-        for (const def of renderedPermissions) {
-            if (result[`permissions.${def.name}`] === true) permissions[def.name] = true;
+        try {
+            for (const def of renderedPermissions) {
+                if (result[`permissions.${def.name}`] === true) permissions[def.name] = true;
+            }
+            for (const name of normalizeApiKeyPermissionNames(result.custom_permissions)) {
+                permissions[name] = true;
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Invalid permission name');
+            return;
         }
         const group = fixedGroup?.id ?? Number(result.group);
         if (!Number.isFinite(group) || group <= 0) {
@@ -162,8 +180,14 @@ function useGroupApiKeyActions(permission: PermSpec) {
                         { name: 'name', type: 'text', label: 'Name', required: true, columns: 6 },
                         { name: 'is_active', type: 'switch', label: 'Active', columns: 6 },
                         ...renderedFields,
+                        CUSTOM_PERMISSION_FIELD,
                     ]}
-                    initial={{ name: row.name, is_active: row.is_active, ...before }}
+                    initial={{
+                        name: row.name,
+                        is_active: row.is_active,
+                        ...before,
+                        custom_permissions: customApiKeyPermissionNames(row.permissions).join(','),
+                    }}
                     submitText="Save changes"
                     onCancel={() => close(null)}
                     onSubmit={(form) => close(form)}
@@ -178,14 +202,20 @@ function useGroupApiKeyActions(permission: PermSpec) {
         const nextActive = result.is_active === true;
         if (nextActive !== row.is_active) changes.is_active = nextActive;
 
-        // Diff only controls that were actually rendered. Unknown and
-        // protected grants remain absent from the partial JSONField update.
-        const permissionChanges: Record<string, boolean> = {};
-        for (const def of renderedPermissions) {
-            const key = `permissions.${def.name}`;
-            const was = before[key] === true;
-            const now = result[key] === true;
-            if (was !== now) permissionChanges[def.name] = now;
+        // Diff only guided controls that were actually rendered, plus the
+        // explicit freeform set. Protected hidden grants remain absent unless
+        // the operator deliberately types one (the server is authoritative).
+        let permissionChanges: Record<string, boolean>;
+        try {
+            permissionChanges = buildApiKeyPermissionChanges(
+                row.permissions,
+                renderedPermissions,
+                result,
+                result.custom_permissions,
+            );
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Invalid permission name');
+            return;
         }
         if (Object.keys(permissionChanges).length) changes.permissions = permissionChanges;
         if (!Object.keys(changes).length) return;
@@ -378,7 +408,9 @@ function AuthorizedGroupApiKeyDetail({ id, onClose }: { id: number; onClose: () 
                                     ? permissions.map((permission) => <Badge key={permission} tone="info">{permission}</Badge>)
                                     : <span className="dim-italic">No permissions granted</span>}
                             </div>
-                            <p className="dim">Only controls visible to the operator are diffed when editing; unknown grants are preserved.</p>
+                            <p className="dim">
+                                Use Edit to add or remove arbitrary permission names. Hidden protected controls are never changed implicitly.
+                            </p>
                         </>
                     ),
                 },

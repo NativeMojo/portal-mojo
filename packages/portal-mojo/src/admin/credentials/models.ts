@@ -330,6 +330,16 @@ registerGroupApiKeyPermissions([
     { name: 'manage_members', label: 'Manage Members' },
     { name: 'view_billing', label: 'View Billing' },
     {
+        name: 'send_sms',
+        label: 'Send SMS',
+        tooltip: 'Send outbound SMS messages for this key\'s group.',
+    },
+    {
+        name: 'comms',
+        label: 'Communications',
+        tooltip: 'Broad communications access, including SMS. Prefer Send SMS when that is all the integration needs.',
+    },
+    {
         name: 'geoip_sync',
         label: 'GeoIP Federation Sync',
         tooltip: 'Lets this key push abuse signals into the fleet shared GeoIP threat intelligence.',
@@ -342,6 +352,60 @@ export function grantedPermissions(dict: Record<string, unknown> | null | undefi
     return Object.entries(dict ?? {})
         .filter(([, value]) => value === true || value === 1)
         .map(([name]) => name);
+}
+
+/** TagInput CSV or array to unique permission names. */
+export function normalizeApiKeyPermissionNames(raw: unknown): string[] {
+    const values = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+    const names: string[] = [];
+    for (const value of values) {
+        let name = String(value ?? '').trim();
+        if (name.startsWith('permissions.')) name = name.slice('permissions.'.length).trim();
+        if (!name) continue;
+        if (name === '__replace') {
+            throw new Error('Permission "__replace" is reserved and cannot be granted.');
+        }
+        if (!names.includes(name)) names.push(name);
+    }
+    return names;
+}
+
+/** Truthy stored grants that have no registered guided control. */
+export function customApiKeyPermissionNames(
+    dict: Record<string, unknown> | null | undefined,
+): string[] {
+    const registered = new Set(getGroupApiKeyPermissions().map((permission) => permission.name));
+    return grantedPermissions(dict).filter((name) => !registered.has(name)).sort();
+}
+
+/**
+ * Build a merge-safe permissions patch from rendered switches and freeform
+ * tags. Only rendered switches are diffed, so protected controls hidden from
+ * this operator remain untouched. Missing previously-custom tags are revoked.
+ */
+export function buildApiKeyPermissionChanges(
+    current: Record<string, unknown> | null | undefined,
+    rendered: ApiKeyPermissionDef[],
+    form: Record<string, unknown>,
+    customRaw: unknown,
+): Record<string, boolean> {
+    const currentGranted = new Set(grantedPermissions(current));
+    const changes: Record<string, boolean> = {};
+
+    for (const permission of rendered) {
+        const next = form[`permissions.${permission.name}`] === true;
+        if (currentGranted.has(permission.name) !== next) changes[permission.name] = next;
+    }
+
+    const beforeCustom = new Set(customApiKeyPermissionNames(current));
+    const afterCustom = normalizeApiKeyPermissionNames(customRaw);
+    for (const name of afterCustom) {
+        if (!currentGranted.has(name)) changes[name] = true;
+    }
+    for (const name of beforeCustom) {
+        if (!afterCustom.includes(name)) changes[name] = false;
+    }
+    return changes;
 }
 
 export interface WebhookSubscriptionRow {

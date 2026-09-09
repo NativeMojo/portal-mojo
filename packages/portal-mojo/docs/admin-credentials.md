@@ -67,10 +67,14 @@ All ordinary API-key lists force `graph=default`, discard URL/persisted
 `graph` and unsupported search params before creating a query key, and scrub
 token fields from every list/detail/save result before any cache write.
 
-Create sends only permission controls whose value is `true`. Edit compares only
-controls that were actually rendered and sends a partial permission dictionary;
-unknown or protected grants are therefore preserved, while a visible changed
-grant may send `false` to revoke it.
+The guided forms include `send_sms` and the broader `comms` permission. Create
+and edit also expose **Additional permission names** as freeform tags, so a
+new backend permission does not require a portal release before a key can use
+it. Create sends only true guided controls and named tags. Edit diffs only
+controls that were actually rendered, adds newly named tags, and sends `false`
+for removed custom tags. Hidden protected grants are preserved unless an
+operator deliberately enters their name; django-mojo remains authoritative
+for every grant and revocation.
 
 The permission catalog is live and injectable:
 
@@ -88,6 +92,11 @@ registerGroupApiKeyPermissions([
 Registration replaces the same permission name and appends new names. Mounted
 editors subscribe to changes. `grantPermissions` gates the control itself; the
 backend remains authoritative on every save.
+
+`normalizeApiKeyPermissionNames()` trims and deduplicates TagInput CSV (or an
+array) and rejects the reserved `__replace` JSON update signal.
+`buildApiKeyPermissionChanges()` constructs the narrow merge patch used by the
+edit form without resending unchanged custom grants.
 
 ### Rate-limit overrides
 

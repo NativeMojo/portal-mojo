@@ -21,8 +21,28 @@ try {
     const components = await server.ssrLoadModule('/packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
     const {
-        buildApiKeyLimitPatch, readApiKeyRateLimits, validateApiKeyRateLimitInput,
+        buildApiKeyLimitPatch, buildApiKeyPermissionChanges,
+        getGroupApiKeyPermissions, normalizeApiKeyPermissionNames,
+        readApiKeyRateLimits, validateApiKeyRateLimitInput,
     } = models;
+
+    const permissionNames = getGroupApiKeyPermissions().map((permission) => permission.name);
+    assert(permissionNames.includes('send_sms'), 'the guided API-key editor must expose send_sms');
+    assert(permissionNames.includes('comms'), 'the guided API-key editor must expose comms');
+    assert.deepEqual(
+        normalizeApiKeyPermissionNames(' orders.read, custom_delivery,orders.read '),
+        ['orders.read', 'custom_delivery'],
+    );
+    assert.throws(() => normalizeApiKeyPermissionNames('__replace'), /reserved/);
+    assert.deepEqual(
+        buildApiKeyPermissionChanges(
+            { view_logs: true, legacy_custom: true, remove_me: true },
+            getGroupApiKeyPermissions(),
+            { 'permissions.view_logs': true },
+            'legacy_custom,new_custom',
+        ),
+        { new_custom: true, remove_me: false },
+    );
 
     const configured = {
         zeta: { limit: 10, window: 30 },
@@ -184,7 +204,7 @@ try {
     assert.deepEqual(legacy.data.limits.__replace, { limit: 999, window: 1 }, 'reserved stored data remains read-only');
     assert.equal(JSON.stringify(legacy.data).includes('mock_gk_'), false, 'credential material stays absent');
 
-    console.log('admin credentials rate-limit contract verified');
+    console.log('admin credentials permission and rate-limit contracts verified');
 } finally {
     await server.close();
 }
