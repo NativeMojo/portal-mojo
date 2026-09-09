@@ -1540,6 +1540,10 @@ interface MockGeoIp {
     is_whitelisted: boolean;
     whitelisted_reason: string | null;
     whitelisted_until: number | null;
+    firewall_generation: number;
+    firewall_pending: boolean;
+    firewall_sync_error: string;
+    firewall_observed_at: number | null;
     expires_at: number | null;
     /** Excluded from the `default` graph — the raw provider blob. */
     provider: string | null;
@@ -1616,6 +1620,9 @@ const GEOIP_SEEDS: GeoIpSeed[] = [
     // ── A datacenter VPN, blocked with a live TTL ──
     { ip: '45.33.32.156', cc: 'US', country: 'United States', region: 'California', rc: 'US-CA', city: 'Fremont', lat: 37.5483, lng: -121.9886, tz: 'America/Los_Angeles', asn: 'AS63949', asnOrg: 'Akamai Connected Cloud', isp: 'Linode', connection: 'hosting', vpn: true, cloud: true, datacenter: true, threat: 'high', blockedReason: 'Credential stuffing from a VPN exit', blockedInDays: 6, blockCount: 2, lastSeenHours: 4 },
 
+    // ── The bouncer incident source used by Incident #603 ──
+    { ip: '198.51.100.66', cc: 'CN', country: 'China', region: 'Beijing', rc: 'CN-BJ', city: 'Beijing', postal: '100000', lat: 39.9042, lng: 116.4074, tz: 'Asia/Shanghai', asn: 'AS45090', asnOrg: 'Shenzhen Tencent Computer Systems', isp: 'Tencent Cloud', connection: 'hosting', vpn: true, proxy: true, cloud: true, datacenter: true, attacker: true, abuser: true, threat: 'critical', blockedReason: 'Bouncer blocked automated credential attack', blockedInDays: null, blockCount: 18, lastSeenHours: 2 },
+
     // ── An EXPIRED block: is_blocked is still true, blocked_until is past.
     //    web-mojo rendered this as "Blocked". block_active() says otherwise.
     { ip: '104.28.14.33', cc: 'BR', country: 'Brazil', region: 'São Paulo', rc: 'BR-SP', city: 'São Paulo', lat: -23.5505, lng: -46.6333, tz: 'America/Sao_Paulo', asn: 'AS13335', asnOrg: 'Cloudflare', isp: 'Cloudflare', connection: 'hosting', proxy: true, cloud: true, threat: 'medium', blockedReason: 'Scraper burst', blockedInDays: -3, blockCount: 1, lastSeenHours: 9 },
@@ -1690,6 +1697,10 @@ function buildGeoIps(): MockGeoIp[] {
             is_whitelisted: whitelisted,
             whitelisted_reason: seed.whitelistReason ?? null,
             whitelisted_until: whitelisted && seed.whitelistInDays != null ? nowSec + seed.whitelistInDays * DAY : null,
+            firewall_generation: blocked || whitelisted ? 1 : 0,
+            firewall_pending: false,
+            firewall_sync_error: '',
+            firewall_observed_at: blocked || whitelisted ? lastSeen : null,
             // `is_expired`: internal records never expire.
             expires_at: provider === 'internal' ? null : nowSec + 60 * DAY,
             provider,
@@ -1806,7 +1817,8 @@ const GEOIP_BASIC_FIELDS = [
     'is_tor', 'is_vpn', 'is_proxy', 'is_known_attacker', 'is_known_abuser',
     'threat_level', 'is_blocked', 'blocked_at', 'blocked_until', 'provider',
     'blocked_reason', 'block_count', 'is_whitelisted', 'whitelisted_reason',
-    'whitelisted_until',
+    'whitelisted_until', 'firewall_generation', 'firewall_pending',
+    'firewall_sync_error', 'firewall_observed_at',
 ];
 
 /** The `federation` graph: NO enforcement state and NO raw provider blob. */
@@ -1997,6 +2009,8 @@ function geolocateMock(ip: string, autoRefresh: boolean): MockGeoIp {
             is_blocked: false, blocked_at: null, blocked_until: null,
             blocked_reason: null, block_count: 0,
             is_whitelisted: false, whitelisted_reason: null, whitelisted_until: null,
+            firewall_generation: 0, firewall_pending: false,
+            firewall_sync_error: '', firewall_observed_at: null,
             expires_at: null, provider: null, data: {},
         };
         db.geoIps.unshift(row);
@@ -9093,7 +9107,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
                 return { status: true, data: { ...row }, graph: String(opts.params?.graph ?? 'default') };
             }
             const graph = String(opts.params?.graph ?? 'default');
-            return { status: true, data: { ...row, ...(graph === 'detailed' ? { ip_info: { ip_address: row.source_ip, country_code: row.country_code } } : {}) }, graph };
+            const geo = row.source_ip ? db.geoIps.find((candidate) => candidate.ip_address === row.source_ip) : null;
+            const ipInfo = geo
+                ? serializeGeoIp(geo, 'default')
+                : { ip_address: row.source_ip, country_code: row.country_code };
+            return { status: true, data: { ...row, ...(graph === 'detailed' ? { ip_info: ipInfo } : {}) }, graph };
         }
         if (method === 'POST') return { status: false, error: 'Incident creation is not available', error_code: 403 };
         const result = listRows(

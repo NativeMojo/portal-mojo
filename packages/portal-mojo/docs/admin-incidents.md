@@ -60,6 +60,14 @@ the child reveals the parent. Ticket/rule/AI/network-response/dashboard controls
 remain excluded. Bouncer discovery stays category-prefix plus MUID search
 because its reporter writes MUID into incident details.
 
+Incidents with a source address add a formatted **Source** section. It promotes
+the detailed graph's `ip_info` into location/network, risk and reputation,
+effective block/whitelist state, checked-firewall reconciliation, observation
+times, and incident connection context. The address and action open the shared
+GeoIP dossier from the existing cache table (never a billed provider lookup).
+Missing enrichment stays visibly unknown; the exact `ip_info` object remains in
+Raw data.
+
 MojoSec events add a dedicated formatted section over the backend's fixed,
 server-derived `metadata.mojosec` projection. It promotes the detection and
 sensor identity, timing, policy revision, recommendation, and every currently

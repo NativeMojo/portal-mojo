@@ -22,6 +22,12 @@ try {
         'Incident detail must expose the complete authorized API record in a Raw data section');
     assert.match(incidentDetail, /queryKey: \[IncidentModel\.endpoint, 'raw-one'.*queryFn: async \(\) => \(await mojoCall/s,
         'raw incident detail must use its own unsanitized query cache');
+    assert.match(incidentDetail, /key: 'source'.*label: 'Source'.*IncidentSourceIntelligence/s,
+        'Incident detail must present common source intelligence in a dedicated section');
+    assert.match(incidentDetail, /showGeoIpDossier|showGeoIpDossierForAddress/,
+        'Incident source intelligence must open the canonical GeoIP dossier');
+    assert.match(incidentDetail, /firewall_pending.*firewall_sync_error/s,
+        'Incident source intelligence must expose firewall reconciliation state');
     assert.match(eventDetailSource, /key: 'mojosec'.*label: 'MojoSec'/s,
         'MojoSec event metadata must have a dedicated detail section');
     assert.match(eventDetailSource, /key: 'raw'.*label: 'Raw data'.*JsonBlock value=\{rawEvent\}/s,
@@ -112,6 +118,10 @@ try {
     const secretFixture = (await mock.mockFetch('/api/incident/incident/603', { headers: manager, params: { graph: 'detailed' } })).data;
     assert(JSON.stringify(secretFixture).includes('sentinel'));
     assert(!JSON.stringify(sanitize.sanitizeIncidentRow(secretFixture)).includes('sentinel'));
+    assert.equal(secretFixture.ip_info.ip_address, '198.51.100.66');
+    assert.equal(secretFixture.ip_info.city, 'Beijing');
+    assert.equal(secretFixture.ip_info.threat_level, 'critical');
+    assert.equal(secretFixture.ip_info.firewall_pending, false);
     const merge = await mock.mockFetch('/api/incident/incident/601', { method: 'POST', headers: manager, body: { merge: [603] } });
     assert.equal(merge.status, true);
     const deletedSource = await mock.mockFetch('/api/incident/incident/603', { headers: manager });

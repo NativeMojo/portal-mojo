@@ -113,6 +113,11 @@ export interface GeoLocatedIPRow {
     whitelisted_reason: string | null;
     whitelisted_until: number | null;
 
+    firewall_generation: number;
+    firewall_pending: boolean;
+    firewall_sync_error: string;
+    firewall_observed_at: number | null;
+
     expires_at: number | null;
 
     /** `extra` on every graph — computed Python properties. */
