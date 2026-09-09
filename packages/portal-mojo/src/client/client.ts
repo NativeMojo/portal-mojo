@@ -23,20 +23,25 @@ import type { MojoList, Params } from './types';
 export { MojoError, AuthRequiredError } from './errors';
 
 const API_BASE: string = import.meta.env.VITE_MOJO_API ?? '';
+/** Reserved for the controlled Django artifact producer; ordinary dev stays mock-backed. */
+export function isPackagedAdmin(): boolean {
+    return import.meta.env.VITE_MOJO_PACKAGED_ADMIN === '1';
+}
 let mockModule: Promise<typeof import('./mock')> | null = null;
 
 function loadMockModule(): Promise<typeof import('./mock')> {
+    if (import.meta.env.VITE_MOJO_PACKAGED_ADMIN === '1') throw new Error('Mock transport is unavailable in packaged Admin');
     return mockModule ??= import('./mock');
 }
 
 /** True when the in-memory mock transport is active (VITE_MOJO_API unset). */
 export function usingMockTransport(): boolean {
-    return !API_BASE;
+    return !isPackagedAdmin() && !API_BASE;
 }
 
 /** The configured django-mojo origin ('' under the mock transport). */
 export function apiOrigin(): string {
-    return API_BASE;
+    return isPackagedAdmin() ? window.location.origin : API_BASE;
 }
 
 /**
@@ -81,6 +86,8 @@ export interface FetchOpts {
     body?: Record<string, unknown>;
     /** Cancels the selected transport request. */
     signal?: AbortSignal;
+    /** Optional final validity check after auth refresh and immediately before sending. */
+    beforeSend?: () => void;
     /** Explicit opt-out from a registered endpoint scope (scoped.ts) — for
      *  genuinely global calls inside a scoped family. Greppable, never silent. */
     unscoped?: boolean;
@@ -117,6 +124,7 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
     // Authorization value is picked up below by construction (web-mojo had to
     // re-stamp a snapshotted header here).
     if (authHooks) await authHooks.preRequest(path);
+    opts.beforeSend?.();
 
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -125,11 +133,11 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
     const bearer = authHooks?.authHeader();
     if (bearer) headers['Authorization'] = bearer;
 
-    if (!API_BASE) {
+    if (usingMockTransport()) {
         const { mockFetch } = await loadMockModule();
         return (await mockFetch(path, { ...opts, headers })) as Envelope;
     }
-    const res = await fetch(`${API_BASE}${path}${buildQuery(opts.params ?? {})}`, {
+    const res = await fetch(`${apiOrigin()}${path}${buildQuery(opts.params ?? {})}`, {
         method: opts.method ?? 'GET',
         headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
@@ -265,7 +273,7 @@ export async function mojoDownload(endpoint: string, params: Params, format: 'cs
     const bearer = authHooks?.authHeader();
     if (bearer) headers['Authorization'] = bearer;
 
-    if (!API_BASE) {
+    if (usingMockTransport()) {
         const { mockFetch } = await loadMockModule();
         const body = (await mockFetch(endpoint, { params: withFormat, headers })) as Envelope;
         if (body.status === false) {
@@ -276,7 +284,7 @@ export async function mojoDownload(endpoint: string, params: Params, format: 'cs
         downloadBlob(new Blob([file.content], { type: file.mime }), file.filename);
         return;
     }
-    const res = await fetch(`${API_BASE}${endpoint}${buildQuery(withFormat)}`, { headers });
+    const res = await fetch(`${apiOrigin()}${endpoint}${buildQuery(withFormat)}`, { headers });
     if (!res.ok) throw new MojoError(`Export failed (HTTP ${res.status})`, res.status);
     downloadBlob(await res.blob(), filename);
 }

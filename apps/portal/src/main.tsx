@@ -9,13 +9,16 @@ import './menus';
 import App from './App';
 import { authRoutes, RequireAuth, handleAuthTokenLanding } from './pages/auth/routes';
 import { adminRoutes } from './pages/admin-routes';
+import { ensureAdminSourceSession, initializeAdminSourceSession, revokeAdminSourceSession } from './admin-source-session';
+import { AdminSourceSessionGate } from './AdminSourceSessionGate';
 
 // Wire the auth gate + Authorization/DUID headers into the client and start
 // session upkeep (single-flight refresh watcher) if a session exists.
+initializeAdminSourceSession();
 mojo.initAuth();
 // Returning from the hosted /auth pages: exchange ?auth_code= for a session
 // (no-op when the param is absent — i.e. every normal load).
-void mojo.handleAuthCodeFromURL();
+const authExchange = mojo.handleAuthCodeFromURL();
 // Reset/magic-link emails landing in the REAL search string
 // (?flow=…&token=…): scrub + hash-route to the matching landing page.
 // Synchronous, and MUST run before createHashRouter is constructed
@@ -23,7 +26,7 @@ void mojo.handleAuthCodeFromURL();
 handleAuthTokenLanding();
 // Dev console handle — e.g. __mojo.logout(), __mojo.requestFreshAuth().
 if (import.meta.env.DEV) {
-    (window as unknown as Record<string, unknown>).__mojo = mojo;
+    (window as unknown as Record<string, unknown>).__mojo = { ...mojo, logout: revokeAdminSourceSession };
 }
 import { RouteError, ThemeProvider } from 'portal-mojo/ui/shell';
 
@@ -46,7 +49,7 @@ if (adminSearch.has('group')) {
 // crash INSIDE the app shell (Sidebar/TopNav stay alive); the root one is
 // the last resort — it catches 404s and shell crashes and, by router
 // semantics, replaces the shell entirely, so the card stands alone.
-const router = createHashRouter([
+function createAdminRouter() { return createHashRouter([
     {
         path: '/',
         element: <RequireAuth><App /></RequireAuth>,
@@ -61,7 +64,7 @@ const router = createHashRouter([
         ],
     },
     ...authRoutes,
-]);
+]); }
 
 const mojoDefaults = mojo.mojoQueryDefaults();
 const queryClient = new QueryClient({
@@ -77,14 +80,30 @@ if (import.meta.env.DEV) {
 mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
 mojo.onAuth('logout', () => { void queryClient.invalidateQueries(); });
 
-createRoot(document.getElementById('root')!).render(
+const root = createRoot(document.getElementById('root')!);
+let router: ReturnType<typeof createAdminRouter> | undefined;
+function render() { root.render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
             <mojo.RealtimeProvider>
                 <ThemeProvider>
-                    <RouterProvider router={router} />
+                    <AdminSourceSessionGate onRetry={() => { void start(); }}>
+                        {router && <RouterProvider router={router} />}
+                    </AdminSourceSessionGate>
                 </ThemeProvider>
             </mojo.RealtimeProvider>
         </QueryClientProvider>
     </StrictMode>,
-);
+); }
+
+async function start(): Promise<void> {
+    try {
+        await authExchange;
+        await ensureAdminSourceSession();
+        router?.dispose();
+        router = createAdminRouter();
+    } catch { /* readiness store supplies eager recovery without losing the hash */ }
+    render();
+}
+render();
+void start();

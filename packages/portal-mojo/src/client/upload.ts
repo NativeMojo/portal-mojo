@@ -368,6 +368,7 @@ class UploadTask implements FileUploadTask {
             onProgress: (loaded: number, total: number) => this.#publish({ loadedBytes: loaded, totalBytes: total > 0 ? total : null }, generation),
         };
         if (usingMockTransport()) {
+            if (import.meta.env.VITE_MOJO_PACKAGED_ADMIN === '1') throw new Error('Mock upload is unavailable in packaged Admin');
             const { mockUploadBytes } = await import('./mock');
             await mockUploadBytes(request);
         } else await xhrUpload(request);

@@ -10,6 +10,13 @@ import {
 
 ## Transport
 
+- The controlled Django Admin artifact explicitly selects packaged mode:
+  `isPackagedAdmin()` is true, `apiOrigin()` is `window.location.origin`, and
+  `usingMockTransport()` is false. Every API path stays `/api/...`, independently
+  of the Admin asset mount. Upload/provider credentials retain their existing
+  isolation; realtime, hosted auth, exports and Shortlinks reuse `apiOrigin()`.
+  This mode is set by the Admin producer, not by ordinary deployment dotenv.
+
 - `VITE_MOJO_API` unset → the in-memory mock answers every call
   (`npm run dev`). Set to a django-mojo origin → real backend
   (`npm run dev:live`, configured in `apps/portal/.env.live`).
@@ -26,6 +33,11 @@ status, errorCode, data)`** carrying the server's real message, numeric HTTP
 status, semantic `error_code`, and structured safe failure evidence. Nothing outside `client.ts`
 parses envelopes; `mojoCall(path, {method, params, body})` is the typed
 escape hatch for protocol modules and returns the unwrapped `Envelope`.
+
+`FetchOpts.beforeSend` is an optional synchronous final validity check, invoked
+after the auth gate refreshes credentials and before headers/network activity.
+The packaged app uses it to recheck its source-generation binding at the cookie
+boundary. Throwing rejects the request. Ordinary consumers need no callback.
 
 Live non-2xx responses and mock `status:false` envelopes preserve the same
 shape. Modern envelopes use numeric top-level `code` plus a string semantic

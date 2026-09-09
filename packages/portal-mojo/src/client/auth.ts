@@ -306,6 +306,12 @@ function adoptGrant(data: TokenGrant, remember = true): AuthUser {
 
 /** Password login. `username` may be a username, email, or (if enabled) phone. */
 export async function login(username: string, password: string, opts: LoginOptions = {}): Promise<LoginResult> {
+    // A malformed/expired session must not prevent the user from replacing it.
+    // The transport gate deliberately blocks authenticated requests when both
+    // tokens are unusable, but /api/login is itself the recovery path. Clear
+    // only that dead session; a valid session (including fresh-auth re-login)
+    // remains intact until the new grant is adopted.
+    if (checkTokenStatus().action === 'logout') clearTokens({ silent: true });
     const body = await mojoCall('/api/login', { method: 'POST', body: { username, password, ...opts.extra } });
     const data = body.data as TokenGrant;
     if (data.mfa_required) {
@@ -721,7 +727,7 @@ export function initAuth(): void {
             // Recursion guard: never gate the refresh call itself.
             if (path === REFRESH_PATH) return;
             // No stored token → pre-login / public flow, pass through.
-            if (!getAccessToken()) return;
+            if (!getAccessToken() && !getRefreshToken()) return;
             await ensureValidToken();
             // NOTE: web-mojo had to re-stamp Authorization here because its
             // Rest snapshotted headers before the gate ran. Our transport

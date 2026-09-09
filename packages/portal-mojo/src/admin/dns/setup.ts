@@ -10,7 +10,7 @@ registerDnsAdminIntegration({
         return resolveDnsDomainByName(normalizedName);
     },
     recordsHref: (domainId) => `dns/records?domain=${encodeURIComponent(domainId)}`,
-    ...(usingMockTransport() ? {
+    ...(import.meta.env.VITE_MOJO_PACKAGED_ADMIN !== '1' && usingMockTransport() ? {
         applyManagedDnsRecords: async (domainId: number, records: readonly ManagedDnsRecordInput[]) => {
             const { applyMockManagedDnsRecords } = await import('../../client/mock');
             applyMockManagedDnsRecords(domainId, records);

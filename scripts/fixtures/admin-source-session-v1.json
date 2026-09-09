@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "request": { "method": "POST", "path": "/api/account/admin/session" },
+  "response": {
+    "status": true,
+    "data": { "path": "/admin/", "source_session_expires_in": 300, "source_session_expires_at": 2000000300 }
+  },
+  "revocation": { "method": "DELETE", "path": "/admin/_session" },
+  "coordination": {
+    "version": 1,
+    "lock": "mojo:admin-source-session:v1",
+    "storage": "mojo:admin-source-generation:v1",
+    "channel": "mojo:admin-source-session:v1",
+    "initial": { "version": 1, "generation": "initial", "state": "active" },
+    "record": { "version": 1, "generation": "00000000-0000-4000-8000-000000000001", "state": "revoked" },
+    "message": { "type": "generation", "version": 1, "generation": "00000000-0000-4000-8000-000000000001", "state": "revoked" },
+    "logout_order": ["persist-tombstone", "broadcast", "clear-credentials", "acquire-lock", "reassert-only-if-still-same-tombstone", "await-delete-response", "complete"],
+    "issue_order": ["acquire-lock", "check-generation-and-auth", "refresh-if-needed", "recheck-generation-and-auth", "post", "await-response-body", "recheck-generation-and-auth", "ready", "release-lock"]
+  }
+}

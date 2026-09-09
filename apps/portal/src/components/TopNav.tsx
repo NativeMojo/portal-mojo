@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { hostedAuthUrl, logout, redirectToHostedAuth, useAuthSnapshot, useMe } from 'portal-mojo/client/runtime';
+import { hostedAuthUrl, redirectToHostedAuth, useAuthSnapshot, useMe } from 'portal-mojo/client/runtime';
+import { revokeAdminSourceSession } from '../admin-source-session';
 import { useTheme, type ThemePref, fmt } from 'portal-mojo/ui/shell';
 import { AssistantLauncher } from 'portal-mojo/admin/assistant/launcher';
 import { authMode } from '../pages/auth/config';
@@ -44,7 +45,7 @@ function UserChip() {
         <div className="user-chip">
             <span className="user-avatar">{fmt.initials(name)}</span>
             <span className="user-name">{name}</span>
-            <button className="btn-icon" title="Sign out" onClick={() => logout()}>
+            <button className="btn-icon" title="Sign out" onClick={async () => { await revokeAdminSourceSession().catch(() => {}); }}>
                 <i className="bi bi-box-arrow-right" />
             </button>
         </div>

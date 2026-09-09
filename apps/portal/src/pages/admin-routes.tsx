@@ -6,9 +6,10 @@ import { AdminLazyPage, adminSectionRoutes } from 'portal-mojo/admin/core';
 import { Guarded } from 'portal-mojo/ui/shell';
 import { GROUP_VIEW_PERMS } from '../group-permissions';
 import { ADMIN_SECTIONS } from '../admin-sections';
+import { withAdminSourceSession } from '../admin-source-session';
 
-const loadGroupsPage = () => import('./GroupsPage').then(({ GroupsPage }) => ({ default: GroupsPage }));
-const loadApiKeysPage = () => import('./ApiKeysPage').then(({ ApiKeysPage }) => ({ default: ApiKeysPage }));
+const loadGroupsPage = withAdminSourceSession(() => import('./GroupsPage').then(({ GroupsPage }) => ({ default: GroupsPage })));
+const loadApiKeysPage = withAdminSourceSession(() => import('./ApiKeysPage').then(({ ApiKeysPage }) => ({ default: ApiKeysPage })));
 
 function AdminDenied() {
     return (

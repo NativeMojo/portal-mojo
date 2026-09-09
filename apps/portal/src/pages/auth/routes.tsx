@@ -20,11 +20,12 @@ import { redirectToHostedAuth, useAuthSnapshot } from 'portal-mojo/client/runtim
 import { AuthIndexRoute, AuthLayout } from './AuthLayout';
 import { FreshAuthHost } from './FreshAuthHost';
 import { authMode, stashReturnRoute } from './config';
+import { withAdminSourceSession } from '../../admin-source-session';
 
-const loadLoginPage = () => import('./LoginPage').then(({ LoginPage }) => ({ Component: LoginPage }));
-const loadForgotPage = () => import('./ForgotPage').then(({ ForgotPage }) => ({ Component: ForgotPage }));
-const loadResetPage = () => import('./ResetPage').then(({ ResetPage }) => ({ Component: ResetPage }));
-const loadMagicPage = () => import('./MagicPage').then(({ MagicPage }) => ({ Component: MagicPage }));
+const loadLoginPage = withAdminSourceSession(() => import('./LoginPage').then(({ LoginPage }) => ({ Component: LoginPage })));
+const loadForgotPage = withAdminSourceSession(() => import('./ForgotPage').then(({ ForgotPage }) => ({ Component: ForgotPage })));
+const loadResetPage = withAdminSourceSession(() => import('./ResetPage').then(({ ResetPage }) => ({ Component: ResetPage })));
+const loadMagicPage = withAdminSourceSession(() => import('./MagicPage').then(({ MagicPage }) => ({ Component: MagicPage })));
 
 /**
  * The in-app auth pages. Registered unconditionally — deep links (reset /

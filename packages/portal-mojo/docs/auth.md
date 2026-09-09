@@ -30,6 +30,34 @@ onAuth('logout', () => queryClient.invalidateQueries());   // every cached answe
 - Events for `onAuth`: `'login' | 'logout' | 'refreshed' | 'refresh-failed'
   | 'unauthorized'`.
 
+Both localStorage and sessionStorage keep the existing token keys. Refresh
+preserves the chosen storage, including sessions with only a valid refresh token
+at boot. Password login can replace malformed/expired credentials without the
+old dead session blocking its own recovery request.
+
+## Packaged Django Admin
+
+The generic auth client has no Admin side effects. The packaged app installs
+its app-local source coordinator before `initAuth`, awaits hosted exchange and
+source readiness before creating its router, and wraps all lazy loaders.
+It uses the page's own API origin and hosted auth. Source grants renew at 70%
+of their effective lifetime, independently of access-token refresh; focus and
+suspended-tab recovery recheck the grant. Eager recovery preserves the route.
+
+The app's `revokeAdminSourceSession()` first persists a nonsecret logout
+tombstone, clears credentials, then waits for the shared exclusive Web Lock and
+the completed `DELETE <admin>/_session` response. It must be awaited by app
+sign-out callers; generic `logout()` retains its existing synchronous semantics
+for ordinary toolkit consumers. All legacy/gate/Portal participants share
+`mojo:admin-source-session:v1` (lock and channel) and
+`mojo:admin-source-generation:v1` (authoritative localStorage record and per-tab
+sessionStorage binding). No credentials appear in coordination messages/storage.
+
+The complete app contract is in the producer repository's
+`docs/admin-artifact.md`; the frozen source fixture is
+`scripts/fixtures/admin-source-session-v1.json`. Django owns real cookie race
+and protected-browser acceptance against the exact artifact manifest digest.
+
 ## Hosted auth pages (the django-mojo "bouncer" pages)
 
 The backend serves themed login/register pages at `<origin>/auth` (behind

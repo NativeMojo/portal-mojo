@@ -9,7 +9,7 @@
 //     set), in-app under the mock (there IS no hosted page to bounce to).
 // Unknown values fall back to that same default WITH a console.warn — never
 // to "no auth at all" (house rule 4).
-import { apiOrigin, usingMockTransport } from 'portal-mojo/client/runtime';
+import { apiOrigin, isPackagedAdmin, usingMockTransport } from 'portal-mojo/client/runtime';
 
 export type AuthMode = 'inapp' | 'hosted';
 
@@ -21,6 +21,7 @@ function defaultMode(): AuthMode {
 
 /** The resolved auth mode for this deployment. */
 export function authMode(): AuthMode {
+    if (isPackagedAdmin()) return 'hosted';
     if (RAW_MODE === 'inapp') return 'inapp';
     if (RAW_MODE === 'hosted') {
         if (usingMockTransport()) {

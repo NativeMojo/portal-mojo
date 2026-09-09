@@ -1,8 +1,10 @@
 // Standalone Admin chrome. Group switching belongs to product portals; this
 // artifact is deliberately global and renders one categorized Admin menu.
 import { SidebarNav } from 'portal-mojo/ui/shell';
+import { usingMockTransport } from 'portal-mojo/client/runtime';
 
-const USING_MOCK = !import.meta.env.VITE_MOJO_API;
+const USING_MOCK = usingMockTransport();
+const version = import.meta.env.VITE_MOJO_APP_VERSION ?? 'development';
 
 export function Sidebar({
     collapsed,
@@ -35,7 +37,7 @@ export function Sidebar({
                     <i className={`bi ${USING_MOCK ? 'bi-database' : 'bi-broadcast'}`} />
                     <span className="nav-text">{USING_MOCK ? 'Mock API' : 'Live API'}</span>
                 </span>
-                <span className="side-version">v0.1.0</span>
+                <span className="side-version">v{version}</span>
             </div>
         </aside>
     );
