@@ -94,6 +94,9 @@ for (const mode of ['mock', 'live', 'packaged']) {
                 assert.equal((persistent ? sessionStorage : localStorage).getItem('access_token'), null);
             }
             await client.mojoCall('/api/user/me');
+            auth.setTokens('expired-access', 'expired-refresh');
+            assert(await auth.exchangeAuthCode('one-time-code'), 'Hosted sign-in must recover from a dead session');
+            assert(requests.some(({ url }) => url === origin + '/api/auth/exchange'));
             await client.mojoDownload('/api/user', {}, 'csv');
             assert(requests.every(({ url }) => url.startsWith(origin + '/api/')));
             const { startFileUpload } = await load('/packages/portal-mojo/src/client/upload.ts');

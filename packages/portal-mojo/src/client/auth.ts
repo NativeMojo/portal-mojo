@@ -605,6 +605,9 @@ export function exchangeAuthCode(code: string): Promise<AuthUser | null> {
 
 async function doExchange(code: string): Promise<AuthUser | null> {
     try {
+        // Hosted sign-in is also a recovery path: stale credentials must not
+        // block exchanging the fresh one-time login code.
+        if (checkTokenStatus().action === 'logout') clearTokens({ silent: true });
         const body = await mojoCall('/api/auth/exchange', { method: 'POST', body: { code } });
         return adoptGrant(body.data as TokenGrant);
     } catch (error) {
