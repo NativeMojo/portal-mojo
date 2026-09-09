@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rename, rm, lstat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inventory, verifyArtifact } from './verify-admin-artifact.mjs';
 
@@ -32,6 +32,14 @@ export async function buildAdmin({ output = join(root, 'dist/admin'), canonical 
     if (output !== join(root, 'dist/admin') && !output.startsWith(join(root, 'dist') + '/')) {
         throw new Error('Admin output must remain under this repository dist directory');
     }
+    let ancestor = resolve(root);
+    for (const part of relative(root, dirname(output)).split('/')) {
+        ancestor = join(ancestor, part);
+        try {
+            const info = await lstat(ancestor);
+            if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Unsafe Admin output ancestry');
+        } catch (error) { if (error.code === 'ENOENT') break; throw error; }
+    }
     await mkdir(dirname(output), { recursive: true });
     const stage = await mkdtemp(join(dirname(output), '.admin-stage-'));
     let backup;
@@ -45,6 +53,11 @@ export async function buildAdmin({ output = join(root, 'dist/admin'), canonical 
             await build({ root: join(root, 'apps/portal'), configFile: join(root, 'apps/portal/vite.config.ts'),
                 mode: 'django-admin', logLevel: 'warn', build: { outDir: stage, manifest: true, sourcemap: false, emptyOutDir: true } });
         } finally { process.env = inherited; }
+        if (!sourceDirty && (git('status', '--porcelain', '--untracked-files=normal') !== ''
+            || git('rev-parse', 'HEAD') !== revision
+            || !(await readFile(join(root, 'package-lock.json'))).equals(lockfile))) {
+            throw new Error('Clean source changed during Admin build; retry from a stable checkout');
+        }
         const manifest = {
             schema_version: 1, artifact: 'portal-mojo-admin', version,
             source_revision: revision, source_dirty: sourceDirty, toolchain: TOOLCHAIN,
