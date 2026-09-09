@@ -2,8 +2,12 @@
 
 The runnable base portal for django-mojo — the reference answer to "grab the
 portal, point it at a django-mojo instance, off to the races." It is the first
-consumer and test bed of the `portal-mojo` package, and the shell that
-`create-portal-mojo` will clone per deployment.
+consumer of the `portal-mojo` package and the built-in Django Admin frontend.
+`npm ci && npm run build:admin` at the root creates the separate `dist/admin`
+distribution using Node 24.21.0/npm 11.19.0. Use `-- --canonical` to require
+clean source. Django serves those bytes behind its protected `/admin/v2/` mount
+(or the configured Admin prefix), with same-origin API calls and hosted auth.
+No API environment variable or frontend build is required on the deployment.
 
 ```bash
 npm install        # at the repo root (npm workspaces)
@@ -16,7 +20,7 @@ Point it at a real backend by setting one env var (`.env.local`):
 VITE_MOJO_API=https://api.example.com
 ```
 
-With it unset, the toolkit's mock (`packages/portal-mojo/src/client/mock.ts`)
+With it unset in ordinary development, the toolkit's mock (`packages/portal-mojo/src/client/mock.ts`)
 serves an in-memory dataset through the **exact django-mojo wire contract** —
 envelope `{status, data, count, size, start}`, `start`/`size` paging,
 `'-field'` sort, `search`, and Django lookups (`role__in`, `is_active`,
@@ -56,9 +60,15 @@ This app owns what is deployment-specific:
 badges, filters, presets, deep-linkable state, add-user form, row-click detail
 modal — in ~80 declarative lines against the toolkit.
 
-## Not here yet (deliberate)
+## Protected packaged runtime
 
-Auth flows, permissions gating, group context, WebSocket, capability
-detection, sidebar collapse/mobile, column chooser, stat strip, inline cell
-edit, autosave forms — those are toolkit phases (see `PLAN.md`), not baseline
-concerns. The seams for all of them exist.
+The packaged app establishes its source-session cookie before constructing the
+hash router and gates every lazy loader. Grants renew from their server deadline
+and on resumed tabs; denied/expired/unavailable grants show eager recovery with
+the route preserved. Sign-out waits for cross-tab coordinated revocation.
+Storage keys remain compatible with MojoAuth; remember-me and session-only
+sessions retain their storage choice. The sidebar shows Live API and the
+artifact version. Embedded consumers and showcase do not install this lifecycle.
+
+See [artifact identity, source timing/coordination and CSP matrix](../../docs/admin-artifact.md).
+Scaffolding and capabilities discovery are future independent work.

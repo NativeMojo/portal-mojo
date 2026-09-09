@@ -360,8 +360,8 @@ portal-mojo/
   packages/portal-mojo   ← the toolkit (npm: `portal-mojo`, subpath exports like web-mojo:
                             portal-mojo/client, /ui, /charts, /admin …)  [shipped in A0]
   apps/portal            ← the base admin portal app: shell, auth, prebuilt pages,
-                            page registry. First consumer + test bed of the package,
-                            and the template `create-portal-mojo` clones per deployment.
+                            page registry. Builds the protected static dist/admin
+                            artifact Django vendors; no scaffolder prerequisite.
   apps/showcase           ← standalone component playground (mock-only, no admin/auth
                             chrome) — every portal-mojo component, live, in one place.
                             Not part of the admin app; meant to be published on its
@@ -389,7 +389,8 @@ mountable two ways from the same code:
    dedicated back office (the `contrib.admin` equivalent) — for products whose
    user-facing surface isn't a portal (consumer React/mobile apps), or where
    admin belongs on a separate origin (IP-restricted host, separate cookie
-   surface). The capabilities endpoint makes one build fit every deployment.
+   surface). The packaged Django artifact uses same-origin API requests and a
+   protected source-session lifecycle; one relative build fits every Admin prefix.
 2. **Embedded admin** — a product's custom portal (its own app on portal-mojo)
    imports the same sections and registers them under a "System" area gated by
    `view_admin`, beside its product pages. **Default** for products that have a
@@ -562,12 +563,13 @@ autosave editing, permission-gated UI, live metrics dashboard.
   (parked).
 - Image editor: framework-free canvas math plus the controlled React
   crop/transform/filter editor. Board #1262 — **DONE 2026-08-07**.
-- Distribution: `create-portal-mojo` scaffolder (thin shell: config + page
-  registry + npm dep). **django-mojo dependency:** a capabilities endpoint
-  (generalize dnsman `capabilities()`) so one admin build lights up only the
-  domains a deployment runs; boot-time version handshake, degrade gracefully.
-  Board #1263 (parked; the endpoint files to NativeMojo Inbox as a django-mojo
-  item at activation).
+- Distribution: #1263 packages the existing Admin application as reproducible
+  `dist/admin` with a versioned exhaustive integrity manifest, same-origin APIs,
+  renewable private source access and shared cross-tab logout coordination.
+  Django #4060 vendors the exact verified manifest hash and owns protected
+  browser/CSP acceptance. See `docs/admin-artifact.md`. Scaffolding and a
+  capabilities handshake remain independent future work; neither blocks this
+  distribution. Embedded self-registering section bundles remain supported.
 - Reusable WebSocket transport (`wss://…/ws/realtime/`, challenged bearer
   handshake, heartbeat, refcounted topics) + Assistant streaming consumer with
   backend-echoed per-turn request correlation.

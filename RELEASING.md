@@ -1,5 +1,8 @@
 # Releasing `portal-mojo`
 
+Release verification requires Node 24.21.0 and npm 11.19.0, matching CI and
+the packaged Admin producer. Install dependencies with `npm ci`.
+
 One command publishes a stable release:
 
 ```bash
@@ -37,3 +40,21 @@ tag or reuse a published version.
 Trusted Publishing must authorize GitHub repository `NativeMojo/portal-mojo`,
 workflow `release.yml`, environment `npm-production`, and action `npm publish`.
 No `NPM_TOKEN` secret is used or required.
+
+## Built-in Django Admin artifact
+
+The npm toolkit and the static Django Admin artifact are separate outputs.
+`npm run build:admin -- --canonical` creates a clean, same-origin `dist/admin`
+with its exhaustive versioned integrity inventory. Never vendor ordinary
+`apps/portal/dist` or a draft (`source_dirty: true`). `verify:release` includes
+runtime/session fixtures and two fresh builds with exact manifest-byte equality.
+The release command's pre-commit verification uses truthful draft provenance;
+the tagged CI run builds and retains the clean canonical artifact afterward.
+
+CI/release retains all of `dist/admin`, including hidden `.vite` metadata,
+as `portal-mojo-admin-<version>-<full-revision>` for 90 days. Django vendors the
+verified directory and retains the durable source copy. Record the retrieval
+location, source revision, exact toolchain and SHA-256 of `admin-artifact.json`
+on the paired producer/consumer work items before downstream acceptance.
+See [the artifact and source-session contract](docs/admin-artifact.md), including
+offline identity checks, recovery, CSP test ownership and immutable replacement.
