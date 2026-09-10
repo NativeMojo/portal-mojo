@@ -14,49 +14,48 @@
 //     operation stays ABSENT rather than shipping disabled.
 //   · the `version` chip — the heartbeat payload has no version field.
 //   · trusted-HTML interpolation throughout — every slot here is a ReactNode.
-import { useState, type ReactNode } from 'react';
+import { useState,type ReactNode } from 'react';
+import { downloadBlob,useCan } from '../../client/runtime';
 import {
-    Badge,
-    DetailView,
-    Eyebrow,
-    FlatRow,
-    JsonBlock,
-    KnownFieldsCard,
-    StatusPanel,
-    ArmedButton,
-    fmt,
-    modal,
-    toast,
-    type Tone,
+ArmedButton,
+Badge,
+DetailView,
+Eyebrow,
+FlatRow,
+JsonBlock,
+KnownFieldsCard,
+StatusPanel,
+fmt,
+modal,
+toast,
+type Tone,
 } from '../../ui';
-import { downloadBlob } from '../../client/runtime';
 import {
-    BROADCAST_COMMANDS,
-    broadcastCommand,
-    pingRunner,
-    shutdownRunner,
-    type BroadcastCommand,
+BROADCAST_COMMANDS,
+broadcastCommand,
+pingRunner,
+shutdownRunner,
+type BroadcastCommand,
 } from './control';
 import {
-    JOBS_MANAGE_PERMS,
-    formatHeartbeatAge,
-    formatUptime,
-    heartbeatAgeSeconds,
-    jobStatusTone,
-    runnerFailureRate,
-    runnerHealth,
-    runnerUptimeSeconds,
-    type JobRow,
-    type RunnerHostInfo,
-    type RunnerRow,
+JOBS_MANAGE_PERMS,
+formatHeartbeatAge,
+formatUptime,
+heartbeatAgeSeconds,
+jobStatusTone,
+runnerFailureRate,
+runnerHealth,
+runnerUptimeSeconds,
+type JobRow,
+type RunnerHostInfo,
+type RunnerRow,
 } from './models';
 import {
-    useRunnerActiveJobs,
-    useRunnerJobHistory,
-    useRunnerJobLogs,
-    useRunnerSysinfo,
+useRunnerActiveJobs,
+useRunnerJobHistory,
+useRunnerJobLogs,
+useRunnerSysinfo,
 } from './queries';
-import { useCan } from '../../client/runtime';
 
 // ── Small presentational pieces ───────────────────────────────────────
 
@@ -439,6 +438,7 @@ export function RunnerDetail({ runner, onClose }: { runner: RunnerRow; onClose: 
                 active: activeRows.length || null,
                 history: history.data?.count || null,
             }}
+            contextMenu={[{ label: 'Runner controls…', permissions: JOBS_MANAGE_PERMS, onSelect: () => void modal.open(close => <div className="modal-pad"><h2 className="modal-title">Runner controls</h2><ControlSection runner={runner} onClose={() => close(null)} /><div className="modal-actions"><button className="btn" onClick={() => close(null)}>Close</button></div></div>) }]}
             sections={[
                 {
                     key: 'overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => (
@@ -558,11 +558,8 @@ export function RunnerDetail({ runner, onClose }: { runner: RunnerRow; onClose: 
                         </>
                     ),
                 },
-                { divider: 'Control' },
-                {
-                    key: 'control', label: 'Control', icon: 'bi-power',
-                    render: () => <ControlSection runner={runner} onClose={onClose} />,
-                },
+                
+                
             ]}
             initialSection="overview"
             onClose={onClose}

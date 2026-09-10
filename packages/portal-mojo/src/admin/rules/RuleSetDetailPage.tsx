@@ -1,14 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo,useRef } from 'react';
 import { useCan } from '../../client/runtime';
-import { Badge, DetailView, FlatRow, JsonBlock, ModelTable, fmt, modal, toast, type BatchAction, type Column } from '../../ui';
+import { Badge,DetailView,FlatRow,JsonBlock,ModelTable,fmt,modal,toast,type BatchAction,type Column } from '../../ui';
 import { HandlerChainBuilder } from './HandlerChainBuilder';
-import { parseHandlerChain, runtimeEffectiveHandlerChain, validateHandlerChain } from './handler-dsl';
-import { confirmCatchAllEnable, openHandlerChainEditor, openRuleEditor, openRuleSetEditor } from './editors';
-import { BUNDLE_BY_OPTIONS, RULESET_MANAGE_PERMS, RuleModel, RuleSetModel, type RuleRow } from './models';
+import { conditionRemovalEffect } from './condition-removal';
+import { confirmCatchAllEnable,openHandlerChainEditor,openRuleEditor,openRuleSetEditor } from './editors';
+import { parseHandlerChain,runtimeEffectiveHandlerChain,validateHandlerChain } from './handler-dsl';
+import { BUNDLE_BY_OPTIONS,RULESET_MANAGE_PERMS,RuleModel,RuleSetModel,type RuleRow } from './models';
 
 export function RuleSetDetail({ id, onClose }: { id: number; onClose: () => void }) {
-    const { can: canManage } = useCan(RULESET_MANAGE_PERMS); const query = RuleSetModel.useOne(Number.isFinite(id) ? id : null);
-    const rules = RuleModel.useList({ parent: id, size: 250, sort: 'index' }); const save = RuleSetModel.useSave(); const destroy = RuleSetModel.useDelete(); const destroyRule = RuleModel.useDelete();
+    const { can: canManage } = useCan(RULESET_MANAGE_PERMS);
+    const permission = useRef(canManage); permission.current = canManage; const query = RuleSetModel.useOne(Number.isFinite(id) ? id : null);
+    const rules = RuleModel.useList({ parent: id, size: 250, sort: 'index' }); const save = RuleSetModel.useSave(); const destroyRule = RuleModel.useDelete();
     const duplicateIndexes = useMemo(() => { const counts = new Map<number, number>(); for (const row of rules.data?.rows ?? []) counts.set(row.index, (counts.get(row.index) ?? 0) + 1); return [...counts].filter(([, count]) => count > 1).map(([index]) => index); }, [rules.data]);
     if (!Number.isFinite(id)) return <div className="modal-pad text-bad">Invalid rule-set id. <button type="button" className="btn" onClick={onClose}>Close</button></div>;
     if (query.isPending || !query.data) return <div className="modal-pad dim">Loading rule set… <button type="button" className="btn" onClick={onClose}>Close</button></div>;
@@ -19,10 +21,31 @@ export function RuleSetDetail({ id, onClose }: { id: number; onClose: () => void
         { key: 'comparator', label: 'Comparator', render: (rule) => <code>{rule.comparator}</code> }, { key: 'value', label: 'Value', render: (rule) => <code>{rule.value_type}:{rule.value}</code> },
         { key: 'is_required', label: 'Required', render: (rule) => rule.is_required ? 'Yes' : 'No' },
     ];
-    const ruleActions: BatchAction<RuleRow>[] = canManage ? [{ key: 'delete', label: 'Delete conditions', icon: 'bi-trash', danger: true, confirm: 'Delete the selected conditions? This cannot be undone.', run: (rule) => destroyRule.mutateAsync({ id: rule.id }) }] : [];
+    const ruleActions: BatchAction<RuleRow>[] = canManage ? [{
+        key: 'delete', label: 'Remove conditions', icon: 'bi-trash', danger: true, confirm: false,
+        prepare: async selected => {
+            try {
+            if (!permission.current) return null;
+            const [parent, children] = await Promise.all([query.refetch(), rules.refetch()]);
+            if (!parent.data || !children.data || parent.error || children.error) throw new Error('Authoritative rule state unavailable. No conditions removed.');
+            const current = selected.map(item => children.data!.rows.find(child => child.id === item.id));
+            if (current.some(item => !item)) throw new Error('Selected conditions changed; refresh and select again.');
+            const effect = conditionRemovalEffect(parent.data, children.data.count, selected.length);
+            const confirmed = await modal.confirm({ title: `Remove ${selected.length} conditions?`, danger: true, confirmText: 'Remove conditions', message: <div><p>Rule set: {parent.data.name} (#{id}) · {parent.data.match_by === 0 ? 'ALL' : 'ANY'}</p><ul>{current.map(item => <li key={item!.id}>{item!.name} (#{item!.id})</li>)}</ul><p>{effect}</p><p>These conditions cannot be restored by this action.</p></div> });
+            return confirmed && permission.current ? selected.map(item => item.id) : null;
+            } catch (error) { toast.error(error instanceof Error ? error.message : 'Condition state unavailable'); return null; }
+        },
+        runBatch: async selected => {
+            if (!permission.current) throw new Error('Permission to remove conditions was revoked.');
+            const results = await Promise.allSettled(selected.map(rule => destroyRule.mutateAsync({ id: rule.id })));
+            await Promise.all([query.refetch(), rules.refetch()]);
+            const failed = results.filter(result => result.status === 'rejected');
+            if (failed.length) throw new Error(`${results.length - failed.length} removed; ${failed.length} refused. Authoritative parent and conditions refreshed. ${String((failed[0] as PromiseRejectedResult).reason)}`);
+        },
+    }] : [];
     const setActive = async (next: boolean) => { if (next && !(await confirmCatchAllEnable(row, rules.data?.count ?? 0))) return; try { await save.mutateAsync({ id, changes: { is_active: next } }); toast.success(next ? 'Rule set enabled' : 'Rule set disabled'); } catch (error) { toast.error(error instanceof Error ? error.message : 'State change failed'); } };
     const bundleLabel = BUNDLE_BY_OPTIONS.find((option) => Number(option.value) === row.bundle_by)?.label ?? `Unknown (${row.bundle_by})`;
-    return <DetailView icon="bi-diagram-3" title={row.name || `Rule set #${row.id}`} subtitle={`${row.category} · priority ${row.priority} · first active match wins`} chips={[{ text: row.is_active ? 'ACTIVE' : 'INACTIVE', tone: row.is_active ? 'success' : 'muted' }, { text: `${rules.data?.count ?? 0} CONDITIONS`, tone: duplicateIndexes.length ? 'warning' : 'info' }]} active={canManage ? { value: row.is_active, onChange: (next) => void setActive(next) } : undefined} onClose={onClose} menuContext={row} contextMenu={canManage ? [{ label: 'Edit rule set', onSelect: () => void openRuleSetEditor(row) }, { label: 'Edit handler chain', onSelect: () => void openHandlerChainEditor(row) }, { divider: true }, { label: 'Delete rule set and conditions', danger: true, onSelect: async () => { if (!(await modal.confirm({ title: 'Delete rule set?', message: `Delete “${row.name}” and all ${rules.data?.count ?? 0} conditions?`, confirmText: 'Delete rule set', danger: true }))) return; await destroy.mutateAsync({ id }); onClose(); } }] : []} sections={[
+    return <DetailView icon="bi-diagram-3" title={row.name || `Rule set #${row.id}`} subtitle={`${row.category} · priority ${row.priority} · first active match wins`} chips={[{ text: row.is_active ? 'ACTIVE' : 'INACTIVE', tone: row.is_active ? 'success' : 'muted' }, { text: `${rules.data?.count ?? 0} CONDITIONS`, tone: duplicateIndexes.length ? 'warning' : 'info' }]} active={canManage ? { value: row.is_active, disabled: save.isPending, onChange: (next) => void setActive(next) } : undefined} onClose={onClose} menuContext={row} contextMenu={canManage ? [{ label: 'Edit rule set', onSelect: () => void openRuleSetEditor(row) }, { label: 'Edit handler chain', onSelect: () => void openHandlerChainEditor(row) }, { label: row.is_active ? 'Deactivate' : 'Reactivate', disabled: save.isPending, onSelect: () => void setActive(!row.is_active) }] : []} sections={[
         { key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-stack"><FlatRow label="State">{row.is_active ? 'Active' : 'Inactive'}</FlatRow><FlatRow label="Category"><code>{row.category}</code></FlatRow><FlatRow label="Priority">{row.priority} (lower is evaluated first within this category)</FlatRow><FlatRow label="Matching">{row.match_by === 0 ? 'All conditions' : row.match_by === 1 ? 'Any condition' : `Unknown (${row.match_by})`}</FlatRow><FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow></div> },
         { key: 'conditions', label: 'Conditions', icon: 'bi-funnel', render: () => <div>{duplicateIndexes.length > 0 && <div className="rule-priority-warning">Duplicate condition indexes {duplicateIndexes.join(', ')} have undefined tie order.</div>}<ModelTable model={RuleModel} title="Conditions" columns={ruleColumns} searchable={false} defaultParams={{ parent: id, sort: 'index' }} onRowClick={canManage ? (rule) => void openRuleEditor(id, rule, nextIndex) : undefined} {...(canManage ? { addLabel: 'Add condition', onAdd: () => void openRuleEditor(id, undefined, nextIndex), selectable: true, batchActions: ruleActions } : {})} /></div> },
         { key: 'triggering', label: 'Triggering', icon: 'bi-lightning', render: () => <div className="detail-stack"><FlatRow label="Bundle by">{bundleLabel}</FlatRow><FlatRow label="Bundle window">{row.bundle_minutes == null ? 'Unbounded' : row.bundle_minutes === 0 ? 'Disabled (no time bundling)' : `${row.bundle_minutes} minutes`}</FlatRow><FlatRow label="Trigger">{row.trigger_count == null ? 'Immediately on first event' : `${row.trigger_count} events${row.trigger_window == null ? '' : ` within ${row.trigger_window} minutes`}`}</FlatRow><FlatRow label="Re-trigger">{row.retrigger_every == null ? 'Once per incident' : `Every ${row.retrigger_every} additional events`}</FlatRow></div> },

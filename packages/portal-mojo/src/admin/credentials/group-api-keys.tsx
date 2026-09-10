@@ -1,24 +1,26 @@
-import { useContext, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useContext,useSyncExternalStore } from 'react';
 import {
-    GroupContext, hasPermission, useCan, useMe,
-    type PermSpec,
+GroupContext,hasPermission,useCan,useMe,
+type PermSpec,
 } from '../../client/runtime';
 import {
-    ArmedButton, Badge, DetailView, Eyebrow, FlatRow, ModelTable,
-    SchemaForm, fmt, modal, toast,
-    type Column, type Field, type FilterDef,
+Badge,DetailView,Eyebrow,FlatRow,ModelTable,
+SchemaForm,fmt,modal,toast,
+type Column,type Field,type FilterDef,
 } from '../../ui';
+import { ApiKeyLimitsSummary,ApiKeyRateLimitsEditor } from './api-key-rate-limits';
 import {
-    GLOBAL_CREDENTIAL_PERMS, GROUP_CREDENTIAL_PERMS,
-    GroupApiKeyModel, buildApiKeyPermissionChanges, customApiKeyPermissionNames,
-    fetchApiKeyToken,
-    getGroupApiKeyPermissions, grantedPermissions,
-    groupApiKeyPermissionsVersion, subscribeGroupApiKeyPermissions,
-    normalizeApiKeyPermissionNames, readApiKeyRateLimits, useCreateGroupApiKey,
-    type ApiKeyPermissionDef, type CredentialGroup, type GroupApiKeyRow,
+GLOBAL_CREDENTIAL_PERMS,GROUP_CREDENTIAL_PERMS,
+GroupApiKeyModel,buildApiKeyPermissionChanges,customApiKeyPermissionNames,
+fetchApiKeyToken,
+getGroupApiKeyPermissions,grantedPermissions,
+groupApiKeyPermissionsVersion,
+normalizeApiKeyPermissionNames,readApiKeyRateLimits,
+subscribeGroupApiKeyPermissions,
+useCreateGroupApiKey,
+type ApiKeyPermissionDef,type CredentialGroup,type GroupApiKeyRow,
 } from './models';
-import { ApiKeyLimitsSummary, ApiKeyRateLimitsEditor } from './api-key-rate-limits';
 import { showSecretDialog } from './secret-dialog';
 
 function groupLabel(group: GroupApiKeyRow['group']): string {
@@ -95,7 +97,7 @@ function useGroupApiKeyActions(permission: PermSpec) {
     const renderedPermissions = useRenderedPermissions();
     const create = useCreateGroupApiKey();
     const save = GroupApiKeyModel.useSave();
-    const destroy = GroupApiKeyModel.useDelete();
+    
     const { can } = useCan(permission);
 
     const createKey = async (fixedGroup?: CredentialGroup) => {
@@ -244,19 +246,19 @@ function useGroupApiKeyActions(permission: PermSpec) {
         }
     };
 
-    const deleteKey = async (row: GroupApiKeyRow) => {
+    const toggleKey = async (row: GroupApiKeyRow) => {
         if (!can) return false;
         try {
-            await destroy.mutateAsync({ id: row.id });
-            toast.success('API key deleted');
+            await save.mutateAsync({ id: row.id, changes: { is_active: !row.is_active } });
+            toast.success(row.is_active ? 'API key deactivated' : 'API key reactivated');
             return true;
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to delete API key');
+            toast.error(error instanceof Error ? error.message : 'Failed to update API key');
             return false;
         }
     };
 
-    return { canManage: can, createKey, editKey, revealToken, deleteKey };
+    return { canManage: can, createKey, editKey, revealToken, toggleKey, pending: save.isPending };
 }
 
 function ApiKeyCard({ row, actions }: {
@@ -299,13 +301,7 @@ function ApiKeyCard({ row, actions }: {
                     <button className="btn btn-compact" title="Reveal the current token" onClick={() => void actions.revealToken(row)}>
                         <i className="bi bi-eye" /> Token
                     </button>
-                    <ArmedButton
-                        className="btn-compact"
-                        label={<i className="bi bi-trash" aria-label="Delete this key" />}
-                        armedLabel="Click again — services using this key lose access"
-                        title="Delete this key"
-                        onConfirm={async () => { await actions.deleteKey(row); }}
-                    />
+                    <button className="btn btn-compact" disabled={actions.pending} onClick={() => void actions.toggleKey(row)}>{row.is_active ? 'Deactivate' : 'Reactivate'}</button>
                 </div>
             )}
         </div>
@@ -369,6 +365,12 @@ function AuthorizedGroupApiKeyDetail({ id, onClose }: { id: number; onClose: () 
                 { text: `${permissions.length} grants`, tone: 'info' },
                 limitsChip,
             ]}
+            active={actions.canManage ? { value: row.is_active, disabled: actions.pending, onChange: () => void actions.toggleKey(row) } : undefined}
+            contextMenu={actions.canManage ? [
+                { label: 'Edit key', onSelect: () => void actions.editKey(row) },
+                { label: 'Reveal audited token', onSelect: () => void actions.revealToken(row) },
+                { label: row.is_active ? 'Deactivate' : 'Reactivate', disabled: actions.pending, onSelect: () => void actions.toggleKey(row) },
+            ] : []}
             sections={[
                 {
                     key: 'overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => (
@@ -378,24 +380,7 @@ function AuthorizedGroupApiKeyDetail({ id, onClose }: { id: number; onClose: () 
                             <FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow>
                             <FlatRow label="Last used">{fmt.relative(row.last_used, 'never')}</FlatRow>
                             <FlatRow label="Expires">{row.expires_at ? fmt.datetime(row.expires_at) : 'Never'}</FlatRow>
-                            {actions.canManage && (
-                                <div className="ga-toolbar" style={{ marginTop: 16 }}>
-                                    <button className="btn btn-compact" onClick={() => void actions.editKey(row)}>
-                                        <i className="bi bi-pencil" /> Edit
-                                    </button>
-                                    <button className="btn btn-compact" onClick={() => void actions.revealToken(row)}>
-                                        <i className="bi bi-eye" /> Reveal audited token
-                                    </button>
-                                    <ArmedButton
-                                        className="btn-compact"
-                                        label="Delete"
-                                        armedLabel="Click again — delete now"
-                                        onConfirm={async () => {
-                                            if (await actions.deleteKey(row)) onClose();
-                                        }}
-                                    />
-                                </div>
-                            )}
+                            
                         </>
                     ),
                 },

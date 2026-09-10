@@ -1,15 +1,15 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCan, type PermSpec } from '../../client/runtime';
+import { useState } from 'react';
+import { useCan,type PermSpec } from '../../client/runtime';
 import {
-    ArmedButton, Badge, DetailView, Eyebrow, FlatRow, ModelTable,
-    SchemaForm, fmt, modal, toast,
-    type Column, type Field, type FilterDef,
+Badge,DetailView,Eyebrow,FlatRow,ModelTable,
+SchemaForm,fmt,modal,toast,
+type Column,type Field,type FilterDef,
 } from '../../ui';
 import {
-    GLOBAL_CREDENTIAL_PERMS, GROUP_CREDENTIAL_PERMS,
-    WebhookSubscriptionModel, fetchWebhookSecret, normalizeWebhookEvents,
-    type CredentialGroup, type WebhookSecretInfo, type WebhookSubscriptionRow,
+GLOBAL_CREDENTIAL_PERMS,GROUP_CREDENTIAL_PERMS,
+WebhookSubscriptionModel,fetchWebhookSecret,normalizeWebhookEvents,
+type CredentialGroup,type WebhookSecretInfo,type WebhookSubscriptionRow,
 } from './models';
 import { showSecretDialog } from './secret-dialog';
 
@@ -123,7 +123,7 @@ const WEBHOOK_FIELDS: Field[] = [
 
 function useWebhookActions(permission: PermSpec) {
     const save = WebhookSubscriptionModel.useSave();
-    const destroy = WebhookSubscriptionModel.useDelete();
+    
     const { can } = useCan(permission);
 
     const createSubscription = async (fixedGroup?: CredentialGroup) => {
@@ -209,19 +209,9 @@ function useWebhookActions(permission: PermSpec) {
         }
     };
 
-    const deleteSubscription = async (row: WebhookSubscriptionRow) => {
-        if (!can) return false;
-        try {
-            await destroy.mutateAsync({ id: row.id });
-            toast.success('Webhook subscription deleted');
-            return true;
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to delete subscription');
-            return false;
-        }
-    };
+    
 
-    return { canManage: can, createSubscription, editSubscription, toggleSubscription, deleteSubscription };
+    return { canManage: can, createSubscription, editSubscription, toggleSubscription, pending: save.isPending };
 }
 
 function WebhookCard({ row, actions }: {
@@ -271,13 +261,7 @@ function WebhookCard({ row, actions }: {
                             }}
                         />
                     </label>
-                    <ArmedButton
-                        className="btn-compact"
-                        label={<i className="bi bi-trash" aria-label="Delete this subscription" />}
-                        armedLabel="Click again — deliveries stop"
-                        title="Delete this subscription"
-                        onConfirm={async () => { await actions.deleteSubscription(row); }}
-                    />
+                    
                 </div>
             )}
         </div>
@@ -333,6 +317,8 @@ export function WebhookSubscriptionDetail({ id, onClose }: { id: number; onClose
             title={row.url}
             subtitle={`${groupLabel(row.group)} · webhook subscription`}
             chips={[{ text: row.is_active ? 'Active' : 'Inactive', tone: row.is_active ? 'success' : 'muted' }]}
+            active={actions.canManage ? { value: row.is_active, disabled: actions.pending, onChange: next => void actions.toggleSubscription(row, next) } : undefined}
+            contextMenu={actions.canManage ? [{ label: 'Edit subscription', onSelect: () => void actions.editSubscription(row) }, { label: row.is_active ? 'Deactivate' : 'Reactivate', disabled: actions.pending, onSelect: () => void actions.toggleSubscription(row, !row.is_active) }] : []}
             sections={[
                 {
                     key: 'overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => (
@@ -342,19 +328,7 @@ export function WebhookSubscriptionDetail({ id, onClose }: { id: number; onClose
                             <FlatRow label="URL"><code>{row.url}</code></FlatRow>
                             <FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow>
                             <FlatRow label="Modified">{fmt.datetime(row.modified)}</FlatRow>
-                            <div className="ga-toolbar" style={{ marginTop: 16 }}>
-                                <button className="btn btn-compact" onClick={() => void actions.editSubscription(row)}>
-                                    <i className="bi bi-pencil" /> Edit URL, events, and status
-                                </button>
-                                <ArmedButton
-                                    className="btn-compact"
-                                    label="Delete"
-                                    armedLabel="Click again — delete now"
-                                    onConfirm={async () => {
-                                        if (await actions.deleteSubscription(row)) onClose();
-                                    }}
-                                />
-                            </div>
+                            
                         </>
                     ),
                 },

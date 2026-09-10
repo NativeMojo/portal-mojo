@@ -25,32 +25,31 @@
 //     tool `_tool_run_scheduled_task_now`. There is no REST route and no
 //     publish endpoint to synthesize one, so the control stays ABSENT rather
 //     than shipping disabled (wave-7a precedent). Tracked as django-mojo #1309.
+import { useQuery,useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { mojoList, useCan } from '../../client/runtime';
+import { mojoList,useCan } from '../../client/runtime';
 import {
-    ArmedButton,
-    Badge,
-    DetailView,
-    Eyebrow,
-    FlatRow,
-    JsonBlock,
-    StatusPanel,
-    fmt,
-    modal,
-    toast,
-    type Tone,
+Badge,
+DetailView,
+Eyebrow,
+FlatRow,
+JsonBlock,
+StatusPanel,
+fmt,
+modal,
+toast,
+type Tone
 } from '../../ui';
 import {
-    SCHEDULED_TASK_MANAGE_PERMS,
-    SCHEDULED_TASK_VIEW_PERMS,
-    ScheduledTaskModel,
-    TaskResultModel,
-    formatRunDays,
-    formatRunTimes,
-    type ScheduledTaskRow,
-    type ScheduledTaskType,
-    type TaskResultRow,
+SCHEDULED_TASK_MANAGE_PERMS,
+SCHEDULED_TASK_VIEW_PERMS,
+ScheduledTaskModel,
+TaskResultModel,
+formatRunDays,
+formatRunTimes,
+type ScheduledTaskRow,
+type ScheduledTaskType,
+type TaskResultRow,
 } from './models';
 import { openScheduledTaskEditor } from './scheduled-task-form';
 
@@ -211,7 +210,7 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
     const queryClient = useQueryClient();
     const query = ScheduledTaskModel.useOne(id);
     const save = ScheduledTaskModel.useSave();
-    const remove = ScheduledTaskModel.useDelete();
+    
     const { can: canManage } = useCan(SCHEDULED_TASK_MANAGE_PERMS);
 
     if (query.isPending) return <div className="modal-pad dim">Loading scheduled task…</div>;
@@ -243,16 +242,7 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
         }
     };
 
-    const destroy = async () => {
-        try {
-            await remove.mutateAsync({ id });
-            await invalidate();
-            toast.success(`Deleted ${task.name || 'scheduled task'}`);
-            onClose();
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Delete failed');
-        }
-    };
+    
 
     const schedule = formatSchedule(task);
     const stateTone: Tone = task.enabled ? 'success' : 'muted';
@@ -271,6 +261,7 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
                 ...(task.run_once ? [{ icon: 'bi-1-circle', text: 'Run once', tone: 'info' as const }] : []),
                 { icon: 'bi-broadcast', text: task.channel, tone: 'muted' },
             ]}
+            active={canManage ? { value: task.enabled, disabled: save.isPending, onChange: next => void setEnabled(next) } : undefined}
             badges={{ overview: task.last_error ? <Badge tone="danger">error</Badge> : null }}
             menuContext={task}
             contextMenu={[
@@ -283,6 +274,7 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
                     label: task.enabled ? 'Disable' : 'Enable',
                     icon: task.enabled ? 'bi-pause-circle' : 'bi-play-circle',
                     permissions: SCHEDULED_TASK_MANAGE_PERMS,
+                    disabled: save.isPending,
                     onSelect: () => { void setEnabled(!task.enabled); },
                 },
             ]}
@@ -348,66 +340,8 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
                 },
                 { key: 'config', label: 'Configuration', icon: 'bi-sliders', render: () => <ConfigurationSection task={task} /> },
                 { key: 'results', label: 'Results', icon: 'bi-list-check', render: () => <ResultsSection taskId={id} /> },
-                { divider: 'Manage' },
-                {
-                    key: 'manage', label: 'Manage', icon: 'bi-gear', permissions: SCHEDULED_TASK_MANAGE_PERMS, render: () => (
-                        <>
-                            <Eyebrow>Operates on {task.name || 'this task'}</Eyebrow>
-                            <div className="jobs-op-row">
-                                <div className="jobs-op-label">
-                                    <i className={`bi ${task.enabled ? 'bi-pause-circle' : 'bi-play-circle'}`} />
-                                    {task.enabled ? 'Disable' : 'Enable'}
-                                </div>
-                                <div className="jobs-op-desc">
-                                    {task.enabled
-                                        ? 'The hourly dispatcher skips disabled tasks. Nothing already published is affected.'
-                                        : 'The hourly dispatcher will pick this task up again on its next matching hour.'}
-                                </div>
-                                <div className="jobs-op-action">
-                                    <button
-                                        type="button" className="btn btn-compact" disabled={!canManage || save.isPending}
-                                        onClick={() => void setEnabled(!task.enabled)}
-                                    >
-                                        {task.enabled ? 'Disable' : 'Enable'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="jobs-op-row">
-                                <div className="jobs-op-label"><i className="bi bi-pencil" /> Edit</div>
-                                <div className="jobs-op-desc">
-                                    Change the schedule, notification channels and configuration. The task type is fixed
-                                    after creation.
-                                </div>
-                                <div className="jobs-op-action">
-                                    <button type="button" className="btn btn-compact" disabled={!canManage} onClick={() => void edit()}>
-                                        Edit task…
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="danger-zone">
-                                <div className="jobs-op-row">
-                                    <div className="jobs-op-label"><i className="bi bi-trash" /> Delete</div>
-                                    <div className="jobs-op-desc">
-                                        Removes the task and cascades to every one of its execution results. Jobs already
-                                        published stay queued.
-                                    </div>
-                                    <div className="jobs-op-action">
-                                        <ArmedButton
-                                            className="btn-compact btn-danger-ghost"
-                                            label="Delete task"
-                                            armedLabel="Click again — the task and all its results are gone"
-                                            icon="bi-trash"
-                                            disabled={!canManage || remove.isPending}
-                                            onConfirm={destroy}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    ),
-                },
+                
+                
             ]}
             initialSection="overview"
             onClose={onClose}

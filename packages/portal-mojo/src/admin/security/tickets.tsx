@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { mojoSave, useCan } from '../../client/runtime';
+import { useEffect,useMemo,useRef,useState,type MouseEvent } from 'react';
 import type { RecordFeedItem } from '../../client/record-feed';
+import { createTicketNoteAdapter } from '../../client/record-feed';
+import { mojoSave,useCan } from '../../client/runtime';
 import {
-    Badge, CollectionSelect, DetailView, MarkdownView, ModelTable, RecordFeed, SchemaForm, fmt, modal, toast,
-    type Column, type Field, type FilterDef, type FormData, type Tone,
+Badge,CollectionSelect,DetailView,MarkdownView,ModelTable,RecordFeed,SchemaForm,fmt,modal,toast,
+type Column,type Field,type FilterDef,type FormData,type Tone,
 } from '../../ui';
 import { AssistantContextLauncher } from '../assistant/launchers';
-import { createTicketNoteAdapter } from '../../client/record-feed';
 import {
-    MaestroItemLinkModel, TICKET_MANAGE_PERMS, TICKET_USER_LOOKUP_PERMS,
-    TicketModel, buildTicketActionResponseBody, invalidateTicketDependents,
-    isTicketActionDisabled, isTicketTerminal, knownOptionsWithCurrent, relationId, relationLabel,
-    type TicketNoteAction, type TicketRow,
+MaestroItemLinkModel,TICKET_MANAGE_PERMS,TICKET_USER_LOOKUP_PERMS,
+TicketModel,buildTicketActionResponseBody,invalidateTicketDependents,
+isTicketActionDisabled,isTicketTerminal,knownOptionsWithCurrent,relationId,relationLabel,
+type TicketNoteAction,type TicketRow,
 } from './models';
 
 export const TICKET_STATUSES = [
@@ -407,6 +407,12 @@ function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) 
             ]}
             onClose={close}
             menuContext={ticket}
+            contextMenu={canManage ? [
+                { label: 'Edit ticket', disabled: busy, onSelect: () => void openTicketEditor(ticket) },
+                { label: llmEnabled ? 'Disable LLM' : 'Enable LLM', disabled: busy, onSelect: () => void runLlm() },
+                { label: 'Close ticket', disabled: busy || isTicketTerminal(ticket.status), onSelect: () => void patch({ status: 'closed' }, 'Ticket closed') },
+                { label: 'Push to Maestro', disabled: busy || Boolean(link), onSelect: () => void push() },
+            ] : []}
             sections={[
                 {
                     key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => (
@@ -439,9 +445,9 @@ function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) 
                     ),
                 },
                 ...(canManage ? [{
-                    key: 'manage', label: 'Manage', icon: 'bi-sliders', render: () => (
+                    key: 'properties', label: 'Properties', icon: 'bi-sliders', render: () => (
                 <section className="ticket-detail-controls" aria-label="Ticket controls">
-                    <h4>Manage ticket</h4>
+                    <h4>Ticket properties</h4>
                     {error && <div className="form-alert" role="alert">{error}</div>}
                     <div className="ticket-control-grid">
                         <label className="field"><span className="field-label">Status</span>
@@ -481,12 +487,7 @@ function TicketDetail({ ticketId, close }: { ticketId: number; close(): void }) 
                             if (descriptionDraft !== (ticket.description ?? '')) void patch({ description: descriptionDraft }, 'Description updated');
                         }} />
                     </label>
-                    <div className="ticket-control-actions">
-                        <button type="button" className="btn" disabled={busy} onClick={() => void runLlm()}>{llmEnabled ? 'Disable LLM' : 'Enable LLM'}</button>
-                        <button type="button" className="btn" disabled={busy || isTicketTerminal(ticket.status)} onClick={() => void patch({ status: 'closed' }, 'Ticket closed')}>Close ticket</button>
-                        <button type="button" className="btn" disabled={busy || Boolean(link)} onClick={() => void push()}>{pushToMaestro.isPending ? 'Queueing…' : 'Push to Maestro'}</button>
-                        <button type="button" className="btn" disabled={busy} onClick={() => void openTicketEditor(ticket)}>Edit all fields</button>
-                    </div>
+
                 </section>
                     ),
                 }] : []),

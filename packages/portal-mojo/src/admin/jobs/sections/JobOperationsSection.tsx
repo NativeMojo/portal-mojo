@@ -13,25 +13,27 @@
 //   · clear-queue's `confirm:"yes"` is sent only AFTER the armed confirmation.
 //     Pre-satisfying a server-side safety gate removes it.
 //   · every destructive control is an ArmedButton, not a plain button.
-import { useState, type ReactNode } from 'react';
-import { ArmedButton, JsonBlock, modal, toast } from '../../../ui';
+import { useEffect,useRef,useState,type ReactNode } from 'react';
 import { useCan } from '../../../client/runtime';
+import { ArmedButton,JsonBlock,modal,toast } from '../../../ui';
 import {
-    cleanupConsumers,
-    clearQueue,
-    clearStuck,
-    forEachChannel,
-    isPurgeDryRun,
-    manualReclaim,
-    publishTestJob,
-    publishTestSuite,
-    purgeJobs,
-    rebuildScheduled,
-    resetFailed,
-    summarizeChannelOutcomes,
-    type PurgeResult,
+cleanupConsumers,
+clearQueue,
+clearStuck,
+forEachChannel,
+isPurgeDryRun,
+manualReclaim,
+publishTestJob,
+publishTestSuite,
+purgeJobs,
+rebuildScheduled,
+resetFailed,
+summarizeChannelOutcomes,
+type PurgeResult,
 } from '../control';
-import { JOBS_MANAGE_PERMS, JOB_STATUS_OPTIONS } from '../models';
+import { JOBS_MANAGE_PERMS,JOB_STATUS_OPTIONS } from '../models';
+
+import { createPurgePreviewGuard,type PurgePreviewIdentity } from '../purge-preview';
 
 const ALL_CHANNELS = '';
 
@@ -56,63 +58,69 @@ function OperationRow({ label, icon, description, children, note }: {
 
 // ── Purge dialog: preview, then arm ───────────────────────────────────
 
-function PurgeDialog({ onClose }: { onClose: () => void }) {
+export function PurgeDialog({ onClose, onExecuting }: { onClose: () => void; onExecuting?: (value: boolean) => void }) {
     const [days, setDays] = useState(30);
     const [status, setStatus] = useState('');
-    const [preview, setPreview] = useState<PurgeResult | null>(null);
+    const guard = useRef(createPurgePreviewGuard());
+    const [preview, setPreview] = useState<(PurgePreviewIdentity & { result: PurgeResult }) | null>(null);
     const [busy, setBusy] = useState(false);
-
+    const [executing, setExecuting] = useState(false);
+    const executionLock = useRef(false);
+    const mounted = useRef(false);
+    const [outcome, setOutcome] = useState<PurgeResult | null>(null);
+    const { can: canManage } = useCan(JOBS_MANAGE_PERMS);
+    useEffect(() => {
+        guard.current = createPurgePreviewGuard(); mounted.current = true;
+        return () => { mounted.current = false; guard.current.dispose(); };
+    }, []);
+    const invalidate = () => { if (executionLock.current) return; guard.current.invalidate(); setPreview(null); setBusy(false); };
     const runPreview = async () => {
-        setBusy(true);
-        setPreview(null);
+        if (!canManage || executionLock.current) return;
+        const identity = guard.current.begin({ daysOld: Math.max(0, Math.floor(days)), status: status || null });
+        setBusy(true); setPreview(null); setOutcome(null);
         try {
-            const result = await purgeJobs({ daysOld: days, status: status || null, dryRun: true });
-            setPreview(result);
+            const result = await purgeJobs({ ...identity.params, dryRun: true });
+            if (guard.current.accept(identity)) setPreview(Object.assign(identity, { result }));
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Purge preview failed');
-        } finally {
-            setBusy(false);
-        }
+            if (guard.current.current(identity)) toast.error(error instanceof Error ? error.message : 'Purge preview failed');
+        } finally { if (guard.current.current(identity)) setBusy(false); }
     };
-
     const runPurge = async () => {
-        setBusy(true);
+        const params = preview && guard.current.execution(preview);
+        if (!canManage || busy || executionLock.current || !params) return;
+        executionLock.current = true; onExecuting?.(true); setExecuting(true);
+        guard.current.invalidate(); setBusy(true);
         try {
-            const result = await purgeJobs({ daysOld: days, status: status || null });
-            // A REAL run reports `deleted`; only the dry run has `count`.
-            const deleted = isPurgeDryRun(result) ? result.count : result.deleted;
-            toast.success(`Purged ${deleted} record(s) older than ${days} day(s)`);
-            onClose();
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Purge failed');
-        } finally {
-            setBusy(false);
-        }
+            const result = await purgeJobs({ ...params });
+            if (mounted.current) { setOutcome(result); setPreview(null); }
+        } catch (error) { if (mounted.current) toast.error(error instanceof Error ? error.message : 'Purge failed'); }
+        finally { executionLock.current = false; onExecuting?.(false); if (mounted.current) { setExecuting(false); setBusy(false); } }
     };
-
-    const previewCount = preview && isPurgeDryRun(preview) ? preview.count : null;
+    const previewCount = preview && isPurgeDryRun(preview.result) ? preview.result.count : null;
 
     return (
         <div className="modal-pad">
             <h2 className="modal-title">Purge old jobs</h2>
             <p className="dim">
                 Deletes job rows older than the cutoff, and their events and logs with them. Preview first — the
-                count is the only way to know what the cutoff actually covers.
+                preview is an estimate. Execution recalculates the cutoff; deleted counts include cascaded event and log rows.
             </p>
             <label className="jobs-field">
                 <span>Older than (days)</span>
                 <input
                     type="number" className="input input-compact" min={0} step={1}
+                    disabled={executing}
                     value={days}
-                    onChange={(event) => { setDays(Math.max(0, Number(event.target.value) || 0)); setPreview(null); }}
+                    onChange={(event) => { setDays(Math.max(0, Math.floor(Number(event.target.value) || 0))); invalidate(); }}
                 />
             </label>
             <label className="jobs-field">
                 <span>Status filter</span>
                 <select
                     className="input input-compact"
+                    disabled={executing}
                     value={status}
-                    onChange={(event) => { setStatus(event.target.value); setPreview(null); }}
+                    onChange={(event) => { setStatus(event.target.value); invalidate(); }}
                 >
                     <option value="">Every status</option>
                     {JOB_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -123,23 +131,25 @@ function PurgeDialog({ onClose }: { onClose: () => void }) {
                 <p className={`jobs-note ${previewCount > 0 ? 'jobs-note-warn' : 'jobs-note-info'}`}>
                     <i className="bi bi-info-circle" />
                     {previewCount > 0
-                        ? <> <strong>{previewCount}</strong> job(s) would be deleted, created before {new Date(preview.cutoff).toLocaleString()}.</>
+                        ? <> <strong>{previewCount}</strong> job(s) would be deleted, created before {new Date(preview.result.cutoff).toLocaleString()}.</>
                         : <> Nothing matches — no job is older than that cutoff.</>}
                 </p>
             )}
 
+            {outcome && <div className="jobs-note jobs-note-info"><h3>Execution result (actual cutoff)</h3><JsonBlock value={outcome} defaultOpen /></div>}
             <div className="modal-actions">
-                <button type="button" className="btn" onClick={onClose}>Cancel</button>
+                <button type="button" className="btn" disabled={executing} onClick={() => { invalidate(); onClose(); }}>Cancel</button>
                 <button type="button" className="btn" disabled={busy} onClick={() => void runPreview()}>
                     {busy && !preview ? 'Previewing…' : 'Preview'}
                 </button>
                 <ArmedButton
+                    key={preview?.id ?? 'no-preview'}
                     label="Purge"
                     armedLabel={previewCount != null ? `Click again to delete ${previewCount} job(s)` : 'Click again to purge'}
                     className="btn-danger-ghost"
                     // Arming before a preview would be arming a number nobody
                     // has seen.
-                    disabled={busy || previewCount == null || previewCount === 0}
+                    disabled={!canManage || busy || previewCount == null || previewCount === 0}
                     onConfirm={runPurge}
                 />
             </div>
@@ -208,6 +218,7 @@ export function JobOperationsSection({ channels, channelsPending, onChanged }: {
     onChanged?: () => void;
 }) {
     const { can: canManage } = useCan(JOBS_MANAGE_PERMS);
+    const purgeExecuting = useRef(false);
     const [channel, setChannel] = useState(ALL_CHANNELS);
     const noChannels = !channelsPending && channels.length === 0;
     // A stale selection must never become a request for a channel that no
@@ -368,8 +379,8 @@ export function JobOperationsSection({ channels, channelsPending, onChanged }: {
                 <button
                     type="button" className="btn btn-compact btn-danger-ghost" disabled={!canManage}
                     onClick={() => void modal.open((close) => (
-                        <PurgeDialog onClose={() => { close(null); onChanged?.(); }} />
-                    ), { size: 'sm' })}
+                        <PurgeDialog onExecuting={value => { purgeExecuting.current = value; }} onClose={() => { if (!purgeExecuting.current) { close(null); onChanged?.(); } }} />
+                    ), { size: 'sm', canDismiss: () => !purgeExecuting.current })}
                 >
                     Purge…
                 </button>

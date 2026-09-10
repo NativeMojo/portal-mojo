@@ -21,36 +21,40 @@
 // shared ImageField avatar manager hangs off the kebab;
 // presence/status/locked/warning render as chips instead of a two-row aux.
 import { useSyncExternalStore } from 'react';
-import { useCan, useMe } from '../../../client/runtime';
+import { useCan,useMe } from '../../../client/runtime';
 import {
-    DetailView, getFormTabs, subscribeFormTabs, fmt, modal,
-    type Chip, type DetailMenuEntry,
+DetailView,
+fmt,
+getFormTabs,
+modal,
+subscribeFormTabs,
+type Chip,type DetailMenuEntry,
 } from '../../../ui';
-import {
-    USER_DEVICE_PERMISSIONS, USER_EVENT_PERMISSIONS, USER_LOGIN_PERMISSIONS,
-    USER_LOG_PERMISSIONS, USER_MANAGE_PERMISSIONS, USER_PUSH_DEVICE_PERMISSIONS,
-    UserModel, type UserRow,
-} from './models';
 import { MEMBER_READ_PERMISSIONS } from '../members';
-import { useUserAdminActions } from './sections/actions';
-import { useSharedUserQueries } from './sections/queries';
 import {
-    accountType, inactivityWarning, isAnonymized, isOnline, statusBadge, useAdminCaller,
-} from './sections/shared';
-import { USER_APP_PERMS_TABSET } from './sections/permission-catalog';
-import { OverviewSection } from './sections/OverviewSection';
-import { ProfileSection } from './sections/ProfileSection';
-import { PersonalSection } from './sections/PersonalSection';
-import { SecuritySection } from './sections/SecuritySection';
-import { OAuthSection } from './sections/OAuthSection';
-import { GroupsSection } from './sections/GroupsSection';
-import { AppPermsSection, SysPermsSection } from './sections/PermissionsSection';
+USER_DEVICE_PERMISSIONS,USER_EVENT_PERMISSIONS,USER_LOGIN_PERMISSIONS,
+USER_LOG_PERMISSIONS,USER_MANAGE_PERMISSIONS,USER_PUSH_DEVICE_PERMISSIONS,
+UserModel,type UserRow,
+} from './models';
+import { useUserAdminActions } from './sections/actions';
 import { ApiKeysSection } from './sections/ApiKeysSection';
-import { DevicesSection } from './sections/DevicesSection';
-import { LoginsSection } from './sections/LoginsSection';
 import { AuditSection } from './sections/AuditSection';
-import { NotificationsSection } from './sections/NotificationsSection';
+import { DevicesSection } from './sections/DevicesSection';
+import { GroupsSection } from './sections/GroupsSection';
+import { LoginsSection } from './sections/LoginsSection';
 import { UserMetadataSection } from './sections/MetadataPanel';
+import { NotificationsSection } from './sections/NotificationsSection';
+import { OAuthSection } from './sections/OAuthSection';
+import { OverviewSection } from './sections/OverviewSection';
+import { USER_APP_PERMS_TABSET } from './sections/permission-catalog';
+import { AppPermsSection,SysPermsSection } from './sections/PermissionsSection';
+import { PersonalSection } from './sections/PersonalSection';
+import { ProfileSection } from './sections/ProfileSection';
+import { useSharedUserQueries } from './sections/queries';
+import { SecuritySection } from './sections/SecuritySection';
+import {
+accountType,inactivityWarning,isAnonymized,isOnline,statusBadge,useAdminCaller,
+} from './sections/shared';
 
 export interface UserDetailProps {
     id: number;
@@ -144,6 +148,7 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
     // ── Kebab (UserView contextItems at full scope) ───────────────────
     const ADMIN = USER_MANAGE_PERMISSIONS;
     const MENU: DetailMenuEntry<UserRow>[] = [
+        { label: user.is_active ? 'Deactivate' : 'Reactivate', icon: 'bi-power', permissions: ADMIN, when: u => Boolean(u && !isAnonymized(u)), onSelect: () => void (user.is_active ? actions.disableUser() : actions.reactivateUser()) },
         { label: 'Edit user', icon: 'bi-pencil', permissions: ADMIN, onSelect: () => void actions.editUser() },
         {
             label: 'Manage avatar…', icon: 'bi-image', permissions: ADMIN,
