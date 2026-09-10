@@ -432,7 +432,7 @@
       "file": "packages/portal-mojo/src/admin/rules/RuleSetDetailPage.tsx",
       "symbol": "RuleModel.useDelete",
       "expression": "RuleModel.useDelete",
-      "fingerprint": "14f31c1aa53a18f62f39",
+      "fingerprint": "f3b38cb41f462d793f1d",
       "permission": "RULESET_MANAGE_PERMS checked before and after confirmation",
       "rationale": "Only selected child conditions; authoritative ALL/ANY/final-catch-all warning and partial result refresh of parent and children.",
       "runtimeCase": "mounted-rule-partial-authoritative-refresh"

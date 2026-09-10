@@ -965,7 +965,7 @@
       "category": "record",
       "parent": "RuleSetDetail",
       "target": null,
-      "fingerprint": "fa7e73b747f60566fa7e",
+      "fingerprint": "b5624d9f0452b1820678",
       "categories": [
         "record"
       ]
@@ -8310,7 +8310,7 @@
       "owner": "RuleSetDetail",
       "key": "'conditions'",
       "label": "Conditions",
-      "fingerprint": "41950c0eb46874c64cdb"
+      "fingerprint": "a38c25a984b4b22d4ac2"
     },
     {
       "file": "packages/portal-mojo/src/admin/rules/RuleSetDetailPage.tsx",
