@@ -2,7 +2,7 @@
     "name": "portal-mojo-repo",
     "private": true,
     "version": "0.0.0",
-    "description": "portal-mojo monorepo — React portal toolkit for django-mojo (packages/) and the base admin portal (apps/)",
+    "description": "portal-mojo monorepo \u2014 React portal toolkit for django-mojo (packages/) and the base admin portal (apps/)",
     "workspaces": [
         "packages/*",
         "apps/*"
@@ -66,6 +66,7 @@
         "verify:upload-ux": "node scripts/verify-upload-ux.mjs",
         "verify:record-attachments": "node scripts/verify-record-attachments.mjs",
         "verify:form-uploads": "node scripts/verify-form-uploads.mjs",
-        "verify:image-editor": "node scripts/verify-image-editor.mjs"
+        "verify:image-editor": "node scripts/verify-image-editor.mjs",
+        "verify:admin-modals": "node scripts/verify-admin-modals.mjs"
     }
 }
