@@ -201,7 +201,9 @@ function ModalDialog({ item }: { item: ModalItem }) {
     const ref = useRef<HTMLDialogElement>(null);
 
     useEffect(() => {
-        ref.current?.showModal();
+        const dialog = ref.current;
+        dialog?.showModal();
+        return () => { if (dialog?.open) dialog.close(); };
     }, []);
 
     const dismiss = () => {

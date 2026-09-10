@@ -76,6 +76,8 @@ export interface DetailMenuItem<TCtx = unknown> {
     onSelect: () => void;
     /** Destructive styling (`--bad`), the source's `danger` flag. */
     danger?: boolean;
+    /** Keep an action visible while preventing repeat submission. */
+    disabled?: boolean;
 }
 
 export type DetailMenuEntry<TCtx = unknown> = DetailMenuItem<TCtx> | { divider: true };
@@ -86,7 +88,7 @@ export interface DetailViewProps<TCtx = unknown> {
     title: string;
     subtitle?: string;
     chips?: Chip[];
-    active?: { value: boolean; onChange: (next: boolean) => void };
+    active?: { value: boolean; onChange: (next: boolean) => void; disabled?: boolean };
     sections: RailEntry[];
     initialSection?: string;
     /** Controlled rail badges keyed by section key — numbers, dots, text,
@@ -229,6 +231,7 @@ export function DetailView<TCtx = unknown>({
     avatarName, icon, title, subtitle, chips = [], active,
     sections, initialSection, badges, contextMenu, menuContext, onClose,
 }: DetailViewProps<TCtx>) {
+    const [sectionsExpanded, setSectionsExpanded] = useState(false);
     const can = useCanChecker();
     const warnOnce = useWarnOnce();
 
@@ -299,7 +302,7 @@ export function DetailView<TCtx = unknown>({
     if (menuOpen && menuEntries.length === 0) setMenuOpen(false);
 
     return (
-        <div className="detail">
+        <div className={`detail${onClose ? ' detail-modal-body' : ''}`}>
             <header className="detail-header">
                 <div className="detail-avatar">
                     {avatarName ? initials(avatarName) : <i className={`bi ${icon ?? 'bi-file-earmark'}`} />}
@@ -323,6 +326,8 @@ export function DetailView<TCtx = unknown>({
                                 role="switch"
                                 className="switch"
                                 checked={active.value}
+                                disabled={active.disabled}
+                                aria-label="Active"
                                 onChange={(e) => active.onChange(e.target.checked)}
                             />
                         </label>
@@ -356,8 +361,9 @@ export function DetailView<TCtx = unknown>({
                                             key={`${entry.label}${i}`}
                                             className={`dv-menu-item${entry.danger ? ' dv-danger' : ''}`}
                                             role="menuitem"
+                                            disabled={entry.disabled}
                                             // Source order: run the handler, then close.
-                                            onClick={() => { entry.onSelect(); setMenuOpen(false); }}
+                                            onClick={() => { if (!entry.disabled) { entry.onSelect(); setMenuOpen(false); } }}
                                         >
                                             {entry.icon && <i className={`bi ${entry.icon}`} />}
                                             <span>{entry.label}</span>
@@ -375,14 +381,20 @@ export function DetailView<TCtx = unknown>({
                 </div>
             </header>
             <div className="detail-body">
-                <nav className="detail-rail" aria-label={`${title} sections`}>
+                <button type="button" className="detail-section-toggle" aria-expanded={sectionsExpanded} onClick={() => setSectionsExpanded(value => !value)}>
+                    <span>{visibleSections.find(section => section.key === effectiveKey)?.label ?? 'Sections'}</span>
+                    {railBadge(safeNode(badges?.[effectiveKey ?? ''], 'DetailView active badge'))}
+                    <i className={`bi bi-chevron-${sectionsExpanded ? 'up' : 'down'}`} />
+                </button>
+                <nav className={`detail-rail${sectionsExpanded ? ' detail-rail-expanded' : ''}`} aria-label={`${title} sections`}>
                     {visibleEntries.map((entry, i) => 'divider' in entry ? (
                         <div key={`d${i}`} className="rail-divider">{entry.divider}</div>
                     ) : (
                         <button
                             key={entry.key}
                             className={`rail-item${entry.key === effectiveKey ? ' rail-active' : ''}`}
-                            onClick={() => setActiveKey(entry.key)}
+                            aria-current={entry.key === effectiveKey ? 'page' : undefined}
+                            onClick={() => { setActiveKey(entry.key); setSectionsExpanded(false); }}
                         >
                             <i className={`bi ${entry.icon}`} /> {entry.label}
                             {railBadge(safeNode(badges?.[entry.key], `DetailView badge "${entry.key}"`))}

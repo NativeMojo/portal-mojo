@@ -36,3 +36,31 @@
    [hidden] guard is explicit + !important so no future display rule on
    .dv-keep can accidentally resurrect a hidden section's pixels. */
 .dv-keep[hidden] { display: none !important; }
+
+/* Responsive detail navigation uses the host width, including embedded views. */
+.detail-section-toggle { display: none; }
+.detail-title, .detail-sub { overflow-wrap: anywhere; }
+.detail-gutter { flex: none; }
+.dv-menu-item:disabled { opacity: .5; cursor: default; }
+@container (max-width: 560px) {
+    .detail-header { padding: 12px; gap: 9px; }
+    .detail-avatar { width: 34px; height: 34px; flex: none; }
+    .detail-title { font-size: 16px; }
+    .detail-sub { font-size: 12px; gap: 4px; }
+    .detail-gutter { gap: 4px; }
+    .detail-body { flex-direction: column; }
+    .detail-section-toggle { display: flex; align-items: center; gap: 8px; flex: none; width: 100%; padding: 10px 14px; background: var(--surface2); color: var(--ink); border: 0; border-bottom: 1px solid var(--line); text-align: left; }
+    .detail-rail { display: none; width: auto; flex: none; max-height: 32%; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+    .detail-rail.detail-rail-expanded { display: block; }
+    .detail-content { padding: 14px; }
+}
+/* Dialog-only constraints never cap page or embedded DetailView hosts. */
+.mojo-modal { max-height: calc(100dvh - 24px); }
+.mojo-modal .modal-pad { overflow-wrap: anywhere; }
+.mojo-modal .modal-title { position: sticky; top: -20px; background: var(--surface); z-index: 1; padding-block: 5px; }
+.mojo-modal .modal-actions { position: sticky; bottom: -22px; background: var(--surface); padding-block: 12px; flex-wrap: wrap; z-index: 1; }
+@media (max-width: 560px) {
+    .mojo-modal .modal-pad { padding: 16px; }
+    .mojo-modal .modal-title { top: -16px; }
+    .mojo-modal .modal-actions { bottom: -16px; }
+}

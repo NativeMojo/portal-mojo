@@ -614,7 +614,8 @@ button { font: inherit; color: inherit; }
 .chart-tip-total { border-top: 1px solid var(--line-soft); margin-top: 4px; padding-top: 5px; }
 
 /* ============================================================ Detail view */
-.detail { display: flex; flex-direction: column; min-height: 560px; max-height: 82vh; }
+.detail { display: flex; flex-direction: column; min-height: 0; container-type: inline-size; }
+.mojo-modal-flush > .detail { height: min(720px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); }
 .detail-loading { padding: 80px; display: flex; justify-content: center; }
 .detail-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--line); flex: none; }
 .detail-avatar {
