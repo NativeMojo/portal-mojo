@@ -272,8 +272,8 @@ function ConfigDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const [saving, setSaving] = useState(false);
     const query = PhoneConfigModel.useOne(id);
     const canManage = useCan(PHONE_CONFIG_MANAGE_PERMISSIONS).can;
-    
-    
+
+
     const [testing, setTesting] = useState(false);
     if (!query.data) return <div className="modal-pad">{query.isLoading ? 'Loading provider configuration…' : 'Configuration unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;
     const row = query.data;
@@ -297,7 +297,7 @@ function ConfigDetail({ id, onClose }: { id: number; onClose: () => void }) {
             setTesting(false);
         }
     };
-    
+
     return <DetailView
         title={row.name}
         subtitle={relationLabel(row.group)}

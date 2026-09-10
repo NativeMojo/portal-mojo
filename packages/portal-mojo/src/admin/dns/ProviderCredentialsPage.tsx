@@ -170,7 +170,7 @@ function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabiliti
     const { data: row, isPending, error } = DnsCredentialModel.useOne(id);
     const { can: canManage } = useCan(DNS_MANAGE_PERMISSIONS);
     const save = DnsCredentialModel.useSave();
-    
+
     if (isPending) return <div className="modal-pad dim">Loading credential…</div>;
     if (!row || error) return <div className="modal-pad text-bad">{error?.message ?? 'Credential not found'}</div>;
 
@@ -183,7 +183,7 @@ function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabiliti
         }
     };
 
-    
+
 
     return <DetailView title={row.name || `Credential #${row.id}`} subtitle={providerLabel(row.provider)} icon="bi-key" onClose={close}
         chips={[{ text: row.verified ? 'Verified' : 'Unverified', tone: verificationTone(row) }, { text: row.is_active ? 'Active' : 'Retired', tone: row.is_active ? 'success' : 'muted' }]}

@@ -36,7 +36,7 @@ export function FilesPage() {
     const queryClient = useQueryClient();
     const canManage = useCan(STORAGE_MANAGE_PERMS).can;
     const canChooseGroup = useCan(GROUP_DIRECTORY_PERMS).can;
-    
+
     const saveAccess = (row: FileRow, value: boolean) => saveFileAndReconcileGroup(queryClient, row.id, { is_public: value });
     const batches: BatchAction<FileRow>[] = [
         { key: 'public', label: 'Make public', eligible: (row) => !row.is_public, confirm: 'Make the selected files public?', run: (row) => saveAccess(row, true) },

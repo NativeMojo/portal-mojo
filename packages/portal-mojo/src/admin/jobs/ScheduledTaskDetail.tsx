@@ -210,7 +210,7 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
     const queryClient = useQueryClient();
     const query = ScheduledTaskModel.useOne(id);
     const save = ScheduledTaskModel.useSave();
-    
+
     const { can: canManage } = useCan(SCHEDULED_TASK_MANAGE_PERMS);
 
     if (query.isPending) return <div className="modal-pad dim">Loading scheduled task…</div>;
@@ -242,7 +242,7 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
         }
     };
 
-    
+
 
     const schedule = formatSchedule(task);
     const stateTone: Tone = task.enabled ? 'success' : 'muted';
@@ -340,8 +340,8 @@ export function ScheduledTaskDetail({ id, onClose }: { id: string; onClose: () =
                 },
                 { key: 'config', label: 'Configuration', icon: 'bi-sliders', render: () => <ConfigurationSection task={task} /> },
                 { key: 'results', label: 'Results', icon: 'bi-list-check', render: () => <ResultsSection taskId={id} /> },
-                
-                
+
+
             ]}
             initialSection="overview"
             onClose={onClose}

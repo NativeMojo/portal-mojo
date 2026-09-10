@@ -91,6 +91,6 @@ export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose
     ] : []} sections={[
         { key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-section"><FlatRow label="Name"><code>{bucket.name}</code></FlatRow><FlatRow label="Created">{fmt.datetime(bucket.created)}</FlatRow><FlatRow label="Inventory">Complete account inventory row</FlatRow><Outcome value={outcome} />{emptyResult && <div className="storage-counts"><b>Last acknowledged empty counts</b><span>Objects {emptyResult.deleted_objects}</span><span>Versions {emptyResult.deleted_versions}</span><span>Delete markers {emptyResult.deleted_markers}</span><span>Multipart uploads {emptyResult.aborted_uploads}</span></div>}</div> },
         { key: 'access', label: 'Access', icon: 'bi-shield-lock', permissions: BUCKET_MANAGE_PERMS, render: () => <div className="detail-section"><h3>Verified access posture</h3><p className="dim">Every attempt refreshes inventory in a finally path. A rejection can still represent partial external change.</p></div> },
-        
+
     ]} initialSection="overview" onClose={onClose} />;
 }

@@ -24,7 +24,7 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
     const permission = useRef(canManage); permission.current = canManage;
     useEffect(() => { permission.current = canManage; return () => { permission.current = false; }; }, [canManage]);
     const regenerate = FileModel.useAction('regenerate_renditions');
-    
+
     const shares = ShortLinkShareModel.useList({ file: id, start: 0, size: 25 }, { enabled: canManage });
     const alive = useRef(true);
     const initialPollStarted = useRef(false);
@@ -97,7 +97,7 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
         } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not queue renditions'); }
         finally { regenerationBusyRef.current = false; setRegenerationBusy(false); }
     };
-    
+
 
     const toggleShare = async (shareId: number, next: boolean) => {
         if (!permission.current || shareLocks.current.has(shareId)) return;

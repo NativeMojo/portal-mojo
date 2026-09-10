@@ -113,12 +113,12 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
     const canManage = useCan(IPSET_MANAGE_PERMS).can;
     const allowed = useRef(canManage); allowed.current = canManage;
     useEffect(() => { allowed.current = canManage; return () => { allowed.current = false; }; }, [canManage]);
-    
+
     const sync = IPSetModel.useAction('sync');
     const enable = IPSetModel.useAction('enable');
     const disable = IPSetModel.useAction('disable');
     const refresh = IPSetModel.useAction('refresh_source');
-    
+
     const save = IPSetModel.useSave();
 
     if (isPending) return <div className="modal-pad dim">Loading IP set…</div>;

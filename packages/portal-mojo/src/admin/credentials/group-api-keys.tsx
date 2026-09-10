@@ -116,7 +116,7 @@ function useGroupApiKeyActions(permission: PermSpec) {
     const renderedPermissions = useRenderedPermissions();
     const create = useCreateGroupApiKey();
     const save = GroupApiKeyModel.useSave();
-    
+
     const { can } = useCan(permission);
 
     const createKey = async (fixedGroup?: CredentialGroup) => {
@@ -399,7 +399,7 @@ function AuthorizedGroupApiKeyDetail({ id, onClose }: { id: number; onClose: () 
                             <FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow>
                             <FlatRow label="Last used">{fmt.relative(row.last_used, 'never')}</FlatRow>
                             <FlatRow label="Expires">{row.expires_at ? fmt.datetime(row.expires_at) : 'Never'}</FlatRow>
-                            
+
                         </>
                     ),
                 },

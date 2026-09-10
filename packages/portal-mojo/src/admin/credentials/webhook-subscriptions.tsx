@@ -137,7 +137,7 @@ const WEBHOOK_FIELDS: Field[] = [
 
 function useWebhookActions(permission: PermSpec) {
     const save = WebhookSubscriptionModel.useSave();
-    
+
     const { can } = useCan(permission);
 
     const createSubscription = async (fixedGroup?: CredentialGroup) => {
@@ -223,7 +223,7 @@ function useWebhookActions(permission: PermSpec) {
         }
     };
 
-    
+
 
     return { canManage: can, createSubscription, editSubscription, toggleSubscription, pending: save.isPending };
 }
@@ -275,7 +275,7 @@ function WebhookCard({ row, actions }: {
                             }}
                         />
                     </label>
-                    
+
                 </div>
             )}
         </div>
@@ -342,7 +342,7 @@ export function WebhookSubscriptionDetail({ id, onClose }: { id: number; onClose
                             <FlatRow label="URL"><code>{row.url}</code></FlatRow>
                             <FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow>
                             <FlatRow label="Modified">{fmt.datetime(row.modified)}</FlatRow>
-                            
+
                         </>
                     ),
                 },

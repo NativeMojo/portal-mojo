@@ -56,6 +56,6 @@ export function ShortlinkDetail({ id, onClose }: { id: number; onClose: () => vo
                 <h3>Tracked records</h3><p className="dim">Human and bot values count retained tracking records. Total hits may also include requests made while tracking was off.</p>
                 {counts.isLoading ? <p>Loading counts…</p> : counts.isError ? <div className="form-alert">Tracked counts unavailable.</div> : <div className="shortlink-counts"><div><b>{counts.data?.human ?? 0}</b><span>Human records</span></div><div><b>{counts.data?.bot ?? 0}</b><span>Bot records</span></div><div><b>{counts.data?.remainder ?? row.hit_count}</b><span>Hit-count remainder</span></div></div>}
             </div> },
-            
+
         ]} />;
 }

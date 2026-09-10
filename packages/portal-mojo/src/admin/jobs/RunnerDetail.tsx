@@ -558,8 +558,8 @@ export function RunnerDetail({ runner, onClose }: { runner: RunnerRow; onClose: 
                         </>
                     ),
                 },
-                
-                
+
+
             ]}
             initialSection="overview"
             onClose={onClose}
