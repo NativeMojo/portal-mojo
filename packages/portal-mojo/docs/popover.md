@@ -128,3 +128,18 @@ baked in 20px padding + 260px min-width for its one tenant, the calendar
   document state, remember listeners attach a tick later.
 - Placement flips only bottom→top (per source). If content can be taller
   than the viewport, cap and scroll it in YOUR content styles.
+
+## Modal ownership
+
+A popover anchored inside a native modal portals into that dialog in both
+native-Popover and fallback paths. Promoting a body-owned popover to the top
+layer affects painting but does not escape the document's modal inertness; it
+can appear visible while pointer/focus input lands underneath. Keeping the
+portal in the owning dialog preserves menu and picker interaction. The first
+Escape closes the popover; the next may dismiss the parent dialog.
+
+Vertical placement clamps to the viewport when neither side fits. DetailView
+menu content owns its height limit and scrolling; the general popover host
+keeps overflow available for nested calendar/picker content. Dialog layout
+cleanup restores focus while the native dialog is still connected. Header
+menu selections focus their stable trigger before launching nested dialogs.

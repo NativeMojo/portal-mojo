@@ -363,7 +363,7 @@ export function DetailView<TCtx = unknown>({
                                             role="menuitem"
                                             disabled={entry.disabled}
                                             // Source order: run the handler, then close.
-                                            onClick={() => { if (!entry.disabled) { entry.onSelect(); setMenuOpen(false); } }}
+                                            onClick={() => { if (!entry.disabled) { kebabRef.current?.focus(); entry.onSelect(); setMenuOpen(false); } }}
                                         >
                                             {entry.icon && <i className={`bi ${entry.icon}`} />}
                                             <span>{entry.label}</span>

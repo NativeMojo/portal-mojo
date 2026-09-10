@@ -2,7 +2,7 @@
 // native <dialog> + a portal-free host. `await modal.confirm(...)` from any
 // event handler; no JSX modal state to hoist. The z-index/backdrop stack
 // manager web-mojo needed does not exist here: <dialog> stacks natively.
-import { useEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 
 export type ModalSize = 'sm' | 'md' | 'lg';
 
@@ -200,10 +200,11 @@ export const modal = {
 function ModalDialog({ item }: { item: ModalItem }) {
     const ref = useRef<HTMLDialogElement>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const dialog = ref.current;
+        const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         dialog?.showModal();
-        return () => { if (dialog?.open) dialog.close(); };
+        return () => { if (dialog?.open) dialog.close(); if (opener?.isConnected) opener.focus(); };
     }, []);
 
     const dismiss = () => {
@@ -227,7 +228,7 @@ function ModalDialog({ item }: { item: ModalItem }) {
 function DrawerDialog({ item }: { item: DrawerItem }) {
     const ref = useRef<HTMLDialogElement>(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const el = ref.current;
         el?.showModal();
         // Unmount is the END of the exit animation (the manager holds the item

@@ -142,7 +142,7 @@ export function scanAdminModals(program, targetFiles, reviewed = []) {
 // Low-level exported delete APIs remain public; any UI reference is reviewed.
 export function scanLifecycleReferences(program, sources) {
     const checker = program.getTypeChecker(); const references = [];
-    const helpers = new Set(['deleteShortlink','deleteFileShare','deleteMessagingRow','deleteAssistantConversation','deleteAssistantSkill','deleteAssistantMemory','deleteDnsRecordSet','emptyBucket','purgeJobs','cleanupConsumers']);
+    const helpers = new Set(['deleteShortlink','deleteFileShare','deleteMessagingRow','deleteAssistantConversation','deleteAssistantSkill','deleteAssistantMemory','deleteDnsRecordSet','emptyBucket','purgeJobs','cleanupConsumers','clearQueue']);
     const original = (node, seen = new Set()) => {
         if (!node || seen.has(node)) return null; seen.add(node);
         if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)) return original(node.expression,seen);

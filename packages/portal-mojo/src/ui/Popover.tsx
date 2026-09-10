@@ -11,10 +11,10 @@
 // `showPopover()`): top-layer members paint in promotion order, so a popover
 // opened from inside a modal stacks above it. `manual` (not `auto`) opts out
 // of UA light-dismiss — close behavior stays ours, matching the source.
-// Browsers without the API fall back to a plain portaled div; when the
-// anchor sits inside an open <dialog> the portal target becomes that dialog
-// (a descendant paints with its top-layer host, and position:fixed children
-// are not clipped by ancestor overflow), so pickers-in-modals keep working.
+// A popover anchored inside a modal remains a DOM descendant of that dialog
+// in both paths. Top-layer painting alone does not escape the document's
+// modal inertness: a body portal can be visible yet reject pointer/focus input.
+// Browsers without the API paint the fixed descendant with its dialog host.
 //
 // Coordinates: the element is position:fixed in BOTH paths, so all math is
 // viewport-relative (a deliberate translation from the source's
@@ -118,6 +118,10 @@ export function Popover({
                 top = rect.top - popRect.height - gap;
             }
 
+            // Keep a tall menu reachable even when it cannot fit wholly on
+            // either side. Individual menu content owns scrolling; do not clip
+            // this host, which may contain nested calendar/picker popovers.
+            top = Math.max(VIEWPORT_INSET, Math.min(top, vh - popRect.height - VIEWPORT_INSET));
             el.style.top = `${top}px`;
             el.style.left = `${left}px`;
         };
@@ -162,6 +166,7 @@ export function Popover({
             // request. The next Escape then reaches the dialog.
             event.preventDefault();
             event.stopPropagation();
+            anchorRef.current?.focus();
             onCloseRef.current('escape');
         };
 
@@ -180,14 +185,10 @@ export function Popover({
 
     if (!open) return null;
 
-    // Portal target is decided at render. With the Popover API the top layer
-    // makes document.body universal; without it, an anchor inside an open
-    // modal portals into that <dialog> so the popover paints with its
-    // top-layer host. (Ref read during render is idempotent here — the
-    // anchor mounts before any user-driven open.)
-    const host = SUPPORTS_POPOVER
-        ? document.body
-        : anchorRef.current?.closest('dialog') ?? document.body;
+    // Keep modal descendants outside the inert document subtree, including
+    // when showPopover() promotes them to the native top layer. Ref reads are
+    // idempotent here: the anchor mounts before any user-driven opening.
+    const host = anchorRef.current?.closest('dialog') ?? document.body;
 
     return createPortal(
         <div

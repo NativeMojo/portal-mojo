@@ -19,7 +19,7 @@
 
 /* Kebab menu (inside the unpadded .mojo-popover shell — content brings its
    own padding/width, per the Popover contract). */
-.dv-menu { padding: 5px; min-width: 200px; }
+.dv-menu { padding: 5px; min-width: 200px; max-height: calc(100dvh - 24px); overflow-y: auto; }
 .dv-menu-item {
     display: flex; align-items: center; gap: 9px; width: 100%;
     padding: 7px 9px; border: none; background: none; border-radius: 7px;

@@ -8,6 +8,9 @@ const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://loc
 for (const name of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','Event','MouseEvent','CustomEvent','Node']) globalThis[name] = dom.window[name];
 Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const nativeMatches=HTMLElement.prototype.matches; HTMLElement.prototype.matches=function(selector){return selector===':popover-open'?this.hasAttribute('data-test-open'):nativeMatches.call(this,selector);};
+HTMLElement.prototype.showPopover=function(){this.setAttribute('data-test-open','');}; HTMLElement.prototype.hidePopover=function(){this.removeAttribute('data-test-open');};
+globalThis.ResizeObserver=class { observe(){} disconnect(){} };
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 const React = await import('react'); const { createRoot } = await import('react-dom/client'); const { act } = React;
 const requests = [], errors = [], deleted = []; let confirmation;
@@ -27,6 +30,7 @@ const ruleUI = `export * from '/packages/portal-mojo/src/ui/index.ts'; import Re
 const virtual = { '/__4156_memory.ts': memoryApi, '/__4156_rules.ts': ruleModels, '/__4156_rule_ui.ts': ruleUI, '/__4156_runtime.ts': runtime, '/__4156_models.ts': model, '/__4156_control.ts': `export * from '/packages/portal-mojo/src/admin/jobs/control.ts'; export const purgeJobs = params => globalThis.__modal4156.purge(params);` };
 const targets = ['jobs/sections/JobOperationsSection.tsx','identity/users/sections/OAuthSection.tsx','identity/users/sections/actions.tsx','assistant/pages.tsx','rules/RuleSetDetailPage.tsx'];
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{ name: 'modal-boundary-fixtures', enforce: 'pre', resolveId: id => id in virtual ? id : null, load: id => virtual[id], transform(source,id) {
+    if (id.endsWith('/ui/Popover.tsx') && process.env.POPOVER_REGRESSION_REF) return execFileSync('git', ['show', `${process.env.POPOVER_REGRESSION_REF}:packages/portal-mojo/src/ui/Popover.tsx`], { encoding: 'utf8' });
     if (!targets.some(path => id.endsWith('/admin/' + path))) return;
     if (process.env.MODAL_REGRESSION_REF) source = execFileSync('git', ['show', `${process.env.MODAL_REGRESSION_REF}:${id.replace(process.cwd() + '/', '')}`], { encoding: 'utf8' });
     source = source.replace(/from ['"](?:\.\.\/)+client\/runtime['"]/g, `from '/__4156_runtime.ts'`);
@@ -112,4 +116,7 @@ try {
     await act(async()=>rejectWrite(new Error('server refused memory removal'))); assert.match(document.body.textContent,/server refused memory removal/); assert.match(document.body.textContent,/latest/,'Refused removal retains the authoritative value');
     await click('Remove personal'); await unmount(); await act(async()=>confirmation(true)); assert.equal(fixture.memoryWrites.length,1,'Unmount invalidates memory confirmation');
     console.log('Mounted memory exception: explicit group selection, assistant member authority, stale scope read suppression, frozen confirmation scope, and system permission loss.');
+    function MenuHost(){const anchor=React.useRef(null);const [open,setOpen]=React.useState(false);return React.createElement('dialog',{open:true},React.createElement('button',{ref:anchor,onClick:()=>setOpen(true)},'Anchor'),React.createElement(ui.Popover,{anchorRef:anchor,open,onClose:()=>setOpen(false)},React.createElement('button',{role:'menuitem'},'Nested operation')));}
+    await mount(MenuHost,{}); await click('Anchor'); assert.equal(document.querySelector('[role="menuitem"]').closest('[popover]').parentElement.tagName,'DIALOG','Native popovers must remain within the modal subtree to escape document inertness'); await act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));document.querySelector('[role="menuitem"]').focus();document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}); assert.equal(document.activeElement.textContent,'Anchor','Escape restores the anchor focus'); await unmount();
+    console.log('Mounted native-popover host regression: menu stays in the dialog subtree. Native pointer/focus proof remains browser-owned.');
 } finally { queryClient.clear(); await server.close(); dom.window.close(); delete globalThis.__modal4156; }

@@ -445,6 +445,15 @@
       "permission": "BUCKET_MANAGE_PERMS and fresh authentication",
       "rationale": "Retains the bucket; exact case-sensitive name after armed confirmation removes objects, versions, markers and multipart uploads, reporting partial external outcomes.",
       "runtimeCase": "bucket-exact-name-fresh-auth-partial"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx",
+      "symbol": "clearQueue",
+      "expression": "clearQueue",
+      "fingerprint": "3b485ccf6a1410bb822c",
+      "permission": "JOBS_MANAGE_PERMS with an explicit channel and armed confirmation",
+      "rationale": "Clears Redis queue entries and cancels pending database jobs; send confirm:yes only after the operator confirms, preserving partial per-channel results.",
+      "runtimeCase": "jobs-clear-queue-armed-channel-results"
     }
   ]
 }
