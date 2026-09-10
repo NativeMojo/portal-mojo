@@ -49,9 +49,21 @@ export function CertificateLifecyclePoller({ domain, intervalMs = CERTIFICATE_PO
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [version, setVersion] = useState(0);
 
-    useEffect(() => queryClient.getQueryCache().subscribe((event) => {
-        if (event.query.queryKey[0] === CertificateModel.endpoint) setVersion((value) => value + 1);
-    }), [queryClient]);
+    useEffect(() => {
+        let mounted = true;
+        let queued = false;
+        const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+            if (event.query.queryKey[0] !== CertificateModel.endpoint || queued) return;
+            // Observer registration can notify while a detail is rendering.
+            // Coalesce cache notifications after that render, including StrictMode replay.
+            queued = true;
+            queueMicrotask(() => {
+                queued = false;
+                if (mounted) setVersion((value) => value + 1);
+            });
+        });
+        return () => { mounted = false; unsubscribe(); };
+    }, [queryClient]);
 
     useEffect(() => {
         const rowsById = new Map<number, CertificateRow>();

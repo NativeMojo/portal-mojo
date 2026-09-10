@@ -30,6 +30,7 @@ const ruleUI = `export * from '/packages/portal-mojo/src/ui/index.ts'; import Re
 const virtual = { '/__4156_memory.ts': memoryApi, '/__4156_rules.ts': ruleModels, '/__4156_rule_ui.ts': ruleUI, '/__4156_runtime.ts': runtime, '/__4156_models.ts': model, '/__4156_control.ts': `export * from '/packages/portal-mojo/src/admin/jobs/control.ts'; export const purgeJobs = params => globalThis.__modal4156.purge(params);` };
 const targets = ['jobs/sections/JobOperationsSection.tsx','identity/users/sections/OAuthSection.tsx','identity/users/sections/actions.tsx','assistant/pages.tsx','rules/RuleSetDetailPage.tsx'];
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{ name: 'modal-boundary-fixtures', enforce: 'pre', resolveId: id => id in virtual ? id : null, load: id => virtual[id], transform(source,id) {
+    if (id.endsWith('/ui/DetailView.tsx')) return source.replace("from '../client/me'", "from '/__4156_runtime.ts'");
     if (id.endsWith('/ui/Popover.tsx') && process.env.POPOVER_REGRESSION_REF) return execFileSync('git', ['show', `${process.env.POPOVER_REGRESSION_REF}:packages/portal-mojo/src/ui/Popover.tsx`], { encoding: 'utf8' });
     if (!targets.some(path => id.endsWith('/admin/' + path))) return;
     if (process.env.MODAL_REGRESSION_REF) source = execFileSync('git', ['show', `${process.env.MODAL_REGRESSION_REF}:${id.replace(process.cwd() + '/', '')}`], { encoding: 'utf8' });
@@ -41,7 +42,7 @@ const server = await createServer({ root: process.cwd(), appType: 'custom', logL
     if (id.endsWith('/actions.tsx')) source += '\nexport { PasskeysModal };';
     return source;
 } }] });
-const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+const { QueryClient, QueryClientProvider, useQuery } = await import('@tanstack/react-query');
 let root; const queryClient = new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
 const renderElement=(Component,props)=>React.createElement(QueryClientProvider,{client:queryClient},React.createElement(React.StrictMode,null,React.createElement(Component,props)));
 const button = text => [...document.querySelectorAll('button')].find(node => node.textContent.trim() === text || node.getAttribute('aria-label') === text);
@@ -120,4 +121,25 @@ try {
     function MenuHost(){const anchor=React.useRef(null);const [open,setOpen]=React.useState(false);return React.createElement('dialog',{open:true},React.createElement('button',{ref:anchor,onClick:()=>setOpen(true)},'Anchor'),React.createElement(ui.Popover,{anchorRef:anchor,open,onClose:()=>setOpen(false)},React.createElement('button',{role:'menuitem'},'Nested operation')));}
     await mount(MenuHost,{}); await click('Anchor'); assert.equal(document.querySelector('[role="menuitem"]').closest('[popover]').parentElement.tagName,'DIALOG','Native popovers must remain within the modal subtree to escape document inertness'); await act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));document.querySelector('[role="menuitem"]').focus();document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}); assert.equal(document.activeElement.textContent,'Anchor','Escape restores the anchor focus'); await unmount();
     console.log('Mounted native-popover host regression: menu stays in the dialog subtree. Native pointer/focus proof remains browser-owned.');
+    const detailSections = [{key:'one',label:'One',render:()=>React.createElement('p',null,'First')},{key:'two',label:'Two',render:()=>React.createElement('p',null,'Second')}];
+    await mount(ui.DetailView,{title:'Keyboard fixture',sections:detailSections});
+    await act(async()=>document.querySelector('.detail-section-toggle').click());
+    const secondSection=[...document.querySelectorAll('.detail-rail button')].find(node=>node.textContent.trim()==='Two');
+    await act(async()=>{secondSection.focus();secondSection.click();});
+    assert(document.activeElement===document.querySelector('.detail-section-toggle'),'Compact selection must restore focus before hiding the focused rail');
+    await unmount(); console.log('Mounted compact navigation: section selection returns focus to the visible toggle.');
+    const { CertificateLifecyclePoller } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/CertificateLifecyclePoller.tsx');
+    const { CertificateModel } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/models.ts');
+    const certKey=CertificateModel.keys.one(999);
+    queryClient.setQueryData(certKey,{id:999,domain:1,status:'active',renew_after:Date.now()/1000+86400,not_after:Date.now()/1000+172800,attempts:1});
+    function CertificateObserver(){useQuery({queryKey:certKey,queryFn:async()=>null,enabled:false});return null;}
+    function CertificateHost({inspect=false}){return React.createElement(React.Fragment,null,React.createElement(CertificateLifecyclePoller,{}),inspect&&React.createElement(CertificateObserver,{}));}
+    const renderErrors=[]; const oldConsoleError=console.error; console.error=(...args)=>{renderErrors.push(args.join(' '));};
+    try {
+        await mount(CertificateHost,{});
+        await act(async()=>root.render(renderElement(CertificateHost,{inspect:true})));
+        await unmount();
+    } finally { console.error=oldConsoleError; }
+    assert(!renderErrors.some(message=>message.includes('while rendering a different component')),'Opening a certificate observer must not update its lifecycle poller during render');
+    console.log('Mounted certificate lifecycle: opening a cached certificate observer does not schedule a cross-component render update.');
 } finally { queryClient.clear(); await server.close(); dom.window.close(); delete globalThis.__modal4156; }

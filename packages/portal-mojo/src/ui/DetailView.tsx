@@ -232,6 +232,7 @@ export function DetailView<TCtx = unknown>({
     sections, initialSection, badges, contextMenu, menuContext, onClose,
 }: DetailViewProps<TCtx>) {
     const [sectionsExpanded, setSectionsExpanded] = useState(false);
+    const sectionToggleRef = useRef<HTMLButtonElement>(null);
     const can = useCanChecker();
     const warnOnce = useWarnOnce();
 
@@ -381,7 +382,7 @@ export function DetailView<TCtx = unknown>({
                 </div>
             </header>
             <div className="detail-body">
-                <button type="button" className="detail-section-toggle" aria-expanded={sectionsExpanded} onClick={() => setSectionsExpanded(value => !value)}>
+                <button ref={sectionToggleRef} type="button" className="detail-section-toggle" aria-expanded={sectionsExpanded} onClick={() => setSectionsExpanded(value => !value)}>
                     <span>{visibleSections.find(section => section.key === effectiveKey)?.label ?? 'Sections'}</span>
                     {railBadge(safeNode(badges?.[effectiveKey ?? ''], 'DetailView active badge'))}
                     <i className={`bi bi-chevron-${sectionsExpanded ? 'up' : 'down'}`} />
@@ -394,7 +395,11 @@ export function DetailView<TCtx = unknown>({
                             key={entry.key}
                             className={`rail-item${entry.key === effectiveKey ? ' rail-active' : ''}`}
                             aria-current={entry.key === effectiveKey ? 'page' : undefined}
-                            onClick={() => { setActiveKey(entry.key); setSectionsExpanded(false); }}
+                            onClick={() => {
+                                if (sectionsExpanded) sectionToggleRef.current?.focus();
+                                setActiveKey(entry.key);
+                                setSectionsExpanded(false);
+                            }}
                         >
                             <i className={`bi ${entry.icon}`} /> {entry.label}
                             {railBadge(safeNode(badges?.[entry.key], `DetailView badge "${entry.key}"`))}

@@ -194,3 +194,5 @@ get rows. See [Admin modal policy](admin-modals.md) for lifecycle exceptions.
 - The styles for the C1 chrome live in `apps/portal/src/theme/detailview.css`
   (`.rail-badge`, `.rail-dot`, `.dv-menu*`, `.dv-keep`) — tokens only,
   both themes.
+
+Keyboard selection in the compact section rail returns focus to the visible section toggle before the rail collapses. The desktop rail retains ordinary button focus.
