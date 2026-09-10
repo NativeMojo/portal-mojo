@@ -3,6 +3,59 @@
 .phonehub-heading h1 { margin: 2px 0 4px; font-size: 1.55rem; color: var(--ink-strong); }
 .phonehub-heading p { margin: 0; max-width: 76ch; }
 .phonehub-secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
-.phonehub-config-editor .form-grid { align-items: end; }
+.phonehub-config-editor { display: flex; flex-direction: column; max-height: 88vh; padding: 0; overflow: hidden; }
+.phonehub-config-header { flex: none; padding: 21px 24px 17px; border-bottom: 1px solid var(--line); }
+.phonehub-config-header .modal-title { margin: 3px 0 5px; font-size: 20px; }
+.phonehub-config-header p { margin: 0; max-width: 72ch; line-height: 1.45; }
+.phonehub-config-sections { display: grid; gap: 14px; min-height: 0; padding: 18px 24px 22px; overflow-y: auto; }
+.phonehub-config-section { padding: 17px; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in srgb, var(--surface2) 44%, var(--surface)); }
+.phonehub-config-section-heading { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 15px; }
+.phonehub-config-section-heading h3 { margin: 0; color: var(--ink-strong); font-size: 15px; }
+.phonehub-config-section-heading p { margin: 3px 0 0; color: var(--mute); font-size: 12.5px; line-height: 1.4; }
+.phonehub-config-section-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.phonehub-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 14px; }
+.phonehub-field-span { grid-column: 1 / -1; }
+.phonehub-provider-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.phonehub-provider-fieldset legend { padding: 0; }
+.phonehub-provider-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.phonehub-provider-option { position: relative; cursor: pointer; }
+.phonehub-provider-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.phonehub-provider-option > span { display: grid; grid-template-columns: auto 1fr; column-gap: 9px; align-items: center; min-height: 68px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); transition: border-color .15s ease, background .15s ease; }
+.phonehub-provider-option i { grid-row: 1 / 3; color: var(--mute); font-size: 17px; }
+.phonehub-provider-option strong { color: var(--ink-strong); font-size: 13px; }
+.phonehub-provider-option small { color: var(--mute); font-size: 11.5px; line-height: 1.3; }
+.phonehub-provider-option input:checked + span { border-color: var(--accent); background: var(--accent-soft); }
+.phonehub-provider-option input:checked + span i { color: var(--accent); }
+.phonehub-provider-option input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.phonehub-secret-field { min-width: 0; }
+.phonehub-secret-field .field-help { min-height: 16px; }
+.phonehub-provider-note { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line)); border-radius: 9px; background: var(--accent-soft); color: var(--ink); font-size: 12.5px; line-height: 1.45; }
+.phonehub-provider-note i { flex: none; color: var(--accent); }
+.phonehub-provider-note.is-warning { border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); background: var(--warn-soft); }
+.phonehub-provider-note.is-warning i { color: var(--warn); }
+.phonehub-behavior-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.phonehub-behavior-setting { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); cursor: pointer; }
+.phonehub-behavior-setting > span { display: grid; gap: 2px; min-width: 0; }
+.phonehub-behavior-setting strong { color: var(--ink-strong); font-size: 13px; }
+.phonehub-behavior-setting small { color: var(--mute); font-size: 11.5px; line-height: 1.35; }
+.phonehub-cache-field { width: min(220px, 100%); margin-top: 13px; }
+.phonehub-number-suffix { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.phonehub-number-suffix > span { color: var(--mute); font-size: 12.5px; }
+.phonehub-config-actions { flex: none; margin: 0; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--surface); }
+.phonehub-provider-summary { display: flex; align-items: center; gap: 13px; margin: 14px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface2); }
+.phonehub-provider-summary > i { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 11px; background: var(--accent-soft); color: var(--accent); font-size: 19px; }
+.phonehub-provider-summary h3 { margin: 1px 0; color: var(--ink-strong); font-size: 15px; }
+.phonehub-provider-summary p { margin: 0; color: var(--mute); font-size: 12.5px; }
+.phonehub-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.phonehub-summary-grid .known-card { display: grid; gap: 5px; margin: 0; }
+.phonehub-summary-grid span { color: var(--mute); font-size: 11.5px; }
+.phonehub-summary-grid strong { color: var(--ink-strong); font-size: 13px; overflow-wrap: anywhere; }
 .phonehub-page code { overflow-wrap: anywhere; }
-@media (max-width: 700px) { .phonehub-secret-row { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .phonehub-provider-option > span { transition: none; } }
+@media (max-width: 700px) {
+    .phonehub-config-header { padding-inline: 18px; }
+    .phonehub-config-sections { padding-inline: 18px; }
+    .phonehub-field-grid, .phonehub-provider-options, .phonehub-behavior-grid, .phonehub-summary-grid { grid-template-columns: 1fr; }
+    .phonehub-secret-row { grid-template-columns: 1fr; }
+    .phonehub-config-actions { padding-inline: 18px; }
+}
