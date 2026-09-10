@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import ts from 'typescript';
 
 globalThis.window = {
     addEventListener() {}, removeEventListener() {}, confirm: () => true,
@@ -26,7 +27,53 @@ const read = (relative) => readFile(new URL(`../${relative}`, import.meta.url), 
  *  assertion runs against code only. */
 const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
+// Inspect mutation argument fields, not nearby copy or read expressions.
+// Follow local variable initializers so `{ changes }` and payload spreads
+// receive the same check as an inline payload. Editor-produced payloads are
+// separately checked below through their field definitions and module source.
+function enabledMutationFields(source) {
+    const tree = ts.createSourceFile('ipset.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const bindings = new Map();
+    const mutations = [];
+    const collect = node => {
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+            const values = bindings.get(node.name.text) ?? [];
+            values.push(node.initializer); bindings.set(node.name.text, values);
+        }
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+            && ['mutate', 'mutateAsync'].includes(node.expression.name.text)) mutations.push(node);
+        ts.forEachChild(node, collect);
+    };
+    collect(tree);
+    const fields = [];
+    const inspect = (node, visited = new Set()) => {
+        if (visited.has(node)) return;
+        visited.add(node);
+        if (ts.isIdentifier(node)) {
+            for (const value of bindings.get(node.text) ?? []) inspect(value, visited);
+        }
+        if (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) {
+            const name = ts.isComputedPropertyName(node.name) ? node.name.expression : node.name;
+            if ((ts.isIdentifier(name) && !ts.isComputedPropertyName(node.name)) || ts.isStringLiteral(name)) {
+                if (name.text === 'is_enabled') fields.push(node.getText(tree));
+            } else if (ts.isComputedPropertyName(node.name)) {
+                assert.fail('Review dynamic mutation payload field: ' + node.name.getText(tree));
+            }
+        }
+        ts.forEachChild(node, child => inspect(child, visited));
+    };
+    for (const mutation of mutations) for (const argument of mutation.arguments) inspect(argument);
+    return fields;
+}
+
 try {
+    // The confirmation regression must pass, while actual inline/aliased fields fail.
+    assert.deepEqual(enabledMutationFields('confirm({message: "changes this set", confirmText: row.is_enabled ? "Disable" : "Enable"}); save.mutateAsync({id, changes});'), []);
+    assert.deepEqual(enabledMutationFields('save.mutateAsync({id, changes: {name: row.is_enabled ? "on" : "off"}});'), []);
+    assert.equal(enabledMutationFields('save.mutateAsync({id, changes: {is_enabled: true}});').length, 1);
+    assert.equal(enabledMutationFields('const changes = { ["is_enabled"]: false }; save.mutateAsync({id, changes});').length, 1);
+    assert.equal(enabledMutationFields('const changes = {is_enabled}; const payload = {...changes}; save.mutate({id, changes: payload});').length, 1);
+
     const me = await server.ssrLoadModule('/packages/portal-mojo/src/client/me.ts');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
     const gf = await server.ssrLoadModule('/packages/portal-mojo/src/admin/network/geofence/geofence-data.ts');
@@ -319,10 +366,8 @@ try {
         'packages/portal-mojo/src/admin/network/IPSetDetail.tsx',
     ]) {
         const code = stripComments(await read(relative));
-        assert.doesNotMatch(code, /changes[^;]{0,200}is_enabled/,
-            `${relative} never puts is_enabled in a save body`);
-        assert.doesNotMatch(code, /mutateAsync\([^)]{0,200}is_enabled/,
-            `${relative} never mutates is_enabled directly`);
+        assert.deepEqual(enabledMutationFields(code), [],
+            `${relative} never puts an is_enabled field in a mutation payload`);
     }
     assert(!('is_enabled' in (ipsetEditor.buildIPSetCreatePayload({ kind: 'custom', name: 'x' }) ?? {})),
         'the create payload itself carries no is_enabled — the record is created disabled');
