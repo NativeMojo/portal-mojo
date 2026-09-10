@@ -7807,7 +7807,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             if ('group' in (opts.body ?? {})) return { status: false, error: 'group belongs in request context, not the body', error_code: 400 };
             if (tier === 'group' && !caller.is_superuser) {
                 let currentGroup: number | null = groupId; const visited = new Set<number>(); let membership: MockMember | undefined;
-                while (currentGroup != null && !visited.has(currentGroup)) { visited.add(currentGroup); membership = db.members.find(member => member.user === caller.id && member.group === currentGroup && member.is_active); if (membership) break; const parent = db.groups.find(row => row.id === currentGroup)?.parent; currentGroup = typeof parent === 'number' ? parent : parent?.id ?? null; }
+                while (currentGroup != null && !visited.has(currentGroup)) { visited.add(currentGroup); membership = db.members.find(member => member.user === caller.id && member.group === currentGroup && member.is_active); if (membership) break; const parent = db.groups.find(row => row.id === currentGroup)?.parent; currentGroup = typeof parent === 'number' ? parent : typeof parent?.id === 'number' ? parent.id : null; }
                 if (!membership || method !== 'GET' && !['assistant', 'admin'].some(permission => Boolean(membership!.permissions[permission]))) return permissionDenied();
             }
             const store: Record<string, unknown> = tier === 'global' ? db.assistantMemory.global : tier === 'user' ? (db.assistantMemory.users.get(caller.id) ?? {}) : (db.assistantMemory.groups.get(groupId!) ?? {});

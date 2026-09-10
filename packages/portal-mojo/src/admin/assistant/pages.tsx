@@ -3,7 +3,7 @@ import type { MemberLike } from '../../client/me';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileReference } from '../../client/record-feed';
 import { memberHasPermission, mojoCall, mojoList, useCan, useMe, useRealtime, useRealtimeStatus } from '../../client/runtime';
-import { Badge, DetailView, FlatRow, fmt, modal, toast } from '../../ui';
+import { Badge, DetailView, FlatRow, fmt, modal } from '../../ui';
 import { AssistantFeed } from './AssistantFeed';
 import { ASSISTANT_PERMISSIONS } from './AssistantPanel';
 import { deleteAssistantMemory, getAssistantConversation, getAssistantMemory, getAssistantSkill, listAssistantConversations, listAssistantSkills, saveAssistantMemory, sendAssistantMessage } from './api';
