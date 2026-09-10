@@ -9,7 +9,7 @@ import { SECURITY_VIEW_PERMS } from '../security-permissions';
 
 export const ADMIN_DASHBOARD_PERMISSIONS = [...new Set([...DASHBOARD_METRIC_PERMISSIONS, ...SECURITY_VIEW_PERMS, ...JOBS_VIEW_PERMS, ...EMAIL_ADMIN_PERMISSIONS, ...LOGIN_SUMMARY_PERMS])];
 export const DASHBOARD_ADMIN_SECTION: AdminSection = {
-    id: 'dashboard', basePath: '', title: 'Overview', icon: 'bi-grid-1x2', navigationGroup: 'overview', permissions: ADMIN_DASHBOARD_PERMISSIONS,
+    id: 'dashboard', basePath: '', title: 'Dashboard', icon: 'bi-grid-1x2', navigationGroup: null, permissions: ADMIN_DASHBOARD_PERMISSIONS,
     routes: [{ path: '', label: 'Dashboard', loadComponent: () => import('../dashboard/AdminDashboardPage').then(({ AdminDashboardPage }) => ({ default: AdminDashboardPage })), permissions: ADMIN_DASHBOARD_PERMISSIONS, fallbackToFirstVisible: true }],
 };
 export const MONITORING_ADMIN_SECTION: AdminSection = {

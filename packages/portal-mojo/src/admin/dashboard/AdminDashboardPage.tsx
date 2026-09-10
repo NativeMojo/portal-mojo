@@ -84,7 +84,7 @@ function LoginOverview() {
 
 export function AdminDashboardPage() {
     return <div className="admin-dashboard">
-        <header className="admin-dashboard-header"><div className="eyebrow">Overview</div><h1>Admin dashboard</h1><p className="dim">Authoritative operational signals for this django-mojo deployment.</p></header>
+        <header className="admin-dashboard-header"><h1>Dashboard</h1><p className="dim">Authoritative operational signals for this django-mojo deployment.</p></header>
         <MetricOverview />
         <AttentionOverview />
         <LoginOverview />

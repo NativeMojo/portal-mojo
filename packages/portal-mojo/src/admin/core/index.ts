@@ -55,7 +55,8 @@ export interface AdminSection {
     icon: string;
     permissions: string[];
     capability?: string;
-    navigationGroup?: AdminNavigationGroup;
+    /** Set to null to keep this section's routes at the top level of a grouped menu. */
+    navigationGroup?: AdminNavigationGroup | null;
     routes: AdminRoute[];
 }
 
@@ -202,13 +203,17 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
     if (opts.grouped) {
         const groups = new Map<AdminNavigationGroup, MenuItem[]>();
         for (const section of sections) {
-            const group = section.navigationGroup ?? 'other';
             const base = relativePath(mount, section.basePath ?? section.id);
             const labeled = section.routes.filter((route) => route.label);
             const destinations: MenuItem[] = labeled.length > 0 ? labeled.map((route) => ({
                 id: `admin:${section.id}:${route.path || 'index'}`, label: route.label!, keywords: [section.title],
                 route: absolutePath(base, route.path), permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
             })) : [{ id: `admin:${section.id}`, label: section.title, keywords: [section.title], route: absolutePath(base), permissionClauses: [section.permissions] }];
+            if (section.navigationGroup === null) {
+                items.push(...destinations.map((destination) => ({ ...destination, icon: section.icon })));
+                continue;
+            }
+            const group = section.navigationGroup ?? 'other';
             groups.set(group, [...(groups.get(group) ?? []), ...destinations]);
         }
         for (const [group, children] of [...groups.entries()].sort((a, b) => ADMIN_NAVIGATION_GROUPS[a[0]].order - ADMIN_NAVIGATION_GROUPS[b[0]].order)) {

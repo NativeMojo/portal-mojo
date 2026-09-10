@@ -47,11 +47,17 @@ try {
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS).some((route) => route.path === ''));
     assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS, { mount: '/system' }).some((route) => route.path === 'system'));
     const menu = admin.adminSectionsMenu(admin.ADMIN_SECTIONS, { grouped: true });
-    const overview = menu.items.find((item) => item.id === 'admin:overview');
-    assert.deepEqual(overview.children.map((item) => [item.label, item.route]), [['Dashboard', '/']]);
+    const dashboardItem = menu.items.find((item) => item.id === 'admin:dashboard:index');
+    assert.deepEqual([dashboardItem?.label, dashboardItem?.route, dashboardItem?.icon], ['Dashboard', '/', 'bi-grid-1x2']);
+    assert.equal(menu.items.some((item) => item.id === 'admin:overview'), false,
+        'Dashboard must be a direct navigation item, not wrapped by Overview');
     assert.match(adminCore, /fallbackToFirstVisible/);
     assert.doesNotMatch(portalMain, /DashboardPage/);
     assert.doesNotMatch(portalMenus, /id:\s*'admin:dashboard'/);
+    const dashboardPlacement = portalMenus.indexOf('...(dashboardContribution ? [dashboardContribution] : [])');
+    const identityPlacement = portalMenus.indexOf('\n        identity,');
+    assert(dashboardPlacement >= 0 && dashboardPlacement < identityPlacement,
+        'the standalone portal must place the contributed Dashboard before Identity & Access');
     await assert.rejects(access(new URL('../apps/portal/src/pages/DashboardPage.tsx', import.meta.url)));
 
     for (const endpoint of ['/api/metrics/value/get', '/api/incident/incident', '/api/jobs/job', '/api/aws/email/sent']) {

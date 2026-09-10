@@ -22,6 +22,7 @@ const contributedById = new Map(
 
 const identityMeta = ADMIN_NAVIGATION_GROUPS['identity-access'];
 const identityContribution = contributedById.get(identityMeta.id);
+const dashboardContribution = contributedById.get('admin:dashboard:index');
 const identity: MenuItem = {
     id: identityMeta.id,
     label: identityMeta.label,
@@ -34,7 +35,7 @@ const identity: MenuItem = {
 };
 
 const contributedCategories = contributions.items.filter((item) =>
-    !item.divider && item.id !== identityMeta.id);
+    !item.divider && item.id !== identityMeta.id && item.id !== dashboardContribution?.id);
 
 registerMenus([{
     name: 'admin',
@@ -42,6 +43,7 @@ registerMenus([{
     presentation: 'accordion',
     items: [
         { divider: 'Admin' },
+        ...(dashboardContribution ? [dashboardContribution] : []),
         identity,
         ...contributedCategories,
     ],

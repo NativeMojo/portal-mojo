@@ -6,7 +6,7 @@ The page uses only authoritative django-mojo signals: time series `user_activity
 
 Each panel owns an independent permission gate. A caller without metrics access can still see authorized incident, job, email, or login-geography panels, and no denied panel issues a request. Every dashboard query cache key includes the authenticated caller UID. Login geography starts at the previous 30-day date and deliberately omits `dr_end`, matching the backend's instant-bound semantics.
 
-The dashboard section contributes the single Overview → Dashboard menu entry. If the caller has none of the aggregate dashboard grants, the root route redirects to their first visible Admin route; if no Admin route is visible it renders Access denied.
+The dashboard section contributes a direct, top-level Dashboard menu entry instead of wrapping it in an Overview category. If the caller has none of the aggregate dashboard grants, the root route redirects to their first visible Admin route; if no Admin route is visible it renders Access denied.
 
 Attention links preserve the exact server filter in the URL:
 
