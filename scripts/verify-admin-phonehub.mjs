@@ -31,6 +31,11 @@ try{
  assert.deepEqual(api.buildPhoneConfigPayload({name:'x'},{twilio_auth_token:{mode:'replace',value:' replacement '}}),{name:'x',twilio_auth_token:'replacement'});
  assert.deepEqual(api.buildPhoneConfigPayload({name:'x'},{twilio_auth_token:{mode:'clear',confirmed:true}}),{name:'x',twilio_auth_token:null});
  assert.throws(()=>api.buildPhoneConfigPayload({},{twilio_auth_token:{mode:'replace',value:'  '}}),/cannot be empty/);assert.equal(api.PHONE_GROUP_CHOICE_LIMIT,100);
+ assert.equal(api.DEFAULT_MOJO_REMOTE_URL,'https://api.mojoverify.com');
+ assert.equal(api.resolveMojoRemoteUrl(null),'https://api.mojoverify.com');
+ assert.equal(api.resolveMojoRemoteUrl('  '),'https://api.mojoverify.com');
+ assert.equal(api.resolveMojoRemoteUrl(' https://custom-mojo.example/api/ '),'https://custom-mojo.example/api/');
+ assert.deepEqual(api.buildPhoneConfigPayload({provider:'mojo',mojo_remote_url:null},{}),{provider:'mojo',mojo_remote_url:'https://api.mojoverify.com'});
  const login=async(email)=>{const response=await mock.mockFetch('/api/login',{method:'POST',body:{username:email,password:'mojo'}});return {Authorization:`Bearer ${response.data.access_token}`};};
  const viewer=await login('phone.viewer@nativemojo.com');const manager=await login('phone.manager@nativemojo.com');const config=await login('phone.config@nativemojo.com');const comms=await login('phone.comms@nativemojo.com');const operator=await login('showcase.operator@nativemojo.com');
  assert.equal((await mock.mockFetch('/api/phonehub/number/normalize',{method:'POST',body:{phone_number:'(415) 555-0100',country_code:'US'}})).data.phone_number,'+14155550100');

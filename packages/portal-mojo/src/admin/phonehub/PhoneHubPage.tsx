@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArmedButton, Badge, DetailView, FlatRow, ModelTable, Tabs, fmt, modal, toast, type Column, type FilterDef } from '../../ui';
 import { mojoList, useCan } from '../../client/runtime';
-import { buildPhoneConfigPayload, fetchPhoneGroupChoices, lookupPhoneNumber, normalizePhoneNumber, savePhoneConfigImperative, testPhoneConfigImperative, type PhoneSecretField, type SecretEdit } from './api';
+import { DEFAULT_MOJO_REMOTE_URL, buildPhoneConfigPayload, fetchPhoneGroupChoices, lookupPhoneNumber, normalizePhoneNumber, resolveMojoRemoteUrl, savePhoneConfigImperative, testPhoneConfigImperative, type PhoneSecretField, type SecretEdit } from './api';
 import { exportPhoneConfigs, exportPhoneNumbers, exportSmsAudits } from './data';
 import {
     PHONE_CONFIG_DELETE_PERMISSIONS, PHONE_CONFIG_MANAGE_PERMISSIONS, PHONE_CONFIG_VIEW_PERMISSIONS,
@@ -127,7 +127,7 @@ function ConfigEditor({ row, close }: { row?: PhoneConfigRow; close: (value: Pho
     const [twilioFrom, setTwilioFrom] = useState(row?.twilio_from_number ?? '');
     const [awsRegion, setAwsRegion] = useState(row?.aws_region ?? 'us-east-1');
     const [awsSender, setAwsSender] = useState(row?.aws_sender_id ?? '');
-    const [mojoUrl, setMojoUrl] = useState(row?.mojo_remote_url ?? '');
+    const [mojoUrl, setMojoUrl] = useState(resolveMojoRemoteUrl(row?.mojo_remote_url));
     const refs = useRef<Partial<Record<PhoneSecretField, HTMLInputElement | null>>>({});
     const [clearFields, setClearFields] = useState<PhoneSecretField[]>([]);
     const [busy, setBusy] = useState(false);
@@ -137,6 +137,7 @@ function ConfigEditor({ row, close }: { row?: PhoneConfigRow; close: (value: Pho
 
     const chooseProvider = (next: PhoneProvider) => {
         setProvider(next);
+        if (next === 'mojo') setMojoUrl((value) => resolveMojoRemoteUrl(value));
         setClearFields([]);
     };
     const toggleClear = (field: PhoneSecretField) => {
@@ -163,7 +164,7 @@ function ConfigEditor({ row, close }: { row?: PhoneConfigRow; close: (value: Pho
             ? { twilio_from_number: twilioFrom || null }
             : provider === 'aws'
                 ? { aws_region: awsRegion || null, aws_sender_id: awsSender || null }
-                : { mojo_remote_url: mojoUrl || null };
+                : { mojo_remote_url: resolveMojoRemoteUrl(mojoUrl) };
         try {
             buildPhoneConfigPayload({}, credentials);
             const saved = await savePhoneConfigImperative(qc, row?.id ?? null, {
@@ -223,7 +224,7 @@ function ConfigEditor({ row, close }: { row?: PhoneConfigRow; close: (value: Pho
                         <label className="field"><span className="field-label">Sender ID</span><input className="input" value={awsSender} onChange={(event) => setAwsSender(event.target.value)} placeholder="Optional, region-dependent" /></label>
                     </>}
                     {provider === 'mojo' && <>
-                        <label className="field phonehub-field-span"><span className="field-label">Remote Mojo URL</span><input className="input" type="url" value={mojoUrl} onChange={(event) => setMojoUrl(event.target.value)} placeholder="https://sms.example.com" /></label>
+                        <label className="field phonehub-field-span"><span className="field-label">Remote Mojo URL</span><input className="input" type="url" value={mojoUrl} onChange={(event) => setMojoUrl(event.target.value)} onBlur={() => setMojoUrl((value) => resolveMojoRemoteUrl(value))} placeholder={DEFAULT_MOJO_REMOTE_URL} /><span className="field-help">Defaults to the hosted MojoVerify API. Change this only for a custom Mojo endpoint.</span></label>
                     </>}
                     {providerCredentialFields[provider].map((field) => <CredentialField
                         key={field}

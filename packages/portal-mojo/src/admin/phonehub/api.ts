@@ -3,9 +3,14 @@ import { mojoCall, mojoList } from '../../client/runtime';
 import { PhoneConfigModel, sanitizePhoneConfigRow, sanitizePhoneNumberRow, type PhoneConfigRow, type PhoneNumberRow, type PhoneRelation } from './models';
 
 export const PHONE_GROUP_CHOICE_LIMIT=100;
+export const DEFAULT_MOJO_REMOTE_URL='https://api.mojoverify.com';
 export const PHONE_SECRET_FIELDS=['twilio_account_sid','twilio_auth_token','aws_access_key_id','aws_secret_access_key','mojo_api_key'] as const;
 export type PhoneSecretField=(typeof PHONE_SECRET_FIELDS)[number];
 export type SecretEdit={mode:'untouched'}|{mode:'replace';value:string}|{mode:'clear';confirmed:true};
+
+export function resolveMojoRemoteUrl(value:unknown):string{
+    return typeof value==='string'&&value.trim()?value.trim():DEFAULT_MOJO_REMOTE_URL;
+}
 
 export async function normalizePhoneNumber(phoneNumber:string,countryCode?:string):Promise<string>{
     const body=await mojoCall('/api/phonehub/number/normalize',{method:'POST',body:{phone_number:phoneNumber,...(countryCode?{country_code:countryCode}:{})}});
@@ -25,6 +30,7 @@ export async function lookupPhoneNumber(phoneNumber:string,previous?:PhoneNumber
 }
 export function buildPhoneConfigPayload(scalars:Record<string,unknown>,credentials:Partial<Record<PhoneSecretField,SecretEdit>>):Record<string,unknown>{
     const body={...scalars};
+    if(body.provider==='mojo')body.mojo_remote_url=resolveMojoRemoteUrl(body.mojo_remote_url);
     for(const field of PHONE_SECRET_FIELDS){const edit=credentials[field];if(!edit||edit.mode==='untouched')continue;if(edit.mode==='clear')body[field]=null;else{const value=edit.value.trim();if(!value)throw new Error(`${field} replacements cannot be empty.`);body[field]=value;}}
     return body;
 }
