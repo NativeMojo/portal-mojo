@@ -10,15 +10,21 @@
 // the public, admin-targetable verification sender (NOT the JWT-scoped
 // auth/verify/email/send).
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect,useRef,useState } from 'react';
-import { mojoCall,useCan,useMe,withFreshAuth,type Field } from '../../../../client/runtime';
+import { useEffect, useRef, useState } from 'react';
+import { mojoCall, useCan, useMe, withFreshAuth, type Field } from '../../../../client/runtime';
 import {
-Badge,ImageField,PasswordStrengthMeter,fmt,formModal,modal,toast,
-type FileFieldOwnerResult,
+    Badge,
+    ImageField,
+    PasswordStrengthMeter,
+    fmt,
+    formModal,
+    modal,
+    toast,
+    type FileFieldOwnerResult,
 } from '../../../../ui';
-import { PasskeyModel,USER_MANAGE_PERMISSIONS,UserModel,type UserRow } from '../models';
+import { PasskeyModel, USER_MANAGE_PERMISSIONS, UserModel, type UserRow } from '../models';
 import { OAuthConnectionList } from './OAuthSection';
-import { openGroupDetail,useAdminCaller } from './shared';
+import { openGroupDetail, useAdminCaller } from './shared';
 
 /** One-field prompt modal (the source's Modal.prompt pencils). */
 async function promptField(title: string, field: Field, initial: string): Promise<string | null> {
@@ -666,6 +672,7 @@ function PasskeysModal({ userId, onClose }: { userId: number; onClose: () => voi
     const admin = useCan(USER_MANAGE_PERMISSIONS).can;
     const allowed = useMe().data?.id === userId || admin;
     const permission = useRef(allowed); permission.current = allowed;
+    useEffect(() => { permission.current = allowed; return () => { permission.current = false; }; }, [allowed]);
     const { data, isPending } = PasskeyModel.useList({ user: userId, size: 25, sort: '-created' });
     const save = PasskeyModel.useSave();
     const del = PasskeyModel.useDelete();

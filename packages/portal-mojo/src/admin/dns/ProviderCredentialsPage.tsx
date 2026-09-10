@@ -1,20 +1,34 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef,useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
-Badge,CollectionSelect,
-DetailView,
-FlatRow,ModelTable,fmt,modal,toast,
-type Column,type FilterDef,type Tone,
+    Badge,
+    CollectionSelect,
+    DetailView,
+    FlatRow,
+    ModelTable,
+    fmt,
+    modal,
+    toast,
+    type Column,
+    type FilterDef,
+    type Tone,
 } from '../../ui';
 import {
-DNS_GROUP_CHOICE_ENDPOINT,invalidateDnsCredentials,linkDnsCredential,
-rotateDnsCredential,useDnsCapabilities,
+    DNS_GROUP_CHOICE_ENDPOINT,
+    invalidateDnsCredentials,
+    linkDnsCredential,
+    rotateDnsCredential,
+    useDnsCapabilities,
 } from './api';
-import { linkableProviders,providerLabel } from './data';
+import { linkableProviders, providerLabel } from './data';
 import {
-DNS_MANAGE_PERMISSIONS,DNS_VIEW_PERMISSIONS,DnsCredentialModel,
-type DnsCapabilities,type DnsCredentialRow,type DnsGroupChoice,
+    DNS_MANAGE_PERMISSIONS,
+    DNS_VIEW_PERMISSIONS,
+    DnsCredentialModel,
+    type DnsCapabilities,
+    type DnsCredentialRow,
+    type DnsGroupChoice,
 } from './models';
 
 function groupId(group: DnsCredentialRow['group']): number | null {

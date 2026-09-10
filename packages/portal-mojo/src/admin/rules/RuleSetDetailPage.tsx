@@ -1,15 +1,16 @@
-import { useMemo,useRef } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useCan } from '../../client/runtime';
-import { Badge,DetailView,FlatRow,JsonBlock,ModelTable,fmt,modal,toast,type BatchAction,type Column } from '../../ui';
+import { Badge, DetailView, FlatRow, JsonBlock, ModelTable, fmt, modal, toast, type BatchAction, type Column } from '../../ui';
 import { HandlerChainBuilder } from './HandlerChainBuilder';
 import { conditionRemovalEffect } from './condition-removal';
-import { confirmCatchAllEnable,openHandlerChainEditor,openRuleEditor,openRuleSetEditor } from './editors';
-import { parseHandlerChain,runtimeEffectiveHandlerChain,validateHandlerChain } from './handler-dsl';
-import { BUNDLE_BY_OPTIONS,RULESET_MANAGE_PERMS,RuleModel,RuleSetModel,type RuleRow } from './models';
+import { confirmCatchAllEnable, openHandlerChainEditor, openRuleEditor, openRuleSetEditor } from './editors';
+import { parseHandlerChain, runtimeEffectiveHandlerChain, validateHandlerChain } from './handler-dsl';
+import { BUNDLE_BY_OPTIONS, RULESET_MANAGE_PERMS, RuleModel, RuleSetModel, type RuleRow } from './models';
 
 export function RuleSetDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const { can: canManage } = useCan(RULESET_MANAGE_PERMS);
-    const permission = useRef(canManage); permission.current = canManage; const query = RuleSetModel.useOne(Number.isFinite(id) ? id : null);
+    const permission = useRef(canManage); permission.current = canManage;
+    useEffect(() => { permission.current = canManage; return () => { permission.current = false; }; }, [canManage]); const query = RuleSetModel.useOne(Number.isFinite(id) ? id : null);
     const rules = RuleModel.useList({ parent: id, size: 250, sort: 'index' }); const save = RuleSetModel.useSave(); const destroyRule = RuleModel.useDelete();
     const duplicateIndexes = useMemo(() => { const counts = new Map<number, number>(); for (const row of rules.data?.rows ?? []) counts.set(row.index, (counts.get(row.index) ?? 0) + 1); return [...counts].filter(([, count]) => count > 1).map(([index]) => index); }, [rules.data]);
     if (!Number.isFinite(id)) return <div className="modal-pad text-bad">Invalid rule-set id. <button type="button" className="btn" onClick={onClose}>Close</button></div>;

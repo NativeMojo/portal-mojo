@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { useCan,useMe } from '../../../../client/runtime';
+import { useEffect, useRef } from 'react';
+import { useCan, useMe } from '../../../../client/runtime';
 // OAuth section — AdminConnectedSection port (read in full 2026-08-05):
 // the user's linked OAuth providers with admin unlink. The same list powers
 // the Profile card's "manage linked accounts" modal (source Phase 3 shared
@@ -8,8 +8,8 @@ import { useCan,useMe } from '../../../../client/runtime';
 // Wire: GET /api/account/oauth_connection?user=<id> → rows
 // {id, provider, email, is_active, created} (default graph, measured in
 // django-mojo oauth.py); DELETE /api/account/oauth_connection/<id> unlinks.
-import { Eyebrow,fmt,modal,toast } from '../../../../ui';
-import { OAuthConnectionModel,USER_MANAGE_PERMISSIONS,type UserRow } from '../models';
+import { Eyebrow, fmt, modal, toast } from '../../../../ui';
+import { OAuthConnectionModel, USER_MANAGE_PERMISSIONS, type UserRow } from '../models';
 import { providerIcon } from './shared';
 
 export function OAuthConnectionList({ userId, canManage = true }: { userId: number; canManage?: boolean }) {
@@ -19,6 +19,7 @@ export function OAuthConnectionList({ userId, canManage = true }: { userId: numb
     const me = useMe().data;
     const allowed = (me?.id === userId || admin) && canManage;
     const permission = useRef(allowed); permission.current = allowed;
+    useEffect(() => { permission.current = allowed; return () => { permission.current = false; }; }, [allowed]);
     const rows = data?.rows ?? [];
 
     const unlink = async (id: number, provider: string) => {

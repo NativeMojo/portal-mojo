@@ -1,5 +1,5 @@
-import { useEffect,useRef,useState,type ReactNode } from 'react';
-import { DetailView,JsonBlock,fmt,toast,type Tone } from '../../ui';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { DetailView, JsonBlock, fmt, toast, type Tone } from '../../ui';
 import type { LogRow } from './models';
 
 export type StoredLogKind = 'request' | 'response' | 'message';

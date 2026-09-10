@@ -1,13 +1,15 @@
-import { useCallback,useEffect,useRef,useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import type { MemberLike } from '../../client/me';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileReference } from '../../client/record-feed';
-import { mojoList,useCan,useMe,useRealtime,useRealtimeStatus } from '../../client/runtime';
-import { Badge,DetailView,FlatRow,fmt,modal,toast } from '../../ui';
+import { memberHasPermission, mojoCall, mojoList, useCan, useMe, useRealtime, useRealtimeStatus } from '../../client/runtime';
+import { Badge, DetailView, FlatRow, fmt, modal, toast } from '../../ui';
 import { AssistantFeed } from './AssistantFeed';
 import { ASSISTANT_PERMISSIONS } from './AssistantPanel';
-import { deleteAssistantMemory,getAssistantConversation,getAssistantMemory,getAssistantSkill,listAssistantConversations,listAssistantSkills,saveAssistantMemory,sendAssistantMessage } from './api';
+import { deleteAssistantMemory, getAssistantConversation, getAssistantMemory, getAssistantSkill, listAssistantConversations, listAssistantSkills, saveAssistantMemory, sendAssistantMessage } from './api';
 import { setAssistantSkillActive } from './skill-lifecycle';
-import { AssistantOutcomeUnknownError,chooseAssistantTransport,startAssistantRealtimeTurn,type AssistantRealtimeTurn } from './streaming';
-import type { AssistantConversation,AssistantConversationSummary,AssistantSkill } from './types';
+import { AssistantOutcomeUnknownError, chooseAssistantTransport, startAssistantRealtimeTurn, type AssistantRealtimeTurn } from './streaming';
+import type { AssistantConversation, AssistantConversationSummary, AssistantSkill } from './types';
 
 function PageState({ loading, error, retry }: { loading: boolean; error: string; retry(): void }) { if (loading) return <div className="panel panel-pad dim">Loading…</div>; if (error) return <div className="panel panel-pad"><div className="form-alert" role="alert">{error}</div><button type="button" className="btn" onClick={retry}>Retry</button></div>; return null; }
 function Heading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <header className="admin-page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div></header>; }
@@ -84,11 +86,47 @@ export function SkillsPage() {
 interface GroupChoice { id: number; name: string }
 type MemoryTier = 'global' | 'user' | 'group';
 export function MemoriesPage() {
-    const [tier, setTier] = useState<MemoryTier>('user'); const [groups, setGroups] = useState<GroupChoice[]>([]); const [group, setGroup] = useState<number | null>(null); const [entries, setEntries] = useState<Record<string, unknown>>({}); const [key, setKey] = useState(''); const [value, setValue] = useState(''); const [loading, setLoading] = useState(false); const [error, setError] = useState('');
-    useEffect(() => { void mojoList<GroupChoice>('/api/group', { start: 0, size: 50, sort: 'name' }).then((page) => { setGroups(page.rows.map((row) => ({ id: Number(row.id), name: String(row.name) }))); setGroup((current) => current ?? page.rows[0]?.id ?? null); }, () => setGroups([])); }, []);
-    const load = useCallback(async () => { if (tier === 'group' && group == null) { setEntries({}); return; } setLoading(true); setError(''); try { setEntries(await getAssistantMemory(tier, tier === 'group' ? group! : undefined)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Memory unavailable'); } finally { setLoading(false); } }, [tier, group]); useEffect(() => { void load(); }, [load]);
+    const { can: systemAllowed, me } = useCan('sys.assistant');
+    const [tier, setTier] = useState<MemoryTier>('user');
+    const [groups, setGroups] = useState<GroupChoice[]>([]); const [group, setGroup] = useState<number | null>(null);
+    const [entries, setEntries] = useState<Record<string, unknown>>({}); const [key, setKey] = useState(''); const [value, setValue] = useState('');
+    const [loading, setLoading] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+    const member = useQuery({ queryKey: ['assistant-memory-member', me?.id, group], enabled: systemAllowed && tier === 'group' && group != null && !me?.is_superuser, queryFn: async () => (await mojoCall(`/api/group/${group}/member`)).data as MemberLike });
+    const canManage = systemAllowed && (tier !== 'group' || group != null && (Boolean(me?.is_superuser) || memberHasPermission(member.data ?? null, 'assistant')));
+    const scopeKey = `${me?.id}:${tier}:${group ?? ''}`;
+    const scope = useRef({ key: scopeKey, allowed: canManage, mounted: true }); scope.current.key = scopeKey; scope.current.allowed = canManage;
+    const generation = useRef(0); const lock = useRef(false);
+    useEffect(() => { scope.current.mounted = true; return () => { scope.current.mounted = false; generation.current++; }; }, []);
+    useEffect(() => { if (!systemAllowed) { setGroups([]); return; } let cancelled = false; void mojoList<GroupChoice>('/api/group', { start: 0, size: 50, sort: 'name' }).then(page => { if (!cancelled) setGroups(page.rows.map(row => ({ id: Number(row.id), name: String(row.name) }))); }, () => { if (!cancelled) setGroups([]); }); return () => { cancelled = true; }; }, [systemAllowed]);
+    const load = useCallback(async () => {
+        const request = ++generation.current; const captured = scopeKey;
+        setEntries({}); setError('');
+        if (!systemAllowed || tier === 'group' && group == null) { setLoading(false); return; }
+        setLoading(true);
+        try { const next = await getAssistantMemory(tier, tier === 'group' ? group! : undefined); if (scope.current.mounted && request === generation.current && scope.current.key === captured) setEntries(next); }
+        catch (cause) { if (scope.current.mounted && request === generation.current && scope.current.key === captured) setError(cause instanceof Error ? cause.message : 'Memory unavailable'); }
+        finally { if (scope.current.mounted && request === generation.current && scope.current.key === captured) setLoading(false); }
+    }, [scopeKey, systemAllowed, tier, group]);
+    useEffect(() => { void load(); }, [load]);
     const validKey = /^[a-z0-9:_-]{1,64}$/.test(key); const validValue = value.length > 0 && value.length <= 500;
-    const save = async () => { if (!validKey || !validValue || (tier === 'group' && group == null)) return; try { await saveAssistantMemory(tier, key, value, tier === 'group' ? group! : undefined); setKey(''); setValue(''); await load(); toast.success('Memory saved'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Save failed'); } };
-    const remove = async (entryKey: string) => { const scope = { tier, group: tier === 'group' ? group! : undefined }; const confirmed = await modal.confirm({ title: 'Delete memory?', message: `Remove key “${entryKey}” from ${scope.tier} memory${scope.group == null ? '' : ` for group #${scope.group} (${groups.find(item => item.id === scope.group)?.name ?? 'Unknown'})`}? The previous value cannot be restored by this action.`, confirmText: 'Delete', danger: true }); if (!confirmed) return; try { await deleteAssistantMemory(scope.tier, entryKey, scope.group); await load(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Delete failed'); } };
-    return <div><Heading eyebrow="Assistant" title="Memory" description="Manage global, personal, or explicitly selected group memory without ambient group state." /><div className="panel panel-pad assistant-memory-controls"><div className="seg">{(['global', 'user', 'group'] as MemoryTier[]).map((item) => <button key={item} className={`seg-btn${tier === item ? ' seg-active' : ''}`} onClick={() => setTier(item)}>{item}</button>)}</div>{tier === 'group' && <label className="field"><span className="field-label">Group (bounded first 50)</span><select className="input" value={group ?? ''} onChange={(event) => setGroup(event.target.value ? Number(event.target.value) : null)}><option value="">Choose a group</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}<div className="assistant-memory-form"><label className="field"><span className="field-label">Key</span><input className="input" maxLength={64} value={key} onChange={(event) => setKey(event.target.value)} placeholder="lowercase:key" /></label><label className="field"><span className="field-label">Value</span><textarea className="input" maxLength={500} rows={2} value={value} onChange={(event) => setValue(event.target.value)} /></label><button className="btn btn-primary" disabled={!validKey || !validValue || loading || (tier === 'group' && group == null)} onClick={() => void save()}>Save</button></div>{key && !validKey && <p className="field-error">Use 1–64 lowercase letters, numbers, colon, underscore, or hyphen.</p>}{error && <div className="form-alert" role="alert">{error}</div>}</div><div className="panel assistant-list">{loading ? <p className="empty">Loading…</p> : Object.entries(entries).length ? <table><thead><tr><th>Key</th><th>Value</th><th /></tr></thead><tbody>{Object.entries(entries).slice(0, 100).map(([entryKey, entryValue]) => <tr key={entryKey}><td><code>{entryKey}</code></td><td>{String(entryValue).slice(0, 500)}</td><td><button className="btn-icon" aria-label={`Delete ${entryKey}`} onClick={() => void remove(entryKey)}><i className="bi bi-trash" /></button></td></tr>)}</tbody></table> : <p className="empty">No {tier} memory.</p>}</div></div>;
+    const mutate = async (operation: () => Promise<void>, captured: string) => {
+        if (lock.current || !scope.current.mounted || !scope.current.allowed || scope.current.key !== captured) return;
+        lock.current = true; setBusy(true); setError('');
+        try { await operation(); if (scope.current.mounted && scope.current.key === captured) await load(); }
+        catch (cause) { if (scope.current.mounted && scope.current.key === captured) setError(cause instanceof Error ? cause.message : 'Memory change failed'); }
+        finally { lock.current = false; if (scope.current.mounted) setBusy(false); }
+    };
+    const save = async () => { if (!validKey || !validValue) return; await mutate(() => saveAssistantMemory(tier, key, value, tier === 'group' ? group! : undefined), scopeKey); };
+    const remove = async (entryKey: string) => {
+        const frozen = { tier, group: tier === 'group' ? group! : undefined, key: scopeKey };
+        if (!canManage) return;
+        const confirmed = await modal.confirm({ title: 'Remove memory key?', message: `Remove “${entryKey}” from ${frozen.tier} memory${frozen.group == null ? '' : ` for group #${frozen.group} (${groups.find(item => item.id === frozen.group)?.name ?? 'Unknown'})`}? The previous value cannot be restored by this action.`, confirmText: 'Remove key', danger: true });
+        if (confirmed) await mutate(() => deleteAssistantMemory(frozen.tier, entryKey, frozen.group), frozen.key);
+    };
+    return <div><Heading eyebrow="Assistant" title="Memory" description="Manage global, personal, or explicitly selected group memory without ambient group state." />
+        <div className="panel panel-pad assistant-memory-controls"><div className="seg">{(['global', 'user', 'group'] as MemoryTier[]).map(item => <button key={item} disabled={busy} className={`seg-btn${tier === item ? ' seg-active' : ''}`} onClick={() => setTier(item)}>{item}</button>)}</div>
+        {tier === 'group' && <label className="field"><span className="field-label">Group (bounded first 50)</span><select className="input" value={group ?? ''} disabled={busy} onChange={event => setGroup(event.target.value ? Number(event.target.value) : null)}><option value="">Choose a group</option>{groups.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+        {!canManage && <p className="dim">Memory editing requires system Assistant permission and, for a selected group, inherited member Assistant authority or superuser access.</p>}
+        <div className="assistant-memory-form"><label className="field"><span className="field-label">Key</span><input className="input" disabled={!canManage || busy} maxLength={64} value={key} onChange={event => setKey(event.target.value)} placeholder="lowercase:key" /></label><label className="field"><span className="field-label">Value</span><textarea className="input" disabled={!canManage || busy} maxLength={500} rows={2} value={value} onChange={event => setValue(event.target.value)} /></label><button className="btn btn-primary" disabled={!canManage || busy || !validKey || !validValue || loading} onClick={() => void save()}>Save</button></div>{error && <div className="form-alert" role="alert">{error}</div>}</div>
+        <div className="panel assistant-list">{loading ? <p className="empty">Loading…</p> : Object.entries(entries).length ? <table><thead><tr><th>Key</th><th>Value</th><th /></tr></thead><tbody>{Object.entries(entries).slice(0, 100).map(([entryKey, entryValue]) => <tr key={entryKey}><td><code>{entryKey}</code></td><td>{String(entryValue).slice(0, 500)}</td><td>{canManage && <button className="btn-icon" disabled={busy} aria-label={`Remove ${entryKey}`} onClick={() => void remove(entryKey)}><i className="bi bi-trash" /></button>}</td></tr>)}</tbody></table> : <p className="empty">No {tier} memory.</p>}</div></div>;
 }

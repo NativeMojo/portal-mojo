@@ -1,8 +1,8 @@
 import { useCan } from '../../client/runtime';
-import { Badge,DetailView,FlatRow,ModelTable,fmt,groupByDay,modal,toast,type BatchAction,type Column,type FilterDef,type Section } from '../../ui';
+import { Badge, DetailView, FlatRow, ModelTable, fmt, groupByDay, modal, toast, type BatchAction, type Column, type FilterDef, type Section } from '../../ui';
 import { exportPublicMessages } from './data';
-import { PUBLIC_MESSAGE_MANAGE_PERMISSIONS,PublicMessageModel,type PublicMessageRow } from './models';
-import { publicMessageMailto,redactMessagingError } from './sanitize';
+import { PUBLIC_MESSAGE_MANAGE_PERMISSIONS, PublicMessageModel, type PublicMessageRow } from './models';
+import { publicMessageMailto, redactMessagingError } from './sanitize';
 
 const columns:Column<PublicMessageRow>[]=[{key:'created',label:'Received',sortable:true,hideable:false,render:r=>fmt.datetime(r.created)},{key:'kind',label:'Kind',sortable:true},{key:'name',label:'Name',sortable:true},{key:'email',label:'Email',sortable:true},{key:'subject',label:'Subject',sortable:true},{key:'status',label:'Status',sortable:true,render:r=><Badge tone={r.status==='open'?'warning':'success'}>{r.status}</Badge>}];
 const filters:FilterDef[]=[{key:'kind__in',label:'Kind',type:'multiselect',options:[{value:'contact_us',label:'Contact us'},{value:'support',label:'Support'}]},{key:'status__in',label:'Status',type:'multiselect',options:[{value:'open',label:'Open'},{value:'closed',label:'Closed'}]},{key:'created',label:'Received',type:'daterange'}];

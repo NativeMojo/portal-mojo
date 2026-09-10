@@ -25,31 +25,31 @@
 //     tool `_tool_run_scheduled_task_now`. There is no REST route and no
 //     publish endpoint to synthesize one, so the control stays ABSENT rather
 //     than shipping disabled (wave-7a precedent). Tracked as django-mojo #1309.
-import { useQuery,useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { mojoList,useCan } from '../../client/runtime';
+import { mojoList, useCan } from '../../client/runtime';
 import {
-Badge,
-DetailView,
-Eyebrow,
-FlatRow,
-JsonBlock,
-StatusPanel,
-fmt,
-modal,
-toast,
-type Tone
+    Badge,
+    DetailView,
+    Eyebrow,
+    FlatRow,
+    JsonBlock,
+    StatusPanel,
+    fmt,
+    modal,
+    toast,
+    type Tone,
 } from '../../ui';
 import {
-SCHEDULED_TASK_MANAGE_PERMS,
-SCHEDULED_TASK_VIEW_PERMS,
-ScheduledTaskModel,
-TaskResultModel,
-formatRunDays,
-formatRunTimes,
-type ScheduledTaskRow,
-type ScheduledTaskType,
-type TaskResultRow,
+    SCHEDULED_TASK_MANAGE_PERMS,
+    SCHEDULED_TASK_VIEW_PERMS,
+    ScheduledTaskModel,
+    TaskResultModel,
+    formatRunDays,
+    formatRunTimes,
+    type ScheduledTaskRow,
+    type ScheduledTaskType,
+    type TaskResultRow,
 } from './models';
 import { openScheduledTaskEditor } from './scheduled-task-form';
 

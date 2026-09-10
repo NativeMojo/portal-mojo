@@ -1,15 +1,29 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useCan,type PermSpec } from '../../client/runtime';
+import { useCan, type PermSpec } from '../../client/runtime';
 import {
-Badge,DetailView,Eyebrow,FlatRow,ModelTable,
-SchemaForm,fmt,modal,toast,
-type Column,type Field,type FilterDef,
+    Badge,
+    DetailView,
+    Eyebrow,
+    FlatRow,
+    ModelTable,
+    SchemaForm,
+    fmt,
+    modal,
+    toast,
+    type Column,
+    type Field,
+    type FilterDef,
 } from '../../ui';
 import {
-GLOBAL_CREDENTIAL_PERMS,GROUP_CREDENTIAL_PERMS,
-WebhookSubscriptionModel,fetchWebhookSecret,normalizeWebhookEvents,
-type CredentialGroup,type WebhookSecretInfo,type WebhookSubscriptionRow,
+    GLOBAL_CREDENTIAL_PERMS,
+    GROUP_CREDENTIAL_PERMS,
+    WebhookSubscriptionModel,
+    fetchWebhookSecret,
+    normalizeWebhookEvents,
+    type CredentialGroup,
+    type WebhookSecretInfo,
+    type WebhookSubscriptionRow,
 } from './models';
 import { showSecretDialog } from './secret-dialog';
 

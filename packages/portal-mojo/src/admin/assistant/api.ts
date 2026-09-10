@@ -1,7 +1,7 @@
 import type { FileReference } from '../../client/record-feed';
-import { mojoCall,mojoDelete,mojoList,type Params } from '../../client/runtime';
-import { projectConversation,projectConversationSummary,projectReply,projectSkill } from './data';
-import type { AssistantConversation,AssistantConversationSummary,AssistantReply,AssistantSkill } from './types';
+import { mojoCall, mojoDelete, mojoList, type Params } from '../../client/runtime';
+import { projectConversation, projectConversationSummary, projectReply, projectSkill } from './data';
+import type { AssistantConversation, AssistantConversationSummary, AssistantReply, AssistantSkill } from './types';
 
 const malformed = (label: string): never => { throw new Error(`${label} returned an invalid response`); };
 export async function sendAssistantMessage(message: string, conversationId?: number, attachments: readonly FileReference[] = []): Promise<AssistantReply> { const ids = attachments.map((file) => file.id); if (ids.length > 5 || new Set(ids).size !== ids.length || ids.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw new Error('Assistant attachments must be 1–5 unique completed File references'); const body = await mojoCall('/api/assistant', { method: 'POST', body: { message, ...(conversationId != null ? { conversation_id: conversationId } : {}), ...(ids.length ? { attachments: ids } : {}) } }); return projectReply(body.data) ?? malformed('Assistant'); }

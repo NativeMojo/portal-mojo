@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { DetailView,FlatRow,ModelTable,Tabs,fmt,modal,toast,type Column } from '../../ui';
+import { DetailView, FlatRow, ModelTable, Tabs, fmt, modal, toast, type Column } from '../../ui';
 import { exportEmailTemplates } from './data';
-import { EmailTemplateModel,type EmailTemplateRow } from './models';
+import { EmailTemplateModel, type EmailTemplateRow } from './models';
 import { SandboxedEmailPreview } from './SandboxedEmailPreview';
 import { redactMessagingError } from './sanitize';
 

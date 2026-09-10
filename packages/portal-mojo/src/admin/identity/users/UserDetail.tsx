@@ -21,20 +21,26 @@
 // shared ImageField avatar manager hangs off the kebab;
 // presence/status/locked/warning render as chips instead of a two-row aux.
 import { useSyncExternalStore } from 'react';
-import { useCan,useMe } from '../../../client/runtime';
+import { useCan, useMe } from '../../../client/runtime';
 import {
-DetailView,
-fmt,
-getFormTabs,
-modal,
-subscribeFormTabs,
-type Chip,type DetailMenuEntry,
+    DetailView,
+    fmt,
+    getFormTabs,
+    modal,
+    subscribeFormTabs,
+    type Chip,
+    type DetailMenuEntry,
 } from '../../../ui';
 import { MEMBER_READ_PERMISSIONS } from '../members';
 import {
-USER_DEVICE_PERMISSIONS,USER_EVENT_PERMISSIONS,USER_LOGIN_PERMISSIONS,
-USER_LOG_PERMISSIONS,USER_MANAGE_PERMISSIONS,USER_PUSH_DEVICE_PERMISSIONS,
-UserModel,type UserRow,
+    USER_DEVICE_PERMISSIONS,
+    USER_EVENT_PERMISSIONS,
+    USER_LOGIN_PERMISSIONS,
+    USER_LOG_PERMISSIONS,
+    USER_MANAGE_PERMISSIONS,
+    USER_PUSH_DEVICE_PERMISSIONS,
+    UserModel,
+    type UserRow,
 } from './models';
 import { useUserAdminActions } from './sections/actions';
 import { ApiKeysSection } from './sections/ApiKeysSection';
@@ -47,13 +53,18 @@ import { NotificationsSection } from './sections/NotificationsSection';
 import { OAuthSection } from './sections/OAuthSection';
 import { OverviewSection } from './sections/OverviewSection';
 import { USER_APP_PERMS_TABSET } from './sections/permission-catalog';
-import { AppPermsSection,SysPermsSection } from './sections/PermissionsSection';
+import { AppPermsSection, SysPermsSection } from './sections/PermissionsSection';
 import { PersonalSection } from './sections/PersonalSection';
 import { ProfileSection } from './sections/ProfileSection';
 import { useSharedUserQueries } from './sections/queries';
 import { SecuritySection } from './sections/SecuritySection';
 import {
-accountType,inactivityWarning,isAnonymized,isOnline,statusBadge,useAdminCaller,
+    accountType,
+    inactivityWarning,
+    isAnonymized,
+    isOnline,
+    statusBadge,
+    useAdminCaller,
 } from './sections/shared';
 
 export interface UserDetailProps {

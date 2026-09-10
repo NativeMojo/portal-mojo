@@ -14,7 +14,7 @@ export * from './RunnerDetail';
 export * from './sections/JobRunnersStrip';
 export * from './sections/JobChannelsPanel';
 export * from './sections/JobThroughputSection';
-export * from './sections/JobOperationsSection';
+export { JobOperationsSection } from './sections/JobOperationsSection';
 // Stage C — scheduled tasks (plan step 10).
 export * from './ScheduledTasksPage';
 export * from './ScheduledTaskDetail';

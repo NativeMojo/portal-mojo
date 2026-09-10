@@ -1,25 +1,44 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useContext,useSyncExternalStore } from 'react';
+import { useContext, useSyncExternalStore } from 'react';
 import {
-GroupContext,hasPermission,useCan,useMe,
-type PermSpec,
+    GroupContext,
+    hasPermission,
+    useCan,
+    useMe,
+    type PermSpec,
 } from '../../client/runtime';
 import {
-Badge,DetailView,Eyebrow,FlatRow,ModelTable,
-SchemaForm,fmt,modal,toast,
-type Column,type Field,type FilterDef,
+    Badge,
+    DetailView,
+    Eyebrow,
+    FlatRow,
+    ModelTable,
+    SchemaForm,
+    fmt,
+    modal,
+    toast,
+    type Column,
+    type Field,
+    type FilterDef,
 } from '../../ui';
-import { ApiKeyLimitsSummary,ApiKeyRateLimitsEditor } from './api-key-rate-limits';
+import { ApiKeyLimitsSummary, ApiKeyRateLimitsEditor } from './api-key-rate-limits';
 import {
-GLOBAL_CREDENTIAL_PERMS,GROUP_CREDENTIAL_PERMS,
-GroupApiKeyModel,buildApiKeyPermissionChanges,customApiKeyPermissionNames,
-fetchApiKeyToken,
-getGroupApiKeyPermissions,grantedPermissions,
-groupApiKeyPermissionsVersion,
-normalizeApiKeyPermissionNames,readApiKeyRateLimits,
-subscribeGroupApiKeyPermissions,
-useCreateGroupApiKey,
-type ApiKeyPermissionDef,type CredentialGroup,type GroupApiKeyRow,
+    GLOBAL_CREDENTIAL_PERMS,
+    GROUP_CREDENTIAL_PERMS,
+    GroupApiKeyModel,
+    buildApiKeyPermissionChanges,
+    customApiKeyPermissionNames,
+    fetchApiKeyToken,
+    getGroupApiKeyPermissions,
+    grantedPermissions,
+    groupApiKeyPermissionsVersion,
+    normalizeApiKeyPermissionNames,
+    readApiKeyRateLimits,
+    subscribeGroupApiKeyPermissions,
+    useCreateGroupApiKey,
+    type ApiKeyPermissionDef,
+    type CredentialGroup,
+    type GroupApiKeyRow,
 } from './models';
 import { showSecretDialog } from './secret-dialog';
 

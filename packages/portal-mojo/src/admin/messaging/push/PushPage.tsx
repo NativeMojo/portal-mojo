@@ -1,16 +1,28 @@
-import { useQuery,useQueryClient } from '@tanstack/react-query';
-import { useRef,useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { KPITile,MetricsChart } from '../../../charts';
+import { KPITile, MetricsChart } from '../../../charts';
 import { useCan } from '../../../client/runtime';
-import { Badge,DetailView,FlatRow,ModelTable,Tabs,fmt,modal,toast,type Column,type FilterDef } from '../../../ui';
-import { fetchPushGroupChoices,fetchPushStats,parseFcmServiceAccount,savePushConfigImperative,testPushConfigConnection,type FcmCredentialEdit } from './api';
+import { Badge, DetailView, FlatRow, ModelTable, Tabs, fmt, modal, toast, type Column, type FilterDef } from '../../../ui';
+import { fetchPushGroupChoices, fetchPushStats, parseFcmServiceAccount, savePushConfigImperative, testPushConfigConnection, type FcmCredentialEdit } from './api';
 import {
-PUSH_CONFIG_MANAGE_PERMISSIONS,PUSH_CONFIG_TEST_PERMISSIONS,PUSH_CONFIG_VIEW_PERMISSIONS,
-PUSH_DELIVERY_VIEW_PERMISSIONS,PUSH_DEVICE_VIEW_PERMISSIONS,PUSH_GROUP_DIRECTORY_PERMISSIONS,
-PUSH_METRICS_PERMISSIONS,PUSH_TEMPLATE_MANAGE_PERMISSIONS,PUSH_TEMPLATE_VIEW_PERMISSIONS,
-PushConfigModel,PushDeliveryModel,PushDeviceModel,PushTemplateModel,
-type PushConfigRow,type PushDeliveryRow,type PushDeviceRow,type PushTemplateRow,
+    PUSH_CONFIG_MANAGE_PERMISSIONS,
+    PUSH_CONFIG_TEST_PERMISSIONS,
+    PUSH_CONFIG_VIEW_PERMISSIONS,
+    PUSH_DELIVERY_VIEW_PERMISSIONS,
+    PUSH_DEVICE_VIEW_PERMISSIONS,
+    PUSH_GROUP_DIRECTORY_PERMISSIONS,
+    PUSH_METRICS_PERMISSIONS,
+    PUSH_TEMPLATE_MANAGE_PERMISSIONS,
+    PUSH_TEMPLATE_VIEW_PERMISSIONS,
+    PushConfigModel,
+    PushDeliveryModel,
+    PushDeviceModel,
+    PushTemplateModel,
+    type PushConfigRow,
+    type PushDeliveryRow,
+    type PushDeviceRow,
+    type PushTemplateRow,
 } from './models';
 
 const relationLabel=(value:{id:number;name?:string;display_name?:string}|null,fallback='—')=>value?.name??value?.display_name??(value?`#${value.id}`:fallback);

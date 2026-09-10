@@ -1,10 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useCan } from '../../client/runtime';
-import { DetailView,FlatRow,fmt,toast } from '../../ui';
+import { DetailView, FlatRow, fmt, toast } from '../../ui';
 import {
-SHORTLINK_MANAGE_PERMISSIONS,ShortlinkModel,ShortlinkReconciliationError,functionalShortlinkUrl,
-refreshShortlinks,setShortlinkActive,useTrackedCounts,
+    SHORTLINK_MANAGE_PERMISSIONS,
+    ShortlinkModel,
+    ShortlinkReconciliationError,
+    functionalShortlinkUrl,
+    refreshShortlinks,
+    setShortlinkActive,
+    useTrackedCounts,
 } from './models';
 
 export function ShortlinkDetail({ id, onClose }: { id: number; onClose: () => void }) {

@@ -13,27 +13,27 @@
 //   · clear-queue's `confirm:"yes"` is sent only AFTER the armed confirmation.
 //     Pre-satisfying a server-side safety gate removes it.
 //   · every destructive control is an ArmedButton, not a plain button.
-import { useEffect,useRef,useState,type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useCan } from '../../../client/runtime';
-import { ArmedButton,JsonBlock,modal,toast } from '../../../ui';
+import { ArmedButton, JsonBlock, modal, toast } from '../../../ui';
 import {
-cleanupConsumers,
-clearQueue,
-clearStuck,
-forEachChannel,
-isPurgeDryRun,
-manualReclaim,
-publishTestJob,
-publishTestSuite,
-purgeJobs,
-rebuildScheduled,
-resetFailed,
-summarizeChannelOutcomes,
-type PurgeResult,
+    cleanupConsumers,
+    clearQueue,
+    clearStuck,
+    forEachChannel,
+    isPurgeDryRun,
+    manualReclaim,
+    publishTestJob,
+    publishTestSuite,
+    purgeJobs,
+    rebuildScheduled,
+    resetFailed,
+    summarizeChannelOutcomes,
+    type PurgeResult,
 } from '../control';
-import { JOBS_MANAGE_PERMS,JOB_STATUS_OPTIONS } from '../models';
+import { JOBS_MANAGE_PERMS, JOB_STATUS_OPTIONS } from '../models';
 
-import { createPurgePreviewGuard,type PurgePreviewIdentity } from '../purge-preview';
+import { createPurgePreviewGuard, type PurgePreviewIdentity } from '../purge-preview';
 
 const ALL_CHANNELS = '';
 
@@ -89,7 +89,7 @@ export function PurgeDialog({ onClose, onExecuting }: { onClose: () => void; onE
         const params = preview && guard.current.execution(preview);
         if (!canManage || busy || executionLock.current || !params) return;
         executionLock.current = true; onExecuting?.(true); setExecuting(true);
-        guard.current.invalidate(); setBusy(true);
+        guard.current.invalidate(); setPreview(null); setBusy(true);
         try {
             const result = await purgeJobs({ ...params });
             if (mounted.current) { setOutcome(result); setPreview(null); }

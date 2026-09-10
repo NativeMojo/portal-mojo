@@ -67,6 +67,12 @@
         "verify:record-attachments": "node scripts/verify-record-attachments.mjs",
         "verify:form-uploads": "node scripts/verify-form-uploads.mjs",
         "verify:image-editor": "node scripts/verify-image-editor.mjs",
-        "verify:admin-modals": "node scripts/verify-admin-modals.mjs"
+        "verify:admin-modals": "node scripts/verify-admin-modals.mjs",
+        "verify:admin-modal-mounted": "node scripts/verify-admin-modal-mounted.mjs",
+        "verify:admin-modal-scanner": "node scripts/verify-admin-modal-scanner.mjs",
+        "verify:admin-modal-lifecycle": "node scripts/verify-admin-modal-lifecycle.mjs"
+    },
+    "devDependencies": {
+        "jsdom": "^26.1.0"
     }
 }

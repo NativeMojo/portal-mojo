@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useCan } from '../../client/runtime';
-import { Badge,CollectionSelect,ModelTable,fmt,modal,type BatchAction,type Column,type FilterDef } from '../../ui';
+import { Badge, CollectionSelect, ModelTable, fmt, modal, type BatchAction, type Column, type FilterDef } from '../../ui';
 import { FileUploadSurface } from './FileUploadSurface';
 import { FileView } from './FileView';
-import { FileModel,GROUP_DIRECTORY_PERMS,STORAGE_MANAGE_PERMS,exportFiles,openCapabilityUrl,saveFileAndReconcileGroup,type FileRow,type RelationRow } from './models';
+import { FileModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, exportFiles, openCapabilityUrl, saveFileAndReconcileGroup, type FileRow, type RelationRow } from './models';
 
 const COLUMNS: Column<FileRow>[] = [
     { key: 'filename', label: 'Filename', sortable: true, hideable: false },

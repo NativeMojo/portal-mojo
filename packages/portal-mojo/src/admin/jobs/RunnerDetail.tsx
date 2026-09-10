@@ -14,47 +14,47 @@
 //     operation stays ABSENT rather than shipping disabled.
 //   · the `version` chip — the heartbeat payload has no version field.
 //   · trusted-HTML interpolation throughout — every slot here is a ReactNode.
-import { useState,type ReactNode } from 'react';
-import { downloadBlob,useCan } from '../../client/runtime';
+import { useState, type ReactNode } from 'react';
+import { downloadBlob, useCan } from '../../client/runtime';
 import {
-ArmedButton,
-Badge,
-DetailView,
-Eyebrow,
-FlatRow,
-JsonBlock,
-KnownFieldsCard,
-StatusPanel,
-fmt,
-modal,
-toast,
-type Tone,
+    ArmedButton,
+    Badge,
+    DetailView,
+    Eyebrow,
+    FlatRow,
+    JsonBlock,
+    KnownFieldsCard,
+    StatusPanel,
+    fmt,
+    modal,
+    toast,
+    type Tone,
 } from '../../ui';
 import {
-BROADCAST_COMMANDS,
-broadcastCommand,
-pingRunner,
-shutdownRunner,
-type BroadcastCommand,
+    BROADCAST_COMMANDS,
+    broadcastCommand,
+    pingRunner,
+    shutdownRunner,
+    type BroadcastCommand,
 } from './control';
 import {
-JOBS_MANAGE_PERMS,
-formatHeartbeatAge,
-formatUptime,
-heartbeatAgeSeconds,
-jobStatusTone,
-runnerFailureRate,
-runnerHealth,
-runnerUptimeSeconds,
-type JobRow,
-type RunnerHostInfo,
-type RunnerRow,
+    JOBS_MANAGE_PERMS,
+    formatHeartbeatAge,
+    formatUptime,
+    heartbeatAgeSeconds,
+    jobStatusTone,
+    runnerFailureRate,
+    runnerHealth,
+    runnerUptimeSeconds,
+    type JobRow,
+    type RunnerHostInfo,
+    type RunnerRow,
 } from './models';
 import {
-useRunnerActiveJobs,
-useRunnerJobHistory,
-useRunnerJobLogs,
-useRunnerSysinfo,
+    useRunnerActiveJobs,
+    useRunnerJobHistory,
+    useRunnerJobLogs,
+    useRunnerSysinfo,
 } from './queries';
 
 // ── Small presentational pieces ───────────────────────────────────────

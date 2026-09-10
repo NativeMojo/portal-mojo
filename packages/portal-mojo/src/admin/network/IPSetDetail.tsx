@@ -3,18 +3,29 @@
 // CIDR Data, with a fleet-operations kebab), rebuilt on the house detail
 // modal with every fleet-affecting action behind an armed confirmation.
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
-ArmedButton,Badge,DetailView,Eyebrow,FlatRow,StatusPanel,
-fmt,modal,toast,
+    ArmedButton,
+    Badge,
+    DetailView,
+    Eyebrow,
+    FlatRow,
+    StatusPanel,
+    fmt,
+    modal,
+    toast,
 } from '../../ui';
 import { promptEditIPSet } from './IPSetEditor';
 import {
-IPSET_CACHE_ONLY_HELP,
-IPSET_KIND_BADGE_OPTIONS,
-IPSET_MANAGE_PERMS,IPSET_SOURCE_OPTIONS,IPSetModel,
-isCacheOnlyIPSet,useIPSetCidrData,type IPSetRow
+    IPSET_CACHE_ONLY_HELP,
+    IPSET_KIND_BADGE_OPTIONS,
+    IPSET_MANAGE_PERMS,
+    IPSET_SOURCE_OPTIONS,
+    IPSetModel,
+    isCacheOnlyIPSet,
+    useIPSetCidrData,
+    type IPSetRow,
 } from './models';
 
 const DASH = <span className="dim-italic">—</span>;
@@ -101,6 +112,8 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
     const qc = useQueryClient();
     const { data: row, isPending, error } = IPSetModel.useOne(id);
     const canManage = useCan(IPSET_MANAGE_PERMS).can;
+    const allowed = useRef(canManage); allowed.current = canManage;
+    useEffect(() => { allowed.current = canManage; return () => { allowed.current = false; }; }, [canManage]);
     
     const sync = IPSetModel.useAction('sync');
     const enable = IPSetModel.useAction('enable');
@@ -115,6 +128,7 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
     const cacheOnly = isCacheOnlyIPSet(row);
 
     const run = async (label: string, fn: () => Promise<unknown>) => {
+        if (!allowed.current) return;
         try {
             await fn();
             toast.success(label);
@@ -127,7 +141,7 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
 
     const onEdit = async () => {
         const changes = await promptEditIPSet(row);
-        if (!changes) return;
+        if (!changes || !allowed.current) return;
         try {
             await save.mutateAsync({ id, changes });
             // A `data` save re-runs set_data() server-side, so the detailed
@@ -150,6 +164,12 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
                 ...(cacheOnly ? [{ icon: 'bi-database-lock', text: 'CACHE-ONLY', tone: 'warning' as const }] : []),
                 ...(row.sync_error ? [{ icon: 'bi-exclamation-triangle', text: 'Sync error', tone: 'danger' as const }] : []),
             ]}
+            contextMenu={[
+                { label: 'Edit IP set', permissions: IPSET_MANAGE_PERMS, disabled: save.isPending, onSelect: () => void onEdit() },
+                { label: row.is_enabled ? 'Disable & remove from fleet' : 'Enable & sync', permissions: IPSET_MANAGE_PERMS, disabled: cacheOnly || enable.isPending || disable.isPending, onSelect: async () => { if (await modal.confirm({ title: row.is_enabled ? 'Disable fleet enforcement?' : 'Enable fleet enforcement?', message: `${row.name}: changes this set on every fleet instance.`, confirmText: row.is_enabled ? 'Disable' : 'Enable' })) await run('IP set state updated', () => (row.is_enabled ? disable : enable).mutateAsync({ id })); } },
+                { label: 'Sync to fleet', permissions: IPSET_MANAGE_PERMS, disabled: cacheOnly || sync.isPending, onSelect: async () => { if (await modal.confirm({ title: 'Sync to fleet?', message: `Push ${row.name} to every fleet instance now.`, confirmText: 'Sync' })) await run('Sync requested', () => sync.mutateAsync({ id })); } },
+                { label: 'Refresh source', permissions: IPSET_MANAGE_PERMS, disabled: refresh.isPending, onSelect: async () => { if (await modal.confirm({ title: 'Refresh source?', message: `Replace stored CIDRs for ${row.name} from its provider list.`, confirmText: 'Refresh' })) await run('Source refresh requested', () => refresh.mutateAsync({ id })); } },
+            ]}
             sections={[
                 {
                     key: 'config', label: 'Configuration', icon: 'bi-sliders', render: () => (
@@ -165,49 +185,7 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
                                 meta={row.last_synced == null
                                     ? 'Never synced to the fleet.'
                                     : `Last synced ${fmt.datetime(row.last_synced)} · ${fmt.relative(row.last_synced)}`}
-                                actions={canManage ? (
-                                    <div className="netsec-action-row">
-                                        {row.is_enabled ? (
-                                            <ArmedButton
-                                                className="btn-compact"
-                                                icon="bi-toggle-off"
-                                                label="Disable & remove from fleet"
-                                                armedLabel="Click again — every fleet instance drops this set from iptables"
-                                                onConfirm={() => run('IP set disabled and removed from the fleet', () => disable.mutateAsync({ id }))}
-                                            />
-                                        ) : (
-                                            <ArmedButton
-                                                className="btn-compact"
-                                                icon="bi-toggle-on"
-                                                label="Enable & sync"
-                                                disabled={cacheOnly || enable.isPending}
-                                                armedLabel={cacheOnly
-                                                    ? 'Click again — the server will refuse this (cache-only list)'
-                                                    : `Click again — ${row.cidr_count.toLocaleString()} ranges are kernel-blocked fleet-wide`}
-                                                onConfirm={() => run('IP set enabled and synced', () => enable.mutateAsync({ id }))}
-                                            />
-                                        )}
-                                        <ArmedButton
-                                            className="btn-compact"
-                                            icon="bi-broadcast"
-                                            label="Sync to fleet"
-                                            disabled={cacheOnly || sync.isPending}
-                                            armedLabel="Click again — pushes this set to every fleet instance now"
-                                            onConfirm={() => run('Sync broadcast to the fleet', () => sync.mutateAsync({ id }))}
-                                        />
-                                        <ArmedButton
-                                            className="btn-compact"
-                                            icon="bi-arrow-clockwise"
-                                            label="Refresh source"
-                                            armedLabel="Click again — refetches the provider list and replaces the stored CIDRs"
-                                            onConfirm={() => run('Source refresh requested', () => refresh.mutateAsync({ id }))}
-                                        />
-                                        <button className="btn btn-compact" onClick={() => void onEdit()}>
-                                            <i className="bi bi-pencil" /> Edit
-                                        </button>
-                                        
-                                    </div>
-                                ) : null}
+
                             />
 
                             {cacheOnly && (

@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ArmedButton,Badge,DetailView,FlatRow,ModelTable,SchemaForm,fmt,formModal,modal,toast,type Column,type FilterDef,type FormData } from '../../ui';
-import { auditEmailDomain,reconcileEmailDomain,saveEmailDomainAtomic } from './api';
+import { ArmedButton, Badge, DetailView, FlatRow, ModelTable, SchemaForm, fmt, formModal, modal, toast, type Column, type FilterDef, type FormData } from '../../ui';
+import { auditEmailDomain, reconcileEmailDomain, saveEmailDomainAtomic } from './api';
 import { exportEmailDomains } from './data';
 import { openEmailDomainWizard } from './EmailDomainWizard';
-import { EmailDomainModel,type EmailDomainRow } from './models';
+import { EmailDomainModel, type EmailDomainRow } from './models';
 import { redactMessagingError } from './sanitize';
 
 const columns:Column<EmailDomainRow>[]=[{key:'name',label:'Domain',sortable:true,hideable:false},{key:'status',label:'Status',sortable:true,render:r=><Badge tone={r.status==='verified'||r.status==='ready'?'success':r.status==='missing'?'danger':'warning'}>{r.status}</Badge>},{key:'region',label:'Region',sortable:true},{key:'receiving_enabled',label:'Receiving',sortable:true,render:r=>r.receiving_enabled?'Enabled':'Disabled'},{key:'dns_mode',label:'DNS',sortable:true},{key:'created',label:'Created',sortable:true,render:r=>fmt.date(r.created)}];

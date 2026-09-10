@@ -218,6 +218,7 @@ function ModalDialog({ item }: { item: ModalItem }) {
             onCancel={(e) => { e.preventDefault(); dismiss(); }}
             onMouseDown={(e) => { if (e.target === ref.current) dismiss(); }}
         >
+            {item.flush && <button type="button" className="btn-icon modal-fallback-close" aria-label="Close" onClick={dismiss}><i className="bi bi-x-lg" /></button>}
             {item.render(item.resolve)}
         </dialog>
     );

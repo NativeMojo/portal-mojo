@@ -1,18 +1,40 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect,useMemo,useRef,useState,type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { RecordFeedItem } from '../../client/record-feed';
 import { createTicketNoteAdapter } from '../../client/record-feed';
-import { mojoSave,useCan } from '../../client/runtime';
+import { mojoSave, useCan } from '../../client/runtime';
 import {
-Badge,CollectionSelect,DetailView,MarkdownView,ModelTable,RecordFeed,SchemaForm,fmt,modal,toast,
-type Column,type Field,type FilterDef,type FormData,type Tone,
+    Badge,
+    CollectionSelect,
+    DetailView,
+    MarkdownView,
+    ModelTable,
+    RecordFeed,
+    SchemaForm,
+    fmt,
+    modal,
+    toast,
+    type Column,
+    type Field,
+    type FilterDef,
+    type FormData,
+    type Tone,
 } from '../../ui';
 import { AssistantContextLauncher } from '../assistant/launchers';
 import {
-MaestroItemLinkModel,TICKET_MANAGE_PERMS,TICKET_USER_LOOKUP_PERMS,
-TicketModel,buildTicketActionResponseBody,invalidateTicketDependents,
-isTicketActionDisabled,isTicketTerminal,knownOptionsWithCurrent,relationId,relationLabel,
-type TicketNoteAction,type TicketRow,
+    MaestroItemLinkModel,
+    TICKET_MANAGE_PERMS,
+    TICKET_USER_LOOKUP_PERMS,
+    TicketModel,
+    buildTicketActionResponseBody,
+    invalidateTicketDependents,
+    isTicketActionDisabled,
+    isTicketTerminal,
+    knownOptionsWithCurrent,
+    relationId,
+    relationLabel,
+    type TicketNoteAction,
+    type TicketRow,
 } from './models';
 
 export const TICKET_STATUSES = [

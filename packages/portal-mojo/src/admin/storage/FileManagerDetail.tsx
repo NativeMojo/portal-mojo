@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useCan } from '../../client/runtime';
-import { Badge,DetailView,FlatRow,fmt,modal,toast } from '../../ui';
+import { Badge, DetailView, FlatRow, fmt, modal, toast } from '../../ui';
 import { FileView } from './FileView';
-import { FileManagerModel,FileModel,GROUP_DIRECTORY_PERMS,STORAGE_MANAGE_PERMS,USER_DIRECTORY_PERMS,runFileManagerAction,saveFileManagerAtomic,storageRelationId } from './models';
+import { FileManagerModel, FileModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, USER_DIRECTORY_PERMS, runFileManagerAction, saveFileManagerAtomic, storageRelationId } from './models';
 import { openFileManagerEditor } from './storage-dialogs';
 
 function NestedFiles({ managerId }: { managerId: number }) {

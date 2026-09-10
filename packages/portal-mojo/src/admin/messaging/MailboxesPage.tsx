@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge,DetailView,FlatRow,ModelTable,fmt,formModal,modal,toast,type Column,type FilterDef,type FormData } from '../../ui';
-import { saveMailbox,sendEmail } from './api';
-import { EmailDomainModel,MailboxModel,type MailboxRow,type SendEmailInput } from './models';
+import { Badge, DetailView, FlatRow, ModelTable, fmt, formModal, modal, toast, type Column, type FilterDef, type FormData } from '../../ui';
+import { saveMailbox, sendEmail } from './api';
+import { EmailDomainModel, MailboxModel, type MailboxRow, type SendEmailInput } from './models';
 import { redactMessagingError } from './sanitize';
 
 const columns:Column<MailboxRow>[]=[{key:'email',label:'Mailbox',sortable:true,hideable:false},{key:'domain',label:'Domain',render:r=>typeof r.domain==='object'?r.domain?.name??`#${r.domain?.id}`:`#${r.domain}`},{key:'allow_inbound',label:'Inbound',sortable:true,render:r=><Badge tone={r.allow_inbound?'success':'muted'}>{r.allow_inbound?'On':'Off'}</Badge>},{key:'allow_outbound',label:'Outbound',sortable:true,render:r=><Badge tone={r.allow_outbound?'success':'muted'}>{r.allow_outbound?'On':'Off'}</Badge>},{key:'is_system_default',label:'System default',sortable:true,render:r=>r.is_system_default?'Yes':'—'},{key:'is_domain_default',label:'Domain default',sortable:true,render:r=>r.is_domain_default?'Yes':'—'},{key:'created',label:'Created',sortable:true,render:r=>fmt.date(r.created)}];

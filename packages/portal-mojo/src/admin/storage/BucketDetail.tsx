@@ -1,10 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
-import { ArmedButton,DetailView,FlatRow,SchemaForm,fmt,modal,toast } from '../../ui';
+import { ArmedButton, DetailView, FlatRow, SchemaForm, fmt, modal, toast } from '../../ui';
 import {
-BUCKET_MANAGE_PERMS,emptyBucket,setBucketPublic,
-type BucketEmptyResult,type BucketMutationOutcome,type S3BucketRow,type S3FailureEvidence,
+    BUCKET_MANAGE_PERMS,
+    emptyBucket,
+    setBucketPublic,
+    type BucketEmptyResult,
+    type BucketMutationOutcome,
+    type S3BucketRow,
+    type S3FailureEvidence,
 } from './models';
 
 function message(error: unknown): string { return error instanceof Error ? error.message : 'Storage operation failed'; }
@@ -31,6 +36,8 @@ function Outcome({ value }: { value: BucketMutationOutcome<unknown> | null }) {
 export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose: () => void }) {
     const queryClient = useQueryClient();
     const canManage = useCan(BUCKET_MANAGE_PERMS).can;
+    const permission = useRef(canManage); permission.current = canManage;
+    useEffect(() => { permission.current = canManage; return () => { permission.current = false; }; }, [canManage]);
     const [outcome, setOutcome] = useState<BucketMutationOutcome<unknown> | null>(null);
     const [emptyResult, setEmptyResult] = useState<BucketEmptyResult | null>(null);
 
@@ -42,14 +49,15 @@ export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose
                 : <>This applies the all-private Public Access Block posture to <code>{bucket.name}</code>. The operation is externally observable and not atomic.</>,
             confirmText: isPublic ? 'Make public' : 'Make private', danger: isPublic,
         });
-        if (!confirmed) return;
+        if (!confirmed || !permission.current) return;
         const next = await setBucketPublic(queryClient, bucket.name, isPublic);
         setOutcome(next);
         if (next.data) toast.success(`${bucket.name} verified ${next.data.is_public ? 'public' : 'private'}`);
     };
 
     const confirmEmpty = async () => {
-        if (!canManage) return;
+        if (!permission.current) return;
+        let pending = false;
         await modal.open((close) => (
             <div className="modal-pad">
                 <h2 className="modal-title">Empty {bucket.name}</h2>
@@ -59,9 +67,13 @@ export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose
                     submitText="Empty bucket"
                     onCancel={() => close(null)}
                     onSubmit={async (data) => {
+                        if (!permission.current) throw new Error('Permission to empty this bucket was revoked.');
                         const exact = String(data.confirm_name ?? '');
                         if (exact !== bucket.name) throw new Error('Bucket name does not match exactly. No request was sent.');
-                        const next = await emptyBucket(queryClient, bucket.name, exact);
+                        pending = true;
+                        let next;
+                        try { next = await emptyBucket(queryClient, bucket.name, exact); }
+                        finally { pending = false; }
                         setOutcome(next);
                         if (next.error) throw next.error;
                         if (next.data) { setEmptyResult(next.data); toast.success(`${bucket.name} empty acknowledged`); }
@@ -69,7 +81,7 @@ export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose
                     }}
                 />
             </div>
-        ), { size: 'sm' });
+        ), { size: 'sm', canDismiss: () => !pending });
     };
 
     return <DetailView title={bucket.name} subtitle="Account-level S3 bucket" icon="bi-bucket" chips={[{ text: 'Global', tone: 'info' }]} contextMenu={canManage ? [

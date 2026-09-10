@@ -13,9 +13,9 @@
 //     field so they are drivable end-to-end in dev (a real server never does)
 // Data endpoints stay open (no auth required) until the portal grows login
 // pages (Chunk C3) — then they 401 without a bearer, like the real backend.
-import { getDnsAdminIntegration,type ManagedDnsRecordInput } from '../admin/dns/dns-integration';
+import { getDnsAdminIntegration, type ManagedDnsRecordInput } from '../admin/dns/dns-integration';
 import { markdownToHtml } from './markdown-parse';
-import type { Params,User } from './types';
+import type { Params, User } from './types';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
 function mulberry32(seed: number) {
@@ -7805,7 +7805,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (memoryMatch) {
             if (!hasGlobalPermission(caller, ['assistant'])) return permissionDenied(); const tier = memoryMatch[1] as 'global' | 'user' | 'group'; const entryKey = memoryMatch[2] ? decodeURIComponent(memoryMatch[2]) : null; const groupId = tier === 'group' ? Number(opts.params?.group) : null;
             if ('group' in (opts.body ?? {})) return { status: false, error: 'group belongs in request context, not the body', error_code: 400 };
-            if (tier === 'group') { const membership = db.members.find((member) => member.user === caller.id && member.group === groupId && member.is_active); if (!membership) return permissionDenied(); }
+            if (tier === 'group' && !caller.is_superuser) {
+                let currentGroup: number | null = groupId; const visited = new Set<number>(); let membership: MockMember | undefined;
+                while (currentGroup != null && !visited.has(currentGroup)) { visited.add(currentGroup); membership = db.members.find(member => member.user === caller.id && member.group === currentGroup && member.is_active); if (membership) break; const parent = db.groups.find(row => row.id === currentGroup)?.parent; currentGroup = typeof parent === 'number' ? parent : parent?.id ?? null; }
+                if (!membership || method !== 'GET' && !['assistant', 'admin'].some(permission => Boolean(membership!.permissions[permission]))) return permissionDenied();
+            }
             const store: Record<string, unknown> = tier === 'global' ? db.assistantMemory.global : tier === 'user' ? (db.assistantMemory.users.get(caller.id) ?? {}) : (db.assistantMemory.groups.get(groupId!) ?? {});
             if (method === 'GET' && entryKey == null) return { status: true, data: { ...store } };
             if (method === 'POST' && entryKey == null) { const key = typeof opts.body?.key === 'string' ? opts.body.key : ''; const value = typeof opts.body?.value === 'string' ? opts.body.value : ''; if (!/^[a-z0-9:_-]{1,64}$/.test(key) || value.length < 1 || value.length > 500) return { status: false, error: 'Invalid memory key or value', error_code: 400 }; store[key] = value; if (tier === 'user') db.assistantMemory.users.set(caller.id, store); if (tier === 'group') db.assistantMemory.groups.set(groupId!, store); return { status: true, data: { key, value } }; }

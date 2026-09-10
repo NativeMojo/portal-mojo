@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect,useRef,useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
-import { Badge,DataView,DetailView,FlatRow,SchemaForm,fmt,modal,toast } from '../../ui';
-import { FilePreview,filePreviewCategory } from './FilePreview';
-import { normalizeRenditionRoles,normalizeRenditions,pollRenditionConvergence,renditionTargetSignature,type RenditionPollStop } from './file-renditions';
-import { FileModel,STORAGE_MANAGE_PERMS,ShortLinkShareModel,createFileShare,isSafeCapabilityUrl,openCapabilityUrl,saveFileAndReconcileGroup,setFileShareActive,type FileRenditionRow } from './models';
+import { Badge, DataView, DetailView, FlatRow, SchemaForm, fmt, modal, toast } from '../../ui';
+import { FilePreview, filePreviewCategory } from './FilePreview';
+import { normalizeRenditionRoles, normalizeRenditions, pollRenditionConvergence, renditionTargetSignature, type RenditionPollStop } from './file-renditions';
+import { FileModel, STORAGE_MANAGE_PERMS, ShortLinkShareModel, createFileShare, isSafeCapabilityUrl, openCapabilityUrl, saveFileAndReconcileGroup, setFileShareActive, type FileRenditionRow } from './models';
 
 function ShareResult({ url, close }: { url: string; close: () => void }) {
     return <div className="modal-pad"><h2 className="modal-title">Share link created</h2><p className="modal-message">This newly minted capability is shown once from component-local state.</p><code className="storage-capability">{url}</code><div className="modal-actions"><button className="btn" onClick={() => void navigator.clipboard.writeText(url)}>Copy</button><button className="btn btn-primary" onClick={close}>Done</button></div></div>;
@@ -19,6 +19,10 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
     const queryClient = useQueryClient();
     const query = FileModel.useOne(id);
     const canManage = useCan(STORAGE_MANAGE_PERMS).can;
+    const [pendingShares, setPendingShares] = useState<Set<number>>(() => new Set());
+    const shareLocks = useRef(new Set<number>());
+    const permission = useRef(canManage); permission.current = canManage;
+    useEffect(() => { permission.current = canManage; return () => { permission.current = false; }; }, [canManage]);
     const regenerate = FileModel.useAction('regenerate_renditions');
     
     const shares = ShortLinkShareModel.useList({ file: id, start: 0, size: 25 }, { enabled: canManage });
@@ -65,12 +69,12 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
     const updatePublic = async () => {
         const next = !file.is_public;
         const ok = await modal.confirm({ title: next ? 'Make file public?' : 'Make file private?', message: <>Change access for <b>{file.filename}</b>?</>, confirmText: next ? 'Make public' : 'Make private', danger: next });
-        if (!ok) return;
+        if (!ok || !permission.current) return;
         try { await saveFileAndReconcileGroup(queryClient, id, { is_public: next }); await query.refetch(); } catch (error) { toast.error(error instanceof Error ? error.message : 'Access change failed'); }
     };
     const createShare = async () => {
         const values = await modal.open<Record<string, unknown>>((close) => <div className="modal-pad"><h2 className="modal-title">Create share link</h2><SchemaForm fields={[{ name: 'expire_days', type: 'text', label: 'Expire after days', help: '0 means no expiry.' }, { name: 'track_clicks', type: 'switch', label: 'Track clicks' }, { name: 'note', type: 'textarea', label: 'Audit note' }]} initial={{ expire_days: '30', track_clicks: false, note: '' }} submitText="Create share" onCancel={() => close(null as never)} onSubmit={(data) => close(data as unknown as Record<string, unknown>)} /></div>);
-        if (!values) return;
+        if (!values || !permission.current) return;
         try {
             const result = await createFileShare(id, { expire_days: Number(values.expire_days ?? 30), track_clicks: Boolean(values.track_clicks), note: String(values.note ?? '') });
             await modal.open((close) => <ShareResult url={result.url} close={() => close(null)} />, { size: 'sm' });
@@ -84,7 +88,7 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
         const normalized = normalizeRenditionRoles(roles);
         try {
             const ok = await modal.confirm({ title: normalized.length ? `Regenerate ${normalized.join(', ')}?` : 'Regenerate all renditions?', message: 'The renderer is asynchronous. This viewer polls finite observable state for up to 12 attempts.', confirmText: 'Queue regeneration' });
-            if (!ok) return;
+            if (!ok || !permission.current) return;
             const currentRoles = normalizeRenditions(file.renditions).map((row) => row.role);
             const targetRoles = normalized.length > 0 ? normalized : currentRoles.length > 0 ? currentRoles : ['thumbnail', 'preview'];
             const before = renditionTargetSignature(file, targetRoles);
@@ -95,13 +99,23 @@ export function FileView({ id, onClose }: { id: number; onClose: () => void }) {
     };
     
 
-    return <DetailView title={file.filename} subtitle={`${file.content_type} · ${file.file_size == null ? 'unknown size' : fmt.filesize(file.file_size)}`} icon="bi-file-earmark" chips={[{ text: file.upload_status, tone: file.upload_status === 'completed' ? 'success' : file.upload_status === 'failed' ? 'danger' : 'warning' }, { text: file.is_public ? 'Public' : 'Private', tone: file.is_public ? 'warning' : 'muted' }]} sections={[
-        { key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-section"><div className="storage-action-row">{isSafeCapabilityUrl(file.url) && <><button className="btn" onClick={() => openCapabilityUrl(file.url!)}><i className="bi bi-box-arrow-up-right" /> Open</button><button className="btn" onClick={() => openCapabilityUrl(file.url!, true)}><i className="bi bi-download" /> Download</button><button className="btn" onClick={() => void navigator.clipboard.writeText(file.url!)}><i className="bi bi-copy" /> Copy URL</button></>}{canManage && <button className="btn" onClick={() => void updatePublic()}>{file.is_public ? 'Make private…' : 'Make public…'}</button>}</div>{!isSafeCapabilityUrl(file.url) && <p className="storage-unsafe">The backend URL is absent or unsafe; Open, Download, and Copy are refused.</p>}<FlatRow label="Filename">{file.filename}</FlatRow><FlatRow label="Category">{file.category || 'Unknown'}</FlatRow><FlatRow label="Upload status"><Badge tone={file.upload_status === 'completed' ? 'success' : 'warning'}>{file.upload_status}</Badge></FlatRow><FlatRow label="Public">{file.is_public ? 'Yes' : 'No'}</FlatRow><FlatRow label="Active">{file.is_active ? 'Yes' : 'No'}</FlatRow></div> },
+    const toggleShare = async (shareId: number, next: boolean) => {
+        if (!permission.current || shareLocks.current.has(shareId)) return;
+        shareLocks.current.add(shareId); setPendingShares(new Set(shareLocks.current));
+        try { await setFileShareActive(shareId, next); }
+        catch (error) { toast.error(error instanceof Error ? error.message : 'Share state change failed'); }
+        finally { await shares.refetch(); shareLocks.current.delete(shareId); setPendingShares(new Set(shareLocks.current)); }
+    };
+    return <DetailView contextMenu={[
+        ...(isSafeCapabilityUrl(file.url) ? [{ label: 'Open file', onSelect: () => { openCapabilityUrl(file.url!); } }, { label: 'Download file', onSelect: () => { openCapabilityUrl(file.url!, true); } }, { label: 'Copy URL', onSelect: () => void navigator.clipboard.writeText(file.url!).catch(() => toast.error('Copy failed')) }] : []),
+        ...(canManage ? [{ label: file.is_public ? 'Make private…' : 'Make public…', onSelect: () => void updatePublic() }, { label: 'Create share…', onSelect: () => void createShare() }, { label: 'Regenerate all renditions…', disabled: regenerationBusy || pollState === 'polling', onSelect: () => void runRegenerate() }] : []),
+    ]} title={file.filename} subtitle={`${file.content_type} · ${file.file_size == null ? 'unknown size' : fmt.filesize(file.file_size)}`} icon="bi-file-earmark" chips={[{ text: file.upload_status, tone: file.upload_status === 'completed' ? 'success' : file.upload_status === 'failed' ? 'danger' : 'warning' }, { text: file.is_public ? 'Public' : 'Private', tone: file.is_public ? 'warning' : 'muted' }]} sections={[
+        { key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-section">{!isSafeCapabilityUrl(file.url) && <p className="storage-unsafe">The backend URL is absent or unsafe; Open, Download, and Copy are refused.</p>}<FlatRow label="Filename">{file.filename}</FlatRow><FlatRow label="Category">{file.category || 'Unknown'}</FlatRow><FlatRow label="Upload status"><Badge tone={file.upload_status === 'completed' ? 'success' : 'warning'}>{file.upload_status}</Badge></FlatRow><FlatRow label="Public">{file.is_public ? 'Yes' : 'No'}</FlatRow><FlatRow label="Active">{file.is_active ? 'Yes' : 'No'}</FlatRow></div> },
         { key: 'preview', label: 'Preview', icon: 'bi-eye', render: () => <div className="detail-section"><FilePreview file={file} /></div> },
         { key: 'details', label: 'Details', icon: 'bi-card-list', render: () => <div className="detail-section"><FlatRow label="ID">{file.id}</FlatRow><FlatRow label="Content type">{file.content_type}</FlatRow><FlatRow label="Size">{file.file_size == null ? 'Unknown' : fmt.filesize(file.file_size)}</FlatRow><FlatRow label="Group">{typeof file.group === 'object' && file.group ? file.group.name || `#${file.group.id}` : file.group == null ? 'System' : `#${file.group}`}</FlatRow><FlatRow label="Backend">{typeof file.file_manager === 'object' && file.file_manager ? file.file_manager.name || `#${file.file_manager.id}` : `#${file.file_manager ?? '—'}`}</FlatRow><FlatRow label="Created">{fmt.datetime(file.created)}</FlatRow><FlatRow label="Modified">{fmt.datetime(file.modified)}</FlatRow></div> },
-        { key: 'renditions', label: 'Renditions', icon: 'bi-images', render: () => { const pollingDisabled = regenerationBusy || pollState === 'polling'; return <div className="detail-section"><div className="storage-section-head"><div><h3>Renditions</h3><p className="dim">Derived from the role-keyed File graph; no duplicate rendition store.</p></div>{canManage && <button className="btn" disabled={pollingDisabled} onClick={() => void runRegenerate()}>Regenerate all…</button>}</div><RenditionRows rows={renditionRows} canManage={canManage} pollingDisabled={pollingDisabled} onRegenerate={(roles) => void runRegenerate(roles)} />{pollState === 'polling' && <p className="dim"><i className="bi bi-arrow-repeat spin" /> Waiting for observable rendition change…</p>}{pollState === 'timeout' && <div className="form-alert">No convergence after 12 attempts. The job may still be running. <button className="btn btn-compact" onClick={() => void query.refetch()}>Refresh now</button></div>}{pollState && ['failed', 'expired'].includes(pollState) && <div className="form-alert">Polling stopped because upload state is {pollState}.</div>}</div>; } },
-        { key: 'shares', label: 'Shares', icon: 'bi-share', render: () => <div className="detail-section"><div className="storage-section-head"><div><h3>Visible shares</h3><p className="dim">Owner-visible rows only unless the caller separately holds global shortlink authority.</p></div>{canManage && <button className="btn btn-primary" onClick={() => void createShare()}>Create share…</button>}</div>{!canManage ? <p className="dim">Share controls are unavailable for this viewer.</p> : shares.isError ? <div className="form-alert">Visible shares unavailable. File inspection remains available.</div> : (shares.data?.rows ?? []).length === 0 ? <p className="dim">No visible shares.</p> : <div className="storage-shares">{shares.data!.rows.map((share) => <div key={share.id}><span><code>{share.code}</code><small>{share.is_active ? 'Active' : 'Inactive'} · {share.expires_at ? fmt.datetime(share.expires_at) : 'No expiry'} · {share.hit_count} hits · {share.track_clicks ? 'tracking' : 'not tracking'}{share.note ? ` · ${share.note}` : ''}</small></span><div className="storage-action-row"><button className="btn btn-compact" onClick={async () => { await setFileShareActive(share.id, !share.is_active); await shares.refetch(); }}>{share.is_active ? 'Deactivate' : 'Activate'}</button></div></div>)}</div>}</div> },
+        { key: 'renditions', label: 'Renditions', icon: 'bi-images', render: () => { const pollingDisabled = regenerationBusy || pollState === 'polling'; return <div className="detail-section"><div className="storage-section-head"><div><h3>Renditions</h3><p className="dim">Derived from the role-keyed File graph; no duplicate rendition store.</p></div></div><RenditionRows rows={renditionRows} canManage={canManage} pollingDisabled={pollingDisabled} onRegenerate={(roles) => void runRegenerate(roles)} />{pollState === 'polling' && <p className="dim"><i className="bi bi-arrow-repeat spin" /> Waiting for observable rendition change…</p>}{pollState === 'timeout' && <div className="form-alert">No convergence after 12 attempts. The job may still be running. <button className="btn btn-compact" onClick={() => void query.refetch()}>Refresh now</button></div>}{pollState && ['failed', 'expired'].includes(pollState) && <div className="form-alert">Polling stopped because upload state is {pollState}.</div>}</div>; } },
+        { key: 'shares', label: 'Shares', icon: 'bi-share', render: () => <div className="detail-section"><div className="storage-section-head"><div><h3>Visible shares</h3><p className="dim">Owner-visible rows only unless the caller separately holds global shortlink authority.</p></div>{canManage && <button className="btn btn-primary" onClick={() => void createShare()}>Create share…</button>}</div>{!canManage ? <p className="dim">Share controls are unavailable for this viewer.</p> : shares.isError ? <div className="form-alert">Visible shares unavailable. File inspection remains available.</div> : (shares.data?.rows ?? []).length === 0 ? <p className="dim">No visible shares.</p> : <div className="storage-shares">{shares.data!.rows.map((share) => <div key={share.id}><span><code>{share.code}</code><small>{share.is_active ? 'Active' : 'Inactive'} · {share.expires_at ? fmt.datetime(share.expires_at) : 'No expiry'} · {share.hit_count} hits · {share.track_clicks ? 'tracking' : 'not tracking'}{share.note ? ` · ${share.note}` : ''}</small></span><div className="storage-action-row"><button className="btn btn-compact" disabled={pendingShares.has(share.id)} onClick={() => void toggleShare(share.id, !share.is_active)}>{share.is_active ? 'Deactivate' : 'Activate'}</button></div></div>)}</div>}</div> },
         { key: 'metadata', label: 'Metadata', icon: 'bi-braces', render: () => <div className="detail-section"><DataView data={file.metadata ?? {}} columns={2} /></div> },
-        ...(canManage ? [] : []),
+
     ]} initialSection="overview" onClose={onClose} />;
 }
