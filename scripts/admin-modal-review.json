@@ -1,0 +1,450 @@
+{
+  "bodies": [
+    {
+      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:chooseAdmissionMode:modal.open:0",
+      "fingerprint": "27731687c685fab5cd6d",
+      "category": "editor",
+      "purpose": "Choose the member admission path"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/incidents/IncidentsPage.tsx:IncidentsPage:modal.open:0",
+      "fingerprint": "b5f90e6f8c697bb663ea",
+      "category": "action",
+      "purpose": "MergeTargetForm: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/rules/editors.tsx:openRuleSetEditor:modal.open:0",
+      "fingerprint": "bac4c47ef4e6d15d8100",
+      "category": "editor",
+      "purpose": "RuleSetEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/rules/editors.tsx:openRuleEditor:modal.open:0",
+      "fingerprint": "d734234c5ff1ae23f10f",
+      "category": "editor",
+      "purpose": "RuleEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/rules/editors.tsx:openHandlerChainEditor:modal.open:0",
+      "fingerprint": "bf7539dcd6b5b4802d2d",
+      "category": "editor",
+      "purpose": "HandlerEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/security/tickets.tsx:openTicketEditor:modal.open:0",
+      "fingerprint": "e848246dbf48849fe006",
+      "category": "editor",
+      "purpose": "TicketEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/bouncer/signatures.tsx:openSignatureEditor:modal.open:0",
+      "fingerprint": "edff56d1829aa4cbe8a8",
+      "category": "editor",
+      "purpose": "SignatureEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/cloudwatch/CloudWatchDashboardPage.tsx:showCloudWatchResources:modal.open:0",
+      "fingerprint": "f4fdffe916c7528a77b6",
+      "category": "record",
+      "purpose": "CloudWatchResourcesDialog: inspect evidence"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:changePassword:modal.open:0",
+      "fingerprint": "88c3830979e208523f3a",
+      "category": "editor",
+      "purpose": "ChangePasswordModal: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:openAvatarModal:modal.open:0",
+      "fingerprint": "73f84cfbd1c5e9e3260f",
+      "category": "editor",
+      "purpose": "AvatarModal: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:openPasskeysModal:modal.open:0",
+      "fingerprint": "6cad5c70031e574402df",
+      "category": "action",
+      "purpose": "PasskeysModal: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:openLinkedAccountsModal:modal.open:0",
+      "fingerprint": "be643c4e0e0e3c33a633",
+      "category": "action",
+      "purpose": "OAuthConnectionList: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog:modal.open:0",
+      "fingerprint": "ccfbeaa5bbe7b795071a",
+      "category": "action",
+      "purpose": "SecretBox: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openAdd:modal.open:0",
+      "fingerprint": "345db791d25a538a73dd",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openEdit:modal.open:0",
+      "fingerprint": "e5073579c6283f053e3d",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:modal.open:0",
+      "fingerprint": "a126443c233b9a7c5520",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:editKey:modal.open:0",
+      "fingerprint": "b5e44f67107cdb7c30ed",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:createSubscription:modal.open:0",
+      "fingerprint": "96e0782fbe2a8d051ad3",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:editSubscription:modal.open:0",
+      "fingerprint": "e92d20595cab2311113a",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog:modal.open:0",
+      "fingerprint": "748d1cab042efc135bac",
+      "category": "editor",
+      "purpose": "AuthConfigBody: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/settings/SettingEditor.tsx:showSettingEditor:modal.open:0",
+      "fingerprint": "a92485e11ecc1fca445b",
+      "category": "editor",
+      "purpose": "SettingEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx:JobOperationsSection:modal.open:0",
+      "fingerprint": "0a4bceead72198821bfd",
+      "category": "action",
+      "purpose": "TestJobDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx:JobOperationsSection:modal.open:1",
+      "fingerprint": "d23c2400004c841c2f65",
+      "category": "action",
+      "purpose": "PurgeDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx:JobOperationsSection:modal.open:2",
+      "fingerprint": "de0af97db926b4342829",
+      "category": "action",
+      "purpose": "JsonBlock: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/RunnerDetail.tsx:openBroadcast:modal.open:0",
+      "fingerprint": "3660f70196b8ebdb6549",
+      "category": "action",
+      "purpose": "BroadcastForm: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/RunnerDetail.tsx:openBroadcast:modal.open:1",
+      "fingerprint": "b285137d23281c3d68a3",
+      "category": "action",
+      "purpose": "JsonBlock: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/RunnerDetail.tsx:RunnerDetail:modal.open:0",
+      "fingerprint": "ffa17dd613f1a247911c",
+      "category": "action",
+      "purpose": "ControlSection: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/JobDetail.tsx:openCancel:modal.open:0",
+      "fingerprint": "598786f1e57093849c56",
+      "category": "action",
+      "purpose": "CancelJobDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/JobDetail.tsx:openRetry:modal.open:0",
+      "fingerprint": "61d7f7cf472012690374",
+      "category": "action",
+      "purpose": "RetryJobDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/jobs/scheduled-task-form.tsx:openScheduledTaskEditor:modal.open:0",
+      "fingerprint": "2c417703ef6914800ea1",
+      "category": "editor",
+      "purpose": "ScheduledTaskEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx:openEditor:modal.open:0",
+      "fingerprint": "606bbaff1220a9d20e7a",
+      "category": "editor",
+      "purpose": "DnsRecordEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainCertificatesSection.tsx:request:modal.open:0",
+      "fingerprint": "1dc3619fb03c19c91892",
+      "category": "action",
+      "purpose": "CertificateRequestDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/CertificatesPage.tsx:request:modal.open:0",
+      "fingerprint": "31f857165c8dfe2d9045",
+      "category": "action",
+      "purpose": "CertificateRequestDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainOnboardingDialog.tsx:showDomainOnboarding:modal.open:0",
+      "fingerprint": "c3cecb9980f7544d5435",
+      "category": "action",
+      "purpose": "DomainOnboardingDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor:modal.open:0",
+      "fingerprint": "356802aaea52ec550670",
+      "category": "editor",
+      "purpose": "CredentialSecretForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/BucketDetail.tsx:confirmEmpty:modal.open:0",
+      "fingerprint": "7106fbb4c96a4f0e8078",
+      "category": "confirmation",
+      "purpose": "SchemaForm: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/BucketDetail.tsx:BucketDetail:modal.open:0",
+      "fingerprint": "983d2f32c09a80b47282",
+      "category": "confirmation",
+      "purpose": "ArmedButton: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/FileView.tsx:createShare:modal.open:0",
+      "fingerprint": "4f8839598abb7cd4feb7",
+      "category": "editor",
+      "purpose": "SchemaForm: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/FileView.tsx:createShare:modal.open:1",
+      "fingerprint": "0184647dad966714fc09",
+      "category": "action",
+      "purpose": "ShareResult: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/storage-dialogs.tsx:openFileManagerEditor:modal.open:0",
+      "fingerprint": "b0e972125666ede9deb8",
+      "category": "editor",
+      "purpose": "ManagerEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/FileManagerDetail.tsx:action:modal.open:0",
+      "fingerprint": "6147855f03e670b3540b",
+      "category": "action",
+      "purpose": "Provider operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/FileUploadSurface.tsx:FileUploadSurface:modal.open:0",
+      "fingerprint": "2f6fd25fafb074004396",
+      "category": "editor",
+      "purpose": "DestinationDialog: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/FilesPage.tsx:FilesPage:modal.open:0",
+      "fingerprint": "d5ca7de659b2bfc96d0b",
+      "category": "editor",
+      "purpose": "MoveGroupDialog: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/shortlinks/ShortlinksPage.tsx:ShortlinksPage:modal.open:0",
+      "fingerprint": "d4278f213a09ff935505",
+      "category": "editor",
+      "purpose": "CreateShortlink: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailDomainWizard.tsx:openEmailDomainWizard:modal.open:0",
+      "fingerprint": "6cc1c172e5767fb9e6f1",
+      "category": "editor",
+      "purpose": "WizardBody: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailDomainWizard.tsx:openEmailDomainWizard:modal.open:1",
+      "fingerprint": "7a51919311143250dc8a",
+      "category": "action",
+      "purpose": "OnboardResult: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailDomainsPage.tsx:audit:modal.open:0",
+      "fingerprint": "8fc89463b34a9913b4ce",
+      "category": "record",
+      "purpose": "Badge: inspect evidence"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailDomainsPage.tsx:DomainDetail:modal.open:0",
+      "fingerprint": "1da10a2f20f87c36c5b6",
+      "category": "editor",
+      "purpose": "CredentialDialog: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailDomainsPage.tsx:EmailDomainsPage:modal.open:0",
+      "fingerprint": "fd76abe89d8da206ea93",
+      "category": "editor",
+      "purpose": "DomainCreate: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailTemplatesPage.tsx:edit:modal.open:0",
+      "fingerprint": "c4e773e714e9492d32d2",
+      "category": "editor",
+      "purpose": "TemplateEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/EmailTemplatesPage.tsx:add:modal.open:0",
+      "fingerprint": "7c946b1d38226ff91b9f",
+      "category": "editor",
+      "purpose": "TemplateEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:edit:modal.open:0",
+      "fingerprint": "e9051a62aa334c9456c3",
+      "category": "editor",
+      "purpose": "TemplateEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:PushTemplatesPage:modal.open:0",
+      "fingerprint": "a1bb0138176abca03340",
+      "category": "editor",
+      "purpose": "TemplateEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:edit:modal.open:1",
+      "fingerprint": "35b41f1d35f7660b2995",
+      "category": "editor",
+      "purpose": "ConfigEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:PushConfigsPage:modal.open:0",
+      "fingerprint": "a5859e2e381948d2cc44",
+      "category": "editor",
+      "purpose": "ConfigEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:PhoneNumbersPage:modal.open:0",
+      "fingerprint": "e083dca33e21617a493d",
+      "category": "action",
+      "purpose": "LookupDialog: focused lifecycle, verification or operation result"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:edit:modal.open:0",
+      "fingerprint": "504091d6fa14a66d9260",
+      "category": "editor",
+      "purpose": "ConfigEditor: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:ProviderConfigsPage:modal.open:0",
+      "fingerprint": "a5859e2e381948d2cc44",
+      "category": "editor",
+      "purpose": "ConfigEditor: collect and save fields"
+    },
+    {
+      "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:FreshAuthDialog:dialog:0",
+      "fingerprint": "cd50b6e426dffd14387b",
+      "category": "confirmation",
+      "purpose": "Reauthenticate before the pending sensitive action"
+    }
+  ],
+  "lifecycle": [
+    {
+      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
+      "symbol": "deleteAssistantMemory",
+      "expression": "deleteAssistantMemory",
+      "fingerprint": "2c1785314139a2efee49",
+      "permission": "sys.assistant and explicit group inherited assistant membership or superuser",
+      "rationale": "A named value is removed from a frozen memory tier and group; no record history is deleted.",
+      "runtimeCase": "mounted-memory-scope-permission-refusal"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx",
+      "symbol": "deleteDnsRecordSet",
+      "expression": "deleteDnsRecordSet",
+      "fingerprint": "dfe4fde7f91f23788973",
+      "permission": "DNS record mutation authority, live capability and coordinated zone revision",
+      "rationale": "Remove the selected whole record set; provider answers may change; refresh or reconcile on uncertainty.",
+      "runtimeCase": "dns-record-delete-coordinator"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/dns/api.ts",
+      "symbol": "deleteDnsRecordSet",
+      "expression": "deleteDnsRecordSet",
+      "fingerprint": "d40cabeae6b261e659a6",
+      "permission": "DNS record mutation authority, live capability and coordinated zone revision",
+      "rationale": "Compatibility alias only; low-level API remains exported and does not add a built-in UI affordance.",
+      "runtimeCase": "dns-record-delete-coordinator"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/identity/users/sections/OAuthSection.tsx",
+      "symbol": "OAuthConnectionModel.useDelete",
+      "expression": "OAuthConnectionModel.useDelete",
+      "fingerprint": "5195029f530c249e2dfd",
+      "permission": "live owner or USER_MANAGE_PERMISSIONS, plus supplied canManage",
+      "rationale": "Unlink this user/provider association; provider account stays intact and reconnect requires authorization.",
+      "runtimeCase": "mounted-owner-oauth-revocation"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
+      "symbol": "PasskeyModel.useDelete",
+      "expression": "PasskeyModel.useDelete",
+      "fingerprint": "581ccb0b30be1ab091bd",
+      "permission": "live owner or USER_MANAGE_PERMISSIONS",
+      "rationale": "Remove this user/relying-party credential; reenrollment required, physical device retained.",
+      "runtimeCase": "mounted-owner-passkey-unmount"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx",
+      "symbol": "purgeJobs",
+      "expression": "purgeJobs",
+      "fingerprint": "978dd7ae5181cb8c312d",
+      "permission": "JOBS_MANAGE_PERMS",
+      "rationale": "Preview is an estimate bound to immutable parameters and generation; actual execution reports cutoff and cascade counts and requires rearming.",
+      "runtimeCase": "mounted-strictmode-purge-race-refusal"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx",
+      "symbol": "purgeJobs",
+      "expression": "purgeJobs",
+      "fingerprint": "ed55af87520ea0436a1e",
+      "permission": "JOBS_MANAGE_PERMS",
+      "rationale": "Preview is an estimate bound to immutable parameters and generation; actual execution reports cutoff and cascade counts and requires rearming.",
+      "runtimeCase": "mounted-strictmode-purge-race-refusal"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx",
+      "symbol": "cleanupConsumers",
+      "expression": "cleanupConsumers",
+      "fingerprint": "f2a0fd8bc4bf2b082ba3",
+      "permission": "JOBS_MANAGE_PERMS",
+      "rationale": "Focused channel consumer maintenance with explicit result; this is stale consumer cleanup, not deleting a schedule or job inspector.",
+      "runtimeCase": "jobs-cleanup-consumers"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/rules/RuleSetDetailPage.tsx",
+      "symbol": "RuleModel.useDelete",
+      "expression": "RuleModel.useDelete",
+      "fingerprint": "14f31c1aa53a18f62f39",
+      "permission": "RULESET_MANAGE_PERMS checked before and after confirmation",
+      "rationale": "Only selected child conditions; authoritative ALL/ANY/final-catch-all warning and partial result refresh of parent and children.",
+      "runtimeCase": "mounted-rule-partial-authoritative-refresh"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/storage/BucketDetail.tsx",
+      "symbol": "emptyBucket",
+      "expression": "emptyBucket",
+      "fingerprint": "692696453df277b10adb",
+      "permission": "BUCKET_MANAGE_PERMS and fresh authentication",
+      "rationale": "Retains the bucket; exact case-sensitive name after armed confirmation removes objects, versions, markers and multipart uploads, reporting partial external outcomes.",
+      "runtimeCase": "bucket-exact-name-fresh-auth-partial"
+    }
+  ]
+}

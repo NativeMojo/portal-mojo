@@ -69,8 +69,7 @@ Verification is transactional at the UI boundary: a failed first link adds
 nothing; a failed rotation rejects, preserves the previous masks/encrypted
 pair, and refetches the now-unverified row with its provider error. Successful
 verification replaces the masks and marks the row verified. Viewer-only users
-can inspect safe rows; managers can link, rotate, activate/retire, and arm
-deletion.
+can inspect safe rows; managers can link, rotate and activate/retire; built-in deletion is absent.
 
 ## Themes and showcase
 
@@ -78,3 +77,10 @@ The page composes existing portal primitives and semantic tokens; it adds no
 fixed colors or theme-specific stylesheet. The executable three-leg showcase
 is **Develop → Components → Admin → DNS**: live manager lifecycle,
 viewer-only contract, and malformed-capability unavailable state.
+
+## Modal lifecycle convention
+
+See [Admin modal policy](admin-modals.md) for header actions, content-only
+sections, supported lifecycle fields and retained irreversible exceptions.
+Provider credentials retire/reactivate through `is_active`, keeping history;
+rotation remains write-only and imperative. Built-in credential Delete is absent.

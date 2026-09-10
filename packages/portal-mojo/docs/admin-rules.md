@@ -85,3 +85,11 @@ The showcase demo is under **Admin → Rule Engine** and includes supported
 steps, notification target commas, duplicate/extra parameters, unsupported
 content, structural errors, move/remove actions, exact raw serialization, and
 the empty-chain case.
+
+## Modal lifecycle convention
+
+See [Admin modal policy](admin-modals.md) for header actions, content-only
+sections, supported lifecycle fields and retained irreversible exceptions.
+RuleSet parents deactivate. Child removal confirms fresh parent/mode/selection;
+ALL broadens, ANY narrows while nonempty, and the last removal is catch-all.
+Partial deletion refreshes authoritative parent and condition state.

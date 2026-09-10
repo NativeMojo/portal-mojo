@@ -45,7 +45,9 @@ Import from `portal-mojo/admin`.
   the outcome is marked unknown, the list is refreshed, and the send is never
   retried automatically.
 - `POST /api/assistant/context` sends only `{model, pk}`. The returned conversation id is immediately fetched from `/api/assistant/conversation/<id>?graph=detail`; the client never synthesizes or reposts context text.
-- Conversation and Skill lists/details/deletes are imperative and component-local. They do not use `defineModel`, Query cache, `ModelTable`, a `RecordFeed` adapter, persistence, or exports.
+- Conversation and Skill lists/details are imperative and component-local.
+  Built-in Delete controls are absent. Skill deactivation/reactivation requires
+  `sys.view_admin` and reloads authoritative state; conversations retain history. They do not use `defineModel`, Query cache, `ModelTable`, a `RecordFeed` adapter, persistence, or exports.
 - A foreign conversation visible to an administrator is inspect-only. Only `conversation.user.id === me.id` enables continuation.
 
 `AssistantFeed` uses controlled `RecordFeed` plus the shared attachment queue at

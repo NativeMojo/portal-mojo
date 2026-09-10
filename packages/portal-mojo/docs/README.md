@@ -41,6 +41,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [ModelTable.md](ModelTable.md) | The server-driven table: columns, filters, selection/batch, chooser, persist, autoRefresh, expand, groupBy, export, skeleton |
 | [forms.md](forms.md) | The `Field` language, `SchemaForm`, `formModal`, `FormView` inline autosave + showWhen + tabsets |
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |
+| [admin-modals.md](admin-modals.md) | Admin modal inventory, presentation, resource lifecycle and retained exception policy |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
 | [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
 | [idioms.md](idioms.md) | ArmedButton (two-step confirm), `undoToast` (grace-period undo), `progressToast` — the dangerous-action trio |

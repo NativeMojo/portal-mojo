@@ -65,7 +65,8 @@ FileManager DELETE and `check_public_access` are absent.
 `FileModel` forces the list graph and normal saves to `filename`, `is_public`,
 and explicit `group`. Group moves refetch and compare the authoritative FK.
 Selection supports public/private, explicit prepared group move, safe
-same-gesture download, and all-settled confirmed delete. Authorized operators
+same-gesture download. File deletion is absent from detail and batch controls;
+`is_active` is not presented as a safe revocation mechanism. Authorized operators
 also get **Add File** and a drag-only whole-page drop overlay. Both open one
 configuration modal; the bounded queue lives above it, so closing the modal
 does not cancel work or discard outcomes.

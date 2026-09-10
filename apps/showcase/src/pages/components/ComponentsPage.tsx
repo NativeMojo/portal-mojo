@@ -8,8 +8,14 @@
 // (wire params, django-mojo answers) — the Groups demo below runs against
 // /api/group on whichever transport the app is using (mock or live).
 import {
-    Component, Suspense, lazy, useEffect, useMemo, useState,
-    type ComponentType, type ReactNode,
+    Component,
+    Suspense,
+    lazy,
+    useEffect,
+    useMemo,
+    useState,
+    type ComponentType,
+    type ReactNode,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -69,6 +75,7 @@ const PasswordDemo = lazyDemo(() => import('./demos-password'), 'PasswordDemo');
 const IdiomsDemo = lazyDemo(() => import('./demos-idioms'), 'IdiomsDemo');
 const LoadingDemo = lazyDemo(() => import('./demos-loading'), 'LoadingDemo');
 const RecordFeedDemo = lazyDemo(() => import('./demos-record-feed'), 'RecordFeedDemo');
+const AdminModalsDemo = lazyDemo(() => import('./demos-admin-modals'), 'AdminModalsDemo');
 const AdminCredentialsDemo = lazyDemo(() => import('./demos-admin-credentials'), 'AdminCredentialsDemo');
 const AdminMonitoringDemo = lazyDemo(() => import('./demos-admin-monitoring'), 'AdminMonitoringDemo');
 const AdminMetricsExplorerDemo = lazyDemo(() => import('./demos-admin-metrics-explorer'), 'AdminMetricsExplorerDemo');
@@ -422,6 +429,7 @@ const GROUPS: DemoGroup[] = [
                 blurb: 'Caller-only stats, globally gated metrics, strict device/delivery projections, templates, and cache-free FCM configuration without send, retry, or delete shortcuts.',
                 render: () => <AdminPushDemo />,
             },
+            { key: 'admin-modals', title: 'Admin modal audit', icon: 'bi-ui-checks', blurb: 'Responsive detail chrome, lifecycle actions, rich badges, nested editors and embedded hosts.', render: () => <AdminModalsDemo /> },
             {
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
                 blurb: 'Global S3 buckets, masked storage backends, explicit policy-backed file uploads, capability-safe sharing, and finite rendition convergence.',

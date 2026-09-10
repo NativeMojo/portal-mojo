@@ -37,7 +37,7 @@ of the toolkit it must render inside the app's `QueryClientProvider`
     contextMenu={[
         { label: 'Resend invite', icon: 'bi-envelope-paper', when: (u) => u?.last_login == null, onSelect: ... },
         { divider: true },
-        { label: 'Delete', icon: 'bi-trash', danger: true, permissions: ['manage_users', 'users'], onSelect: ... },
+        { label: 'Deactivate', icon: 'bi-pause-circle', permissions: ['manage_users', 'users'], disabled: pending, onSelect: ... },
     ]}
     sections={[
         { key: 'profile', label: 'Profile', icon: 'bi-person', render: () => <>…</> },
@@ -64,16 +64,16 @@ trap — those belong to the host dialog). The affordance follows the callback:
 - **Pass a history-back handler** when a routed record page should keep the
   ✕ as "back" (`onClose={() => navigate(-1)}` — linkable record routes read
   well this way).
-- **Modal hosts MUST pass it.** Inside `modal.detail` this ✕ is the modal's
-  only visible dismiss — the envelope has no header X of its own, only
-  Escape/backdrop — and TypeScript no longer enforces the prop. Omitting it
-  in a modal yields an Escape-only dialog.
+- **Modal hosts pass it** for the normal identity-header close. The flush
+  envelope supplies a fallback close during loading/error states without a
+  DetailView header; Escape/backdrop follow the live `canDismiss` gate.
 
-Sizing is the consuming app's concern: `.detail` carries
-`min-height`/`max-height: 82vh` in the app `theme.css` (base at
-`apps/portal/src/theme.css`) — page hosts relax it there. This is distinct
-from the C1 chrome (`.rail-badge`, `.dv-menu*`, `.dv-keep`) that lives in
-`theme/detailview.css` (see Pitfalls).
+Sizing is the consuming app's concern. Only `.mojo-modal-flush > .detail`
+receives a viewport-height limit; page/embedded bodies have no modal minimum
+or maximum. At narrow container widths an in-flow section button expands the
+same filtered rail entries, including rich, zero and dot badges. No native
+select stringification or second top-layer overlay is involved. The chrome
+lives in `theme/detailview.css` in both consuming apps.
 
 ## Permission-gated sections (fail-closed)
 
@@ -110,7 +110,7 @@ follows. There is no imperative handle.
 
 ## Header kebab menu
 
-`contextMenu?: Array<{ label, icon?, permissions?, when?, onSelect, danger? } | { divider: true }>`
+`contextMenu?: Array<{ label, icon?, permissions?, when?, onSelect, danger?, disabled? } | { divider: true }>`
 renders a three-dot button in the header gutter (before the close X, when one renders) that
 opens a `Popover` menu (`placement: bottom-end`, top-layer — works inside
 `modal.detail`). Filtering is `ContextMenu.visibleItems` parity:
@@ -172,10 +172,12 @@ permission behavior, not misconfig.
 | `FlatRow` | label + value row; `action` adds the edit pencil (`actionIcon` to override, e.g. `bi-plus-lg` for empty values) |
 | `SecurityItem` | icon + title + description row with a trailing slot (badge/button) |
 
-Conventions from the Users proof: pencil actions open `formModal` with
-current values as `initial`; a danger action lives in a `.danger-zone`
-block at the bottom of a section; fields the wire doesn't carry for other
-users (me-graph only: `has_passkey`, `requires_mfa`) don't get rows.
+Pencil actions open `formModal` with current values as `initial`. Current-record
+operations live in the header menu or focused dialogs; content rails never
+contain danger/action panes. Child-specific actions remain contextual. Fields
+the wire does not carry for other users (`has_passkey`, `requires_mfa`) do not
+get rows. See [Admin modal policy](admin-modals.md) for lifecycle exceptions.
+`active.disabled` and menu-entry `disabled` block repeat submission while pending.
 
 ## Pitfalls
 

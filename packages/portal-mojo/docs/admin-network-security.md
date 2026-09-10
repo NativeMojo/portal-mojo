@@ -337,7 +337,7 @@ shows the server's own message.
 
 Anything that reaches the fleet is an `ArmedButton` whose armed label names the
 blast radius: the rules replace (with a plain-language clause diff), override
-removal, ipset enable / disable / sync / refresh / delete, allowlist removal and
+removal, ipset enable / disable / sync / refresh, allowlist removal and
 whitelist removal. Operations that need input (a reason, an expiry) use
 `formModal` instead — an armed button cannot collect input.
 
@@ -345,9 +345,9 @@ whitelist removal. Operations that need input (a reason, an expiry) use
 
 Do not add these back.
 
-1. **Batch delete of IP sets.** Multi-selecting kernel firewall sets and deleting
-   them in one irreversible action is exactly the shape #1097 warned about.
-   Delete is single-record and armed, from the detail modal.
+1. **IPSet deletion.** The backend has `CAN_DELETE=False`; both single-record
+   and batch Delete are absent. Header actions use the supported enabled state,
+   sync and source-refresh operations with focused confirmation.
 2. **Creating a block from the Blocked IPs table.** The backend supports it and
    web-mojo did not expose it either. Unblock and whitelist — both *relaxing* —
    are exposed.

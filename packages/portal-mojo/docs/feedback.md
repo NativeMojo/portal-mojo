@@ -83,3 +83,13 @@ bottom-right cards, max 5, 3.5s. Conventions:
 
 An open `<dialog>` pauses ModelTable's autoRefresh by design — don't build
 alternative modal systems that bypass `<dialog>` or that interlock breaks.
+
+## Admin focused dialogs
+
+Use `modal-pad`, `modal-title`, `modal-message` and `modal-actions`; Cancel
+precedes the primary action. Keep long form bodies scrollable and actions
+reachable in short/narrow viewports. A pending mutation needs both disabled
+buttons and a live `canDismiss` gate for Escape/backdrop. Content records use
+DetailView header actions; never teach routine record deletion in a danger rail.
+See [Admin modal policy](admin-modals.md) for supported lifecycle semantics,
+permission checks and the complete retained-removal contract.

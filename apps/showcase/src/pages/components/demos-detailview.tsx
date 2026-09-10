@@ -12,7 +12,12 @@
 import { useState } from 'react';
 import { useCan } from 'portal-mojo/client';
 import {
-    Badge, DetailView, Eyebrow, FlatRow, SecurityItem, toast,
+    Badge,
+    DetailView,
+    Eyebrow,
+    FlatRow,
+    SecurityItem,
+    toast,
     type DetailMenuEntry,
 } from 'portal-mojo/ui';
 
@@ -70,10 +75,10 @@ const KEBAB: DetailMenuEntry<DemoRecord>[] = [
     { label: 'Manage roles', icon: 'bi-person-gear', permissions: 'users', onSelect: () => toast.info('Manage roles (demo)') },
     { divider: true },
     {
-        label: 'Delete account', icon: 'bi-trash', danger: true,
+        label: 'Deactivate account', icon: 'bi-pause-circle',
         // Any-of: the users CATEGORY rollup also covers manage_users.
         permissions: ['manage_users', 'users'],
-        onSelect: () => toast.error('Not actually deleting (demo)'),
+        onSelect: () => toast.info('Account deactivation is a local demo action'),
     },
 ];
 

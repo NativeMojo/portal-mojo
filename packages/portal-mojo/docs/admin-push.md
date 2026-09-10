@@ -34,3 +34,10 @@ FCM writes are imperative and cache-free. A service account textarea is an uncon
 Connection testing calls only `POST /api/account/devices/push/config/<id>/test` with an empty body. The backend uses its dummy token to validate credentials. The portal never accepts a device token. It also does not expose `/send`, caller `/test`, delivery retry, device registration/unregistration, or any delete action.
 
 All four REST models have live `CAN_DELETE = false`; the mock returns 403 without removing or cascading anything. Templates/configs can be created and edited under their save clauses. Devices and deliveries remain investigative here.
+
+## Modal lifecycle convention
+
+See [Admin modal policy](admin-modals.md) for header actions, content-only
+sections, supported lifecycle fields and retained irreversible exceptions.
+Config/template active-state controls live in the detail header. Config saves
+retain write-only credential handling, and test sends keep their separate gate.

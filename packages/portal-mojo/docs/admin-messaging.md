@@ -25,9 +25,10 @@ Domain credentials are write-only. Secret-bearing saves, onboarding, audit,
 reconcile, and send are imperative and never use MutationCache. Audit is POST,
 has no automatic retry, and always refreshes because it persists readiness.
 Create reports only that the row was created: django-mojo's best-effort
-create-time audit/reconcile can fail after the row exists. Delete warns that
-local mailboxes and sent audit history disappear while SES/SNS/S3/DNS
-resources may remain.
+create-time audit/reconcile can fail after the row exists. Built-in domain,
+mailbox, template and contact deletion is absent so local audit history stays
+available. No archive field is invented. Mailbox inbound/outbound flags remain
+independent; support status changes use their existing status permission.
 
 Onboarding composes the shared `FormWizard`. Managed mode is available only
 when the optional DNS Admin integration resolves the normalized domain and
@@ -46,8 +47,8 @@ Stable mock identities (password `mojo`):
 
 - `email.operator@nativemojo.com` — email only (`comms`).
 - `support.viewer@nativemojo.com` — contact read only.
-- `support.manager@nativemojo.com` — contact read/update/delete.
-- `support.manage-only@nativemojo.com` — delete authority but intentionally no page view.
+- `support.manager@nativemojo.com` — contact read/status update; the low-level delete gate is not a UI action.
+- `support.manage-only@nativemojo.com` — low-level delete authority but intentionally no page view or status-write grant.
 - `showcase.operator@nativemojo.com` — executable showcase coverage.
 
 Live verification is read-only by default. Never create/edit/delete a domain,

@@ -12,7 +12,9 @@ Import `PhoneHubPage`, the three individual pages, models, permission clauses, a
 
 ## Exact permissions
 
-Every exported array is an ANY-of clause and retains the `sys.` UI namespace. Number view is `view_phone_numbers | manage_phone_numbers | comms | manage_users`; save is `manage_phone_numbers | comms | manage_users`; delete is only `manage_phone_numbers`. SMS view is `view_sms | manage_sms | comms | owner | manage_notifications`; save is `manage_sms | comms | manage_notifications`; delete is `manage_sms | manage_notifications`. Config view/save is `manage_phone_config | manage_groups | comms`; delete is `manage_phone_config | manage_groups`. The server remains authoritative.
+Every exported array is an ANY-of clause and retains the `sys.` UI namespace. Number view is `view_phone_numbers | manage_phone_numbers | comms | manage_users`; save is `manage_phone_numbers | comms | manage_users`; delete is only `manage_phone_numbers`. SMS view is `view_sms | manage_sms | comms | owner | manage_notifications`; save is `manage_sms | comms | manage_notifications`; delete is `manage_sms | manage_notifications`. Config view/save is `manage_phone_config | manage_groups | comms`; delete is `manage_phone_config | manage_groups`. These delete clauses describe low-level API compatibility; built-in number,
+SMS and config Delete controls are absent. Config deactivation uses the
+credential-safe imperative save path. The server remains authoritative.
 
 Group choices are fetched only with a separate global group-directory clause and are capped at 100 basic rows. Without that grant the editor does not issue a group-directory request and preserves the existing scope (or creates a system default).
 
@@ -20,7 +22,7 @@ Group choices are fetched only with a separate global group-directory clause and
 
 Phone lookup is always the global Twilio Lookup integration; it is not group-configured. Stored Twilio and AWS credentials can be tested, but the current SMS send implementation only consults a per-group configuration for `provider="mojo"`. Twilio/AWS configurations otherwise fall through to global Twilio send settings, and AWS sending is not wired. `test_mode` only short-circuits connection testing; it does not block sending.
 
-An active group config wins; otherwise `PhoneConfig.get_for_group` falls back to the first active system default. Deleting or deactivating a group config restores that fallback. Deleting a group cascades its config and SMS rows. Deleting a user cascades their SMS rows. Deleting a config does not delete SMS audit rows. Deleting an SMS row affects only local audit storage and cannot recall provider delivery.
+An active group config wins; otherwise `PhoneConfig.get_for_group` falls back to the first active system default. Deactivating a group config restores that fallback; Admin exposes this reversible lifecycle. Deleting a group cascades its config and SMS rows. Deleting a user cascades their SMS rows. Deleting a config does not delete SMS audit rows. Deleting an SMS row affects only local audit storage and cannot recall provider delivery.
 
 ## Reuse rules
 

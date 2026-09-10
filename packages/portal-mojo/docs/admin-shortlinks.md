@@ -18,7 +18,8 @@ Neither table supports search or export, and list parameters are allowlisted.
 
 ## Mutations and short URLs
 
-Create, active-state changes, and delete are imperative one-shot requests. They
+Create and active-state changes are imperative one-shot requests. Built-in
+Admin deletion is absent; exported low-level delete helpers remain compatible. They
 do not claim fresh-auth protection the backend does not provide and do not use
 retrying mutation hooks. Every outcome runs an authoritative reconciliation in
 `finally` semantics. If reconciliation itself fails, the UI warns that the

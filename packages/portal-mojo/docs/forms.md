@@ -433,3 +433,13 @@ orchestrator files follow-ups.
 | `combo` / `combobox` / `autocomplete` | — | ComboBox | OK (ComboInput feature spec, commit-only) |
 | `address` | — | AddressField | OK (private session token, details → atomic declared-field patch) |
 | `tabset` | FormView `tabs` prop | — | OK — tabsets are FORM STRUCTURE here (registry-of-tabs + permissions), not a field type |
+
+## Admin focused dialogs
+
+Use `modal-pad`, `modal-title`, `modal-message` and `modal-actions`; Cancel
+precedes the primary action. Keep long form bodies scrollable and actions
+reachable in short/narrow viewports. A pending mutation needs both disabled
+buttons and a live `canDismiss` gate for Escape/backdrop. Content records use
+DetailView header actions; never teach routine record deletion in a danger rail.
+See [Admin modal policy](admin-modals.md) for supported lifecycle semantics,
+permission checks and the complete retained-removal contract.

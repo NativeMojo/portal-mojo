@@ -187,3 +187,10 @@ the `group-admin.css` semantic rules in its theme entry, as the repository's
 The personal `/api/account/api_keys` page and `/api/auth/generate_api_key` flow
 are intentionally unchanged. This package domain owns only group-scoped
 `/api/group/apikey` credentials and `/api/group/webhook_subscriptions`.
+
+## Modal lifecycle convention
+
+See [Admin modal policy](admin-modals.md) for header actions, content-only
+sections, supported lifecycle fields and retained irreversible exceptions.
+Group API keys and webhook subscriptions deactivate/reactivate; their built-in
+Delete controls are removed. Reveal, secret rotation and cache boundaries remain.

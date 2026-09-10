@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
-    ArmedButton,
     Badge,
     DetailView,
     Eyebrow,

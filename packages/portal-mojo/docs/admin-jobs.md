@@ -309,11 +309,14 @@ Two more corrections found while building, refining 6 and the gate table:
   blanket success.
 - **Purge is dry-run first.** The dialog runs `dry_run:true` and reports
   "N jobs would be deleted before `<cutoff>`"; only the armed confirm performs
-  the real run, which is read from `deleted`. Fixes the source's wrong
-  `data.count` read.
+  the real run, which is read from `deleted`. Preview parameters and generation
+  are captured; changing filters or replacing a preview resets arming. The
+  preview is an estimate: execution recalculates cutoff and includes cascaded
+  event/log rows. Inputs/dismissal lock during execution; failure requires a new
+  preview; actual cutoff and counts remain visible.
 - **Armed confirmations** for purge, clear-queue, clear-stuck,
-  cleanup-consumers, shutdown, broadcast `shutdown`, force-scheduler-lead and
-  task delete. `clear-queue` sends `confirm:"yes"` **only after** arming: the
+  cleanup-consumers, shutdown, broadcast `shutdown`, force-scheduler-lead. Scheduled-task Delete is absent; enabled state
+  preserves task-result history. `clear-queue` sends `confirm:"yes"` **only after** arming: the
   token is a server-side safety gate, and pre-satisfying it (as web-mojo did on
   every call) removes the safety rather than honouring it.
 - **KISS modals.** Job, runner, scheduled-task and task-result inspection are
