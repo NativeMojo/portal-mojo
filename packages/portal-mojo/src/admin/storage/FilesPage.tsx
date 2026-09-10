@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge, CollectionSelect, ModelTable, fmt, modal, type BatchAction, type Column, type FilterDef } from '../../ui';
+import { useState } from 'react';
 import { useCan } from '../../client/runtime';
-import { FileView } from './FileView';
+import { Badge,CollectionSelect,ModelTable,fmt,modal,type BatchAction,type Column,type FilterDef } from '../../ui';
 import { FileUploadSurface } from './FileUploadSurface';
-import { FileModel, GROUP_DIRECTORY_PERMS, STORAGE_MANAGE_PERMS, exportFiles, openCapabilityUrl, saveFileAndReconcileGroup, type FileRow, type RelationRow } from './models';
+import { FileView } from './FileView';
+import { FileModel,GROUP_DIRECTORY_PERMS,STORAGE_MANAGE_PERMS,exportFiles,openCapabilityUrl,saveFileAndReconcileGroup,type FileRow,type RelationRow } from './models';
 
 const COLUMNS: Column<FileRow>[] = [
     { key: 'filename', label: 'Filename', sortable: true, hideable: false },
@@ -36,14 +36,13 @@ export function FilesPage() {
     const queryClient = useQueryClient();
     const canManage = useCan(STORAGE_MANAGE_PERMS).can;
     const canChooseGroup = useCan(GROUP_DIRECTORY_PERMS).can;
-    const remove = FileModel.useDelete();
+    
     const saveAccess = (row: FileRow, value: boolean) => saveFileAndReconcileGroup(queryClient, row.id, { is_public: value });
     const batches: BatchAction<FileRow>[] = [
         { key: 'public', label: 'Make public', eligible: (row) => !row.is_public, confirm: 'Make the selected files public?', run: (row) => saveAccess(row, true) },
         { key: 'private', label: 'Make private', eligible: (row) => row.is_public, run: (row) => saveAccess(row, false) },
         ...(canChooseGroup ? [{ key: 'move', label: 'Move to group', confirm: false as const, prepare: (rows: FileRow[]) => modal.open<number>((close) => <MoveGroupDialog rows={rows} close={(value) => close(value as number)} />), run: (row: FileRow, prepared: unknown) => saveFileAndReconcileGroup(queryClient, row.id, { group: Number(prepared) }, Number(prepared)) }] : []),
         { key: 'download', label: 'Download selected', confirm: false, run: async (row) => { if (!openCapabilityUrl(row.url ?? '', true)) throw new Error(`${row.filename} has no safe download URL`); } },
-        { key: 'delete', label: 'Delete', danger: true, confirm: 'Delete the selected files and their backend objects? This cannot be undone.', run: (row) => remove.mutateAsync({ id: row.id }) },
     ];
     const table = (openUpload?: () => void) => <ModelTable model={FileModel} eyebrow="Infrastructure · Storage" title="Files" columns={COLUMNS} filters={FILTERS} presets={[{ key: 'all', label: 'All', params: {} }, { key: 'ready', label: 'Ready', params: { upload_status: 'completed' } }, { key: 'failed', label: 'Failed', params: { upload_status: 'failed' } }, { key: 'public', label: 'Public', params: { is_public: 'true' } }]} defaultSort="-created" searchable searchPlaceholder="Search filename or content type" selectable={canManage} batchActions={canManage ? batches : []} columnChooser persistState persistKey="admin:storage:files" exportFormats={['csv', 'json']} exporter={exportFiles} onAdd={openUpload} addLabel="Add File" onRowClick={(row) => showFileView(row.id)} />;
     // Do not mount picker/drop/manager queries for view-only operators.

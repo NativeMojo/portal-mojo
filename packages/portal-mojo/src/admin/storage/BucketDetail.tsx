@@ -1,9 +1,10 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArmedButton, DetailView, FlatRow, SchemaForm, fmt, modal, toast } from '../../ui';
+import { useState } from 'react';
+import { useCan } from '../../client/runtime';
+import { ArmedButton,DetailView,FlatRow,SchemaForm,fmt,modal,toast } from '../../ui';
 import {
-    BUCKET_MANAGE_PERMS, emptyBucket, setBucketPublic,
-    type BucketEmptyResult, type BucketMutationOutcome, type S3BucketRow, type S3FailureEvidence,
+BUCKET_MANAGE_PERMS,emptyBucket,setBucketPublic,
+type BucketEmptyResult,type BucketMutationOutcome,type S3BucketRow,type S3FailureEvidence,
 } from './models';
 
 function message(error: unknown): string { return error instanceof Error ? error.message : 'Storage operation failed'; }
@@ -29,6 +30,7 @@ function Outcome({ value }: { value: BucketMutationOutcome<unknown> | null }) {
 
 export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose: () => void }) {
     const queryClient = useQueryClient();
+    const canManage = useCan(BUCKET_MANAGE_PERMS).can;
     const [outcome, setOutcome] = useState<BucketMutationOutcome<unknown> | null>(null);
     const [emptyResult, setEmptyResult] = useState<BucketEmptyResult | null>(null);
 
@@ -47,6 +49,7 @@ export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose
     };
 
     const confirmEmpty = async () => {
+        if (!canManage) return;
         await modal.open((close) => (
             <div className="modal-pad">
                 <h2 className="modal-title">Empty {bucket.name}</h2>
@@ -69,9 +72,13 @@ export function BucketDetail({ bucket, onClose }: { bucket: S3BucketRow; onClose
         ), { size: 'sm' });
     };
 
-    return <DetailView title={bucket.name} subtitle="Account-level S3 bucket" icon="bi-bucket" chips={[{ text: 'Global', tone: 'info' }]} sections={[
+    return <DetailView title={bucket.name} subtitle="Account-level S3 bucket" icon="bi-bucket" chips={[{ text: 'Global', tone: 'info' }]} contextMenu={canManage ? [
+        { label: 'Make public…', danger: true, onSelect: () => void access(true) },
+        { label: 'Make private…', onSelect: () => void access(false) },
+        { label: 'Empty bucket…', danger: true, onSelect: () => void modal.open(close => <div className="modal-pad"><h2 className="modal-title">Empty {bucket.name}</h2><p className="modal-message">Permanently removes objects, versions, delete markers and multipart uploads. Stop writers first. The bucket is retained.</p><div className="modal-actions"><button className="btn" onClick={() => close(null)}>Cancel</button><ArmedButton className="btn-danger" label="Empty bucket" armedLabel="Continue to exact-name confirmation" onConfirm={async () => { await confirmEmpty(); close(null); }} /></div></div>, { size: 'sm' }) },
+    ] : []} sections={[
         { key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-section"><FlatRow label="Name"><code>{bucket.name}</code></FlatRow><FlatRow label="Created">{fmt.datetime(bucket.created)}</FlatRow><FlatRow label="Inventory">Complete account inventory row</FlatRow><Outcome value={outcome} />{emptyResult && <div className="storage-counts"><b>Last acknowledged empty counts</b><span>Objects {emptyResult.deleted_objects}</span><span>Versions {emptyResult.deleted_versions}</span><span>Delete markers {emptyResult.deleted_markers}</span><span>Multipart uploads {emptyResult.aborted_uploads}</span></div>}</div> },
-        { key: 'access', label: 'Access', icon: 'bi-shield-lock', permissions: BUCKET_MANAGE_PERMS, render: () => <div className="detail-section"><h3>Verified access posture</h3><p className="dim">Every attempt refreshes inventory in a finally path. A rejection can still represent partial external change.</p><div className="storage-action-row"><button className="btn btn-danger" onClick={() => void access(true)}>Make public…</button><button className="btn" onClick={() => void access(false)}>Make private…</button></div></div> },
-        { key: 'danger', label: 'Danger zone', icon: 'bi-exclamation-octagon', permissions: BUCKET_MANAGE_PERMS, render: () => <div className="detail-section storage-danger"><h3>Empty bucket</h3><p>Irreversible and non-atomic against active writers. Bucket deletion is unavailable.</p><ArmedButton className="btn-danger" icon="bi-trash3" label="Empty bucket" armedLabel="Click again — remove all objects, versions, markers, and uploads" onConfirm={confirmEmpty} /></div> },
+        { key: 'access', label: 'Access', icon: 'bi-shield-lock', permissions: BUCKET_MANAGE_PERMS, render: () => <div className="detail-section"><h3>Verified access posture</h3><p className="dim">Every attempt refreshes inventory in a finally path. A rejection can still represent partial external change.</p></div> },
+        
     ]} initialSection="overview" onClose={onClose} />;
 }

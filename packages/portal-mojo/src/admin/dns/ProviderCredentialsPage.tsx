@@ -1,18 +1,20 @@
-import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRef,useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
-    ArmedButton, Badge, CollectionSelect, FlatRow, ModelTable, fmt, modal, toast,
-    type Column, type FilterDef, type Tone,
+Badge,CollectionSelect,
+DetailView,
+FlatRow,ModelTable,fmt,modal,toast,
+type Column,type FilterDef,type Tone,
 } from '../../ui';
 import {
-    DNS_GROUP_CHOICE_ENDPOINT, invalidateDnsCredentials, linkDnsCredential,
-    rotateDnsCredential, useDnsCapabilities,
+DNS_GROUP_CHOICE_ENDPOINT,invalidateDnsCredentials,linkDnsCredential,
+rotateDnsCredential,useDnsCapabilities,
 } from './api';
-import { linkableProviders, providerLabel } from './data';
+import { linkableProviders,providerLabel } from './data';
 import {
-    DNS_MANAGE_PERMISSIONS, DNS_VIEW_PERMISSIONS, DnsCredentialModel,
-    type DnsCapabilities, type DnsCredentialRow, type DnsGroupChoice,
+DNS_MANAGE_PERMISSIONS,DNS_VIEW_PERMISSIONS,DnsCredentialModel,
+type DnsCapabilities,type DnsCredentialRow,type DnsGroupChoice,
 } from './models';
 
 function groupId(group: DnsCredentialRow['group']): number | null {
@@ -154,7 +156,7 @@ function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabiliti
     const { data: row, isPending, error } = DnsCredentialModel.useOne(id);
     const { can: canManage } = useCan(DNS_MANAGE_PERMISSIONS);
     const save = DnsCredentialModel.useSave();
-    const destroy = DnsCredentialModel.useDelete();
+    
     if (isPending) return <div className="modal-pad dim">Loading credential…</div>;
     if (!row || error) return <div className="modal-pad text-bad">{error?.message ?? 'Credential not found'}</div>;
 
@@ -167,26 +169,13 @@ function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabiliti
         }
     };
 
-    const remove = async () => {
-        try {
-            await destroy.mutateAsync({ id: row.id });
-            toast.success('Credential deleted');
-            close();
-        } catch (reason) {
-            toast.error(reason instanceof Error ? reason.message : 'Credential could not be deleted');
-        }
-    };
+    
 
-    return (
-        <div className="modal-pad">
-            <div className="eyebrow">Provider credential</div>
-            <h2 className="modal-title">{row.name || `Credential #${row.id}`}</h2>
-            <div className="chip-row" style={{ marginBottom: 14 }}>
-                <Badge tone={verificationTone(row)}>{row.verified ? 'Verified' : 'Unverified'}</Badge>
-                <Badge tone={row.is_active ? 'success' : 'muted'}>{row.is_active ? 'Active' : 'Inactive'}</Badge>
-                <Badge tone="warning">{providerLabel(row.provider)}</Badge>
-            </div>
-            <FlatRow label="Group">{groupLabel(row.group)}</FlatRow>
+    return <DetailView title={row.name || `Credential #${row.id}`} subtitle={providerLabel(row.provider)} icon="bi-key" onClose={close}
+        chips={[{ text: row.verified ? 'Verified' : 'Unverified', tone: verificationTone(row) }, { text: row.is_active ? 'Active' : 'Retired', tone: row.is_active ? 'success' : 'muted' }]}
+        active={canManage ? { value: row.is_active, disabled: save.isPending, onChange: () => void toggle() } : undefined}
+        contextMenu={canManage ? [{ label: 'Rotate credentials…', onSelect: () => void showCredentialEditor(caps, row) }, { label: row.is_active ? 'Retire' : 'Reactivate', disabled: save.isPending, onSelect: () => void toggle() }] : []}
+        sections={[{ key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-section">            <FlatRow label="Group">{groupLabel(row.group)}</FlatRow>
             <FlatRow label="API key"><code>{row.api_key_masked || '—'}</code></FlatRow>
             <FlatRow label="API secret"><code>{row.api_secret_masked || '—'}</code></FlatRow>
             <FlatRow label="Domains at verification">{row.domain_count}</FlatRow>
@@ -196,26 +185,7 @@ function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabiliti
             <p className="dim">
                 The linked-domain count is a health signal only. Provider account domains are never enumerated here.
             </p>
-            {canManage && (
-                <div className="modal-actions">
-                    <button type="button" className="btn" onClick={() => void showCredentialEditor(caps, row)}>
-                        <i className="bi bi-arrow-repeat" /> Rotate
-                    </button>
-                    <button type="button" className="btn" disabled={save.isPending} onClick={() => void toggle()}>
-                        <i className={`bi ${row.is_active ? 'bi-pause-circle' : 'bi-play-circle'}`} /> {row.is_active ? 'Retire' : 'Activate'}
-                    </button>
-                    <ArmedButton
-                        label="Delete"
-                        armedLabel="Click again — linked domains lose provider-backed DNS"
-                        disabled={destroy.isPending}
-                        onConfirm={remove}
-                    />
-                    <button type="button" className="btn" onClick={close}>Close</button>
-                </div>
-            )}
-            {!canManage && <div className="modal-actions"><button type="button" className="btn" onClick={close}>Close</button></div>}
-        </div>
-    );
+</div> }]} />;
 }
 
 const COLUMNS: Column<DnsCredentialRow>[] = [
@@ -248,9 +218,9 @@ function CredentialsTable({ caps }: { caps: DnsCapabilities }) {
     ];
     const openDetail = (row: DnsCredentialRow) => {
         void DnsCredentialModel.fetchOne(queryClient, row.id).catch(() => undefined);
-        void modal.open((done) => (
+        void modal.detail((done) => (
             <CredentialDetail id={row.id} caps={caps} close={() => done(null)} />
-        ), { size: 'md' });
+        ));
     };
     const canLink = canManage && linkableProviders(caps).length > 0;
     return (

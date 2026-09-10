@@ -2,19 +2,20 @@
 // Port of web-mojo `admin/security/IPSetView.js` (TabView: Configuration +
 // CIDR Data, with a fleet-operations kebab), rebuilt on the house detail
 // modal with every fleet-affecting action behind an armed confirmation.
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-    ArmedButton, Badge, DetailView, Eyebrow, FlatRow, StatusPanel,
-    fmt, modal, toast,
-} from '../../ui';
+import { useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
-    IPSET_CACHE_ONLY_HELP, IPSET_DELETE_PERMS, IPSET_KIND_BADGE_OPTIONS,
-    IPSET_MANAGE_PERMS, IPSET_SOURCE_OPTIONS, IPSetModel,
-    isCacheOnlyIPSet, useIPSetCidrData, type IPSetRow,
-} from './models';
+ArmedButton,Badge,DetailView,Eyebrow,FlatRow,StatusPanel,
+fmt,modal,toast,
+} from '../../ui';
 import { promptEditIPSet } from './IPSetEditor';
+import {
+IPSET_CACHE_ONLY_HELP,
+IPSET_KIND_BADGE_OPTIONS,
+IPSET_MANAGE_PERMS,IPSET_SOURCE_OPTIONS,IPSetModel,
+isCacheOnlyIPSet,useIPSetCidrData,type IPSetRow
+} from './models';
 
 const DASH = <span className="dim-italic">—</span>;
 
@@ -100,12 +101,12 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
     const qc = useQueryClient();
     const { data: row, isPending, error } = IPSetModel.useOne(id);
     const canManage = useCan(IPSET_MANAGE_PERMS).can;
-    const canDelete = useCan(IPSET_DELETE_PERMS).can;
+    
     const sync = IPSetModel.useAction('sync');
     const enable = IPSetModel.useAction('enable');
     const disable = IPSetModel.useAction('disable');
     const refresh = IPSetModel.useAction('refresh_source');
-    const remove = IPSetModel.useDelete();
+    
     const save = IPSetModel.useSave();
 
     if (isPending) return <div className="modal-pad dim">Loading IP set…</div>;
@@ -179,6 +180,7 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
                                                 className="btn-compact"
                                                 icon="bi-toggle-on"
                                                 label="Enable & sync"
+                                                disabled={cacheOnly || enable.isPending}
                                                 armedLabel={cacheOnly
                                                     ? 'Click again — the server will refuse this (cache-only list)'
                                                     : `Click again — ${row.cidr_count.toLocaleString()} ranges are kernel-blocked fleet-wide`}
@@ -189,6 +191,7 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
                                             className="btn-compact"
                                             icon="bi-broadcast"
                                             label="Sync to fleet"
+                                            disabled={cacheOnly || sync.isPending}
                                             armedLabel="Click again — pushes this set to every fleet instance now"
                                             onConfirm={() => run('Sync broadcast to the fleet', () => sync.mutateAsync({ id }))}
                                         />
@@ -202,18 +205,7 @@ export function IPSetDetail({ id, onClose }: { id: number; onClose: () => void }
                                         <button className="btn btn-compact" onClick={() => void onEdit()}>
                                             <i className="bi bi-pencil" /> Edit
                                         </button>
-                                        {canDelete && (
-                                            <ArmedButton
-                                                className="btn-compact btn-danger"
-                                                icon="bi-trash"
-                                                label="Delete"
-                                                armedLabel="Click again — deletes the set and removes it from every fleet instance. This cannot be undone."
-                                                onConfirm={() => run('IP set deleted', async () => {
-                                                    await remove.mutateAsync({ id });
-                                                    onClose();
-                                                })}
-                                            />
-                                        )}
+                                        
                                     </div>
                                 ) : null}
                             />

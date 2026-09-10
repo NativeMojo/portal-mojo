@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Badge, JsonBlock, fmt, toast, type Tone } from '../../ui';
+import { useEffect,useRef,useState,type ReactNode } from 'react';
+import { DetailView,JsonBlock,fmt,toast,type Tone } from '../../ui';
 import type { LogRow } from './models';
 
 export type StoredLogKind = 'request' | 'response' | 'message';
@@ -111,23 +111,7 @@ export function LogInspector({ log, onClose }: { log: LogRow; onClose?: () => vo
     const route = [log.method, log.path].filter(Boolean).join(' ') || 'No request route';
 
     return (
-        <div className="monitoring-inspector">
-            <header className="monitoring-inspector-head">
-                <div>
-                    <div className="eyebrow">Stored {recordKind} record</div>
-                    <h2>{route}</h2>
-                    <p>{fmt.datetime(log.created)} · log #{log.id}</p>
-                </div>
-                <div className="monitoring-inspector-actions">
-                    <Badge tone={LEVEL_TONE[log.level.toLowerCase()] ?? 'muted'}>{log.level}</Badge>
-                    {onClose && (
-                        <button type="button" className="btn-icon" onClick={onClose} aria-label="Close inspector" title="Close">
-                            <i className="bi bi-x-lg" />
-                        </button>
-                    )}
-                </div>
-            </header>
-
+        <DetailView title={route} subtitle={`Stored ${recordKind} record · ${fmt.datetime(log.created)} · log #${log.id}`} icon="bi-journal-text" onClose={onClose} chips={[{ text: log.level, tone: LEVEL_TONE[log.level.toLowerCase()] ?? 'muted' }]} sections={[{ key: 'record', label: 'Record', icon: 'bi-file-text', render: () => <div className="monitoring-inspector">
             <div className="monitoring-facts">
                 <Fact label="Kind">{log.kind || 'message'}</Fact>
                 <Fact label="User">{log.username || (log.uid ? `#${log.uid}` : '—')}</Fact>
@@ -155,6 +139,6 @@ export function LogInspector({ log, onClose }: { log: LogRow; onClose?: () => vo
                     The API exposes no request/response correlation key, so no paired record is claimed.
                 </p>
             )}
-        </div>
+        </div> }]} />
     );
 }
