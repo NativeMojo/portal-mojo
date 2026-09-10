@@ -13,9 +13,9 @@
 //     field so they are drivable end-to-end in dev (a real server never does)
 // Data endpoints stay open (no auth required) until the portal grows login
 // pages (Chunk C3) — then they 401 without a bearer, like the real backend.
+import { getDnsAdminIntegration,type ManagedDnsRecordInput } from '../admin/dns/dns-integration';
 import { markdownToHtml } from './markdown-parse';
-import type { Params, User } from './types';
-import { getDnsAdminIntegration, type ManagedDnsRecordInput } from '../admin/dns/dns-integration';
+import type { Params,User } from './types';
 
 // Deterministic dataset — same 57 users on every load so the demo is stable.
 function mulberry32(seed: number) {
@@ -7798,7 +7798,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         if (skillMatch) {
             if (!assistantGate) return permissionDenied(); const id = skillMatch[1] ? Number(skillMatch[1]) : null;
             const skillWire = (row: MockAssistantSkill, detail = false) => ({ id: row.id, tier: row.tier, name: row.name, description: row.description, auto_execute: row.auto_execute, is_active: row.is_active, created: row.created, modified: row.modified, user: row.user == null ? null : assistantUser(row.user), ...(detail ? { triggers: [...row.triggers], steps: structuredClone(row.steps), metadata: { ...row.metadata } } : {}) });
-            if (id != null) { const row = db.assistantSkills.find((candidate) => candidate.id === id); if (!row) return { status: false, error: 'Skill not found', error_code: 404 }; if (method === 'DELETE') { db.assistantSkills = db.assistantSkills.filter((candidate) => candidate.id !== id); return { status: 'deleted' }; } if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; return { status: true, data: skillWire(row, opts.params?.graph === 'detail'), graph: String(opts.params?.graph ?? 'default') }; }
+            if (id != null) { const row = db.assistantSkills.find((candidate) => candidate.id === id); if (!row) return { status: false, error: 'Skill not found', error_code: 404 }; if (method === 'DELETE') { db.assistantSkills = db.assistantSkills.filter((candidate) => candidate.id !== id); return { status: 'deleted' }; } if (method === 'POST') { if (!hasGlobalPermission(caller, ['view_admin'])) return permissionDenied(); if (typeof opts.body?.is_active !== 'boolean') return { status: false, error: 'is_active is required', error_code: 400 }; row.is_active = opts.body.is_active; row.modified = Math.floor(Date.now() / 1000); } else if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; return { status: true, data: skillWire(row, opts.params?.graph === 'detail'), graph: String(opts.params?.graph ?? 'default') }; }
             if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; const rows = [...db.assistantSkills].sort((a, b) => a.name.localeCompare(b.name)); return { status: true, data: rows.map((row) => skillWire(row)), count: rows.length, start: 0, size: rows.length, graph: 'default' };
         }
         const memoryMatch = path.match(/^\/api\/assistant\/memory\/(global|user|group)(?:\/([^/]+))?$/);

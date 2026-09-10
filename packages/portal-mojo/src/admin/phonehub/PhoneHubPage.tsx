@@ -1,14 +1,16 @@
-import { useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArmedButton, Badge, DetailView, FlatRow, ModelTable, Tabs, fmt, modal, toast, type Column, type FilterDef } from '../../ui';
-import { mojoList, useCan } from '../../client/runtime';
-import { DEFAULT_MOJO_REMOTE_URL, buildPhoneConfigPayload, fetchPhoneGroupChoices, lookupPhoneNumber, normalizePhoneNumber, resolveMojoRemoteUrl, savePhoneConfigImperative, testPhoneConfigImperative, type PhoneSecretField, type SecretEdit } from './api';
-import { exportPhoneConfigs, exportPhoneNumbers, exportSmsAudits } from './data';
+import { useQuery,useQueryClient } from '@tanstack/react-query';
+import { useRef,useState } from 'react';
+import { mojoList,useCan } from '../../client/runtime';
+import { Badge,DetailView,FlatRow,ModelTable,Tabs,fmt,modal,toast,type Column,type FilterDef } from '../../ui';
+import { DEFAULT_MOJO_REMOTE_URL,buildPhoneConfigPayload,fetchPhoneGroupChoices,lookupPhoneNumber,normalizePhoneNumber,resolveMojoRemoteUrl,savePhoneConfigImperative,testPhoneConfigImperative,type PhoneSecretField,type SecretEdit } from './api';
+import { exportPhoneConfigs,exportPhoneNumbers,exportSmsAudits } from './data';
 import {
-    PHONE_CONFIG_DELETE_PERMISSIONS, PHONE_CONFIG_MANAGE_PERMISSIONS, PHONE_CONFIG_VIEW_PERMISSIONS,
-    PHONE_GROUP_DIRECTORY_PERMISSIONS, PHONE_LOOKUP_UI_PERMISSIONS, PHONE_NUMBER_DELETE_PERMISSIONS,
-    PHONE_NUMBER_VIEW_PERMISSIONS, SMS_DELETE_PERMISSIONS, SMS_VIEW_PERMISSIONS,
-    PhoneConfigModel, PhoneNumberModel, SmsModel, type PhoneConfigRow, type PhoneNumberRow, type SmsRow,
+PHONE_CONFIG_MANAGE_PERMISSIONS,PHONE_CONFIG_VIEW_PERMISSIONS,
+PHONE_GROUP_DIRECTORY_PERMISSIONS,PHONE_LOOKUP_UI_PERMISSIONS,
+PHONE_NUMBER_VIEW_PERMISSIONS,
+PhoneConfigModel,PhoneNumberModel,
+SMS_VIEW_PERMISSIONS,
+SmsModel,type PhoneConfigRow,type PhoneNumberRow,type SmsRow
 } from './models';
 
 const relationLabel=(value:{id:number;name?:string;display_name?:string}|number|null,empty='System default')=>value==null?empty:typeof value==='number'?`#${value}`:value.name??value.display_name??`#${value.id}`;
@@ -39,13 +41,13 @@ const configColumns:Column<PhoneConfigRow>[]=[
     {key:'modified',label:'Modified',sortable:true,render:r=>fmt.datetime(r.modified)},
 ];
 
-function PhoneDetail({id,onClose}:{id:number;onClose:()=>void}){const query=PhoneNumberModel.useOne(id);const canDelete=useCan(PHONE_NUMBER_DELETE_PERMISSIONS).can;const destroy=PhoneNumberModel.useDelete();if(!query.data)return <div className="modal-pad">{query.isLoading?'Loading phone record…':'Phone record unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;const row=query.data;const remove=async()=>{await destroy.mutateAsync({id});toast.success('Local phone cache row deleted');onClose();};return <DetailView title={row.phone_number} subtitle={`${row.carrier||'Unknown carrier'} · ${row.line_type||'Unknown line type'}`} icon="bi-telephone" onClose={onClose} sections={[{key:'lookup',label:'Lookup',icon:'bi-search',render:()=><div className="detail-section"><FlatRow label="Provider">{row.lookup_provider||'—'}</FlatRow><FlatRow label="Lookup count">{row.lookup_count}</FlatRow><FlatRow label="Last lookup">{row.last_lookup_at?fmt.datetime(row.last_lookup_at):'Never'}</FlatRow><FlatRow label="Expires">{row.lookup_expires_at?fmt.datetime(row.lookup_expires_at):'Unknown'}</FlatRow><p className="dim">Lookup payloads are deliberately excluded from the client cache.</p></div>},{key:'identity',label:'Carrier & owner',icon:'bi-person-lines-fill',render:()=><div className="detail-section"><FlatRow label="Valid">{row.is_valid?'Yes':'No'}</FlatRow><FlatRow label="Mobile">{row.is_mobile?'Yes':'No'}</FlatRow><FlatRow label="VoIP">{row.is_voip?'Yes':'No'}</FlatRow><FlatRow label="Registered owner">{row.registered_owner||'—'}</FlatRow><FlatRow label="Region">{[row.region,row.state].filter(Boolean).join(', ')||'—'}</FlatRow></div>},...(canDelete?[{key:'delete',label:'Delete',icon:'bi-trash',render:()=><div className="detail-section"><p>Deletes this global cached phone record only. It does not affect provider data.</p><ArmedButton label="Delete cached record" armedLabel="Click again to delete" onConfirm={remove}/></div>}]:[])]}/>;}
+function PhoneDetail({id,onClose}:{id:number;onClose:()=>void}){const query=PhoneNumberModel.useOne(id);if(!query.data)return <div className="modal-pad">{query.isLoading?'Loading phone record…':'Phone record unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;const row=query.data;return <DetailView title={row.phone_number} subtitle={`${row.carrier||'Unknown carrier'} · ${row.line_type||'Unknown line type'}`} icon="bi-telephone" onClose={onClose} sections={[{key:'lookup',label:'Lookup',icon:'bi-search',render:()=><div className="detail-section"><FlatRow label="Provider">{row.lookup_provider||'—'}</FlatRow><FlatRow label="Lookup count">{row.lookup_count}</FlatRow><FlatRow label="Last lookup">{row.last_lookup_at?fmt.datetime(row.last_lookup_at):'Never'}</FlatRow><FlatRow label="Expires">{row.lookup_expires_at?fmt.datetime(row.lookup_expires_at):'Unknown'}</FlatRow><p className="dim">Lookup payloads are deliberately excluded from the client cache.</p></div>},{key:'identity',label:'Carrier & owner',icon:'bi-person-lines-fill',render:()=><div className="detail-section"><FlatRow label="Valid">{row.is_valid?'Yes':'No'}</FlatRow><FlatRow label="Mobile">{row.is_mobile?'Yes':'No'}</FlatRow><FlatRow label="VoIP">{row.is_voip?'Yes':'No'}</FlatRow><FlatRow label="Registered owner">{row.registered_owner||'—'}</FlatRow><FlatRow label="Region">{[row.region,row.state].filter(Boolean).join(', ')||'—'}</FlatRow></div>}]}/>;}
 
 function LookupDialog({close}:{close:(row:PhoneNumberRow|null)=>void}){const qc=useQueryClient();const [value,setValue]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');const submit=async()=>{setBusy(true);setError('');try{const normalized=await normalizePhoneNumber(value);let previous:PhoneNumberRow|undefined;try{const existing=await mojoList<PhoneNumberRow>(PhoneNumberModel.endpoint,{phone_number:normalized,graph:'default',start:0,size:1});previous=existing.rows[0];}catch{/* lookup remains available for a new row */}const row=await lookupPhoneNumber(normalized,previous,()=>window.confirm('This cache row is still fresh. Force a paid global Twilio Lookup anyway?'));qc.setQueryData(PhoneNumberModel.keys.one(row.id),row);await qc.invalidateQueries({queryKey:PhoneNumberModel.keys.root});toast.success('Lookup completed with refresh evidence');close(row);}catch(reason){setError(reason instanceof Error?reason.message:'Lookup failed');}finally{setBusy(false);}};return <div className="modal-pad"><h2 className="modal-title">Lookup phone number</h2><p className="dim">The number is normalized first. New or expired rows refresh automatically; a known-fresh row requires confirmation before a paid global Twilio Lookup.</p>{error&&<div className="form-alert" role="alert">{error}</div>}<label className="field"><span className="field-label">Phone number</span><input className="input" value={value} onChange={e=>setValue(e.target.value)} placeholder="+1 415 555 0100"/></label><div className="modal-actions"><button className="btn" disabled={busy} onClick={()=>close(null)}>Cancel</button><button className="btn btn-primary" disabled={busy||!value.trim()} onClick={()=>void submit()}>{busy?'Looking up…':'Normalize and look up'}</button></div></div>;}
 
 export function PhoneNumbersPage(){const canLookup=useCan(PHONE_LOOKUP_UI_PERMISSIONS).can;return <ModelTable model={PhoneNumberModel} eyebrow="Communications · Phone Hub" title="Phone Numbers" columns={phoneColumns} defaultSort="phone_number" searchable searchPlaceholder="Search number, carrier, or owner" columnChooser persistState persistKey="admin:phonehub:numbers" exportFormats={['csv','json']} exporter={exportPhoneNumbers} addLabel="Lookup number" onAdd={canLookup?()=>void modal.open(close=><LookupDialog close={close}/>):undefined} onRowClick={row=>void modal.detail(close=><PhoneDetail id={row.id} onClose={()=>close(null)}/>)}/>;}
 
-function SmsDetail({id,onClose}:{id:number;onClose:()=>void}){const query=SmsModel.useOne(id);const canDelete=useCan(SMS_DELETE_PERMISSIONS).can;const destroy=SmsModel.useDelete();if(!query.data)return <div className="modal-pad">{query.isLoading?'Loading SMS audit…':'SMS audit unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;const row=query.data;const remove=async()=>{await destroy.mutateAsync({id});toast.success('Local SMS audit row deleted');onClose();};return <DetailView title={`${row.from_number} → ${row.to_number}`} subtitle={`${row.direction} · ${row.status}`} icon="bi-chat-square-text" onClose={onClose} sections={[{key:'message',label:'Message',icon:'bi-chat-text',render:()=><div className="detail-section"><FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow><FlatRow label="Provider">{row.provider||'—'}</FlatRow><FlatRow label="Group">{relationLabel(row.group,'None')}</FlatRow><div className="known-card"><h3>Message body</h3><p className="pre-wrap">{row.body||'—'}</p></div>{row.error_message&&<div className="form-alert">{row.error_message}</div>}</div>},...(canDelete?[{key:'delete',label:'Delete',icon:'bi-trash',render:()=><div className="detail-section"><p>Deletes the local audit row only. It cannot recall or alter a provider message. SMS rows are deleted when their owning user or group is deleted; deleting a provider config does not delete them.</p><ArmedButton label="Delete SMS audit row" armedLabel="Click again to delete" onConfirm={remove}/></div>}]:[])]}/>;}
+function SmsDetail({id,onClose}:{id:number;onClose:()=>void}){const query=SmsModel.useOne(id);if(!query.data)return <div className="modal-pad">{query.isLoading?'Loading SMS audit…':'SMS audit unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;const row=query.data;return <DetailView title={`${row.from_number} → ${row.to_number}`} subtitle={`${row.direction} · ${row.status}`} icon="bi-chat-square-text" onClose={onClose} sections={[{key:'message',label:'Message',icon:'bi-chat-text',render:()=><div className="detail-section"><FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow><FlatRow label="Provider">{row.provider||'—'}</FlatRow><FlatRow label="Group">{relationLabel(row.group,'None')}</FlatRow><div className="known-card"><h3>Message body</h3><p className="pre-wrap">{row.body||'—'}</p></div>{row.error_message&&<div className="form-alert">{row.error_message}</div>}</div>}]}/>;}
 export function SmsPage(){return <ModelTable model={SmsModel} eyebrow="Communications · Phone Hub" title="SMS Audit" columns={smsColumns} filters={smsFilters} defaultSort="-created" searchable searchPlaceholder="Search number or message body" autoRefresh={20} columnChooser persistState persistKey="admin:phonehub:sms" exportFormats={['csv','json']} exporter={exportSmsAudits} onRowClick={row=>void modal.detail(close=><SmsDetail id={row.id} onClose={()=>close(null)}/>)}/>;}
 
 type PhoneProvider = PhoneConfigRow['provider'];
@@ -260,13 +262,22 @@ function ConfigEditor({ row, close }: { row?: PhoneConfigRow; close: (value: Pho
 }
 
 function ConfigDetail({ id, onClose }: { id: number; onClose: () => void }) {
+    const qc = useQueryClient();
+    const [saving, setSaving] = useState(false);
     const query = PhoneConfigModel.useOne(id);
     const canManage = useCan(PHONE_CONFIG_MANAGE_PERMISSIONS).can;
-    const canDelete = useCan(PHONE_CONFIG_DELETE_PERMISSIONS).can;
-    const destroy = PhoneConfigModel.useDelete();
+    
+    
     const [testing, setTesting] = useState(false);
     if (!query.data) return <div className="modal-pad">{query.isLoading ? 'Loading provider configuration…' : 'Configuration unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;
     const row = query.data;
+    const toggle = async (next: boolean) => {
+        if (!canManage || saving) return;
+        setSaving(true);
+        try { await savePhoneConfigImperative(qc, id, { is_active: next }, {}); await query.refetch(); }
+        catch (error) { toast.error(error instanceof Error ? error.message : 'State change failed'); }
+        finally { setSaving(false); }
+    };
     const meta = providerMeta[row.provider];
     const edit = () => void modal.open((close) => <ConfigEditor row={row} close={async (saved) => { close(saved); if (saved) await query.refetch(); }} />, { size: 'lg' });
     const test = async () => {
@@ -280,17 +291,18 @@ function ConfigDetail({ id, onClose }: { id: number; onClose: () => void }) {
             setTesting(false);
         }
     };
-    const remove = async () => { await destroy.mutateAsync({ id }); toast.success('Provider configuration deleted'); onClose(); };
+    
     return <DetailView
         title={row.name}
         subtitle={relationLabel(row.group)}
         icon={meta.icon}
         chips={[{ text: meta.label, tone: 'info' }, { text: row.is_active ? 'Active' : 'Inactive', tone: row.is_active ? 'success' : 'muted' }, ...(row.test_mode ? [{ text: 'Test mode', tone: 'warning' as const }] : [])]}
         onClose={onClose}
+        active={canManage ? { value: row.is_active, disabled: saving, onChange: next => void toggle(next) } : undefined}
+        contextMenu={canManage ? [{ label: 'Edit configuration', onSelect: edit }, { label: 'Test stored connection', disabled: testing, onSelect: () => void test() }, { label: row.is_active ? 'Deactivate' : 'Reactivate', disabled: saving, onSelect: () => void toggle(!row.is_active) }] : []}
         sections={[
-            { key: 'overview', label: 'Overview', icon: 'bi-sliders', render: () => <div className="detail-section"><div className="storage-action-row">{canManage && <><button className="btn" onClick={edit}>Edit configuration</button><button className="btn" disabled={testing} onClick={() => void test()}>{testing ? 'Testing…' : 'Test stored connection'}</button></>}</div><div className="phonehub-provider-summary"><i className={`bi ${meta.icon}`} /><div><span className="eyebrow">Provider</span><h3>{meta.label}</h3><p>{meta.description}</p></div></div><div className="phonehub-summary-grid"><div className="known-card"><span>Scope</span><strong>{relationLabel(row.group)}</strong></div><div className="known-card"><span>Automatic lookup</span><strong>{row.lookup_enabled ? `Enabled · ${row.lookup_cache_days} days` : 'Disabled'}</strong></div><div className="known-card"><span>Last modified</span><strong>{fmt.datetime(row.modified)}</strong></div></div><p className="dim">An active group configuration wins; otherwise Phone Hub falls back to the first active system default.</p></div> },
-            { key: 'connection', label: 'Connection', icon: 'bi-plug', render: () => <div className="detail-section"><div className="section-eyebrow">{meta.label} settings</div>{providerVisibleRows(row).map(([label, value]) => <FlatRow key={label} label={label}>{value}</FlatRow>)}<FlatRow label="Credentials"><span><i className="bi bi-shield-lock" /> Write-only; edit to replace or clear</span></FlatRow><div className={`phonehub-provider-note${row.provider === 'mojo' ? '' : ' is-warning'}`}><i className={`bi ${row.provider === 'mojo' ? 'bi-info-circle' : 'bi-exclamation-triangle'}`} /><span>{providerOperationalNote(row.provider)}</span></div>{row.test_mode && <div className="phonehub-provider-note is-warning"><i className="bi bi-beaker" /><span>Test mode only short-circuits the connection test. It does not prevent SMS delivery.</span></div>}<FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow></div> },
-            ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: 'bi-trash', render: () => <div className="detail-section"><p>Deleting this configuration restores the applicable fallback. Existing SMS audit rows are retained.</p><ArmedButton label="Delete provider configuration" armedLabel="Click again to delete" onConfirm={remove} /></div> }] : []),
+            { key: 'overview', label: 'Overview', icon: 'bi-sliders', render: () => <div className="detail-section"><div className="phonehub-provider-summary"><i className={`bi ${meta.icon}`} /><div><span className="eyebrow">Provider</span><h3>{meta.label}</h3><p>{meta.description}</p></div></div><div className="phonehub-summary-grid"><div className="known-card"><span>Scope</span><strong>{relationLabel(row.group)}</strong></div><div className="known-card"><span>Automatic lookup</span><strong>{row.lookup_enabled ? `Enabled · ${row.lookup_cache_days} days` : 'Disabled'}</strong></div><div className="known-card"><span>Last modified</span><strong>{fmt.datetime(row.modified)}</strong></div></div><p className="dim">An active group configuration wins; otherwise Phone Hub falls back to the first active system default.</p></div> },
+            { key: 'connection', label: 'Connection', icon: 'bi-plug', render: () => <div className="detail-section"><div className="section-eyebrow">{meta.label} settings</div>{providerVisibleRows(row).map(([label, value]) => <FlatRow key={label} label={label}>{value}</FlatRow>)}<FlatRow label="Credentials"><span><i className="bi bi-shield-lock" /> Write-only; edit to replace or clear</span></FlatRow><div className={`phonehub-provider-note${row.provider === 'mojo' ? '' : ' is-warning'}`}><i className={`bi ${row.provider === 'mojo' ? 'bi-info-circle' : 'bi-exclamation-triangle'}`} /><span>{providerOperationalNote(row.provider)}</span></div>{row.test_mode && <div className="phonehub-provider-note is-warning"><i className="bi bi-beaker" /><span>Test mode only short-circuits the connection test. It does not prevent SMS delivery.</span></div>}<FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow></div> }
         ]}
     />;
 }
