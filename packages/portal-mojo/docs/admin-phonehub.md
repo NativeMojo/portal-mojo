@@ -16,7 +16,8 @@ Connection tests read the provider's `success` verdict, not the outer REST
 `status`. A failed or missing verdict is an error; `test_mode` is a warning
 that the provider was not contacted. Results persist inside the detail modal
 on both sections, alongside a toast. Scope is labeled in the header and
-Connection section. Saving new credentials clears the previous test result.
+Connection section. Editing is disabled while a connection test is pending, so an old response
+cannot certify replacement credentials. Saving clears the previous test result.
 The stored URL is shown literally; a saved URL plus `missing_credentials` for
 Mojo means the API key is absent. Re-enter it in Edit configuration and save;
 blank password inputs preserve existing values and do not prove a key exists.

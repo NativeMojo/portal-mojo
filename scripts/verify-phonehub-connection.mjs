@@ -3,9 +3,10 @@ import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost' });
-for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'Event', 'Node']) globalThis[name] = dom.window[name];
+for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'Event', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 const fixture = globalThis.__phoneConnection = { reply: {}, writes: [] };
 const runtime = `export * from '/packages/portal-mojo/src/client/runtime.ts'; export const useCan=()=>({can:true,me:{id:1}}); export const mojoList=async()=>({rows:[]}); export const mojoCall=async(path,opts)=>{globalThis.__phoneConnection.writes.push({path,body:{...opts.body}});return globalThis.__phoneConnection.reply;};`;
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{
@@ -15,7 +16,7 @@ const server = await createServer({ root: process.cwd(), appType: 'custom', logL
     transform(source, id) {
         if (!id.includes('/admin/phonehub/')) return;
         source = source.replace("from '../../client/runtime'", "from '/__phone_runtime.ts'");
-        if (id.endsWith('/PhoneHubPage.tsx')) source += '\nexport { ConfigEditor };';
+        if (id.endsWith('/PhoneHubPage.tsx')) source += '\nexport { ConfigEditor, ConfigDetail };';
         return source;
     },
 }] });
@@ -39,7 +40,7 @@ try {
     fixture.reply = { status: true, data: { success: true, test_mode: true, message: 'Provider not tested' } };
     assert.equal((await api.testPhoneConfigImperative(7)).testMode, true);
 
-    const { ConfigEditor } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx');
+    const { ConfigEditor, ConfigDetail } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx');
     const { toast } = await server.ssrLoadModule('/packages/portal-mojo/src/ui/toast.tsx');
     toast.success = () => {};
     const row = { id: 7, name: 'Mojo Remote SMS', provider: 'mojo', group: null, is_active: true, mojo_remote_url: 'https://api.mojoverify.com', lookup_enabled: true, lookup_cache_days: 90, test_mode: false };
@@ -61,6 +62,20 @@ try {
     assert.equal(key.value, '', 'Saved secret must leave the input');
     assert(!JSON.stringify(qc.getQueryCache().getAll()).includes('fake-local-fixture-key'));
     assert.equal(qc.getMutationCache().getAll().length, 0);
+    const { PhoneConfigModel } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/phonehub/models.ts');
+    PhoneConfigModel.useOne = () => ({ data: row, refetch: async () => {} });
+    let finishTest;
+    fixture.reply = new Promise(resolve => { finishTest = resolve; });
+    await React.act(async () => root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(ConfigDetail, { id: 7, onClose() {} }))));
+    const clickMenu = async label => {
+        await React.act(async () => document.querySelector('[aria-label="More actions"]').click());
+        await React.act(async () => [...document.querySelectorAll('[role="menuitem"]')].find(button => button.textContent.trim() === label).click());
+    };
+    await clickMenu('Test stored connection');
+    await React.act(async () => document.querySelector('[aria-label="More actions"]').click());
+    assert.equal([...document.querySelectorAll('[role="menuitem"]')].find(button => button.textContent.trim() === 'Edit configuration').disabled, true, 'Credentials cannot be edited while their test is pending');
+    await React.act(async () => finishTest({ status: true, data: { success: true, message: 'Key verified' } }));
+    assert.match(document.body.textContent, /Connection test: Passed/);
     console.log('Phone Hub: exact provider verdicts, test mode, mounted credential submission and cache isolation passed.');
 } finally {
     await React.act(async () => root.unmount());
