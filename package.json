@@ -15,7 +15,7 @@
         "typecheck": "npm run typecheck -w portal-mojo && npm run typecheck -w portal && npm run typecheck -w showcase",
         "verify:package": "node scripts/verify-package.mjs",
         "verify:packed-package": "node scripts/verify-packed-package.mjs",
-        "verify:release": "npm run verify:release-script && npm run typecheck && npm run verify:package && npm run verify:admin-contracts && npm run verify:admin-bundles && npm run verify:packed-package && npm run verify:menu-flatten && npm run verify:personas && npm run verify:action-results && npm run verify:endpoint-scoping && npm run verify:admin-runtime && npm run verify:admin-artifact",
+        "verify:release": "npm run verify:release-script && npm run typecheck && npm run verify:package && npm run verify:admin-contracts && npm run verify:admin-bundles && npm run verify:packed-package && npm run verify:menu-flatten && npm run verify:personas && npm run verify:action-results && npm run verify:endpoint-scoping && npm run verify:admin-runtime && npm run verify:admin-artifact && npm run verify:form-autosave",
         "build:admin": "node scripts/build-admin.mjs",
         "verify:admin-runtime": "node scripts/verify-admin-runtime.mjs",
         "verify:admin-artifact": "node scripts/verify-admin-artifact.mjs",
@@ -71,7 +71,8 @@
         "verify:admin-modals": "node scripts/verify-admin-modals.mjs",
         "verify:admin-modal-mounted": "node scripts/verify-admin-modal-mounted.mjs && node scripts/verify-toast-modal.mjs",
         "verify:admin-modal-scanner": "node scripts/verify-admin-modal-scanner.mjs",
-        "verify:admin-modal-lifecycle": "node scripts/verify-admin-modal-lifecycle.mjs"
+        "verify:admin-modal-lifecycle": "node scripts/verify-admin-modal-lifecycle.mjs",
+        "verify:form-autosave": "node scripts/verify-form-autosave.mjs"
     },
     "devDependencies": {
         "jsdom": "^26.1.0"

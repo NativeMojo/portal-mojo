@@ -46,6 +46,7 @@ const SearchDemo = lazyDemo(() => import('./demos-search'), 'SearchDemo');
 const ChartsDemo = lazyDemo(() => import('./demos-charts'), 'ChartsDemo');
 const FormsDemo = lazyDemo(() => import('./demos-feedback'), 'FormsDemo');
 const ModalsDemo = lazyDemo(() => import('./demos-feedback'), 'ModalsDemo');
+const GuardrailDemo = lazyDemo(() => import('./demos-feedback'), 'GuardrailDemo');
 const ToastsDemo = lazyDemo(() => import('./demos-feedback'), 'ToastsDemo');
 const DetailViewFullDemo = lazyDemo(() => import('./demos-detailview'), 'DetailViewFullDemo');
 const DataViewDemo = lazyDemo(() => import('./demos-dataview'), 'DataViewDemo');
@@ -283,6 +284,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'modals', title: 'Modals', icon: 'bi-window-stack',
                 blurb: 'Awaitable native-<dialog> manager: confirm, form, detail — stacking for free.',
                 render: () => <ModalsDemo />,
+            },
+            {
+                key: 'guardrail', title: 'Guardrail', icon: 'bi-exclamation-octagon',
+                blurb: 'The "are you sure, and here is why" stop: effect · consequences · undo, optional type-to-confirm, danger and warn tiers, stacks over an open formModal.',
+                render: () => <GuardrailDemo />,
             },
             {
                 key: 'drawer', title: 'Drawer', icon: 'bi-layout-sidebar-inset-reverse',

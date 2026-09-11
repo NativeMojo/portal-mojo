@@ -110,6 +110,32 @@ passed to every run — e.g. collect ONE disable reason) →
 / `"N succeeded, M failed"` (warning) / `"failed for all N"` → always
 clear selection + invalidate.
 
+`confirm` is the permission step and takes three forms:
+
+| `confirm` | Behaviour |
+|---|---|
+| `string` (default `"<label> N item(s)?"`) | `modal.confirm` with that copy; `danger` styles the button. |
+| `false` | No prompt. |
+| `(rows) => Promise<boolean>` | **Replaces** the built-in confirm — resolve `false` to cancel. `prepare` still runs after it. Open a `confirmGuardrail` here for a batch that takes a tenant dark or can't be undone. |
+
+Ask permission in `confirm`, collect input in `prepare` — don't fold a
+guardrail into `prepare` and return `null` to cancel; that conflates
+"nothing collected" with "declined".
+
+```tsx
+{
+    key: 'revoke', label: 'Remove access', danger: true,
+    confirm: (rows) => confirmGuardrail({
+        title: `Remove access for ${rows.length} members?`,
+        effect: <>They lose all access the moment each call lands.</>,
+        why: [<>Accounts stay; grants go — re-inviting restores a fresh preset, not the old unlocks.</>],
+        confirmText: `Remove ${rows.length}`,
+        typeToConfirm: rows.length >= 5 ? String(rows.length) : undefined,
+    }),
+    run: (row) => revoke(row),
+}
+```
+
 `runBatch` executes exactly once for selection-wide operations such as incident
 merge. A rejection produces one actionable error; cancellation mutates
 nothing. Selection clears and the endpoint invalidates after a non-cancelled

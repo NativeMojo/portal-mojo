@@ -43,7 +43,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [tabs-and-form-wizard.md](tabs-and-form-wizard.md) | Accessible Tabs variants and shared-state FormWizard, async finish, reset/roster semantics, modal helper |
 | [admin-modals.md](admin-modals.md) | Admin modal inventory, presentation, resource lifecycle and retained exception policy |
 | [DetailView.md](DetailView.md) | The UserView-style detail surface + row/section primitives |
-| [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*` |
+| [feedback.md](feedback.md) | Awaitable `modal.*`, `toast.*`, `confirmGuardrail` (the are-you-sure-and-here-is-why stop) |
 | [idioms.md](idioms.md) | ArmedButton (two-step confirm), `undoToast` (grace-period undo), `progressToast` — the dangerous-action trio |
 | [file-upload-ux.md](file-upload-ux.md) | Pure file validation, accessible picker/drop controls, bounded component-local upload queues, recovery, and completion callbacks |
 | [image-editor.md](image-editor.md) | Full-resolution crop/transform/filter composition, bounded history, PNG Blob results, modal helper, and ImageField pre-upload editing |

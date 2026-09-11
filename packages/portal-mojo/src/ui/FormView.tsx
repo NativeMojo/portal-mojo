@@ -26,6 +26,7 @@ import { toast } from './toast';
 import {
     useFormAutosave,
     type AutosaveBatchInfo,
+    type AutosaveBeforeSave,
     type FieldStatus,
     type FormAutosaveApi,
 } from './form-autosave';
@@ -104,13 +105,19 @@ export interface FormViewProps<T extends { id: number | string }> {
     savedFlashMs?: number;
     onSaved?: (info: AutosaveBatchInfo & { row: T }) => void;
     onSaveError?: (info: AutosaveBatchInfo & { error: Error }) => void;
+    /**
+     * Pre-save gate, once per batch. `false` drops the batch (its fields
+     * revert, no toast); an object replaces the wire body; true/undefined
+     * proceeds. Put a `confirmGuardrail` here for grants/identity fields.
+     */
+    beforeSave?: AutosaveBeforeSave<T>;
     /** True while any FileField transfer is active. Owners can block dismissal. */
     onPendingChange?: (pending: boolean) => void;
     className?: string;
 }
 
 export function FormView<T extends { id: number | string }>(props: FormViewProps<T>) {
-    const { model, row, fields, tabs, debounceMs, savedFlashMs, onSaved, onSaveError, className } = props;
+    const { model, row, fields, tabs, debounceMs, savedFlashMs, onSaved, onSaveError, beforeSave, className } = props;
     const save = model.useSave();
 
     // Registry-named tabsets re-render on registration; inline defs pass through.
@@ -164,6 +171,7 @@ export function FormView<T extends { id: number | string }>(props: FormViewProps
         save: (changes) => save.mutateAsync({ id: row.id, changes } satisfies SaveVars),
         debounceMs,
         savedFlashMs,
+        beforeSave,
         onSaved: (info) => {
             publishOwnerResult(info.fields, 'success', info.changes, info.row);
             onSaved?.(info);

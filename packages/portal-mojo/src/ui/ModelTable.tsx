@@ -56,12 +56,18 @@ interface BatchActionBase<T> {
     danger?: boolean;
     /** Row-state eligibility. Ineligible selected rows are never submitted. */
     eligible?: (row: T) => boolean;
-    /** Confirm copy; false skips the prompt. Default: "<label> N item(s)?" */
-    confirm?: string | false;
+    /**
+     * The permission step. A string is the `modal.confirm` copy; false skips
+     * the prompt; a function REPLACES the built-in confirm — resolve false
+     * to cancel (open a `confirmGuardrail` here for batches that take a
+     * tenant dark or can't be undone). Default: "<label> N item(s)?"
+     */
+    confirm?: string | false | ((rows: T[]) => Promise<boolean>);
     /**
      * Optional once-per-batch step (collect a reason, pick a value…) run
      * AFTER the confirm. Resolve null to cancel the batch; the resolved
-     * value is passed to every run() call.
+     * value is passed to every run() call. Ask permission in `confirm`,
+     * not here — a null from prepare means "nothing collected".
      */
     prepare?: (rows: T[]) => Promise<unknown | null>;
 }
@@ -449,7 +455,9 @@ export function ModelTable<T extends { id: RowId }>({
     const runBatch = async (action: BatchAction<T>) => {
         const targets = rows.filter((r) => selected.has(r.id) && (!action.eligible || action.eligible(r)));
         if (targets.length === 0) return;
-        if (action.confirm !== false) {
+        if (typeof action.confirm === 'function') {
+            if (!(await action.confirm(targets))) return;
+        } else if (action.confirm !== false) {
             const ok = await modal.confirm({
                 title: action.label,
                 message: action.confirm ?? `${action.label} ${targets.length} item(s)?`,

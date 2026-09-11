@@ -14,6 +14,7 @@ import {
     FlatRow,
     ModelTable,
     SchemaForm,
+    confirmGuardrail,
     fmt,
     modal,
     toast,
@@ -110,6 +111,20 @@ function TokenFooter({ permissions }: { permissions: string[] }) {
             </div>
         </div>
     );
+}
+
+/** The stop in front of `is_active: false` — copy states what the backend does. */
+function confirmDeactivateKey(row: GroupApiKeyRow): Promise<boolean> {
+    return confirmGuardrail({
+        title: `Deactivate API key "${row.name}"?`,
+        effect: <>The key stops authenticating the moment this saves.</>,
+        why: [
+            <>Every integration holding this key gets <b>401</b> on its next call — the caller sees an auth failure, not a notice.</>,
+            <>The key is <b>not rotated</b>: the same secret stays on file, so anyone who holds it regains access the instant it is re-enabled.</>,
+        ],
+        undo: 'Re-enabling restores the same key; no integration needs a new secret.',
+        confirmText: 'Deactivate key',
+    });
 }
 
 function useGroupApiKeyActions(permission: PermSpec) {
@@ -240,6 +255,11 @@ function useGroupApiKeyActions(permission: PermSpec) {
         }
         if (Object.keys(permissionChanges).length) changes.permissions = permissionChanges;
         if (!Object.keys(changes).length) return;
+
+        // Flipping a key inactive is the one edit here with a blast radius
+        // outside this portal — every caller holding the key. Guardrail it;
+        // the other edits in the same form ride along only if it is confirmed.
+        if (changes.is_active === false && !(await confirmDeactivateKey(row))) return;
 
         try {
             await save.mutateAsync({ id: row.id, changes });

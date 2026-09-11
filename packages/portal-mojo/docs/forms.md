@@ -105,9 +105,43 @@ if (!data) return;   // cancelled → null
     savedFlashMs={1500}        // saved-check duration (default 1500)
     onSaved={({ changes, fields, row }) => …}
     onSaveError={({ changes, fields, error }) => …}
+    beforeSave={({ changes, names, row }) => …}   // once per batch, BEFORE the POST (below)
     onPendingChange={(uploading) => setDetailDismissLocked(uploading)}
 />
 ```
+
+### `beforeSave` — the pre-save gate
+
+```tsx
+beforeSave={({ changes, names, row }) => {
+    // changes: the wire body (dotted names expanded: {permissions: {manage_group: true}})
+    // names:   the flat field names in the batch ('permissions.manage_group')
+    const perms = changes.permissions as Record<string, unknown> | undefined;
+    if (perms?.manage_group !== true) return true;            // proceed
+    return confirmGuardrail({ title: `Grant Manage Group to ${row.email}?`, … }); // false → drop
+}}
+```
+
+Runs once per batch with the body about to POST. Three results:
+
+| Return | Effect |
+|---|---|
+| `false` | **Drop the batch.** Its fields revert to the server snapshot and go idle — no error, no toast. A guardrail the operator declined is not a failure. |
+| an object | **Replace the body.** The object POSTs instead of `changes` (`onSaved.changes` reports what was sent). |
+| `true` / `undefined` | Proceed unchanged. |
+
+While it awaits, the batch is **in flight**: the 300ms window cannot re-fire
+and a commit made meanwhile joins the **next** batch (which gets its own
+`beforeSave`). A `false` reverts only the names this batch carried — a field
+re-committed during the await keeps its new value for the next batch. A hook
+that throws or rejects is a bug, not a veto: it surfaces exactly like a
+failed save (revert + pinned error + `onSaveError` toast). Without the prop
+the path is the pre-existing one, unchanged.
+
+Use it for the fields where a typo takes a tenant dark and there is no save
+button to hesitate over: identity fields (`uuid`, `auth_domain`), escalating
+grants (MemberDetail guards `manage_group` / `manage_members` this way). The
+contract is pinned by `npm run verify:form-autosave`.
 
 ### The autosave lifecycle (the machine: `useFormAutosave`)
 

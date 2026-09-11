@@ -1,9 +1,9 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCan, type PermSpec } from '../../../client/runtime';
 import {
     Badge, DetailView, Eyebrow, FlatRow, FormView, JsonBlock, MetricCard,
-    ModelTable, fmt, formModal, toast, type Column, type DetailMenuEntry,
+    ModelTable, confirmGuardrail, fmt, formModal, toast, type Column, type DetailMenuEntry,
 } from '../../../ui';
 import { LOGS_ADMIN_PERMISSIONS, LogModel, type LogRow } from '../../monitoring';
 import {
@@ -49,6 +49,43 @@ function AuditTable({ memberId }: { memberId: number }) {
             defaultSort="-created"
         />
     );
+}
+
+/**
+ * The two grants that let a member reach past its own row. A switch flip
+ * autosaves with no save button, so the stop lives in FormView's
+ * `beforeSave`: only these keys, only the ON direction — everything else
+ * stays one click. (`admin` is not an editable member grant here —
+ * `isEditableMemberPermission` excludes it — so it cannot be flipped from
+ * this form and needs no guard.)
+ */
+const ESCALATING_GRANTS: Record<string, { label: string; why: ReactNode }> = {
+    manage_group: {
+        label: 'Manage Group',
+        why: <><code>manage_group</code> unlocks the group record itself — its settings and policy metadata, its API keys, webhook subscriptions and integrations — every write the group's credential and identity panels gate on.</>,
+    },
+    manage_members: {
+        label: 'Manage Members',
+        why: <><code>manage_members</code> lets the holder change any member's grants, including its own, and admit or remove members — a grant that can reproduce itself.</>,
+    },
+};
+
+/** beforeSave gate: stops only when an escalating grant flips ON. */
+function confirmGrantEscalation(member: MemberRow, changes: Record<string, unknown>): Promise<boolean> | true {
+    const perms = changes.permissions;
+    if (!perms || typeof perms !== 'object') return true;
+    const granting = Object.keys(ESCALATING_GRANTS).filter((key) => (perms as Record<string, unknown>)[key] === true);
+    if (granting.length === 0) return true;
+    const who = member.user?.display_name || member.user?.email || member.user?.username || `User #${member.user?.id ?? member.id}`;
+    const group = member.group?.name || 'this group';
+    const labels = granting.map((key) => ESCALATING_GRANTS[key]!.label).join(' + ');
+    return confirmGuardrail({
+        title: `Grant ${labels} to ${who}?`,
+        effect: <><b>{who}</b> holds <b>{granting.join(' and ')}</b> in <b>{group}</b> the moment this saves — there is no save button and no second step.</>,
+        why: granting.map((key) => ESCALATING_GRANTS[key]!.why),
+        undo: 'Switch it off here to revoke. Anything done while the grant was held stays done.',
+        confirmText: `Grant ${labels}`,
+    });
 }
 
 function GrantSummary({ member }: { member: MemberRow }) {
@@ -201,7 +238,15 @@ export function MemberDetail({
                             <Eyebrow>Per-group authorization</Eyebrow>
                             <p className="dim">Role labels are not authorization. Protected changes may be rejected by <code>MEMBER_PERMS_PROTECTION</code>; failed autosaves revert and show the server error.</p>
                             {canSave
-                                ? <FormView model={MemberModel} row={member} fields={memberPermissionFields()} onSaved={() => { void MemberModel.invalidate(qc); }} />
+                                ? (
+                                    <FormView
+                                        model={MemberModel}
+                                        row={member}
+                                        fields={memberPermissionFields()}
+                                        beforeSave={({ changes }) => confirmGrantEscalation(member, changes)}
+                                        onSaved={() => { void MemberModel.invalidate(qc); }}
+                                    />
+                                )
                                 : <GrantSummary member={member} />}
                             {deploymentOnly.length > 0 && (
                                 <p className="dim">Deployment-specific stored grants without registered editors remain read-only: <code>{deploymentOnly.join(', ')}</code>.</p>

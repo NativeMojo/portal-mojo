@@ -20,6 +20,12 @@
 //   · zod failure: the save of that field is blocked client-side; the message
 //     occupies the same error slot. Hidden (showWhen) fields never queue and
 //     their transient state clears.
+//   · beforeSave (optional): runs once per batch BEFORE the POST, with the
+//     wire body. While it awaits the batch counts as in flight (the timer
+//     cannot re-fire; a commit meanwhile joins the NEXT batch). `false`
+//     DROPS the batch: its names revert to the server snapshot and go idle
+//     — no error, no toast (a guardrail the operator declined is not a
+//     failure). An object REPLACES the body. true/undefined proceeds.
 //
 // Shape: ALL machine state lives in ONE reducer (draft values, server
 // snapshot, per-field status, the pending batch, the in-flight flag) so every
@@ -168,6 +174,8 @@ export type AutosaveAction =
     | { type: 'SAVE_OK'; names: string[]; sent: Record<string, FieldValue>; server: FieldValues }
     /** Batch rejected: REVERT names to the snapshot, pin the server message. */
     | { type: 'SAVE_FAIL'; names: string[]; error: string }
+    /** beforeSave vetoed: REVERT names to the snapshot, status idle, no error. */
+    | { type: 'BATCH_DROP'; names: string[] }
     /** The ~1.5s saved flash ended. */
     | { type: 'FLASH_DONE'; name: string }
     /** The row prop changed (refetch/invalidate) or fields arrived late. */
@@ -366,6 +374,22 @@ export function autosaveReducer(state: AutosaveState, action: AutosaveAction): A
             return { ...state, draft, pending, fieldState, fieldError, inflight: false };
         }
 
+        case 'BATCH_DROP': {
+            const draft = { ...state.draft };
+            const fieldState = { ...state.fieldState };
+            const fieldError = { ...state.fieldError };
+            for (const n of action.names) {
+                // A field re-committed while beforeSave awaited belongs to the
+                // NEXT batch (SAVE_OK precedent) — the veto covers only what
+                // this batch carried.
+                if (n in state.pending) continue;
+                if (n in state.server) draft[n] = state.server[n]!;
+                fieldState[n] = 'idle';
+                fieldError[n] = null;
+            }
+            return { ...state, draft, fieldState, fieldError, inflight: false };
+        }
+
         case 'FLASH_DONE': {
             if (state.fieldState[action.name] !== 'saved') return state;
             return { ...state, fieldState: { ...state.fieldState, [action.name]: 'idle' } };
@@ -387,6 +411,79 @@ export function autosaveReducer(state: AutosaveState, action: AutosaveAction): A
     }
 }
 
+// ── The batch runner ──────────────────────────────────────────────────
+// Pure orchestration over the reducer — exported so the contract (veto /
+// amend / concurrent commit / no-hook parity) is unit-testable without a
+// DOM (scripts/verify-form-autosave.mjs). The hook binds it to its refs.
+
+export interface AutosaveBatchRunnerDeps<T> {
+    /** The state snapshot at fire time. */
+    state: AutosaveState;
+    /** Latest options — read again at settle time (the hook's optsRef). */
+    opts: () => Pick<UseFormAutosaveOptions<T>, 'fields' | 'row' | 'save' | 'beforeSave' | 'onSaved' | 'onSaveError'>;
+    dispatch: (action: AutosaveAction) => void;
+    /** Re-arm the batch window (drain anything committed mid-flight). */
+    armBatchTimer: () => void;
+    /** Start a field's saved flash. */
+    armFlashTimer: (name: string) => void;
+}
+
+/**
+ * Fire one batch from `state.pending`. Resolves when the batch has settled
+ * (saved, failed, or dropped); resolves immediately when nothing fires
+ * (in flight, or nothing pending).
+ */
+export function runAutosaveBatch<T>(deps: AutosaveBatchRunnerDeps<T>): Promise<void> {
+    const { state: s, opts, dispatch, armBatchTimer, armFlashTimer } = deps;
+    if (s.inflight) return Promise.resolve(); // completion re-arms the timer (serialize)
+    const names = Object.keys(s.pending);
+    if (names.length === 0) return Promise.resolve();
+    const sent: Record<string, FieldValue> = { ...s.pending };
+    const changes = expandDotted(sent);
+    dispatch({ type: 'BATCH_START', names });
+
+    const post = (body: Record<string, unknown>): Promise<void> => opts().save(body).then(
+        (savedRow) => {
+            const server = serverValuesFor(opts().fields, savedRow);
+            dispatch({ type: 'SAVE_OK', names, sent, server });
+            for (const n of names) armFlashTimer(n);
+            opts().onSaved?.({ changes: body, fields: names, row: savedRow });
+            armBatchTimer(); // drain anything committed mid-flight
+        },
+        (err: unknown) => fail(body, err),
+    );
+    const fail = (body: Record<string, unknown>, err: unknown) => {
+        const error = err instanceof Error ? err : new Error('Save failed');
+        dispatch({ type: 'SAVE_FAIL', names, error: error.message });
+        opts().onSaveError?.({ changes: body, fields: names, error });
+        armBatchTimer();
+    };
+
+    const beforeSave = opts().beforeSave;
+    if (!beforeSave) return post(changes); // no hook: the pre-existing path, unchanged
+
+    // The gate. BATCH_START already flagged inflight, so the window cannot
+    // re-fire while this awaits and commits meanwhile queue the NEXT batch.
+    let verdict: Promise<boolean | void | Record<string, unknown>>;
+    try {
+        verdict = Promise.resolve(beforeSave({ changes, names, row: opts().row }));
+    } catch (err) {
+        verdict = Promise.reject(err);
+    }
+    return verdict.then(
+        (v) => {
+            if (v === false) {
+                dispatch({ type: 'BATCH_DROP', names });
+                armBatchTimer(); // a commit made during the await fires next
+                return;
+            }
+            const body = v !== null && typeof v === 'object' ? v : changes;
+            return post(body);
+        },
+        (err: unknown) => fail(changes, err),
+    );
+}
+
 // ── The hook ──────────────────────────────────────────────────────────
 
 export interface AutosaveBatchInfo {
@@ -396,6 +493,24 @@ export interface AutosaveBatchInfo {
     fields: string[];
 }
 
+export interface AutosaveBeforeSaveInfo<T> {
+    /** The wire body about to POST (dotted names expanded). */
+    changes: Record<string, unknown>;
+    /** Flat field names the batch carries (`permissions.manage_group`, …). */
+    names: string[];
+    /** The server row the batch edits. */
+    row: T;
+}
+
+/**
+ * Pre-save gate. `false` drops the batch (fields revert to server values,
+ * status → idle, no error toast); an object replaces `changes`; `true` /
+ * `undefined` proceeds. A thrown/rejected hook is a bug, not a veto — it is
+ * surfaced like a failed save (revert + pinned error + onSaveError).
+ */
+export type AutosaveBeforeSave<T> = (info: AutosaveBeforeSaveInfo<T>) =>
+    boolean | void | Record<string, unknown> | Promise<boolean | void | Record<string, unknown>>;
+
 export interface UseFormAutosaveOptions<T> {
     /** EVERY saveable field — flat fields plus every tab's fields. */
     fields: Field[];
@@ -403,6 +518,14 @@ export interface UseFormAutosaveOptions<T> {
     row: T;
     /** One batch POST. MUST reject on failure (defineModel useSave contract). */
     save: (changes: Record<string, unknown>) => Promise<T>;
+    /**
+     * Runs before a batch POSTs. Return false to drop the batch (fields
+     * revert to server values, status → idle, no error toast); return an
+     * object to replace `changes`; true/undefined to proceed. While it awaits
+     * the batch is in flight: the timer cannot re-fire and a commit meanwhile
+     * joins the NEXT batch.
+     */
+    beforeSave?: AutosaveBeforeSave<T>;
     /** Batch window after the last commit (web-mojo: 300). */
     debounceMs?: number;
     /** How long the 'saved' check shows before returning to idle. */
@@ -485,29 +608,13 @@ export function useFormAutosave<T>(opts: UseFormAutosaveOptions<T>): FormAutosav
 
     // ── the batch runner ──────────────────────────────────────────────
     const fireBatch = useCallback(() => {
-        const s = stateRef.current;
-        if (s.inflight) return; // completion re-arms the timer (serialize)
-        const names = Object.keys(s.pending);
-        if (names.length === 0) return;
-        const sent: Record<string, FieldValue> = { ...s.pending };
-        const changes = expandDotted(sent);
-        dispatch({ type: 'BATCH_START', names });
-
-        optsRef.current.save(changes).then(
-            (savedRow) => {
-                const server = serverValuesFor(optsRef.current.fields, savedRow);
-                dispatch({ type: 'SAVE_OK', names, sent, server });
-                for (const n of names) armFlashTimer(n);
-                optsRef.current.onSaved?.({ changes, fields: names, row: savedRow });
-                armBatchTimer(); // drain anything committed mid-flight
-            },
-            (err: unknown) => {
-                const error = err instanceof Error ? err : new Error('Save failed');
-                dispatch({ type: 'SAVE_FAIL', names, error: error.message });
-                optsRef.current.onSaveError?.({ changes, fields: names, error });
-                armBatchTimer();
-            },
-        );
+        void runAutosaveBatch<T>({
+            state: stateRef.current,
+            opts: () => optsRef.current,
+            dispatch,
+            armBatchTimer,
+            armFlashTimer,
+        });
     }, [armBatchTimer, armFlashTimer]);
     fireBatchRef.current = fireBatch;
 
