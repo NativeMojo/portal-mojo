@@ -1,6 +1,6 @@
 {
     "name": "portal-mojo",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "description": "React portal toolkit for django-mojo — typed client + params store, mission-control UI, dependency-free SVG charts, admin section bundles.",
     "type": "module",
     "license": "Apache-2.0",
