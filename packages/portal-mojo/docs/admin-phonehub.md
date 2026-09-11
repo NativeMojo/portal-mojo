@@ -33,7 +33,7 @@ Group choices are fetched only with a separate global group-directory clause and
 
 ## Provider and deletion reality
 
-Phone lookup is always the global Twilio Lookup integration; it is not group-configured. Stored Twilio and AWS credentials can be tested, but the current SMS send implementation only consults a per-group configuration for `provider="mojo"`. Twilio/AWS configurations otherwise fall through to global Twilio send settings, and AWS sending is not wired. `test_mode` only short-circuits connection testing; it does not block sending.
+Phone lookup uses the global Twilio Lookup integration. Mojo SMS delivery uses the selected PhoneConfig’s saved remote URL and encrypted API key. Twilio SMS delivery uses a complete saved credential pair from the selected config, rejects a partial pair, and falls back to global settings only when neither credential is stored. Its sender uses the config’s from number when set, otherwise the global default. AWS credentials can be stored and tested, but AWS delivery is not wired. `test_mode` only short-circuits connection testing; it does not block sending.
 
 An active group config wins; otherwise `PhoneConfig.get_for_group` falls back to the first active system default. Deactivating a group config restores that fallback; Admin exposes this reversible lifecycle. Deleting a group cascades its config and SMS rows. Deleting a user cascades their SMS rows. Deleting a config does not delete SMS audit rows. Deleting an SMS row affects only local audit storage and cannot recall provider delivery.
 

@@ -82,7 +82,7 @@ const providerCredentialFields: Record<PhoneProvider, PhoneSecretField[]> = {
 function providerOperationalNote(provider: PhoneProvider): string {
     if (provider === 'mojo') return 'Mojo Remote is used by the group-aware SMS delivery path.';
     if (provider === 'aws') return 'Stored AWS credentials can be tested here. AWS outbound delivery is not wired yet.';
-    return 'Stored Twilio credentials can be tested here. Outbound delivery currently uses the global Twilio settings.';
+    return 'SMS delivery uses the saved Twilio credential pair, or global settings when neither credential is stored.';
 }
 
 function providerVisibleRows(row: PhoneConfigRow): Array<[string, string]> {
