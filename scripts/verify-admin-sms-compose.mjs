@@ -1,0 +1,108 @@
+import assert from 'node:assert/strict';
+import { JSDOM } from 'jsdom';
+import { createServer } from 'vite';
+
+const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost' });
+for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'Event', 'MouseEvent', 'CustomEvent', 'Node']) globalThis[name] = dom.window[name];
+Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+dom.window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+const React = await import('react');
+const { createRoot } = await import('react-dom/client');
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+const { act } = React;
+const fixture = globalThis.__smsCompose = { me: { id: 7, permissions: { view_sms: true, send_sms: true } }, member: { permissions: { send_sms: true } }, calls: [] };
+fixture.call = (path, opts) => new Promise((resolve, reject) => { opts.beforeSend?.(); fixture.calls.push({ path, opts, resolve, reject }); });
+const virtual = {
+    '/__sms_runtime.ts': `export * from '/packages/portal-mojo/src/client/runtime.ts'; import {hasPermission} from '/packages/portal-mojo/src/client/me.ts'; export const useCan=p=>({can:hasPermission(globalThis.__smsCompose.me,p,globalThis.__smsCompose.member),me:globalThis.__smsCompose.me}); export const mojoCall=(...args)=>globalThis.__smsCompose.call(...args);`,
+    '/__sms_ui.ts': `export * from '/packages/portal-mojo/src/ui/index.ts'; import React from 'react'; export const ModelTable=p=>p.onAdd?React.createElement('button',{onClick:p.onAdd},p.addLabel):null;`,
+};
+const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{ name: 'sms-compose-fixtures', enforce: 'pre', resolveId: id => id in virtual ? id : null, load: id => virtual[id], transform(source, id) {
+    if (!id.includes('/admin/phonehub/')) return;
+    return source.replace(/from ['"]\.\.\/\.\.\/client\/runtime['"]/g, "from '/__sms_runtime.ts'").replace(/from ['"]\.\.\/\.\.\/ui['"]/g, "from '/__sms_ui.ts'");
+} }] });
+const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+let invalidations = 0;
+qc.invalidateQueries = async () => { invalidations++; };
+let root;
+const button = name => [...document.querySelectorAll('button')].find(node => node.textContent.trim() === name);
+const click = async name => { const node = button(name); assert(node, `Missing ${name} action`); assert(!node.disabled, `${name} is disabled`); await act(async () => node.click()); };
+const input = async (selector, value) => { await act(async () => { const node = document.querySelector(selector); const proto = node.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, 'value').set.call(node, value); node.dispatchEvent(new Event('input', { bubbles: true })); }); };
+const reply = async (data, reject = false) => { await act(async () => fixture.calls.at(-1)[reject ? 'reject' : 'resolve'](data)); };
+try {
+    const { SmsPage } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx');
+    const { ModalHost } = await server.ssrLoadModule('/packages/portal-mojo/src/ui/modal.tsx');
+    const render = () => React.createElement(QueryClientProvider, { client: qc }, React.createElement(React.StrictMode, null, React.createElement(SmsPage), React.createElement(ModalHost)));
+    root = createRoot(document.getElementById('root'));
+    await act(async () => root.render(render()));
+    assert(button('Send SMS'), 'SMS readers with send_sms must have a compose action');
+    await click('Send SMS');
+    assert(button('Send message').disabled, 'Empty message cannot send');
+    await input('input[type="tel"]', '(415) 555-0123');
+    await input('textarea', '  Custom message\nSecond line  ');
+    await act(async () => { button('Send message').click(); button('Send message').click(); });
+    assert.equal(fixture.calls.length, 1, 'Double click normalizes once');
+    assert.equal(fixture.calls[0].path, '/api/phonehub/number/normalize');
+    assert(button('Cancel').disabled, 'Cancellation is locked during submission');
+    await reply({ status: true, data: { phone_number: '+14155550123' } });
+    const send = fixture.calls.at(-1);
+    assert.equal(send.path, '/api/phonehub/sms/send');
+    assert.deepEqual(send.opts.body, { to_number: '+14155550123', body: '  Custom message\nSecond line  ' }, 'Only explicit global message fields are sent; preserve body whitespace');
+    await reply({ status: true, data: { id: 8000, created: 1, direction: 'outbound', status: 'queued', to_number: '+14155550123', from_number: '+14155550100', body: '  Custom message\nSecond line  ', provider: 'twilio', metadata: { canary: 'raw-provider-secret' } } });
+    assert.match(document.body.textContent, /queued/i);
+    assert(!document.body.textContent.includes('raw-provider-secret'));
+    assert(!button('Send message'), 'A returned receipt cannot be resubmitted');
+    assert.equal(invalidations, 1, 'Receipt refreshes audit list');
+    assert.equal(qc.getMutationCache().getAll().length, 0, 'Message body is not retained in a mutation cache');
+    await click('Close');
+
+    fixture.me = { id: 7, permissions: { manage_sms: true } };
+    await act(async () => root.render(render()));
+    assert(!button('Send SMS'), 'manage_sms and ambient member send_sms do not grant system sending');
+    fixture.me = { id: 7, permissions: { comms: true } };
+    await act(async () => root.render(render()));
+    await click('Send SMS');
+    await input('input[type="tel"]', '+14155550123'); await input('textarea', 'Retain this draft');
+    await click('Send message');
+    const normalizing = fixture.calls.at(-1); const count = fixture.calls.length;
+    fixture.me = { id: 7, permissions: { view_sms: true } };
+    await act(async () => root.render(render()));
+    await act(async () => normalizing.resolve({ status: true, data: { phone_number: '+14155550123' } }));
+    assert.equal(fixture.calls.length, count, 'Revoking send permission during normalization prevents delivery');
+    assert.match(document.body.textContent, /permission/i); assert.equal(document.querySelector('textarea').value, 'Retain this draft');
+    await click('Cancel');
+
+    fixture.me = { id: 7, permissions: { comms: true } }; await act(async () => root.render(render()));
+    await click('Send SMS'); await input('input[type="tel"]', '+14155550123'); await input('textarea', 'Keep on failure');
+    await click('Send message'); await reply({ data: { phone_number: '+14155550123' } });
+    await reply(new Error('Connection lost'), true);
+    assert.match(document.body.textContent, /Check SMS Audit before trying again/i);
+    assert.equal(document.querySelector('textarea').value, 'Keep on failure');
+    await click('Cancel');
+    await click('Send SMS'); await input('input[type="tel"]', '+14155550123'); await input('textarea', 'Provider refusal');
+    await click('Send message'); await reply({ data: { phone_number: '+14155550123' } });
+    await reply({ data: { id: 8001, status: 'failed', to_number: '+14155550123', error_message: 'Provider refused recipient' } });
+    assert.match(document.body.textContent, /SMS failed/); assert.match(document.body.textContent, /Provider refused recipient/);
+    assert.equal(invalidations, 3, 'Both uncertain sends and failed records refresh the audit list');
+    await click('Close');
+    console.log('SMS compose mounted: permission gates, single flight, exact global payload, draft retention, honest outcomes, cache isolation, and audit refresh passed.');
+    const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
+    const login = async email => { const result = await mock.mockFetch('/api/login', { method: 'POST', body: { username: email, password: 'mojo' } }); return { Authorization: `Bearer ${result.data.access_token}` }; };
+    const comms = await login('phone.comms@nativemojo.com');
+    const manager = await login('phone.manager@nativemojo.com');
+    const viewer = await login('phone.viewer@nativemojo.com');
+    const payload = { to_number: '+14155550123', body: 'Mock custom body\nSecond line' };
+    for (const headers of [manager, viewer]) assert.equal((await mock.mockFetch('/api/phonehub/sms/send', { method: 'POST', headers, body: payload })).error_code, 403, 'Read/manage SMS is not a send permission');
+    assert.equal((await mock.mockFetch('/api/phonehub/sms/send', { method: 'POST', body: payload })).error_code, 401, 'Anonymous sending is refused');
+    assert.equal((await mock.mockFetch('/api/phonehub/sms/send', { headers: comms })).error_code, 405, 'Sending requires POST');
+    assert.equal((await mock.mockFetch('/api/phonehub/sms/send', { method: 'POST', headers: comms, body: { ...payload, body: '' } })).error_code, 400, 'Empty message is refused');
+    const sent = await mock.mockFetch('/api/phonehub/sms/send', { method: 'POST', headers: comms, body: payload });
+    assert.equal(sent.status, true); assert.equal(sent.data.body, payload.body); assert.equal(sent.data.group, null);
+    assert.equal((await mock.mockFetch(`/api/phonehub/sms/${sent.data.id}`, { headers: viewer })).data.status, 'sent', 'Send creates a readable audit row');
+    const failed = await mock.mockFetch('/api/phonehub/sms/send', { method: 'POST', headers: comms, body: { ...payload, to_number: '+14155550000' } });
+    assert.equal(failed.status, true); assert.equal(failed.data.status, 'failed', 'Provider failure is inside a successful REST envelope');
+    assert(!JSON.stringify(mock.getMockRequestHistory()).includes(payload.body), 'Request history does not retain custom SMS bodies');
+    console.log('SMS mock: auth, independent send permission, POST/validation, stored audit record, failed receipt, and private request history passed.');
+} finally { if (root) await act(async () => root.unmount()); qc.clear(); await server.close(); dom.window.close(); delete globalThis.__smsCompose; }

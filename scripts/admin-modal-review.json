@@ -353,6 +353,12 @@
       "fingerprint": "cd50b6e426dffd14387b",
       "category": "confirmation",
       "purpose": "Reauthenticate before the pending sensitive action"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/phonehub/SmsComposer.tsx:openSmsComposer:modal.open:0",
+      "fingerprint": "6fb4c06c8996d12e6e0c",
+      "category": "action",
+      "purpose": "Compose one system SMS and inspect its receipt; independent send permission, single-flight transport and dismissal lock verified by verify-admin-sms-compose and native browser interactions."
     }
   ],
   "lifecycle": [

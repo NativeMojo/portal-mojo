@@ -7537,6 +7537,22 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/phonehub/SmsComposer.tsx:openSmsComposer:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/phonehub/SmsComposer.tsx",
+      "owner": "openSmsComposer",
+      "launcher": "modal.open",
+      "body": [
+        "SmsComposer"
+      ],
+      "category": "action",
+      "parent": "openSmsComposer",
+      "target": null,
+      "fingerprint": "6fb4c06c8996d12e6e0c",
+      "categories": [
+        "action"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:PhoneDetail:DetailView:0",
       "file": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx",
       "owner": "PhoneDetail",
@@ -7605,6 +7621,20 @@
       "fingerprint": "8f9a27f657a1cafcb7ad",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:SmsPage:openSmsComposer:0",
+      "file": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx",
+      "owner": "SmsPage",
+      "launcher": "openSmsComposer",
+      "body": [],
+      "category": "action",
+      "parent": "SmsPage",
+      "target": "packages/portal-mojo/src/admin/phonehub/SmsComposer.tsx:openSmsComposer",
+      "fingerprint": "60b040b3a979a45f5420",
+      "categories": [
+        "action"
       ]
     },
     {

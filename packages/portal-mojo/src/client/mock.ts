@@ -7641,6 +7641,33 @@ async function phoneHubFetch(path:string,opts:MockFetchOpts):Promise<unknown|und
     const method=(opts.method??'GET').toUpperCase();
     if(path==='/api/phonehub/number/normalize'){if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};const normalized=normalizePhone(String(opts.body?.phone_number??''));return normalized?{status:true,data:{phone_number:normalized}}:{status:false,error:'Invalid phone number',error_code:400};}
     const caller=userFromBearer(opts.headers);if(!caller)return permissionDenied(401);
+    if (path === '/api/phonehub/sms/send') {
+        if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        if (!hasGlobalPermission(caller, ['send_sms', 'comms'])) return permissionDenied();
+        const body = opts.body ?? {};
+        const toNumber = normalizePhone(String(body.to_number ?? ''));
+        if (!toNumber || typeof body.body !== 'string' || !body.body.trim()) return { status: false, error: 'A valid to_number and body are required', error_code: 400 };
+        const group = body.group == null ? null : Number(body.group);
+        const configId = getMockEffectivePhoneConfigId(group);
+        const config = db.phoneConfigs.find(row => row.id === configId);
+        const now = Math.floor(Date.now() / 1000);
+        // Deterministic provider refusal for the demo, with the live envelope:
+        // a persisted failed SMS still has outer status:true.
+        const failed = toNumber.endsWith('0000');
+        const row: MockSms = {
+            id: Math.max(0, ...db.sms.map(item => item.id)) + 1,
+            created: now, modified: now, direction: 'outbound',
+            from_number: typeof body.from_number === 'string' ? body.from_number : '+14155550100',
+            to_number: toNumber, body: body.body, status: failed ? 'failed' : 'sent',
+            provider: config?.provider ?? 'twilio', provider_message_id: failed ? null : `mock-sms-${now}`,
+            error_code: failed ? 'mock_recipient_refused' : null,
+            error_message: failed ? 'Demo provider refused this recipient.' : null,
+            metadata: {}, is_test: toNumber.startsWith('+1555'),
+            sent_at: failed ? null : now, delivered_at: null, user: caller.id, group,
+        };
+        db.sms.unshift(row);
+        return { status: true, data: smsWire(row), graph: 'default' };
+    }
     if(path==='/api/phonehub/number/lookup'){
         if(method!=='POST')return {status:false,error:'Method not allowed',error_code:405};const normalized=normalizePhone(String(opts.body?.phone_number??''));if(!normalized)return {status:false,error:'Invalid phone number',error_code:400};const now=Math.floor(Date.now()/1000);let row=db.phoneNumbers.find(item=>item.phone_number===normalized);if(!row){row={id:Math.max(0,...db.phoneNumbers.map(item=>item.id))+1,created:now,modified:now,phone_number:normalized,country_code:normalized.startsWith('+1')?'US':null,region:null,state:null,carrier:null,line_type:null,is_mobile:false,is_voip:false,is_valid:false,registered_owner:null,owner_type:null,address_line1:null,address_city:null,address_state:null,address_zip:null,address_country:null,lookup_provider:null,lookup_data:{},lookup_expires_at:null,lookup_count:0,last_lookup_at:null};db.phoneNumbers.push(row);}if(row.lookup_expires_at==null||row.lookup_expires_at<=now)refreshMockPhone(row);if(opts.body?.force_refresh)refreshMockPhone(row);return {status:true,data:{...row},graph:'default'};
     }
