@@ -338,9 +338,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:edit:modal.open:0",
-      "fingerprint": "504091d6fa14a66d9260",
+      "fingerprint": "e533bca69371fb2d80f5",
       "category": "editor",
-      "purpose": "ConfigEditor: collect and save fields"
+      "purpose": "ConfigEditor: collect and save fields; clear the previous connection result after saving"
     },
     {
       "id": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx:ProviderConfigsPage:modal.open:0",

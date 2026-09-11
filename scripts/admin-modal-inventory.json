@@ -2802,7 +2802,7 @@
       "category": "record",
       "parent": "MemberDetail",
       "target": null,
-      "fingerprint": "34d8c40f54ca177cd994",
+      "fingerprint": "36fa77ec1affd6df02cd",
       "categories": [
         "record"
       ]
@@ -7664,7 +7664,7 @@
       "category": "editor",
       "parent": "edit",
       "target": null,
-      "fingerprint": "504091d6fa14a66d9260",
+      "fingerprint": "e533bca69371fb2d80f5",
       "categories": [
         "editor"
       ]
@@ -7687,7 +7687,7 @@
       "category": "record",
       "parent": "ConfigDetail",
       "target": null,
-      "fingerprint": "259a7c6361dfa9db46f6",
+      "fingerprint": "98e74ef2e54be71c40fe",
       "categories": [
         "record"
       ]
@@ -8571,7 +8571,7 @@
       "owner": "MemberDetail",
       "key": "'Permissions'",
       "label": "Permissions",
-      "fingerprint": "27e254e654f211375c10"
+      "fingerprint": "1637faff88aa4b590afd"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",
@@ -9166,14 +9166,14 @@
       "owner": "ConfigDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "a8ec765eeaf1c6e53dac"
+      "fingerprint": "739fb75cfef74cfbec02"
     },
     {
       "file": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx",
       "owner": "ConfigDetail",
       "key": "'connection'",
       "label": "Connection",
-      "fingerprint": "3be88e2fcab7d7c8d7dd"
+      "fingerprint": "8c1a05c86bb3408b20ec"
     },
     {
       "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
