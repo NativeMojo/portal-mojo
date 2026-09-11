@@ -419,7 +419,7 @@ export function autosaveReducer(state: AutosaveState, action: AutosaveAction): A
 export interface AutosaveBatchRunnerDeps<T> {
     /** The state snapshot at fire time. */
     state: AutosaveState;
-    /** Latest options — read again at settle time (the hook's optsRef). */
+    /** Current options, captured once for this batch and its settlement. */
     opts: () => Pick<UseFormAutosaveOptions<T>, 'fields' | 'row' | 'save' | 'beforeSave' | 'onSaved' | 'onSaveError'>;
     dispatch: (action: AutosaveAction) => void;
     /** Re-arm the batch window (drain anything committed mid-flight). */
@@ -440,14 +440,18 @@ export function runAutosaveBatch<T>(deps: AutosaveBatchRunnerDeps<T>): Promise<v
     if (names.length === 0) return Promise.resolve();
     const sent: Record<string, FieldValue> = { ...s.pending };
     const changes = expandDotted(sent);
+    // The approval, write target and callbacks belong to the same batch.
+    // Reading opts again after a gate can redirect an approved write to a
+    // different row/model rendered while the confirmation was open.
+    const batch = opts();
     dispatch({ type: 'BATCH_START', names });
 
-    const post = (body: Record<string, unknown>): Promise<void> => opts().save(body).then(
+    const post = (body: Record<string, unknown>): Promise<void> => batch.save(body).then(
         (savedRow) => {
-            const server = serverValuesFor(opts().fields, savedRow);
+            const server = serverValuesFor(batch.fields, savedRow);
             dispatch({ type: 'SAVE_OK', names, sent, server });
             for (const n of names) armFlashTimer(n);
-            opts().onSaved?.({ changes: body, fields: names, row: savedRow });
+            batch.onSaved?.({ changes: body, fields: names, row: savedRow });
             armBatchTimer(); // drain anything committed mid-flight
         },
         (err: unknown) => fail(body, err),
@@ -455,18 +459,18 @@ export function runAutosaveBatch<T>(deps: AutosaveBatchRunnerDeps<T>): Promise<v
     const fail = (body: Record<string, unknown>, err: unknown) => {
         const error = err instanceof Error ? err : new Error('Save failed');
         dispatch({ type: 'SAVE_FAIL', names, error: error.message });
-        opts().onSaveError?.({ changes: body, fields: names, error });
+        batch.onSaveError?.({ changes: body, fields: names, error });
         armBatchTimer();
     };
 
-    const beforeSave = opts().beforeSave;
+    const beforeSave = batch.beforeSave;
     if (!beforeSave) return post(changes); // no hook: the pre-existing path, unchanged
 
     // The gate. BATCH_START already flagged inflight, so the window cannot
     // re-fire while this awaits and commits meanwhile queue the NEXT batch.
     let verdict: Promise<boolean | void | Record<string, unknown>>;
     try {
-        verdict = Promise.resolve(beforeSave({ changes, names, row: opts().row }));
+        verdict = Promise.resolve(beforeSave({ changes, names, row: batch.row }));
     } catch (err) {
         verdict = Promise.reject(err);
     }

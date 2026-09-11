@@ -138,6 +138,10 @@ that throws or rejects is a bug, not a veto: it surfaces exactly like a
 failed save (revert + pinned error + `onSaveError` toast). Without the prop
 the path is the pre-existing one, unchanged.
 
+Each batch captures its save target and result callbacks before confirmation.
+Rerendering with another record while the gate awaits cannot redirect that
+approved write or its callbacks to the new record.
+
 Use it for the fields where a typo takes a tenant dark and there is no save
 button to hesitate over: identity fields (`uuid`, `auth_domain`), escalating
 grants (MemberDetail guards `manage_group` / `manage_members` this way). The

@@ -45,7 +45,7 @@ try {
             armed: 0,
             flashed: [],
         };
-        const opts = {
+        let opts = {
             fields: FIELDS,
             row: ROW,
             save: async (body) => { h.saves.push(body); return extra.saveImpl ? extra.saveImpl(body) : { ...ROW, ...body, permissions: { ...ROW.permissions, ...(body.permissions ?? {}) } }; },
@@ -54,6 +54,7 @@ try {
             ...(extra.beforeSave ? { beforeSave: extra.beforeSave } : {}),
         };
         h.dispatch = (action) => { h.actions.push(action.type); h.state = autosaveReducer(h.state, action); };
+        h.rerender = (changes) => { opts = { ...opts, ...changes }; };
         h.commit = (name, value) => h.dispatch({ type: 'COMMIT', field: FIELDS.find((f) => f.name === name), value, fields: FIELDS });
         h.fire = () => runAutosaveBatch({
             state: h.state, opts: () => opts, dispatch: h.dispatch,
@@ -209,6 +210,31 @@ try {
         assert.equal(h.state.draft.display_name, 'Jane');
         assert.equal(h.failed[0].error.message, 'E.164 required');
         assert.equal(h.armed, 1);
+    }
+
+    // Approval belongs to the record that opened the gate, even if props change.
+    for (const rejected of [false, true]) {
+        const gate = deferred();
+        const h = harness({
+            beforeSave: () => gate.promise,
+            ...(rejected ? { saveImpl: () => { throw new Error('Original owner rejected'); } } : {}),
+        });
+        const otherSaves = [];
+        const otherResults = [];
+        h.commit('permissions.manage_group', true);
+        const running = h.fire();
+        h.rerender({
+            row: { ...ROW, id: 2 },
+            save: async (body) => { otherSaves.push(body); return { ...ROW, id: 2 }; },
+            onSaved: (info) => otherResults.push(info),
+            onSaveError: (info) => otherResults.push(info),
+        });
+        gate.resolve(true);
+        await running;
+        assert.deepEqual(otherSaves, [], 'a pending approval must never write to the newly rendered record');
+        assert.equal(h.saves.length, 1, 'the approved batch retains its original save owner');
+        assert.deepEqual(otherResults, [], 'settlement callbacks belong to the original batch owner');
+        assert.equal(rejected ? h.failed.length : h.saved.length, 1);
     }
 
     // ── 7. Reducer: BATCH_DROP touches only its names, skips re-pending ones ──
