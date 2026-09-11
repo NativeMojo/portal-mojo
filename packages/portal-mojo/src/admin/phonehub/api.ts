@@ -42,13 +42,13 @@ export async function savePhoneConfigImperative(qc:QueryClient,id:number|null,sc
     const row=sanitizePhoneConfigRow(response.data as PhoneConfigRow);
     qc.setQueryData(PhoneConfigModel.keys.one(row.id),row);await qc.invalidateQueries({queryKey:PhoneConfigModel.keys.root});return row;
 }
-// Deliberately NOT client/action-result's `mojoAction`: `status` here is the
-// connection test's VERDICT (a result datum), not an action refusal — a failed
-// test must resolve so the panel can render it.
-export async function testPhoneConfigImperative(id:number):Promise<{status:boolean;message:string}>{
+// PhoneConfig returns `success` as its provider verdict; envelope `status`
+// only says the REST action ran. A failed test resolves for inline display.
+export async function testPhoneConfigImperative(id:number):Promise<{status:boolean;message:string;testMode:boolean;errorCode:string|null}>{
     const response=await mojoCall(`${PhoneConfigModel.endpoint}/${id}`,{method:'POST',body:{test_connection:1}});
     const data=(response.data??response) as Record<string,unknown>;
-    return {status:data.status!==false,message:typeof data.message==='string'?data.message:'Connection test completed.'};
+    const status=data.success===true;
+    return {status,testMode:data.test_mode===true,errorCode:typeof data.error==='string'?data.error:null,message:typeof data.message==='string'?data.message:status?'Connection verified.':'The server did not confirm the provider connection.'};
 }
 export async function fetchPhoneGroupChoices():Promise<PhoneRelation[]>{
     const result=await mojoList<Record<string,unknown>>('/api/group',{graph:'basic',sort:'name',start:0,size:PHONE_GROUP_CHOICE_LIMIT});

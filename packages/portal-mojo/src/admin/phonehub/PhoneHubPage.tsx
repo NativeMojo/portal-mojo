@@ -276,6 +276,7 @@ function ConfigDetail({ id, onClose }: { id: number; onClose: () => void }) {
 
 
     const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testPhoneConfigImperative>> | null>(null);
     if (!query.data) return <div className="modal-pad">{query.isLoading ? 'Loading provider configuration…' : 'Configuration unavailable'}<button className="btn" onClick={onClose}>Close</button></div>;
     const row = query.data;
     const toggle = async (next: boolean) => {
@@ -286,30 +287,40 @@ function ConfigDetail({ id, onClose }: { id: number; onClose: () => void }) {
         finally { setSaving(false); }
     };
     const meta = providerMeta[row.provider];
-    const edit = () => void modal.open((close) => <ConfigEditor row={row} close={async (saved) => { close(saved); if (saved) await query.refetch(); }} />, { size: 'lg' });
+    const edit = () => void modal.open((close) => <ConfigEditor row={row} close={async (saved) => { close(saved); if (saved) { setTestResult(null); await query.refetch(); } }} />, { size: 'lg' });
     const test = async () => {
         setTesting(true);
+        setTestResult(null);
         try {
             const result = await testPhoneConfigImperative(id);
-            toast[result.status ? 'success' : 'error'](result.message);
+            setTestResult(result);
+            toast[result.testMode ? 'warning' : result.status ? 'success' : 'error'](result.message);
         } catch (reason) {
-            toast.error(reason instanceof Error ? reason.message : 'Connection test failed');
+            const message = reason instanceof Error ? reason.message : 'Connection test failed';
+            setTestResult({ status: false, message, testMode: false, errorCode: null });
+            toast.error(message);
         } finally {
             setTesting(false);
         }
     };
 
+    const resultNotice = testResult && <div className={testResult.status && !testResult.testMode ? 'known-card' : 'form-alert'} role={testResult.status ? 'status' : 'alert'}>
+        <h3>Connection test: {testResult.testMode ? 'Not tested' : testResult.status ? 'Passed' : 'Failed'}</h3>
+        <p>{testResult.message}</p>
+        {testResult.errorCode === 'missing_credentials' && <p>Use Edit configuration to save the provider credentials, then test again. Blank credential fields keep any saved value unchanged.</p>}
+    </div>;
+
     return <DetailView
         title={row.name}
-        subtitle={relationLabel(row.group)}
+        subtitle={`Scope: ${relationLabel(row.group)}`}
         icon={meta.icon}
         chips={[{ text: meta.label, tone: 'info' }, { text: row.is_active ? 'Active' : 'Inactive', tone: row.is_active ? 'success' : 'muted' }, ...(row.test_mode ? [{ text: 'Test mode', tone: 'warning' as const }] : [])]}
         onClose={onClose}
         active={canManage ? { value: row.is_active, disabled: saving, onChange: next => void toggle(next) } : undefined}
         contextMenu={canManage ? [{ label: 'Edit configuration', onSelect: edit }, { label: 'Test stored connection', disabled: testing, onSelect: () => void test() }, { label: row.is_active ? 'Deactivate' : 'Reactivate', disabled: saving, onSelect: () => void toggle(!row.is_active) }] : []}
         sections={[
-            { key: 'overview', label: 'Overview', icon: 'bi-sliders', render: () => <div className="detail-section"><div className="phonehub-provider-summary"><i className={`bi ${meta.icon}`} /><div><span className="eyebrow">Provider</span><h3>{meta.label}</h3><p>{meta.description}</p></div></div><div className="phonehub-summary-grid"><div className="known-card"><span>Scope</span><strong>{relationLabel(row.group)}</strong></div><div className="known-card"><span>Automatic lookup</span><strong>{row.lookup_enabled ? `Enabled · ${row.lookup_cache_days} days` : 'Disabled'}</strong></div><div className="known-card"><span>Last modified</span><strong>{fmt.datetime(row.modified)}</strong></div></div><p className="dim">An active group configuration wins; otherwise Phone Hub falls back to the first active system default.</p></div> },
-            { key: 'connection', label: 'Connection', icon: 'bi-plug', render: () => <div className="detail-section"><div className="section-eyebrow">{meta.label} settings</div>{providerVisibleRows(row).map(([label, value]) => <FlatRow key={label} label={label}>{value}</FlatRow>)}<FlatRow label="Credentials"><span><i className="bi bi-shield-lock" /> Write-only; edit to replace or clear</span></FlatRow><div className={`phonehub-provider-note${row.provider === 'mojo' ? '' : ' is-warning'}`}><i className={`bi ${row.provider === 'mojo' ? 'bi-info-circle' : 'bi-exclamation-triangle'}`} /><span>{providerOperationalNote(row.provider)}</span></div>{row.test_mode && <div className="phonehub-provider-note is-warning"><i className="bi bi-beaker" /><span>Test mode only short-circuits the connection test. It does not prevent SMS delivery.</span></div>}<FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow></div> }
+            { key: 'overview', label: 'Overview', icon: 'bi-sliders', render: () => <div className="detail-section">{resultNotice}<div className="phonehub-provider-summary"><i className={`bi ${meta.icon}`} /><div><span className="eyebrow">Provider</span><h3>{meta.label}</h3><p>{meta.description}</p></div></div><div className="phonehub-summary-grid"><div className="known-card"><span>Scope</span><strong>{relationLabel(row.group)}</strong></div><div className="known-card"><span>Automatic lookup</span><strong>{row.lookup_enabled ? `Enabled · ${row.lookup_cache_days} days` : 'Disabled'}</strong></div><div className="known-card"><span>Last modified</span><strong>{fmt.datetime(row.modified)}</strong></div></div><p className="dim">An active group configuration wins; otherwise Phone Hub falls back to the first active system default.</p></div> },
+            { key: 'connection', label: 'Connection', icon: 'bi-plug', render: () => <div className="detail-section">{resultNotice}<FlatRow label="Scope">{relationLabel(row.group)}</FlatRow><div className="section-eyebrow">{meta.label} settings</div>{providerVisibleRows(row).map(([label, value]) => <FlatRow key={label} label={label}>{value}</FlatRow>)}<FlatRow label="Credentials"><span><i className="bi bi-shield-lock" /> Write-only; edit to replace or clear</span></FlatRow><div className={`phonehub-provider-note${row.provider === 'mojo' ? '' : ' is-warning'}`}><i className={`bi ${row.provider === 'mojo' ? 'bi-info-circle' : 'bi-exclamation-triangle'}`} /><span>{providerOperationalNote(row.provider)}</span></div>{row.test_mode && <div className="phonehub-provider-note is-warning"><i className="bi bi-beaker" /><span>Test mode only short-circuits the connection test. It does not prevent SMS delivery.</span></div>}<FlatRow label="Created">{fmt.datetime(row.created)}</FlatRow></div> }
         ]}
     />;
 }

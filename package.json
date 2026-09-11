@@ -56,7 +56,7 @@
         "verify:admin-storage": "node scripts/verify-admin-storage.mjs",
         "verify:admin-shortlinks": "node scripts/verify-admin-shortlinks.mjs",
         "verify:admin-messaging": "node scripts/verify-admin-messaging.mjs",
-        "verify:admin-phonehub": "node scripts/verify-admin-phonehub.mjs",
+        "verify:admin-phonehub": "node scripts/verify-admin-phonehub.mjs && node scripts/verify-phonehub-connection.mjs",
         "verify:admin-sms-compose": "node scripts/verify-admin-sms-compose.mjs",
         "verify:admin-push": "node scripts/verify-admin-push.mjs",
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",
@@ -69,7 +69,7 @@
         "verify:form-uploads": "node scripts/verify-form-uploads.mjs",
         "verify:image-editor": "node scripts/verify-image-editor.mjs",
         "verify:admin-modals": "node scripts/verify-admin-modals.mjs",
-        "verify:admin-modal-mounted": "node scripts/verify-admin-modal-mounted.mjs",
+        "verify:admin-modal-mounted": "node scripts/verify-admin-modal-mounted.mjs && node scripts/verify-toast-modal.mjs",
         "verify:admin-modal-scanner": "node scripts/verify-admin-modal-scanner.mjs",
         "verify:admin-modal-lifecycle": "node scripts/verify-admin-modal-lifecycle.mjs"
     },

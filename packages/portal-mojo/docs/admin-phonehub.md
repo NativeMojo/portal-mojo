@@ -12,6 +12,15 @@ Import `PhoneHubPage`, the three individual pages, models, permission clauses, a
 - A successful HTTP envelope can contain a `failed` or `undelivered` SMS record: render that status as failure. Other returned statuses remain literal; only `delivered` confirms delivery. The default graph does not expose `is_test`, so a `sent` receipt does not claim a real delivery. Transport/malformed-receipt failures retain the draft and ask the operator to check SMS Audit before retrying. Every attempted send invalidates the audit list; refresh failure cannot turn a completed send into a retry. Provider refusal is demonstrated in the mock with a recipient ending in `0000`; no mock request contacts a provider.
 - `PhoneConfigModel` reads sanitized scalar/default-graph rows. Saves and `test_connection` use imperative, cache-free calls. The editor follows web-mojo's provider-conditional layout: selecting Twilio, AWS SNS, or Mojo Remote shows and submits only that provider's connection fields. Mojo Remote uses `https://api.mojoverify.com` when the saved URL is unset or the editor is switched to Mojo; an explicitly configured custom URL is preserved. Secret inputs are DOM refs, not React or Query state: blank means untouched and is omitted; replacement must be non-empty; clear sends `null` only after a separate confirmation. Switching providers resets pending clears, and hidden provider credentials remain untouched. Responses are allowlisted before cache reconciliation. This surface edits existing provider credentials; it does not provision Django user/group API keys.
 
+Connection tests read the provider's `success` verdict, not the outer REST
+`status`. A failed or missing verdict is an error; `test_mode` is a warning
+that the provider was not contacted. Results persist inside the detail modal
+on both sections, alongside a toast. Scope is labeled in the header and
+Connection section. Saving new credentials clears the previous test result.
+The stored URL is shown literally; a saved URL plus `missing_credentials` for
+Mojo means the API key is absent. Re-enter it in Edit configuration and save;
+blank password inputs preserve existing values and do not prove a key exists.
+
 ## Exact permissions
 
 Every exported array is an ANY-of clause and retains the `sys.` UI namespace. Number view is `view_phone_numbers | manage_phone_numbers | comms | manage_users`; save is `manage_phone_numbers | comms | manage_users`; delete is only `manage_phone_numbers`. SMS view is `view_sms | manage_sms | comms | owner | manage_notifications`; save is `manage_sms | comms | manage_notifications`; delete is `manage_sms | manage_notifications`. Config view/save is `manage_phone_config | manage_groups | comms`; delete is `manage_phone_config | manage_groups`. These delete clauses describe low-level API compatibility; built-in number,
