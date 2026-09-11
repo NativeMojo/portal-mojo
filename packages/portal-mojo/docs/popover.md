@@ -117,9 +117,9 @@ baked in 20px padding + 260px min-width for its one tenant, the calendar
 - **Don't wrap the shell in `overflow: hidden` styling assumptions** —
   it's in the top layer; nothing ancestral clips or covers it. Anything
   that must paint ABOVE an open popover has to join the top layer later.
-- **Toasts render under open modals** (`.toast-host` is z-index 60, not
-  top layer). Don't signal from popover content inside a modal via toast;
-  show it in the modal body.
+- **Use the single ToastHost for modal notifications.** It follows the active
+  dialog into the native top layer; see [feedback](feedback.md#toast). Keep
+  actionable errors in the modal body too when they need to outlast a toast.
 - **One value pipeline:** the popover is presentation only. Commit
   semantics (`change` on select/Enter/blur, never per keystroke) belong
   to the consuming control.

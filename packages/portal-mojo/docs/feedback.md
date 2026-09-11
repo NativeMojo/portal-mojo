@@ -85,6 +85,10 @@ and drawers), then returns to the page when the last modal closes. Modal-local
 ancestry keeps Undo and progress Cancel usable despite native dialog inertness.
 Moving the host preserves card state and timers and does not focus the toast.
 Mount it once; do not add per-dialog toast hosts or solve this with `z-index`.
+Custom app themes must include the updated toast CSS from
+`apps/portal/src/theme.css`: reset the popover's UA inset/margin/border/padding
+and background, hide closed popovers, and keep only the cards pointer-active.
+Updating the TypeScript package alone does not update a consumer's own theme.
 The showcase's **Toasts inside modal** demo covers errors, Undo, progress,
 and nested opening/closing. `node scripts/verify-toast-modal.mjs` checks the
 mounted lifecycle; native visibility and interaction require browser checks.

@@ -238,5 +238,6 @@ clicked away mid-save, they keep where they went.
 - **The overlay is `dialog[open]`.** ModelTable's `autoRefresh` skips ticks
   while any `dialog[open]` exists, so auto-refresh politely pauses during a
   busy operation. That is intended; don't "fix" it.
-- **Toasts render under the overlay** (`.toast-host` is z-index 60, the
-  overlay is in the top layer). Toast *after* closing the handle, not during.
+- **Toasts remain above the overlay.** The single [ToastHost](feedback.md#toast)
+  follows the active native dialog, keeping notifications and their actions
+  available during a blocking operation.
