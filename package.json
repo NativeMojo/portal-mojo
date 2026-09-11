@@ -72,7 +72,7 @@
         "verify:admin-modal-mounted": "node scripts/verify-admin-modal-mounted.mjs && node scripts/verify-toast-modal.mjs",
         "verify:admin-modal-scanner": "node scripts/verify-admin-modal-scanner.mjs",
         "verify:admin-modal-lifecycle": "node scripts/verify-admin-modal-lifecycle.mjs",
-        "verify:form-autosave": "node scripts/verify-form-autosave.mjs"
+        "verify:form-autosave": "node scripts/verify-form-autosave.mjs && node scripts/verify-form-owner.mjs"
     },
     "devDependencies": {
         "jsdom": "^26.1.0"

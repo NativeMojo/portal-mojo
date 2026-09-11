@@ -116,7 +116,22 @@ export interface FormViewProps<T extends { id: number | string }> {
     className?: string;
 }
 
+const saveOwnerIds = new WeakMap<object, number>();
+let nextSaveOwnerId = 0;
+
 export function FormView<T extends { id: number | string }>(props: FormViewProps<T>) {
+    // A TanStack mutation observer updates its mutationFn on rerender.
+    // Keep the observer and reducer with the model/record that created them,
+    // so a confirmation already in flight cannot migrate to another owner.
+    let modelId = saveOwnerIds.get(props.model.useSave);
+    if (modelId === undefined) {
+        modelId = ++nextSaveOwnerId;
+        saveOwnerIds.set(props.model.useSave, modelId);
+    }
+    return <OwnedFormView key={JSON.stringify([modelId, props.row.id])} {...props} />;
+}
+
+function OwnedFormView<T extends { id: number | string }>(props: FormViewProps<T>) {
     const { model, row, fields, tabs, debounceMs, savedFlashMs, onSaved, onSaveError, beforeSave, className } = props;
     const save = model.useSave();
 
