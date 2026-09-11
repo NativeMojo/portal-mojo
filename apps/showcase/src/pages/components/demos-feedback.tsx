@@ -76,12 +76,24 @@ export function ModalsDemo() {
 }
 
 export function ToastsDemo() {
+    const inModal = () => void modal.open(close => <div className="modal-pad">
+        <h2 className="modal-title">Toast above a modal</h2>
+        <p className="modal-message">Notifications stay readable and their actions stay usable above stacked dialogs.</p>
+        <div className="demo-row">
+            <button className="btn" onClick={() => toast.error('Connection failed: the stored API key is missing')}>Show error toast</button>
+            <button className="btn" onClick={() => toast.undo('Demo change applied', () => toast.success('Demo change undone'))}>Show Undo toast</button>
+            <button className="btn" onClick={() => { const progress = toast.progress('Demo upload', { onCancel: () => progress.remove() }); progress.update(43); }}>Show progress toast</button>
+            <button className="btn" onClick={inModal}>Open nested modal</button>
+        </div>
+        <div className="modal-actions"><button className="btn" onClick={() => close(null)}>Close toast demo</button></div>
+    </div>);
     return (
         <div className="panel panel-pad demo-row">
             <button className="btn" onClick={() => toast.success('Saved')}>success</button>
             <button className="btn" onClick={() => toast.error('Save failed — server said no')}>error</button>
             <button className="btn" onClick={() => toast.info('FYI')}>info</button>
             <button className="btn" onClick={() => toast.warning('Disable: 3 succeeded, 2 failed')}>warning (partial)</button>
+            <button className="btn" onClick={inModal}>Toasts inside modal</button>
         </div>
     );
 }

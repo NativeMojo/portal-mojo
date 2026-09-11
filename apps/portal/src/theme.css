@@ -774,7 +774,15 @@ button { font: inherit; color: inherit; }
 .feed-main { flex: 1; min-width: 0; }
 
 /* ============================================================ Toasts */
-.toast-host { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 60; }
+.toast-host {
+    position: fixed; inset: auto 18px 18px auto; margin: 0; padding: 0;
+    border: none; background: transparent; overflow: visible;
+    display: flex; flex-direction: column; gap: 8px; z-index: 60;
+    max-width: calc(100vw - 36px); pointer-events: none;
+}
+.toast-host[popover]:not(:popover-open) { display: none; }
+.toast-host::backdrop { background: transparent; pointer-events: none; }
+.toast-host > .toast-card { pointer-events: auto; }
 .toast-card {
     display: flex; align-items: center; gap: 9px;
     background: var(--surface); border: 1px solid var(--line);

@@ -18,7 +18,8 @@
 // Visual spec from web-mojo's toast.css (left accent bar, compact card,
 // bottom-right); idiom styles live in the app's theme/idioms.css — tokens
 // only, both themes.
-import { useSyncExternalStore } from 'react';
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 
 type Level = 'success' | 'error' | 'info' | 'warning';
 
@@ -187,8 +188,50 @@ export function ToastHost() {
         (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
         () => toasts,
     );
-    return (
-        <div className="toast-host" role="status" aria-live="polite">
+    // Keep one portal target so moving above a new modal preserves live cards.
+    const [host] = useState(() => typeof document === 'undefined' ? null : document.createElement('div'));
+    const visible = useRef(false);
+    visible.current = items.length > 0;
+    const syncHost = useRef<() => void>(() => {});
+    useLayoutEffect(() => {
+        if (!host) return;
+        host.className = 'toast-host';
+        host.setAttribute('role', 'status');
+        host.setAttribute('aria-live', 'polite');
+        const supportsPopover = typeof host.showPopover === 'function';
+        if (supportsPopover) host.setAttribute('popover', 'manual');
+        let dialogs: HTMLDialogElement[] = [];
+        const sync = (records: MutationRecord[] = []) => {
+            const open = Array.from(document.querySelectorAll('dialog')).filter(dialog => dialog.matches(':modal'));
+            dialogs = dialogs.filter(dialog => open.includes(dialog));
+            for (const dialog of open) if (!dialogs.includes(dialog)) dialogs.push(dialog);
+            // Opening order, not DOM order, determines the active native modal.
+            for (const record of records) {
+                if (record.type !== 'attributes' || record.oldValue !== null || !(record.target instanceof HTMLDialogElement) || !open.includes(record.target)) continue;
+                dialogs = [...dialogs.filter(dialog => dialog !== record.target), record.target];
+            }
+            const parent = dialogs.at(-1) ?? document.body;
+            const moved = host.parentElement !== parent;
+            if (supportsPopover && host.matches(':popover-open') && (moved || !visible.current)) host.hidePopover();
+            // A body-level popover paints above dialogs but remains inert.
+            // Modal-local ancestry is required for Undo/Cancel and keyboard use.
+            if (moved) parent.appendChild(host);
+            if (supportsPopover && visible.current && !host.matches(':popover-open')) host.showPopover();
+        };
+        syncHost.current = sync;
+        const observer = new MutationObserver(sync);
+        observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'], attributeOldValue: true });
+        sync();
+        return () => {
+            observer.disconnect();
+            syncHost.current = () => {};
+            if (supportsPopover && host.matches(':popover-open')) host.hidePopover();
+            host.remove();
+        };
+    }, [host]);
+    useLayoutEffect(() => { syncHost.current(); }, [items.length > 0]);
+    return host ? createPortal(
+        <>
             {items.map((t) => {
                 if (t.kind === 'basic') {
                     return (
@@ -214,6 +257,6 @@ export function ToastHost() {
                 }
                 return <ProgressCard key={t.id} t={t} />;
             })}
-        </div>
-    );
+        </>, host,
+    ) : null;
 }

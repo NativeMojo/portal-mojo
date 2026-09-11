@@ -79,6 +79,16 @@ bottom-right cards, max 5, 3.5s. Conventions:
 - `response: 'payload'` actions toast the SERVER's payload message
   (`outcome.body.message`), not client copy.
 
+`ToastHost` uses a manual native popover above dialog backdrops. Its stable
+portal target follows the most recently opened modal (including nested dialogs
+and drawers), then returns to the page when the last modal closes. Modal-local
+ancestry keeps Undo and progress Cancel usable despite native dialog inertness.
+Moving the host preserves card state and timers and does not focus the toast.
+Mount it once; do not add per-dialog toast hosts or solve this with `z-index`.
+The showcase's **Toasts inside modal** demo covers errors, Undo, progress,
+and nested opening/closing. `node scripts/verify-toast-modal.mjs` checks the
+mounted lifecycle; native visibility and interaction require browser checks.
+
 ## Pitfall
 
 An open `<dialog>` pauses ModelTable's autoRefresh by design — don't build
