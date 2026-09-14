@@ -11,3 +11,20 @@
 .push-preview p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .push-editor textarea { font-family: var(--font-mono, ui-monospace, monospace); }
 @media (max-width: 700px) { .push-kpi-grid, .push-kpi-grid-two { grid-template-columns: 1fr; } }
+
+.push-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 14px; }
+.push-test-target { margin: 14px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface2); overflow-wrap: anywhere; }
+.push-test-result { margin: 16px 0; padding: 14px; border: 1px solid var(--line); border-left: 3px solid var(--good); border-radius: 8px; background: var(--surface2); }
+.push-test-attention { border-left-color: var(--warn); }
+.push-test-result p:last-child { margin-bottom: 0; }
+.push-test-dialog .flat-row { grid-template-columns: 110px minmax(0,1fr); padding: 8px 0; }
+.push-test-dialog .flat-action { display: none; }
+.push-test-dialog .input { width: 100%; }
+.push-editor .field-help { max-width: 65ch; }
+@media (max-width: 560px) { .push-test-dialog .flat-row { grid-template-columns: 1fr; gap: 3px; } }
+
+.push-editor .col-3 { grid-column: span 3; }
+.push-editor .col-4 { grid-column: span 4; }
+.push-editor .col-8 { grid-column: span 8; }
+.push-editor .field { min-width: 0; }
+@media (max-width: 560px) { .push-editor .form-grid > * { grid-column: 1 / -1; } }

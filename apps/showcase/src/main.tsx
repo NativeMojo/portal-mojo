@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
-    RealtimeProvider, initAuth, login, mojoQueryDefaults, onAuth, usingMockTransport,
+    RealtimeProvider, initAuth, login, mojoQueryDefaults, onAuth, usingMockTransport, registerNonFilterParams,
 } from 'portal-mojo/client/runtime';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './theme.css';
@@ -17,6 +17,7 @@ import App from './App';
 // backend), so — since there is no login page here — sign in as the mock's
 // fixed demo identity once at boot, silently, so every data-backed demo
 // (tables, filters, search…) works for a first-time visitor out of the box.
+registerNonFilterParams('demo');
 initAuth();
 if (!usingMockTransport()) {
     throw new Error('apps/showcase is mock-only — do not point it at a real VITE_MOJO_API');

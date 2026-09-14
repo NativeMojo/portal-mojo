@@ -432,7 +432,7 @@ const GROUPS: DemoGroup[] = [
             },
             {
                 key: 'admin-push', title: 'Push notifications', icon: 'bi-bell',
-                blurb: 'Caller-only stats, globally gated metrics, strict device/delivery projections, templates, and cache-free FCM configuration without send, retry, or delete shortcuts.',
+                blurb: 'Test individual registered devices, inspect delivery evidence, and validate FCM configuration with clear scope and simulation status.',
                 render: () => <AdminPushDemo />,
             },
             { key: 'admin-modals', title: 'Admin modal audit', icon: 'bi-ui-checks', blurb: 'Responsive detail chrome, lifecycle actions, rich badges, nested editors and embedded hosts.', render: () => <AdminModalsDemo /> },

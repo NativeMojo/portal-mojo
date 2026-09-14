@@ -7296,6 +7296,22 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushTestDialog.tsx:openPushDeviceTest:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushTestDialog.tsx",
+      "owner": "openPushDeviceTest",
+      "launcher": "modal.open",
+      "body": [
+        "PushTestDialog"
+      ],
+      "category": "action",
+      "parent": "openPushDeviceTest",
+      "target": null,
+      "fingerprint": "ad3ecbbdcafca27ae035",
+      "categories": [
+        "action"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:DeviceDetail:DetailView:0",
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "DeviceDetail",
@@ -7310,9 +7326,23 @@
       "category": "record",
       "parent": "DeviceDetail",
       "target": null,
-      "fingerprint": "199cb6540c3ba339f5cc",
+      "fingerprint": "e7998df6278d5e6a58e7",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:DeviceDetail:openPushDeviceTest:0",
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
+      "owner": "DeviceDetail",
+      "launcher": "openPushDeviceTest",
+      "body": [],
+      "category": "action",
+      "parent": "DeviceDetail",
+      "target": "packages/portal-mojo/src/admin/messaging/push/PushTestDialog.tsx:openPushDeviceTest",
+      "fingerprint": "afcaf810ede98c0b2559",
+      "categories": [
+        "action"
       ]
     },
     {
@@ -7347,7 +7377,7 @@
       "category": "record",
       "parent": "DeliveryDetail",
       "target": null,
-      "fingerprint": "f0c9c70c97c8255677af",
+      "fingerprint": "6deb6a2330f68367f09a",
       "categories": [
         "record"
       ]
@@ -7369,17 +7399,15 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:edit:modal.open:0",
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:edit:openTemplateEditor:0",
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "edit",
-      "launcher": "modal.open",
-      "body": [
-        "TemplateEditor"
-      ],
+      "launcher": "openTemplateEditor",
+      "body": [],
       "category": "editor",
       "parent": "edit",
-      "target": null,
-      "fingerprint": "e9051a62aa334c9456c3",
+      "target": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:openTemplateEditor",
+      "fingerprint": "1079c4263a6ae251f030",
       "categories": [
         "editor"
       ]
@@ -7393,30 +7421,28 @@
         "DetailView",
         "div",
         "FlatRow",
-        "h3",
+        "strong",
         "p",
         "code"
       ],
       "category": "record",
       "parent": "TemplateDetail",
       "target": null,
-      "fingerprint": "efc42e2629f1a84fa048",
+      "fingerprint": "4efec640b66f133a241a",
       "categories": [
         "record"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:PushTemplatesPage:modal.open:0",
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:PushTemplatesPage:openTemplateEditor:0",
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "PushTemplatesPage",
-      "launcher": "modal.open",
-      "body": [
-        "TemplateEditor"
-      ],
+      "launcher": "openTemplateEditor",
+      "body": [],
       "category": "editor",
       "parent": "PushTemplatesPage",
-      "target": null,
-      "fingerprint": "a1bb0138176abca03340",
+      "target": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:openTemplateEditor",
+      "fingerprint": "888a9e224b8dd092b91b",
       "categories": [
         "editor"
       ]
@@ -7438,17 +7464,15 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:edit:modal.open:1",
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:edit:openConfigEditor:0",
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "edit",
-      "launcher": "modal.open",
-      "body": [
-        "ConfigEditor"
-      ],
+      "launcher": "openConfigEditor",
+      "body": [],
       "category": "editor",
       "parent": "edit",
-      "target": null,
-      "fingerprint": "35b41f1d35f7660b2995",
+      "target": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:openConfigEditor",
+      "fingerprint": "9c396168f47a12c1187d",
       "categories": [
         "editor"
       ]
@@ -7462,28 +7486,27 @@
         "DetailView",
         "div",
         "FlatRow",
-        "p"
+        "p",
+        "PushTestResultView"
       ],
       "category": "record",
       "parent": "ConfigDetail",
       "target": null,
-      "fingerprint": "e7fdcc3fb3bac183574d",
+      "fingerprint": "4e994493cef21ea40273",
       "categories": [
         "record"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:PushConfigsPage:modal.open:0",
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:PushConfigsPage:openConfigEditor:0",
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "PushConfigsPage",
-      "launcher": "modal.open",
-      "body": [
-        "ConfigEditor"
-      ],
+      "launcher": "openConfigEditor",
+      "body": [],
       "category": "editor",
       "parent": "PushConfigsPage",
-      "target": null,
-      "fingerprint": "a5859e2e381948d2cc44",
+      "target": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:openConfigEditor",
+      "fingerprint": "f1b12de806ec1766c6f3",
       "categories": [
         "editor"
       ]
@@ -7502,6 +7525,38 @@
       "fingerprint": "6e43c9d287c386a32353",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:openTemplateEditor:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
+      "owner": "openTemplateEditor",
+      "launcher": "modal.open",
+      "body": [
+        "TemplateEditor"
+      ],
+      "category": "editor",
+      "parent": "openTemplateEditor",
+      "target": null,
+      "fingerprint": "6fdfebb0251fab4f0201",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx:openConfigEditor:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
+      "owner": "openConfigEditor",
+      "launcher": "modal.open",
+      "body": [
+        "ConfigEditor"
+      ],
+      "category": "editor",
+      "parent": "openConfigEditor",
+      "target": null,
+      "fingerprint": "88f7ed0954ae847dfe42",
+      "categories": [
+        "editor"
       ]
     },
     {
@@ -9102,15 +9157,15 @@
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "DeviceDetail",
       "key": "'device'",
-      "label": "Device",
-      "fingerprint": "55e2ec067ef4542b574b"
+      "label": "Overview",
+      "fingerprint": "a1989eedcee2d7bb240e"
     },
     {
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "DeviceDetail",
       "key": "'preferences'",
       "label": "Preferences",
-      "fingerprint": "591615f02d75b478a627"
+      "fingerprint": "44a3149fd896e26a7a79"
     },
     {
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
@@ -9124,21 +9179,42 @@
       "owner": "DeliveryDetail",
       "key": "'delivery'",
       "label": "Delivery",
-      "fingerprint": "ca308c7939ee7d4e2de7"
+      "fingerprint": "55f0f243e82119f29d2f"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
+      "owner": "TemplateDetail",
+      "key": "'overview'",
+      "label": "Overview",
+      "fingerprint": "27e72e0f5e468d34d6fb"
     },
     {
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "TemplateDetail",
       "key": "'template'",
-      "label": "Template",
-      "fingerprint": "d4dbecc30b766273aad4"
+      "label": "Notification",
+      "fingerprint": "ae98a28cc01510809991"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
+      "owner": "TemplateDetail",
+      "key": "'variables'",
+      "label": "Variables",
+      "fingerprint": "1f7b81ae456259bac2b8"
     },
     {
       "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
       "owner": "ConfigDetail",
-      "key": "'configuration'",
-      "label": "Configuration",
-      "fingerprint": "d8bddfaf026fd2522f62"
+      "key": "'overview'",
+      "label": "Overview",
+      "fingerprint": "72e46381620c94affe78"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/messaging/push/PushPage.tsx",
+      "owner": "ConfigDetail",
+      "key": "'connection'",
+      "label": "Connection",
+      "fingerprint": "70f5c6b26e2d4b7663b6"
     },
     {
       "file": "packages/portal-mojo/src/admin/phonehub/PhoneHubPage.tsx",
