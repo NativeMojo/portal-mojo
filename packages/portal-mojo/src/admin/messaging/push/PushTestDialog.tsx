@@ -27,15 +27,17 @@ export function openPushDeviceTest(row:PushDeviceRow) {
 function PushTestDialog({row,pending,close}:{row:PushDeviceRow;pending:{current:boolean};close:()=>void}) {
     const sender=useCan(PUSH_DEVICE_TEST_PERMISSIONS);const viewer=useCan(PUSH_DEVICE_VIEW_PERMISSIONS);
     const can=sender.can&&viewer.can;const qc=useQueryClient();
-    const own=usePushRequestOwner(`${row.id}:${can}:${sender.me?.id}`);
-    const [readiness,setReadiness]=useState<PushReadiness|null>(null);const [loadError,setLoadError]=useState('');
+    const ownerKey=`${row.id}:${can}:${sender.me?.id}`;const own=usePushRequestOwner(ownerKey);
+    const attemptedAt=useRef<number|null>(null);
+    const [checked,setReadiness]=useState<{value:PushReadiness;ownerKey:string}|null>(null);const readiness=checked?.ownerKey===ownerKey?checked.value:null;const [loadError,setLoadError]=useState('');
     const [title,setTitle]=useState('Push test');const [message,setMessage]=useState('This is a test notification.');
-    const [busy,setBusy]=useState(false);const [result,setResult]=useState<{value:PushTestResult;at:number}|null>(null);
-    useEffect(()=>{const current=own();setReadiness(null);setResult(null);setLoadError('');if(can)void fetchPushDeviceReadiness(row.id).then(value=>{if(current())setReadiness(value);}).catch(()=>{if(current())setLoadError('Readiness could not be checked. Confirm your permission and try opening this dialog again.');});return()=>{};},[row.id,can]);
+    const [busy,setBusy]=useState(false);const [completed,setResult]=useState<{value:PushTestResult;at:number;ownerKey:string}|null>(null);
+    const result=completed?.ownerKey===ownerKey?completed:!busy&&attemptedAt.current!==null?{at:attemptedAt.current,value:{success:false,outcome:'unknown' as const,message:'A test was already attempted in this dialog. Check the device and delivery history before starting another test.',error_code:null,message_id:null,delivery_id:null,device_id:null,config:null}}:null;
+    useEffect(()=>{const current=own();setReadiness(null);setResult(null);setLoadError('');if(can)void fetchPushDeviceReadiness(row.id).then(value=>{if(current())setReadiness({value,ownerKey});}).catch(()=>{if(current())setLoadError('Readiness could not be checked. Confirm your permission and try opening this dialog again.');});return()=>{};},[ownerKey]);
     const send=async()=>{
-        if(pending.current||!can||!readiness?.ready||result||!title.trim()||!message.trim())return;
-        pending.current=true;setBusy(true);const current=own();
-        try {const value=await sendPushDeviceTest(row.id,title,message);if(current())setResult({value,at:Date.now()/1000});}
+        if(pending.current||attemptedAt.current!==null||!can||!readiness?.ready||result||!title.trim()||!message.trim())return;
+        attemptedAt.current=Date.now()/1000;pending.current=true;setBusy(true);const current=own();
+        try {const value=await sendPushDeviceTest(row.id,title,message);if(current())setResult({value,at:Date.now()/1000,ownerKey});}
         finally {pending.current=false;setBusy(false);void qc.invalidateQueries({queryKey:PushDeliveryModel.keys.root});void qc.invalidateQueries({queryKey:PushDeviceModel.keys.root});void qc.invalidateQueries({queryKey:['/api/account/devices/push/stats']});}
     };
     const config=result?.value.config??readiness?.config;

@@ -7619,7 +7619,7 @@ async function pushFetch(path:string,opts:MockFetchOpts):Promise<unknown|undefin
         const device=pushOwnRows(caller,db.pushDevices,PUSH_DEVICE_VIEW_GRANTS).find(row=>row.id===Number(deviceId));
         if(!device)return {status:false,error:'Device not found',error_code:404};
         const user=db.users.find(row=>row.id===device.user);const org=typeof user?.org==='number'?user.org:user?.org?.id;
-        const config=(org?db.pushConfigs.find(row=>row.is_active&&row.group===org):null)??db.pushConfigs.filter(row=>row.is_active&&row.group==null).sort((a,b)=>b.id-a.id)[0];
+        const config=(org?db.pushConfigs.find(row=>row.is_active&&row.group===org):null)??db.pushConfigs.filter(row=>row.is_active&&row.group==null).sort((a,b)=>a.name.localeCompare(b.name))[0];
         const code=!device.is_active?'inactive_device':!device.push_enabled?'push_disabled':device.push_preferences.test===false?'category_disabled':!device.device_token?'missing_token':!config?'no_config':config.test_mode?'test_mode':!db.pushConfigSecrets.has(config.id)?'missing_credentials':null;
         const readiness={ready:code===null,device_id:device.id,error_code:code,message:code??'Ready',config:config?{id:config.id,name:config.name,group:mockPushGroup(config.group),is_active:config.is_active,test_mode:config.test_mode,has_fcm_credentials:db.pushConfigSecrets.has(config.id),fcm_project_id:config.fcm_project_id}:null};
         if(method==='GET')return {status:true,data:readiness};
