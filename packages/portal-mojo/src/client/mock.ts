@@ -1,3 +1,4 @@
+import { fleetMock } from './fleet-mock';
 // In-memory django-mojo mock. Speaks the EXACT wire contract the real client
 // uses — envelope {status, data|rows..., message}, start/size paging, sort
 // with '-' prefix, search, and Django-style lookups (field, field__in,
@@ -8822,6 +8823,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: { name: domain.name, registrant: transientContact, admin: transientContact, tech: transientContact, privacy: domain.privacy, admin_privacy: domain.privacy, registrant_privacy: domain.privacy, tech_privacy: domain.privacy, auto_renew: domain.auto_renew, nameservers: ['ns-1.example.invalid', 'ns-2.example.invalid'], registrar: 'Amazon Registrar, Inc.', registered_on: domain.registered_on, expires: domain.expires, status_list: ['ok'], privacy_supported: true } };
     }
     // ══ end DNSMan wire ═══════════════════════════════════════════════
+    if (path === '/api/account/admin/fleet' || path.startsWith('/api/account/admin/fleet/')) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        return fleetMock(path, method, opts.body, caller.is_superuser === true);
+    }
     // ── Settings — plaintext stays private; secrets serialize masked ─────
     const oneSetting = path.match(/^\/api\/settings\/(\d+)$/);
     if (oneSetting || path === '/api/settings') {

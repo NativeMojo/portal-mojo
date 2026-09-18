@@ -1,5 +1,6 @@
 import {
     SettingsPage,
+    FleetNodeStatus,
     buildSettingPayload,
     type SettingRow,
 } from 'portal-mojo/admin/operations';
@@ -54,4 +55,12 @@ export function AdminSettingsDemo() {
             <SettingsPage />
         </div>
     );
+}
+
+export function FleetConfigurationDemo() {
+    return <FleetNodeStatus revision={'a'.repeat(32)} report={{ status: 'pending', healthy_everywhere: false,
+        nodes: [{ hostname: 'node-a', revision: 'a'.repeat(32), published: true, installed: true,
+            restart_requested: true, restarted: true, healthy: true, status: 'healthy' },
+        { hostname: 'node-b', revision: 'a'.repeat(32), published: true, installed: false,
+            restart_requested: false, restarted: false, healthy: false, status: 'unknown', error_code: 'node_did_not_reply' }] }} />;
 }

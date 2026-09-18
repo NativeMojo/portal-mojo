@@ -82,6 +82,7 @@ const AdminMonitoringDemo = lazyDemo(() => import('./demos-admin-monitoring'), '
 const AdminMetricsExplorerDemo = lazyDemo(() => import('./demos-admin-metrics-explorer'), 'AdminMetricsExplorerDemo');
 const AdminDashboardDemo = lazyDemo(() => import('./demos-admin-dashboard'), 'AdminDashboardDemo');
 const AdminCloudWatchDemo = lazyDemo(() => import('./demos-admin-cloudwatch'), 'AdminCloudWatchDemo');
+const FleetConfigurationDemo = lazyDemo(() => import('./demos-admin-settings'), 'FleetConfigurationDemo');
 const AdminSettingsDemo = lazyDemo(() => import('./demos-admin-settings'), 'AdminSettingsDemo');
 const AdminBouncerDemo = lazyDemo(() => import('./demos-admin-bouncer'), 'AdminBouncerDemo');
 const AdminDevicesDemo = lazyDemo(() => import('./demos-admin-devices'), 'AdminDevicesDemo');
@@ -474,7 +475,7 @@ const GROUPS: DemoGroup[] = [
             {
                 key: 'admin-settings', title: 'Runtime settings', icon: 'bi-gear',
                 blurb: 'Real global/group settings with write-only secrets and direction-aware atomic transition payloads.',
-                render: () => <AdminSettingsDemo />,
+                render: () => <><AdminSettingsDemo /><FleetConfigurationDemo /></>,
             },
             {
                 key: 'admin-bouncer', title: 'Bouncer', icon: 'bi-shield-check',

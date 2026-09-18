@@ -19,6 +19,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-monitoring.md](admin-monitoring.md) | Monitoring Admin registration, logs, and exact Redis-backed metrics-permission mutations |
 | [admin-metrics-explorer.md](admin-metrics-explorer.md) | Read-only recorded-metrics discovery, full-slug adapters, KPI/fan-out/scalar contracts, and cache identity |
 | [admin-settings.md](admin-settings.md) | Runtime settings admin — direction-aware atomic writes, write-only secrets, and global/group scope |
+| [admin-fleet-configuration.md](admin-fleet-configuration.md) | Superuser structured configuration publishing, version restore and per-node application evidence |
 | [admin-bouncer.md](admin-bouncer.md) | Bouncer decisions, device investigations, and bot-signature administration with token-safe caching |
 | [admin-security-tickets.md](admin-security-tickets.md) | Ticket queue, KISS detail modal, notes, approvals, and Maestro sync contract |
 | [admin-incidents.md](admin-incidents.md) | Incident/event triage, forensic detail, merge semantics, and sanitized export boundary |
