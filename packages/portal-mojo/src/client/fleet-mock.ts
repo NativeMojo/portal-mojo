@@ -1,5 +1,6 @@
 // Mock-only executable Fleet Configuration contract. Never imported by packaged runtime.
 import type { FleetEntry, FleetState, FleetOperation, FleetChanges } from '../admin/fleet-configuration/data';
+const health_scope = 'request_service_jobs_and_dependencies';
 const endpoint = '/api/account/admin/fleet';
 const entries: FleetEntry[] = [
     { key: 'GEOIP_SMART_ENABLED', label: 'Smart IP lookup', section: 'Location', description: 'Enable registered IP lookup providers.', value_type: 'boolean', default: true, current: true, sensitive: false, restart_required: true, overridden: true },
@@ -22,7 +23,7 @@ export function fleetMock(path: string, method: string, body: Record<string, unk
         const state: FleetState = { schema_version: 1, revision, version_id: versions[0].version_id, entries: entries.map(entry => ({ ...entry,
             overridden: entry.key in values, ...(entry.sensitive ? { configured: Boolean(values[entry.key]) } : { current: values[entry.key] ?? entry.default }) })),
             published: true, loaded_revision: null, pending_restart: true, publish_configured: true,
-            fleet: { status: 'pending', nodes: nodes(revision), healthy_everywhere: false, observed_at: new Date().toISOString() } };
+            fleet: { status: 'pending', health_scope, nodes: nodes(revision), healthy_everywhere: false, observed_at: new Date().toISOString() } };
         return ok(state);
     }
     if (method === 'GET' && path === `${endpoint}/history`) return ok({ versions: versions.map((version, index) => ({ version_id: version.version_id, current: index === 0, published_at: version.published_at })), truncated: false });
@@ -30,7 +31,7 @@ export function fleetMock(path: string, method: string, body: Record<string, unk
     if (method !== 'POST' || path !== endpoint || !body) return fail('Not found', 404);
     if (body.expected_revision !== revision) return fail('Fleet configuration changed; reload before publishing', 409);
     if (body.action === 'apply') {
-        operation = { operation_id: 'a'.repeat(32), revision, status: 'timed_out', job_status: 'completed', nodes: nodes(revision), healthy_everywhere: false };
+        operation = { health_scope, operation_id: 'a'.repeat(32), revision, status: 'timed_out', job_status: 'completed', nodes: nodes(revision), healthy_everywhere: false };
         return ok(operation);
     }
     if (body.action === 'restore') {

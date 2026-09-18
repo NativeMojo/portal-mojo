@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMe } from '../../client/runtime';
 import { modal } from '../../ui';
 import {
-    FLEET_ENDPOINT, displayFleetValue, fleetChange, fleetIsHealthy, operationFinished,
+    FLEET_ENDPOINT, FLEET_HEALTH_SCOPE, displayFleetValue, fleetChange, fleetIsHealthy, operationFinished,
     readFleet, readFleetHistory, readFleetOperation, writeFleet,
     type FleetChanges, type FleetEntry, type FleetOperation, type FleetPublication, type FleetReport, type FleetState,
 } from './data';
@@ -70,6 +70,7 @@ function FleetEditor({ state, busy, publish }: { state: FleetState; busy: boolea
 
 export function FleetNodeStatus({ report, revision }: { report: FleetReport; revision: string | null }) {
     const healthy = fleetIsHealthy(report);
+    const jobsCovered = report.health_scope === FLEET_HEALTH_SCOPE;
     return <section className="panel panel-pad" aria-label="Fleet convergence" style={{ marginTop: 20 }}>
         <h2>Fleet convergence</h2><p role="status" className={healthy ? 'text-ok' : 'text-warn'}>
             {healthy ? 'Applied and healthy on every expected node' : `Not confirmed healthy everywhere — ${report.status}`}</p>
@@ -78,8 +79,9 @@ export function FleetNodeStatus({ report, revision }: { report: FleetReport; rev
         {!report.nodes.length ? <p>No node results are available. Publication alone does not establish fleet health.</p>
             : <div className="tbl-scroll"><table className="tbl"><thead><tr><th>Node</th><th>Published</th><th>Downloaded / installed</th><th>Restart</th><th>Healthy</th><th>Result</th></tr></thead>
                 <tbody>{report.nodes.map((node) => <tr key={node.hostname}><td>{node.hostname}</td><td>{node.published ? 'Yes' : 'Unconfirmed'}</td>
-                    <td>{node.installed ? 'Yes' : 'Unconfirmed'}</td><td>{node.restarted ? 'Confirmed' : node.restart_requested ? 'Requested' : 'Unconfirmed'}</td>
-                    <td>{node.healthy && node.installed && node.restarted && !node.error_code ? 'Yes' : 'Unconfirmed'}</td><td>{node.error_code ?? node.status}</td></tr>)}</tbody></table></div>}
+                    <td>{node.installed ? 'Yes' : 'Unconfirmed'}</td><td>{jobsCovered && node.restarted ? 'Confirmed' : node.restart_requested ? 'Requested' : 'Unconfirmed'}</td>
+                    <td>{jobsCovered && node.healthy && node.installed && node.restarted && !node.error_code ? 'Yes' : 'Unconfirmed'}</td><td>{node.error_code ?? (!jobsCovered && node.status === 'healthy' ? 'Scope unverified' : node.status)}</td></tr>)}</tbody></table></div>}
+        {!jobsCovered && <p className="text-warn">This report does not verify job engine and scheduler activation. Refresh after upgrading the backend to confirm fleet health.</p>}
         <p className="dim">Health verifies the request service where enabled, plus the job engine and scheduler. Worker-only nodes do not require a request service. Offline or missing nodes remain unconfirmed.</p>
     </section>;
 }

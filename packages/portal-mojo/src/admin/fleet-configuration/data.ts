@@ -1,5 +1,6 @@
 import { mojoCall, withFreshAuth } from '../../client/runtime';
 
+export const FLEET_HEALTH_SCOPE = 'request_service_jobs_and_dependencies';
 export const FLEET_ENDPOINT = '/api/account/admin/fleet';
 export interface FleetEntry {
     key: string; label: string; section: string; description: string;
@@ -65,7 +66,7 @@ export function fleetChange(entry: FleetEntry, mode: string, input: string): Fle
     return { action: 'set', value };
 }
 export function fleetIsHealthy(report: FleetReport | undefined): boolean {
-    return report?.healthy_everywhere === true && report.nodes.length > 0
+    return report?.health_scope === FLEET_HEALTH_SCOPE && report.healthy_everywhere === true && report.nodes.length > 0
         && report.nodes.every((node) => node.installed && node.restarted && node.healthy && !node.error_code);
 }
 export function operationFinished(operation: FleetOperation): boolean {

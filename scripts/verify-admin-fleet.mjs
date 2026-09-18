@@ -33,8 +33,17 @@ try {
     assert.throws(() => data.fleetChange({...integer, value_type:'object'}, 'set', '[]'));
     assert.throws(() => data.fleetChange({...integer, value_type:'list', max_items: 1}, 'set', '[1,2]'));
     const node = {hostname:'node-a',revision:'a'.repeat(32),published:true,installed:true,restart_requested:true,restarted:true,healthy:true,status:'healthy'};
-    const report = {status:'healthy',healthy_everywhere:true,nodes:[node]};
+    const report = {status:'healthy',healthy_everywhere:true,health_scope:'request_service_jobs_and_dependencies',nodes:[node]};
     assert.equal(data.fleetIsHealthy(report), true);
+    for (const health_scope of [undefined, 'request_service_and_dependencies', 'unknown']) {
+        const legacy = {...report, health_scope};
+        assert.equal(data.fleetIsHealthy(legacy),false,'Legacy health cannot establish jobs activation');
+        const legacyMarkup = renderToStaticMarkup(createElement(FleetNodeStatus,{report:legacy,revision:node.revision}));
+        assert.match(legacyMarkup,/does not verify job engine and scheduler activation/);
+        assert.doesNotMatch(legacyMarkup,/Applied and healthy on every expected node/);
+        assert.doesNotMatch(legacyMarkup,/<td>Confirmed<\/td>/);
+        assert.match(legacyMarkup,/<td>Unconfirmed<\/td><td>Scope unverified<\/td>/);
+    }
     assert.equal(data.fleetIsHealthy({...report,nodes:[]}), false);
     for (const flag of ['installed', 'restarted', 'healthy']) assert.equal(data.fleetIsHealthy({...report,nodes:[{...node,[flag]:false}]}), false);
     const pending = {...report,healthy_everywhere:false,nodes:[node,{...node,hostname:'node-b',healthy:false,error_code:'node_did_not_reply'}]};

@@ -58,7 +58,7 @@ export function AdminSettingsDemo() {
 }
 
 export function FleetConfigurationDemo() {
-    return <FleetNodeStatus revision={'a'.repeat(32)} report={{ status: 'pending', healthy_everywhere: false,
+    return <FleetNodeStatus revision={'a'.repeat(32)} report={{ status: 'pending', healthy_everywhere: false, health_scope: 'request_service_jobs_and_dependencies',
         nodes: [{ hostname: 'node-a', revision: 'a'.repeat(32), published: true, installed: true,
             restart_requested: true, restarted: true, healthy: true, status: 'healthy' },
         { hostname: 'node-b', revision: 'a'.repeat(32), published: true, installed: false,

@@ -26,7 +26,10 @@ polling. Each operation read freshly observes activation until healthy or timed
 out; failed, expired or canceled jobs also stop polling. The expected
 node roster includes missing nodes. Installed, restart requested, restarted and
 healthy remain separate evidence. Only positive installed + restarted + health
-results from every expected node justify fleet completion. Health covers the
+results from every expected node with the explicit
+`request_service_jobs_and_dependencies` health scope justify fleet completion.
+Missing or older health scopes remain unconfirmed, including per-node health and
+restart confirmation, and prompt a backend upgrade. Health covers the
 request service and dependencies where enabled, plus the job engine and scheduler
 with their startup-loaded revision. Worker-only nodes need no request service.
 Draining an old engine is not proof that its replacement has loaded the revision.
