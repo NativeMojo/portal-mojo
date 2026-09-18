@@ -20,12 +20,17 @@ POSTs use `withFreshAuth` and show failures without claiming success. Schema/typ
 validation is repeated by the server; browser validation is only feedback.
 
 Publication means published to S3, never applied. Apply now starts a fixed
-asynchronous sync operation and polls its ID until terminal status. The expected
+asynchronous sync operation and polls its ID until terminal operation status. The
+short job completes after dispatching sync; completed job status does not stop
+polling. Each operation read freshly observes activation until healthy or timed
+out; failed, expired or canceled jobs also stop polling. The expected
 node roster includes missing nodes. Installed, restart requested, restarted and
 healthy remain separate evidence. Only positive installed + restarted + health
 results from every expected node justify fleet completion. Health covers the
-request service and dependencies, not every background workload. Timed-out,
-failed, superseded and unknown results stay visible. Refresh status observes the
+request service and dependencies where enabled, plus the job engine and scheduler
+with their startup-loaded revision. Worker-only nodes need no request service.
+Draining an old engine is not proof that its replacement has loaded the revision.
+Timed-out, failed, superseded and unknown results stay visible. Refresh status observes the
 normal timer workflow even when Apply now was not used.
 
 History contains only version IDs and timestamps. Restore publishes the selected

@@ -41,9 +41,17 @@ try {
     const rendered = renderToStaticMarkup(createElement(FleetNodeStatus,{report:pending,revision:node.revision}));
     assert.match(rendered,/Not confirmed healthy everywhere/);
     assert.match(rendered,/node_did_not_reply/);
+    assert.match(rendered,/request service where enabled, plus the job engine and scheduler/);
+    assert.match(rendered,/Worker-only nodes do not require a request service/);
     assert.doesNotMatch(rendered,/Applied and healthy on every expected node/);
     for (const status of ['failed','timed_out','superseded','healthy','expired','canceled']) assert.equal(data.operationFinished({status}),true);
     assert.equal(data.operationFinished({status:'queued'}),false);
+    const dispatched = {...pending, status:'pending', operation_id:'apply-job', revision:node.revision, job_status:'completed'};
+    assert.equal(data.operationFinished(dispatched),false,'Completed dispatch must keep observing pending node activation');
+    assert.equal(data.fleetIsHealthy(dispatched),false);
+    for (const job_status of ['queued','running','completed']) assert.equal(data.operationFinished({...dispatched,job_status}),false);
+    for (const job_status of ['failed','expired','canceled']) assert.equal(data.operationFinished({...dispatched,job_status}),true);
+    for (const status of ['healthy','timed_out','superseded']) assert.equal(data.operationFinished({...dispatched,status}),true);
     const endpoint = '/api/account/admin/fleet';
     assert.equal(fleetMock(endpoint,'GET',undefined,false).error_code,403);
     const before = fleetMock(endpoint,'GET',undefined,true).data;

@@ -80,7 +80,7 @@ export function FleetNodeStatus({ report, revision }: { report: FleetReport; rev
                 <tbody>{report.nodes.map((node) => <tr key={node.hostname}><td>{node.hostname}</td><td>{node.published ? 'Yes' : 'Unconfirmed'}</td>
                     <td>{node.installed ? 'Yes' : 'Unconfirmed'}</td><td>{node.restarted ? 'Confirmed' : node.restart_requested ? 'Requested' : 'Unconfirmed'}</td>
                     <td>{node.healthy && node.installed && node.restarted && !node.error_code ? 'Yes' : 'Unconfirmed'}</td><td>{node.error_code ?? node.status}</td></tr>)}</tbody></table></div>}
-        <p className="dim">Health verifies the request service and its dependencies. Offline or missing nodes remain unconfirmed.</p>
+        <p className="dim">Health verifies the request service where enabled, plus the job engine and scheduler. Worker-only nodes do not require a request service. Offline or missing nodes remain unconfirmed.</p>
     </section>;
 }
 

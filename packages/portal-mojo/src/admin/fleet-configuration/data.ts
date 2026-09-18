@@ -69,8 +69,9 @@ export function fleetIsHealthy(report: FleetReport | undefined): boolean {
         && report.nodes.every((node) => node.installed && node.restarted && node.healthy && !node.error_code);
 }
 export function operationFinished(operation: FleetOperation): boolean {
+    // A completed job only dispatched sync; operation reads observe actual activation.
     return ['healthy', 'failed', 'expired', 'canceled', 'superseded', 'timed_out'].includes(operation.status)
-        || ['completed', 'failed', 'expired', 'canceled'].includes(operation.job_status ?? '');
+        || ['failed', 'expired', 'canceled'].includes(operation.job_status ?? '');
 }
 export async function readFleet(): Promise<FleetState> {
     return sanitizeFleetState((await mojoCall(FLEET_ENDPOINT)).data as FleetState);
