@@ -4287,6 +4287,11 @@ const db = {
     // The scheduler lock, as `control/force-scheduler-lead` sees it: a Redis
     // string key whose VALUE is the holder. Deleting it is the whole control.
     jobsSchedulerLock: 'runner-mojo-web-01-engine' as string | null,
+    // System Sign-in admin (#5547): the SYSTEM auth_config override (nested,
+    // layered after the deployment file) and OAuth credentials stored in the
+    // Admin. Apple is seeded half-configured; Google has nothing stored.
+    systemAuthConfig: {} as Record<string, unknown>,
+    signinCredentials: { APPLE_TEAM_ID: 'ABCDE12345', APPLE_CLIENT_ID: 'com.example.web' } as Record<string, string>,
     // Per-user login throttle counters (auth/manage/throttle shape). u3 is
     // mid-lockout so the header badge + Clear Rate Limit are demoable.
     throttle: new Map<number, { count: number; limit: number; window: number; retry_after_seconds: number }>([
@@ -4652,16 +4657,20 @@ const LOGIN_METHODS = new Set(['password', 'sms', 'passkey', 'magic', 'google', 
 const REGISTRATION_METHODS = new Set(['password', 'google', 'apple', 'github']);
 const DEFAULT_AUTH_CONFIG: Record<string, unknown> = {
     theme: {
-        app_title: 'DJANGO MOJO', logo_url: '', favicon_url: '', hero_image_url: '',
-        hero_headline: 'Welcome back', hero_subheadline: 'Admin Portal',
-        back_to_website_url: '', terms_url: '', layout: 'card', api_base: '',
+        app_title: 'DJANGO MOJO', auth_provider_name: 'DJANGO MOJO', logo_url: '', favicon_url: '', hero_image_url: '',
+        hero_image_url_light: '', hero_image_url_dark: '',
+        hero_headline: 'Welcome back', hero_subheadline: 'Admin Portal', hero_image_position: 'center',
+        back_to_website_url: '', back_to_website_label: 'Back to website', terms_url: '',
+        // Legacy token kept for the group dialog's card/fullscreen editor; the
+        // system Sign-in admin reads it through SIGNIN_LAYOUT_ALIASES.
+        layout: 'card', appearance: 'system', accent_color: '#6384ff', api_base: '',
         success_redirect: '/', custom_css: '', custom_css_url: '',
     },
     registration: {
         enabled: true, fields: null, extra_fields: [], identity_field: '', min_age: null,
         methods: ['password', 'google', 'apple', 'github'], passkey_prompt: 'off',
     },
-    login: { methods: ['password', 'sms', 'passkey', 'magic', 'google', 'apple', 'github'] },
+    login: { methods: ['password', 'sms', 'passkey', 'magic', 'google', 'apple', 'github'], heading: 'Sign In', supporting_copy: '' },
 };
 const DEPLOYMENT_AUTH_CONFIG: Record<string, unknown> = {
     theme: { hero_subheadline: 'NativeMojo identity', terms_url: 'https://example.com/terms' },
@@ -4735,7 +4744,9 @@ function mockGroupChoiceInteger(value: unknown, fallback: number, minimum: numbe
 }
 
 function resolveAuthConfig(group?: MockGroup): Record<string, unknown> {
-    let config = mergeDicts(DEFAULT_AUTH_CONFIG, DEPLOYMENT_AUTH_CONFIG);
+    // The system Sign-in admin (#5547) stores its overrides between the
+    // deployment file and the group chain, so /api/auth/config reflects saves.
+    let config = mergeDicts(mergeDicts(DEFAULT_AUTH_CONFIG, DEPLOYMENT_AUTH_CONFIG), db.systemAuthConfig);
     if (group) {
         const chain: MockGroup[] = [];
         let current: MockGroup | undefined = group;
@@ -4769,8 +4780,192 @@ function publicAuthConfig(config: Record<string, unknown>): Record<string, unkno
             methods: Array.isArray(registration.methods) ? registration.methods : [],
             passkey_prompt: registration.passkey_prompt ?? 'off',
         },
-        login: { methods: Array.isArray(login.methods) ? login.methods : [] },
+        login: {
+            methods: Array.isArray(login.methods) ? login.methods : [],
+            heading: login.heading ?? 'Sign In',
+            supporting_copy: login.supporting_copy ?? '',
+        },
     };
+}
+
+// ══ System Sign-in admin (#5547) — GET/POST /api/account/admin/signin ══
+
+const SIGNIN_EDITABLE = [
+    'login.heading', 'login.methods', 'login.supporting_copy',
+    'registration.enabled', 'registration.methods', 'registration.passkey_prompt',
+    'theme.accent_color', 'theme.app_title', 'theme.appearance', 'theme.auth_provider_name',
+    'theme.back_to_website_label', 'theme.custom_css', 'theme.favicon_url', 'theme.hero_headline',
+    'theme.hero_image_position', 'theme.hero_image_url', 'theme.hero_image_url_dark',
+    'theme.hero_image_url_light', 'theme.hero_subheadline', 'theme.layout', 'theme.logo_url',
+];
+const SIGNIN_OPTIONS = {
+    login_methods: ['password', 'sms', 'passkey', 'magic', 'google', 'apple', 'github'],
+    registration_methods: ['password', 'google', 'apple', 'github'],
+    layouts: ['minimal', 'compact', 'branded-panel', 'editorial'],
+    appearances: ['light', 'dark', 'system'],
+    hero_image_positions: ['center', 'top', 'bottom', 'left', 'right'],
+    passkey_prompts: ['off', 'optional', 'required'],
+};
+const SIGNIN_LAYOUT_ALIASES: Record<string, string> = { card: 'compact', fullscreen: 'branded-panel' };
+const SIGNIN_API_ORIGIN = 'https://api.example.com';
+/** Values from the server config file — GitHub is configured there. */
+const SIGNIN_DEPLOYMENT_CREDENTIALS: Record<string, string> = {
+    GITHUB_CLIENT_ID: 'Iv1.8a61f9b3a7aba766',
+    GITHUB_CLIENT_SECRET: 'deployment-github-secret-9f2c',
+};
+interface SigninFieldSpec { key: string; label: string; secret: boolean; multiline: boolean }
+const SIGNIN_PROVIDERS: Array<{ name: string; label: string; console_url: string; help: string; fields: SigninFieldSpec[] }> = [
+    {
+        name: 'google', label: 'Google',
+        console_url: 'https://console.cloud.google.com/apis/credentials',
+        help: 'Create an OAuth client ID (type "Web application") in Google Cloud and add the callback URL below as an authorized redirect URI.',
+        fields: [
+            { key: 'GOOGLE_CLIENT_ID', label: 'Client ID', secret: false, multiline: false },
+            { key: 'GOOGLE_CLIENT_SECRET', label: 'Client secret', secret: true, multiline: false },
+        ],
+    },
+    {
+        name: 'apple', label: 'Apple',
+        console_url: 'https://developer.apple.com/account/resources/identifiers/list/serviceId',
+        help: 'Create a Services ID with Sign in with Apple enabled, register the callback URL as a return URL, then create a key and paste its .p8 contents.',
+        fields: [
+            { key: 'APPLE_TEAM_ID', label: 'Team ID', secret: false, multiline: false },
+            { key: 'APPLE_CLIENT_ID', label: 'Services ID', secret: false, multiline: false },
+            { key: 'APPLE_KEY_ID', label: 'Key ID', secret: false, multiline: false },
+            { key: 'APPLE_PRIVATE_KEY', label: 'Private key (.p8)', secret: true, multiline: true },
+        ],
+    },
+    {
+        name: 'github', label: 'GitHub',
+        console_url: 'https://github.com/settings/developers',
+        help: 'Register a new OAuth App in GitHub developer settings and use the callback URL below as its authorization callback URL.',
+        fields: [
+            { key: 'GITHUB_CLIENT_ID', label: 'Client ID', secret: false, multiline: false },
+            { key: 'GITHUB_CLIENT_SECRET', label: 'Client secret', secret: true, multiline: false },
+        ],
+    },
+];
+
+function signinPayload(): Record<string, unknown> {
+    const auth = publicAuthConfig(resolveAuthConfig());
+    const theme = auth.theme as Record<string, unknown>;
+    const layout = String(theme.layout ?? '');
+    theme.layout = SIGNIN_LAYOUT_ALIASES[layout] ?? (SIGNIN_OPTIONS.layouts.includes(layout) ? layout : 'minimal');
+    const loginMethods = (auth.login as { methods: string[] }).methods;
+    const providers = SIGNIN_PROVIDERS.map((provider) => {
+        const fields = provider.fields.map((field) => {
+            const stored = db.signinCredentials[field.key];
+            const deployed = SIGNIN_DEPLOYMENT_CREDENTIALS[field.key];
+            const value = stored ?? deployed;
+            const source = stored != null ? 'admin' : deployed != null ? 'deployment' : 'none';
+            return {
+                key: field.key, label: field.label, secret: field.secret, multiline: field.multiline,
+                configured: value != null, source,
+                value: field.secret || value == null ? null : value,
+                hint: field.secret && value != null ? `…${value.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '').slice(-4)}` : null,
+            };
+        });
+        const missing = fields.filter((field) => !field.configured).map((field) => field.label);
+        return {
+            name: provider.name, label: provider.label,
+            enabled: loginMethods.includes(provider.name),
+            ready: missing.length === 0, missing,
+            callback_url: `${SIGNIN_API_ORIGIN}/api/auth/oauth/${provider.name}/callback`,
+            console_url: provider.console_url, help: provider.help, fields,
+        };
+    });
+    return { schema_version: 1, auth, editable: [...SIGNIN_EDITABLE], options: structuredClone(SIGNIN_OPTIONS), providers };
+}
+
+function signinBadRequest(error: string): Record<string, unknown> {
+    return { status: false, error, error_code: 400 };
+}
+
+function validateSigninAuthValue(path: string, value: unknown): string | null {
+    const oneOf = (allowed: string[]) => typeof value === 'string' && allowed.includes(value) ? null : `${path} must be one of: ${allowed.join(', ')}`;
+    const methods = (allowed: string[]) => {
+        if (!Array.isArray(value)) return `${path} must be a list`;
+        const unknown = value.find((method) => typeof method !== 'string' || !allowed.includes(method));
+        return unknown == null ? null : `${path} has an unknown method '${String(unknown)}'`;
+    };
+    switch (path) {
+        case 'theme.layout': return oneOf(SIGNIN_OPTIONS.layouts);
+        case 'theme.appearance': return oneOf(SIGNIN_OPTIONS.appearances);
+        case 'theme.hero_image_position': return oneOf(SIGNIN_OPTIONS.hero_image_positions);
+        case 'registration.passkey_prompt': return oneOf(SIGNIN_OPTIONS.passkey_prompts);
+        case 'registration.enabled': return typeof value === 'boolean' ? null : `${path} must be true or false`;
+        case 'registration.methods': return methods(SIGNIN_OPTIONS.registration_methods);
+        case 'login.methods': {
+            const error = methods(SIGNIN_OPTIONS.login_methods);
+            if (error) return error;
+            return (value as string[]).includes('password') ? null : 'Password sign-in must stay enabled so admins can always log in.';
+        }
+        case 'theme.accent_color': return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? null : `${path} must be a #rrggbb color`;
+        case 'theme.custom_css':
+            if (typeof value !== 'string') return `${path} must be a string`;
+            return value.includes('<') || value.toLowerCase().includes('@import') || value.includes('://') ? `${path} cannot reference external content` : null;
+        default: return typeof value === 'string' ? null : `${path} must be a string`;
+    }
+}
+
+function setSystemAuthPath(path: string, value: unknown): void {
+    const [section, key] = path.split('.') as [string, string];
+    const current = isPlainObject(db.systemAuthConfig[section]) ? { ...(db.systemAuthConfig[section] as Record<string, unknown>) } : {};
+    current[key] = Array.isArray(value) ? [...value] : value;
+    db.systemAuthConfig = { ...db.systemAuthConfig, [section]: current };
+}
+
+function signinFetch(method: string, body: Record<string, unknown>, headers: Record<string, string> | undefined): unknown {
+    const caller = userFromBearer(headers);
+    if (!caller) return permissionDenied(401);
+    if (!hasGlobalPermission(caller, ['manage_settings', 'admin'])) return permissionDenied();
+    if (method === 'GET') return { status: true, data: signinPayload() };
+    if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+
+    // Validate everything first so a rejected request changes nothing.
+    const authChanges: Array<[string, unknown]> = [];
+    if (body.auth != null) {
+        if (!isPlainObject(body.auth)) return signinBadRequest('auth must be an object of dotted paths');
+        for (const [path, value] of Object.entries(body.auth)) {
+            if (!SIGNIN_EDITABLE.includes(path)) return signinBadRequest(`${path} is not editable here`);
+            const error = validateSigninAuthValue(path, value);
+            if (error) return signinBadRequest(error);
+            authChanges.push([path, value]);
+        }
+    }
+    let provider: typeof SIGNIN_PROVIDERS[number] | undefined;
+    const credentialChanges: Array<[string, string | null]> = [];
+    if (body.provider != null) {
+        provider = SIGNIN_PROVIDERS.find((candidate) => candidate.name === body.provider);
+        if (!provider) return signinBadRequest(`Unknown provider '${String(body.provider)}'`);
+        if (body.values != null) {
+            if (!isPlainObject(body.values)) return signinBadRequest('values must be an object');
+            for (const [key, value] of Object.entries(body.values)) {
+                if (!provider.fields.some((field) => field.key === key)) return signinBadRequest(`${key} is not a ${provider.label} setting`);
+                if (value === undefined || value === '') continue;
+                if (value !== null && typeof value !== 'string') return signinBadRequest(`${key} must be a string or null`);
+                credentialChanges.push([key, value === null ? null : value.trim()]);
+            }
+        }
+        if (body.enabled != null && typeof body.enabled !== 'boolean') return signinBadRequest('enabled must be true or false');
+    } else if (body.values != null || body.enabled != null) {
+        return signinBadRequest('provider is required with values or enabled');
+    }
+
+    for (const [path, value] of authChanges) setSystemAuthPath(path, value);
+    for (const [key, value] of credentialChanges) {
+        if (value === null) delete db.signinCredentials[key];
+        else db.signinCredentials[key] = value;
+    }
+    if (provider && typeof body.enabled === 'boolean') {
+        const resolved = publicAuthConfig(resolveAuthConfig());
+        const toggle = (list: string[]) => body.enabled
+            ? (list.includes(provider!.name) ? list : [...list, provider!.name])
+            : list.filter((name) => name !== provider!.name);
+        setSystemAuthPath('login.methods', toggle((resolved.login as { methods: string[] }).methods));
+        setSystemAuthPath('registration.methods', toggle((resolved.registration as { methods: string[] }).methods));
+    }
+    return { status: true, data: signinPayload() };
 }
 
 // NO_SAVE_FIELDS parity (account/models/user.py RestMeta): silently dropped,
@@ -8013,6 +8208,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         const had = db.throttle.delete(uid);
         return { status: true, data: { deleted: had ? 1 : 0 } };
     }
+    if (path === '/api/account/admin/signin') return signinFetch(method, opts.body ?? {}, opts.headers);
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
         return authFetch(path, opts.body ?? {}, opts.params ?? {});
     }
