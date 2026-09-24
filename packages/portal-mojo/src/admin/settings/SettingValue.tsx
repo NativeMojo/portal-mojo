@@ -11,7 +11,7 @@ function structuredValue(value: string): Record<string, unknown> | unknown[] | n
     }
 }
 
-export function SettingValuePreview({ row, onOpen }: { row: SettingRow; onOpen: () => void }) {
+export function SettingValuePreview({ row }: { row: SettingRow }) {
     if (row.is_secret) return <code>{row.display_value || '******'}</code>;
     const value = row.display_value || '';
     const json = structuredValue(value);
@@ -24,9 +24,6 @@ export function SettingValuePreview({ row, onOpen }: { row: SettingRow; onOpen: 
     return (
         <div style={{ maxWidth: '32ch' }}>
             <code style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</code>
-            <button type="button" className="btn btn-compact" style={{ marginTop: 4 }} aria-label={`View value for ${row.key}`} onClick={(event) => { event.stopPropagation(); onOpen(); }}>
-                View value
-            </button>
         </div>
     );
 }

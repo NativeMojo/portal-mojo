@@ -30,7 +30,8 @@ try {
     const preview = render(cell.render(row));
     assert(preview.length < 1200, 'Large settings must not dump their full value into the list');
     assert(!preview.includes('long nested value'), 'JSON contents belong in the detail viewer');
-    assert.match(preview, /View value/, 'A value can be opened explicitly from the list');
+    assert(!preview.includes('<button'), 'The existing row action opens detail without a redundant button');
+    assert.equal(typeof globalThis.__settingsTable.onRowClick, 'function');
     const detail = target => { SettingModel.useOne = () => ({ data: target, isPending: false }); return render(React.createElement(SettingDetail, { id: target.id, onClose() {} })); };
     const full = detail(row);
     const parsed = new JSDOM(full).window.document;

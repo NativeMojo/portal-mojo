@@ -37,7 +37,7 @@ declare deletion.
 
 JSON objects and arrays show a compact type/count summary in the list. Long or
 multiline text shows a single-line preview, capped at 80 characters. Select the
-row or its **View value** button to open the full value in the existing detail
+row to open the full value in the existing detail
 modal. JSON uses the shared `JsonBlock` viewer, expanded initially, with syntax
 highlighting, Show/Hide, Copy, and a scrollable body. Other text preserves line
 breaks in a scrollable area; invalid JSON remains plain text. Secret values stay

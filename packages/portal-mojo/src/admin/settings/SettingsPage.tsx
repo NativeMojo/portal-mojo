@@ -9,7 +9,7 @@ import { SettingDetail } from './SettingDetail';
 import { SettingValuePreview } from './SettingValue';
 import { showSettingEditor } from './SettingEditor';
 
-const columns = (onOpen: (row: SettingRow) => void): Column<SettingRow>[] => [
+const COLUMNS: Column<SettingRow>[] = [
     {
         key: 'key', label: 'Key', sortable: true, hideable: false, render: (row) => (
             <div className="cell-user">
@@ -20,7 +20,7 @@ const columns = (onOpen: (row: SettingRow) => void): Column<SettingRow>[] => [
     },
     {
         key: 'display_value', label: 'Value', render: (row) => (
-            <SettingValuePreview row={row} onOpen={() => onOpen(row)} />
+            <SettingValuePreview row={row} />
         ),
     },
     { key: 'group', label: 'Scope', render: (row) => settingGroupLabel(row.group) },
@@ -54,7 +54,7 @@ export function SettingsPage() {
             eyebrow="Account"
             title="Settings"
             searchPlaceholder="Search setting keys…"
-            columns={columns(openDetail)}
+            columns={COLUMNS}
             filters={FILTERS}
             presets={[
                 { key: 'all', label: 'All', params: {} },
