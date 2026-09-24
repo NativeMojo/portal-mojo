@@ -58,6 +58,7 @@
         "verify:admin-messaging": "node scripts/verify-admin-messaging.mjs",
         "verify:admin-phonehub": "node scripts/verify-admin-phonehub.mjs && node scripts/verify-phonehub-connection.mjs",
         "verify:admin-sms-compose": "node scripts/verify-admin-sms-compose.mjs",
+        "verify:admin-settings": "node scripts/verify-admin-settings.mjs",
         "verify:admin-signin": "node scripts/verify-admin-signin.mjs",
         "verify:admin-push": "node scripts/verify-admin-push.mjs && node scripts/verify-push-tests.mjs",
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",

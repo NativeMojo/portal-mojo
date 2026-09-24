@@ -33,6 +33,16 @@ queries `/api/group`, and preserves that scope on save. New settings default to
 Global. Delete is intentionally absent because live `Setting.RestMeta` does not
 declare deletion.
 
+## Viewing values
+
+JSON objects and arrays show a compact type/count summary in the list. Long or
+multiline text shows a single-line preview, capped at 80 characters. Select the
+row or its **View value** button to open the full value in the existing detail
+modal. JSON uses the shared `JsonBlock` viewer, expanded initially, with syntax
+highlighting, Show/Hide, Copy, and a scrollable body. Other text preserves line
+breaks in a scrollable area; invalid JSON remains plain text. Secret values stay
+masked in both views.
+
 ## Atomic write contract
 
 Use `saveSettingAtomic()` / `buildSettingPayload()` rather than a generic

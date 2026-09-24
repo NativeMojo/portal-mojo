@@ -4,6 +4,7 @@ import {
     SETTINGS_PERMISSIONS, SettingModel, settingGroupLabel, type SettingRow,
 } from './model';
 import { showSettingEditor } from './SettingEditor';
+import { SettingValue } from './SettingValue';
 
 export function SettingDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const { data: row, isPending, error } = SettingModel.useOne(id);
@@ -26,7 +27,7 @@ export function SettingDetail({ id, onClose }: { id: number; onClose: () => void
                             <Eyebrow>Configuration</Eyebrow>
                             <FlatRow label="Key"><code>{row.key}</code></FlatRow>
                             <FlatRow label="Value">
-                                <code>{row.is_secret ? row.display_value || '******' : row.display_value || '—'}</code>
+                                <SettingValue row={row} />
                             </FlatRow>
                             <FlatRow label="Scope">{settingGroupLabel(row.group)}</FlatRow>
                             <FlatRow label="Storage">
