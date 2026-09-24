@@ -12,6 +12,7 @@ export * from './security';
 export * from './incidents';
 export * from './rules';
 export * from './identity';
+export * from './signin';
 export * from './jobs';
 export * from './network';
 export * from './dns';

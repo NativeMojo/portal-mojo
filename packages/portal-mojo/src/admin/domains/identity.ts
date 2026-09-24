@@ -2,6 +2,7 @@ import type { AdminSection } from '../core';
 import { GLOBAL_CREDENTIAL_PERMS } from '../credentials/models';
 import { MEMBER_READ_PERMISSIONS } from '../identity/members/models';
 import { USER_VIEW_PERMISSIONS } from '../identity/users/models';
+import { SIGNIN_ADMIN_PERMISSIONS } from '../signin/api';
 
 export const USERS_ADMIN_SECTION: AdminSection = {
     id: 'users', basePath: '', title: 'Users', icon: 'bi-people', navigationGroup: 'identity-access', permissions: USER_VIEW_PERMISSIONS,
@@ -21,4 +22,9 @@ export const CREDENTIALS_ADMIN_SECTION: AdminSection = {
     ],
 };
 
-export const IDENTITY_ADMIN_SECTIONS = [USERS_ADMIN_SECTION, MEMBERS_ADMIN_SECTION, CREDENTIALS_ADMIN_SECTION] as const;
+export const SIGNIN_ADMIN_SECTION: AdminSection = {
+    id: 'signin', basePath: 'system/sign-in', title: 'Sign-in', icon: 'bi-box-arrow-in-right', navigationGroup: 'identity-access', permissions: SIGNIN_ADMIN_PERMISSIONS,
+    routes: [{ path: '', loadComponent: () => import('../signin/SigninPage').then(({ SigninPage }) => ({ default: SigninPage })), permissions: SIGNIN_ADMIN_PERMISSIONS }],
+};
+
+export const IDENTITY_ADMIN_SECTIONS = [USERS_ADMIN_SECTION, MEMBERS_ADMIN_SECTION, CREDENTIALS_ADMIN_SECTION, SIGNIN_ADMIN_SECTION] as const;
