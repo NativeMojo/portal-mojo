@@ -6,6 +6,13 @@ export const SETTINGS_ADMIN_SECTION: AdminSection = {
     id: 'settings', title: 'Settings', icon: 'bi-gear', navigationGroup: 'operations', permissions: SETTINGS_PERMISSIONS,
     routes: [{ path: '', loadComponent: () => import('../settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })), permissions: SETTINGS_PERMISSIONS }],
 };
+// Empty any-of permissions admit only the existing literal-superuser bypass.
+// A global admin permission alone must not expose this configuration surface.
+export const FLEET_CONFIGURATION_ADMIN_SECTION: AdminSection = {
+    id: 'fleet-configuration', title: 'Fleet Configuration', icon: 'bi-hdd-network',
+    navigationGroup: 'operations', permissions: [],
+    routes: [{ path: '', loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage })) }],
+};
 export const JOBS_ADMIN_SECTION: AdminSection = {
     id: 'jobs', title: 'Jobs', icon: 'bi-cpu', navigationGroup: 'operations', permissions: [...new Set([...JOBS_VIEW_PERMS, ...SCHEDULED_TASK_VIEW_PERMS])],
     routes: [
@@ -15,4 +22,4 @@ export const JOBS_ADMIN_SECTION: AdminSection = {
         { path: 'scheduled-tasks', label: 'Scheduled Tasks', loadComponent: () => import('../jobs/ScheduledTasksPage').then(({ ScheduledTasksPage }) => ({ default: ScheduledTasksPage })), permissions: SCHEDULED_TASK_VIEW_PERMS },
     ],
 };
-export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, JOBS_ADMIN_SECTION] as const;
+export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, FLEET_CONFIGURATION_ADMIN_SECTION, JOBS_ADMIN_SECTION] as const;

@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'vite';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { readFile } from 'node:fs/promises';
+
+globalThis.window = { addEventListener() {}, removeEventListener() {}, location: { hash: '', pathname: '/', search: '' }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) };
+const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
+try {
+    const data = await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/data.ts');
+    const { FleetNodeStatus } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx');
+    const { fleetMock } = await server.ssrLoadModule('/packages/portal-mojo/src/client/fleet-mock.ts');
+    const { FLEET_CONFIGURATION_ADMIN_SECTION: section } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/domains/operations.ts');
+    const { hasPermission } = await server.ssrLoadModule('/packages/portal-mojo/src/client/me.ts');
+    for (const permissions of [{}, {admin: true}, {manage_settings: true}, {groups: true}]) {
+        assert.equal(hasPermission({id: 1, is_superuser: false, permissions}, section.permissions), false);
+    }
+    assert.equal(hasPermission({id: 1, is_superuser: true}, section.permissions), true);
+    const secret = { key: 'TOKEN', label: 'Token', value_type: 'string', sensitive: true, current: 'must-not-cache', default: 'also-private' };
+    assert.equal(data.fleetChange(secret, 'keep', 'ignored'), null);
+    assert.equal(data.fleetChange(secret, 'set', ''), null);
+    assert.deepEqual(data.fleetChange(secret, 'set', 'replacement'), {action: 'set', value: 'replacement'});
+    assert.deepEqual(data.fleetChange(secret, 'clear', ''), {action: 'clear'});
+    const sanitized = data.sanitizeFleetState({schema_version: 1, entries: [secret], fleet: {nodes: []}});
+    assert.equal('current' in sanitized.entries[0], false);
+    assert.equal('default' in sanitized.entries[0], false);
+    const integer = {...secret, sensitive: false, value_type: 'integer', min_value: 1, max_value: 10};
+    for (const raw of ['1.5', '1e2', '', '0', '11', '9007199254740992']) assert.throws(() => data.fleetChange(integer, 'set', raw));
+    assert.deepEqual(data.fleetChange(integer, 'set', '5'), {action: 'set', value: 5});
+    assert.deepEqual(data.fleetChange({...integer, value_type: 'boolean'}, 'set', 'false'), {action:'set', value:false});
+    assert.throws(() => data.fleetChange({...integer, value_type: 'boolean'}, 'set', 'yes'));
+    assert.throws(() => data.fleetChange({...integer, value_type:'list'}, 'set', '{}'));
+    assert.throws(() => data.fleetChange({...integer, value_type:'object'}, 'set', '[]'));
+    assert.throws(() => data.fleetChange({...integer, value_type:'list', max_items: 1}, 'set', '[1,2]'));
+    const node = {hostname:'node-a',revision:'a'.repeat(32),published:true,installed:true,restart_requested:true,restarted:true,healthy:true,status:'healthy'};
+    const report = {status:'healthy',healthy_everywhere:true,health_scope:'request_service_jobs_and_dependencies',nodes:[node]};
+    assert.equal(data.fleetIsHealthy(report), true);
+    for (const health_scope of [undefined, 'request_service_and_dependencies', 'unknown']) {
+        const legacy = {...report, health_scope};
+        assert.equal(data.fleetIsHealthy(legacy),false,'Legacy health cannot establish jobs activation');
+        const legacyMarkup = renderToStaticMarkup(createElement(FleetNodeStatus,{report:legacy,revision:node.revision}));
+        assert.match(legacyMarkup,/does not verify job engine and scheduler activation/);
+        assert.doesNotMatch(legacyMarkup,/Applied and healthy on every expected node/);
+        assert.doesNotMatch(legacyMarkup,/<td>Confirmed<\/td>/);
+        assert.match(legacyMarkup,/<td>Unconfirmed<\/td><td>Scope unverified<\/td>/);
+    }
+    assert.equal(data.fleetIsHealthy({...report,nodes:[]}), false);
+    for (const flag of ['installed', 'restarted', 'healthy']) assert.equal(data.fleetIsHealthy({...report,nodes:[{...node,[flag]:false}]}), false);
+    const pending = {...report,healthy_everywhere:false,nodes:[node,{...node,hostname:'node-b',healthy:false,error_code:'node_did_not_reply'}]};
+    const rendered = renderToStaticMarkup(createElement(FleetNodeStatus,{report:pending,revision:node.revision}));
+    assert.match(rendered,/Not confirmed healthy everywhere/);
+    assert.match(rendered,/node_did_not_reply/);
+    assert.match(rendered,/request service where enabled, plus the job engine and scheduler/);
+    assert.match(rendered,/Worker-only nodes do not require a request service/);
+    assert.doesNotMatch(rendered,/Applied and healthy on every expected node/);
+    for (const status of ['failed','timed_out','superseded','healthy','expired','canceled']) assert.equal(data.operationFinished({status}),true);
+    assert.equal(data.operationFinished({status:'queued'}),false);
+    const dispatched = {...pending, status:'pending', operation_id:'apply-job', revision:node.revision, job_status:'completed'};
+    assert.equal(data.operationFinished(dispatched),false,'Completed dispatch must keep observing pending node activation');
+    assert.equal(data.fleetIsHealthy(dispatched),false);
+    for (const job_status of ['queued','running','completed']) assert.equal(data.operationFinished({...dispatched,job_status}),false);
+    for (const job_status of ['failed','expired','canceled']) assert.equal(data.operationFinished({...dispatched,job_status}),true);
+    for (const status of ['healthy','timed_out','superseded']) assert.equal(data.operationFinished({...dispatched,status}),true);
+    const endpoint = '/api/account/admin/fleet';
+    assert.equal(fleetMock(endpoint,'GET',undefined,false).error_code,403);
+    const before = fleetMock(endpoint,'GET',undefined,true).data;
+    assert(!JSON.stringify(before).includes('mock-private-value'));
+    const failed = fleetMock(endpoint,'POST',{action:'publish',expected_revision:'stale',changes:{GEOIP_SMART_ENABLED:{action:'set',value:false}}},true);
+    assert.equal(failed.error_code,409);
+    const published = fleetMock(endpoint,'POST',{action:'publish',expected_revision:before.revision,changes:{GEOIP_SMART_ENABLED:{action:'set',value:false}}},true).data;
+    assert.equal(published.published,true); assert.equal(published.applied,false);
+    const after = fleetMock(endpoint,'GET',undefined,true).data;
+    assert.equal(after.entries.find(entry=>entry.sensitive).configured,true,'Unchanged secret remains configured');
+    const apply = fleetMock(endpoint,'POST',{action:'apply',expected_revision:after.revision},true).data;
+    assert.equal(apply.healthy_everywhere,false); assert.equal(apply.nodes[1].error_code,'node_did_not_reply');
+    const restored = fleetMock(endpoint,'POST',{action:'restore',expected_revision:after.revision,version_id:before.version_id},true).data;
+    assert.equal(restored.published,true); assert.notEqual(restored.revision,before.revision);
+    assert.equal(fleetMock(endpoint,'GET',undefined,true).data.entries[0].current,true);
+    const source = await readFile('packages/portal-mojo/src/admin/fleet-configuration/data.ts','utf8');
+    assert.match(source,/return withFreshAuth/); assert.doesNotMatch(source,/useMutation/);
+    console.log('Fleet configuration: permission, schema, secret, conflict, publish/restore and truthful convergence checks passed');
+} finally { await server.close(); }
