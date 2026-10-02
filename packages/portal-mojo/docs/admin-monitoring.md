@@ -93,7 +93,7 @@ current contract.
 ## Styling and showcase
 
 Monitoring components use semantic `monitoring-*` classes and application
-tokens only. A consuming app must include `admin-monitoring.css`. This repo's
-portal and showcase theme entries do so. The showcase's Admin Monitoring demo
-contains static request, response, JSON, and HTML-looking plain-text cases for
-both-theme verification without mutating a backend.
+tokens only. `admin-monitoring.css` ships in `portal-mojo/styles.css`. The
+showcase's Admin Monitoring demo contains static request, response, JSON, and
+HTML-looking plain-text cases for both-theme verification without mutating a
+backend.

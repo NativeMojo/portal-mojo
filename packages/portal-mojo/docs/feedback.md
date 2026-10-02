@@ -66,8 +66,8 @@ ONLY the fields that break things and passes silently otherwise.
 
 Styles: `packages/portal-mojo/src/styles/components/guardrail.css` (`.guardrail`,
 `.guardrail-effect/-why/-why-head/-undo/-type`, `.guardrail-icon`) over
-`--bad/--bad-soft` (danger) and `--warn/--warn-soft` (`danger: false`). The
-package ships no CSS — a consuming app carries that block (README).
+`--bad/--bad-soft` (danger) and `--warn/--warn-soft` (`danger: false`). It
+ships in `portal-mojo/styles.css`; the app declares the tokens (README).
 
 ## modal.drawer
 

@@ -6,6 +6,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
+import { verifyStyleContract } from './style-contract.mjs';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tempRoot = await mkdtemp(join(tmpdir(), 'portal-mojo-package-'));
 const packDir = join(tempRoot, 'pack');
@@ -143,6 +145,13 @@ try {
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
     assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './styles.css', './ui', './ui/shell']);
+    // The installed stylesheets meet the same contract as the source: every
+    // file imported in layer(portal-mojo), no orphan, and the token list exact.
+    assert.equal(installed.exports['./styles.css'], './src/styles/index.css', 'installed portal-mojo/styles.css must resolve to src/styles/index.css');
+    const installedStyles = join(consumerDir, 'node_modules/portal-mojo/src/styles');
+    const { imported: installedImports } = await verifyStyleContract(installedStyles);
+    const packedStyles = [...files].filter((path) => path.startsWith('src/styles/') && path.endsWith('.css')).sort();
+    assert.deepEqual(packedStyles, ['src/styles/index.css', ...installedImports.map((file) => `src/styles/${file}`)].sort(), 'the tarball must hold exactly the stylesheets index.css imports');
 
     // The CSS subpath, the layer and the package's own @source all work from
     // node_modules. The consumer's source holds no class name, so a Tailwind

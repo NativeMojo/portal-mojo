@@ -24,7 +24,7 @@ tab or a cold first frame still shows the document.
 | `debounceMs` | `0` | Wait this long after `source` stops changing before calling the server. Set it for text that grows token by token (a streaming assistant reply) so one reply is one request. |
 | `className` | — | Extra classes on the wrapper. `md` is always present. |
 
-Renders one `<div class="md">`. Styling lives in the consuming app —
+Renders one `<div class="md">`. Styling ships in `portal-mojo/styles.css` —
 `packages/portal-mojo/src/styles/components/markdown.css`, tokens only, both themes; both render
 paths emit the same element set, so one stylesheet dresses both.
 

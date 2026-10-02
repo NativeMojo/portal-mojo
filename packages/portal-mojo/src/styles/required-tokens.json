@@ -1,5 +1,5 @@
 {
-    "description": "Tokens a consuming app must declare for portal-mojo/styles.css: every custom property the package styles read with var() and no fallback, and do not declare themselves. Declare each one for light and for dark. Checked by scripts/verify-package.mjs.",
+    "description": "Tokens a consuming app must declare for portal-mojo/styles.css: every custom property the package styles read with var() and no fallback, and do not declare themselves. Declare each one for light and for dark. Checked by scripts/style-contract.mjs, on the source and on the installed tarball.",
     "required": [
         "--accent",
         "--accent-soft",
