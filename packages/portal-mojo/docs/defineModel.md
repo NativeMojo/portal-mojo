@@ -104,8 +104,12 @@ reaches the client in one of two wire shapes:
 ```
 
 This is NOT the envelope failure: envelope-level `status:false` already
-rejects at the unwrap boundary (`MojoError`). The action-refusal layer sits
-above it and is handled by `useAction` automatically:
+rejects at the unwrap boundary (`MojoError`). Since 0.3 unwrap also rejects
+the flat shape for raw calls; `useAction` opts out of that check
+(`refusal: 'return'` on its own request) so the error names the action and
+honours the model's declared mode. No behaviour change for models. The
+action-refusal layer sits above the boundary and is handled by `useAction`
+automatically:
 
 - **`refusal: 'reject'` (default)** — a `success:false` (or payload
   `status:false`) reply REJECTS with **`ActionRefusedError`**, so a refusal
