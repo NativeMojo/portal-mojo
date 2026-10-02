@@ -91,22 +91,23 @@ try {
     const render = oneId => React.act(async () => root.render(React.createElement(QueryClientProvider, { client: qc },
         React.createElement(GroupContext.Provider, { value: group }, React.createElement(Probe, { oneId })))));
     const settle = () => React.act(async () => new Promise(resolve => setTimeout(resolve, 20)));
+    // A mutation's observers are notified a tick after it settles; keep that inside act.
+    const run = fn => React.act(async () => { const out = await fn(); await new Promise(resolve => setTimeout(resolve, 0)); return out; });
     await render(null);
     const path = `/api/user/${target.id}`;
 
     // ── A. Action: the body is exactly {[key]: payload} ──
     fixture.calls.length = 0;
-    let outcome;
-    await React.act(async () => { outcome = await probe.disable.mutateAsync({ id: target.id, payload: { reason: 'admin' } }); });
+    const outcome = await run(() => probe.disable.mutateAsync({ id: target.id, payload: { reason: 'admin' } }));
     assert.equal(outcome.row.is_active, false, 'A: the action must succeed on a required family');
     let call = sent('POST', path);
     assert.deepEqual(call.body, { disable: { reason: 'admin' } }, 'A: the action body must be exactly {[key]: payload}');
     noScope(call, 'A: useAction');
-    await React.act(async () => { await probe.reactivate.mutateAsync({ id: target.id }); });
+    await run(() => probe.reactivate.mutateAsync({ id: target.id }));
 
     // ── B. Update: the body is exactly the caller's changes ──
     fixture.calls.length = 0;
-    await React.act(async () => { await probe.save.mutateAsync({ id: target.id, changes: { display_name: 'x' } }); });
+    await run(() => probe.save.mutateAsync({ id: target.id, changes: { display_name: 'x' } }));
     call = sent('POST', path);
     assert.deepEqual(call.body, { display_name: 'x' }, 'B: an update must send exactly the caller\'s changes');
     noScope(call, 'B: useSave with an id');
@@ -114,7 +115,8 @@ try {
     // ── C. Get: useOne and fetchOne ──
     fixture.calls.length = 0;
     await render(target.id);
-    await settle();
+    // The mock answers after its own latency: wait for the query, not a fixed time.
+    for (let tries = 0; probe.one.isFetching && tries < 100; tries += 1) await settle();
     assert.equal(probe.one.error, null, `C: useOne must not be blocked (${probe.one.error?.message})`);
     assert.equal(probe.one.data?.id, target.id, 'C: useOne must resolve the record');
     noScope(sent('GET', path), 'C: useOne');
@@ -125,11 +127,10 @@ try {
 
     // ── D. Delete — and the collection create that feeds it is unchanged ──
     fixture.calls.length = 0;
-    let created;
     const changes = { username: 'scope.probe', email: 'scope.probe@nativemojo.com', group: 4 };
-    await React.act(async () => { created = await probe.save.mutateAsync({ id: null, changes }); });
+    const created = await run(() => probe.save.mutateAsync({ id: null, changes }));
     assert.deepEqual(sent('POST', '/api/user').body, changes, 'D: a collection create still sends only the caller\'s changes');
-    await React.act(async () => { await probe.remove.mutateAsync({ id: created.id }); });
+    await run(() => probe.remove.mutateAsync({ id: created.id }));
     noScope(sent('DELETE', `/api/user/${created.id}`), 'D: useDelete');
 
     // ── F. mojoAction: no injection, with a group active in the signal ──

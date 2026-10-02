@@ -32,7 +32,8 @@ export function useModel<T>(endpoint: string, id: number | string | null, saniti
     return useQuery({
         queryKey: [endpoint, 'one', id],
         queryFn: async () => {
-            const row = await mojoGet<T>(endpoint, id!);
+            // A REST record route: the server binds the row's own group (#5923).
+            const row = await mojoGet<T>(endpoint, id!, { unscoped: true });
             return sanitizeRow ? sanitizeRow(row) : row;
         },
         enabled: id != null,

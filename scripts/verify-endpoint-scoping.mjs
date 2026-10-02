@@ -2,8 +2,10 @@
 //
 // Raw useQuery + mojoCall forgetting the scope param was the first consumer
 // audit's largest bug class; this script pins the three defenses: the
-// endpoint-scope registry, the injection helpers (mojoScopedCall / mojoRpc /
-// mojoAction), and the assertScoped dev tripwire inside the unwrap boundary.
+// endpoint-scope registry, the injection helpers (mojoScopedCall / mojoRpc),
+// and the assertScoped dev tripwire inside the unwrap boundary. It also pins
+// the one deliberate exception (#5923): REST record routes — mojoAction and
+// the model's record hooks — send no scope and are declared unscoped.
 //
 // Method notes:
 //   - `import.meta.env.DEV` is TRUE for modules loaded through the Vite dev
@@ -13,7 +15,7 @@
 //   - The mock request history records method/path (plus a params safelist,
 //     never bodies), so params/body PLACEMENT of an injection cannot be
 //     observed at the transport. Placement is pinned by source-text asserts
-//     on scoped.ts / action-result.ts; PRESENCE of the injected key is
+//     on scoped.ts; PRESENCE of the injected key is
 //     proven behaviorally by registering the family as REQUIRED and letting
 //     the assertScoped tripwire be the observer — a call only survives
 //     unwrap if the injected key actually rides the request.
@@ -173,46 +175,51 @@ try {
     const unscopedGroups = await scoped.mojoScopedCall('/api/group', { params: { size: 1 } });
     assert(Array.isArray(unscopedGroups.data), 'an optional scope with no group must pass through unscoped');
 
-    // ── 5. mojoAction body injection ──────────────────────────────────
-    // '/api/user' registered required:TRUE — the tripwire is the observer:
-    // the disable action only succeeds if mojoAction put the scope key in
-    // the action body (the mock records no bodies, so this is the proof).
+    // ── 5. mojoAction sends no scope (#5923) ──────────────────────────
+    // '/api/user/<id>' is a REST record route: the server binds the row's
+    // own group, and a `group` in the body would be saved as the row's
+    // `group` field. '/api/user' is registered required:TRUE, so a
+    // surviving call proves mojoAction declared itself unscoped. The exact
+    // body is read at the transport by verify-model-scope (the mock here
+    // records no bodies).
     resetEndpointScopes();
     registerEndpointScope('/api/user', { key: 'group' });
-    setActiveGroupSignal(4);
 
     const authed = { Authorization: `Bearer ${token}` };
     const directory = await mock.mockFetch('/api/user', { headers: authed, params: { size: 100 } });
     const target = directory.data.find((row) => row.is_active && row.id !== 13);
     assert(target, 'mock seeds must include an active target user');
 
+    // No active group → still succeeds: a record action needs no group.
+    setActiveGroupSignal(null);
+    mock.clearMockRequestHistory();
     const disabled = await actionResult.mojoAction('/api/user', target.id, 'disable', { reason: 'admin' });
-    assert.equal(disabled.ok, true, 'a scope-registered action with an active group must succeed (scope rode the body)');
+    assert.equal(disabled.ok, true, 'a required-scoped record action with no active group must succeed');
     assert.equal(disabled.payload.is_active, false);
+    assert.equal(
+        mock.getMockRequestHistory().some((entry) => entry.method === 'POST' && entry.path === `/api/user/${target.id}`),
+        true,
+        'the action must have reached the mock',
+    );
     const reactivated = await actionResult.mojoAction('/api/user', target.id, 'reactivate');
     assert.equal(reactivated.ok, true, 'restore the seed row');
 
-    // No active group → mojoAction injects nothing → the tripwire throws
-    // before the mock ever sees the POST.
-    setActiveGroupSignal(null);
-    mock.clearMockRequestHistory();
-    await assert.rejects(
-        () => actionResult.mojoAction('/api/user', target.id, 'disable', { reason: 'admin' }),
-        /scope-registered/,
-        'a required-scoped action with no group must trip before transport',
-    );
-    assert.equal(
-        mock.getMockRequestHistory().some((entry) => entry.method === 'POST' && entry.path === `/api/user/${target.id}`),
-        false,
-        'the refused action must never have reached the mock',
-    );
+    // An active group changes nothing: the format hook is the observer —
+    // it runs whenever a scope value is built, and mojoAction builds none.
+    const actionGids = [];
+    registerEndpointScope('/api/user', { key: 'group', format: (g) => { actionGids.push(g); return g; } });
+    setActiveGroupSignal(4);
+    const scopedDisable = await actionResult.mojoAction('/api/user', target.id, 'disable', { reason: 'admin' });
+    assert.equal(scopedDisable.ok, true, 'a record action with an active group must succeed');
+    await actionResult.mojoAction('/api/user', target.id, 'reactivate');
+    assert.deepEqual(actionGids, [], 'mojoAction must inject nothing when a group is active');
 
-    // Inert when nothing is registered — the design guarantee that keeps
-    // the base admin (and verify-action-results) untouched.
+    // Unchanged with nothing registered (the base admin).
     resetEndpointScopes();
     const plainDisable = await actionResult.mojoAction('/api/user', target.id, 'disable', { reason: 'admin' });
-    assert.equal(plainDisable.ok, true, 'with no registrations the injection must be inert');
+    assert.equal(plainDisable.ok, true, 'with no registrations the action must work as before');
     await actionResult.mojoAction('/api/user', target.id, 'reactivate');
+    setActiveGroupSignal(null);
     client.installAuthHooks(null);
 
     // ── 6. Source wiring ──────────────────────────────────────────────
@@ -228,9 +235,18 @@ try {
         'mojoScopedCall must inject into PARAMS for parameter-only requests');
 
     const actionSource = await readFile(new URL('../packages/portal-mojo/src/client/action-result.ts', import.meta.url), 'utf8');
-    assert.match(actionSource, /endpointScopeFor\(path\)/, 'mojoAction must consult the scope registry');
-    assert.match(actionSource, /\{ \.\.\.scope, \[action\]: payload \?\? true \}/,
-        'mojoAction must merge the injected scope into the action body');
+    assert.doesNotMatch(actionSource, /endpoint-scope/, 'mojoAction must not consult the scope registry (#5923)');
+    assert.match(actionSource, /unscoped: true/, 'mojoAction must declare its record call unscoped');
+
+    // The model's record calls are declared unscoped at the one place that
+    // knows they are REST record routes (#5923).
+    const modelSource = await readFile(new URL('../packages/portal-mojo/src/client/model.ts', import.meta.url), 'utf8');
+    assert.match(modelSource, /mojoSave<T>\(endpoint, id, changes, \{ unscoped: true \}\)/, 'useSave with an id must be unscoped');
+    assert.match(modelSource, /mojoDelete\(endpoint, id, \{ unscoped: true \}\)/, 'useDelete must be unscoped');
+    assert.match(modelSource, /mojoGet<T>\(endpoint, id, \{ unscoped: true \}\)/, 'fetchOne must be unscoped');
+    assert.match(modelSource, /body: \{ \[bodyKey\]: payload \},\s+unscoped: true/, 'useAction must send exactly {[key]: payload}, unscoped');
+    const hooksSource = await readFile(new URL('../packages/portal-mojo/src/client/hooks.ts', import.meta.url), 'utf8');
+    assert.match(hooksSource, /mojoGet<T>\(endpoint, id!, \{ unscoped: true \}\)/, 'useModel must be unscoped');
 
     const tableSource = await readFile(new URL('../packages/portal-mojo/src/ui/ModelTable.tsx', import.meta.url), 'utf8');
     assert.doesNotMatch(tableSource, /endpoint-scope/, 'ModelTable must not import endpoint-scope (#1937 boundary)');
