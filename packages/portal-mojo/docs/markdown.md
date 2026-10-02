@@ -25,7 +25,7 @@ tab or a cold first frame still shows the document.
 | `className` | — | Extra classes on the wrapper. `md` is always present. |
 
 Renders one `<div class="md">`. Styling lives in the consuming app —
-`apps/portal/src/theme/markdown.css`, tokens only, both themes; both render
+`packages/portal-mojo/src/styles/components/markdown.css`, tokens only, both themes; both render
 paths emit the same element set, so one stylesheet dresses both.
 
 ### No loading jump, by construction
@@ -175,7 +175,7 @@ that is what lets a cache hit paint on the first frame.
 | `client/markdown-sanitize.ts` | the allowlist sanitizer — the security boundary |
 | `client/markdown-parse.ts` | markdown → block AST, plus the HTML emitter the **mock** uses |
 | `client/markdown-fallback.tsx` | AST → React elements (the fallback path) |
-| `apps/portal/src/theme/markdown.css` | `.md` styling, tokens only, both themes |
+| `packages/portal-mojo/src/styles/components/markdown.css` | `.md` styling, tokens only, both themes |
 
 ## Fallback coverage
 

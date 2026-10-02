@@ -191,7 +191,7 @@ get rows. See [Admin modal policy](admin-modals.md) for lifecycle exceptions.
   cache.
 - **Badges are state, not commands** — to "setBadge", change the value
   your `badges` prop is built from.
-- The styles for the C1 chrome live in `apps/portal/src/theme/detailview.css`
+- The styles for the C1 chrome live in `packages/portal-mojo/src/styles/components/detailview.css`
   (`.rail-badge`, `.rail-dot`, `.dv-menu*`, `.dv-keep`) — tokens only,
   both themes.
 

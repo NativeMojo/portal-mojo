@@ -4,7 +4,7 @@
 // or contains an <svg>.
 //
 // Additions over the source, both needed because portal-mojo charts style
-// through theme.css CLASSES (which a serialized clone loses):
+// through portal-mojo/styles.css CLASSES (which a serialized clone loses):
 //   · computed styles are inlined onto the clone (fixed property list), so
 //     token-driven fills/strokes/fonts survive serialization;
 //   · the backdrop defaults to the nearest ancestor's real background color

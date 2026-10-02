@@ -10,7 +10,7 @@ Six small pieces admin record pages are composed from, ported from
 web-mojo's `src/core/views/data/*` primitives plus its admin metadata
 section. They are presentational and stateless (except `MetadataSection`,
 which writes) — drop them inside a `DetailView` section, a `panel`, or a
-`modal.detail`. Styles: `apps/portal/src/theme/detail-primitives.css`.
+`modal.detail`. Styles: `packages/portal-mojo/src/styles/components/detail-primitives.css`.
 
 **All three trusted-HTML slots are gone.** web-mojo rendered
 `StatusPanel.meta`, `FlowStrip.value/hint` and `Timeline.detail` as

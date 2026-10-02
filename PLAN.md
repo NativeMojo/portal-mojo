@@ -122,7 +122,7 @@ permission-gated, data-backed demos with no login page. Also fixed in passing:
 `.app`'s CSS grid had no
 `grid-template-rows`, so the implicit row auto-sized to content and the
 sidebar grew past 100vh with the page instead of scrolling internally
-(`apps/portal/src/theme.css`) — same fix (`grid-template-rows: minmax(0, 1fr)`
+(now `packages/portal-mojo/src/styles/core.css`) — same fix (`grid-template-rows: minmax(0, 1fr)`
 + `overflow: hidden`) kept `.showcase-shell` correct from the start. Publishing
 `apps/showcase` to maestro sites itself is NOT done — tracked as future work,
 not scaffolded this session.

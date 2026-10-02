@@ -164,7 +164,7 @@ carry them when the registry lands:
   `inline` is fluid to its host. Two panes + rail ≈ 850px — don't mount
   two-pane popovers inside narrow scroll containers, and keep dialogs on
   `months={1}`.
-- Styling lives in `apps/portal/src/theme/daterange.css` (trigger
+- Styling lives in `packages/portal-mojo/src/styles/components/daterange.css` (trigger
   `.mojo-daterange-*`, rail `.mojo-calendar-preset*`), tokens only, both
   themes; the calendar grid ships in `calendar.css`, the popover shell in
   `popover.css`.

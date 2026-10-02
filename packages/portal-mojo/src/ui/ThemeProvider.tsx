@@ -1,6 +1,6 @@
 // ThemeManager port: the preference/resolved two-value model. Preference is
 // 'light' | 'dark' | 'system' (persisted); resolved is what's on screen.
-// Stamps data-theme on <html>; all tokens key off it (see theme.css).
+// Stamps data-theme on <html>; all tokens key off it (the app's theme.css).
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export type ThemePref = 'light' | 'dark' | 'system';

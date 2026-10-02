@@ -222,7 +222,7 @@ not `new Date(epochSeconds)` without `× 1000`.
 
 ## Styling
 
-`apps/portal/src/theme/datetimepicker.css` — layout glue only
+`packages/portal-mojo/src/styles/components/datetimepicker.css` — layout glue only
 (`mojo-datetime-*`: `trigger` / `trigger-text` / `trigger-clear` /
 `popover-inner` / `row` / `cal-col` / `time-col` / `time-head` / `tz-row` /
 `tz-label` / `tz-host` / `foot`), tokens only, both themes. The grid, the

@@ -39,9 +39,10 @@ This app owns what is deployment-specific:
 - `src/main.tsx` — providers + hash router wiring.
 - `src/App.tsx`, `src/components/` — the shell: sidebar, topnav (theme switch).
 - `src/pages/` — the screens, written against the package.
-- `src/theme.css` — the design tokens (web-mojo's 8-value mission-control dark
-  palette verbatim, light twin) and component CSS, plus the Tailwind `@source`
-  scan of the package source. Per-deployment theming happens here.
+- `src/theme.css` — the Tailwind entry. It imports `portal-mojo/styles.css`
+  (the package's component CSS, which scans its own markup) and declares the
+  design tokens (web-mojo's 8-value mission-control dark palette verbatim,
+  light twin). Per-deployment theming happens here.
 
 ## Stack (and why)
 

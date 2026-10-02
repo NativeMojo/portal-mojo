@@ -34,7 +34,7 @@ import {
 Account-security triage: who logged in from a new country, what is this IP,
 and is this device shared across accounts. Demo: showcase → Admin →
 **Devices, logins & GeoIP**. Styles:
-`apps/{portal,showcase}/src/theme/admin-devices.css` (byte-identical).
+`packages/portal-mojo/src/styles/components/admin-devices.css`.
 
 ## Sections
 

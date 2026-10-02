@@ -64,7 +64,7 @@ disable, member `manage_group` / `manage_members` grants (through
 which of the watched keys changed (null/'' normalised), so a save confirms
 ONLY the fields that break things and passes silently otherwise.
 
-Styles: `apps/portal/src/theme/guardrail.css` (`.guardrail`,
+Styles: `packages/portal-mojo/src/styles/components/guardrail.css` (`.guardrail`,
 `.guardrail-effect/-why/-why-head/-undo/-type`, `.guardrail-icon`) over
 `--bad/--bad-soft` (danger) and `--warn/--warn-soft` (`danger: false`). The
 package ships no CSS — a consuming app carries that block (README).
@@ -103,7 +103,7 @@ title · meta) is web-mojo's `Modal.drawer()` carried over.
   otherwise there is no exit at all, so it falls back to dismissable with a
   `console.warn` (house rule: degenerate input → default + warn).
 - An unknown `width` warns and falls back to 480px.
-- Styles: `apps/portal/src/theme/drawer.css` (`.mojo-drawer`, `.drawer-panel`,
+- Styles: `packages/portal-mojo/src/styles/components/drawer.css` (`.mojo-drawer`, `.drawer-panel`,
   `.drawer-head/-eyebrow/-title/-meta`, `.drawer-body`) — tokens only, both
   themes. `DRAWER_EXIT_MS` in `modal.tsx` must match the closing keyframes.
 
@@ -130,10 +130,11 @@ and drawers), then returns to the page when the last modal closes. Modal-local
 ancestry keeps Undo and progress Cancel usable despite native dialog inertness.
 Moving the host preserves card state and timers and does not focus the toast.
 Mount it once; do not add per-dialog toast hosts or solve this with `z-index`.
-Custom app themes must include the updated toast CSS from
-`apps/portal/src/theme.css`: reset the popover's UA inset/margin/border/padding
-and background, hide closed popovers, and keep only the cards pointer-active.
-Updating the TypeScript package alone does not update a consumer's own theme.
+The toast CSS ships in `portal-mojo/styles.css`
+(`packages/portal-mojo/src/styles/core.css`): it resets the popover's UA
+inset/margin/border/padding and background, hides closed popovers, and keeps
+only the cards pointer-active. An app that still carries a copied theme keeps
+its old toast rules until it deletes the copy.
 The showcase's **Toasts inside modal** demo covers errors, Undo, progress,
 and nested opening/closing. `node scripts/verify-toast-modal.mjs` checks the
 mounted lifecycle; native visibility and interaction require browser checks.

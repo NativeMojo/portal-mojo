@@ -144,7 +144,7 @@ lean on the per-precision default.
 
 ## Styling
 
-`apps/portal/src/theme/datepicker.css` — trigger, clear ✕, popover content
+`packages/portal-mojo/src/styles/components/datepicker.css` — trigger, clear ✕, popover content
 box, inline host. The grid itself is `theme/calendar.css` and the floating
 surface is `theme/popover.css`; this file adds nothing they already cover.
 Trigger metrics follow the house control (`.input`): `--surface2` fill,

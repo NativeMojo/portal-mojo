@@ -11,7 +11,7 @@ Point it at any record and get a sensible detail grid. Field **names** and
 **values** together pick the renderer, nested objects become nested grids,
 and anything that isn't a scalar lands in a JSON block with copy and
 collapse. Port of web-mojo `src/core/views/data/DataView.js` (1,153 lines).
-Styles: `apps/portal/src/theme/dataview.css`. Demo: **Develop → Components →
+Styles: `packages/portal-mojo/src/styles/components/dataview.css`. Demo: **Develop → Components →
 DataView**.
 
 ## DataView vs KnownFieldsCard

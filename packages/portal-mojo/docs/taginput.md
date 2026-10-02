@@ -99,7 +99,8 @@ containing commas that would re-split on the next load.
 
 ## Styling
 
-Classes are styled by the consuming app (`apps/portal/src/theme/taginput.css`,
+Classes are styled by the package stylesheet
+(`packages/portal-mojo/src/styles/components/taginput.css`,
 tokens only, light + dark): `.tag-input`, `.tag-input-wrap` (wears the `.input`
 field look, accent ring on `:focus-within`), `.tag-chip` / `.tag-chip-text` /
 `.tag-chip-x`, `.tag-input-field`, `.tag-input-foot` / `.tag-input-count` /

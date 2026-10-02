@@ -101,7 +101,7 @@ Parse fns return `null` on invalid input, never throw; format fns return
 
 ## Styling
 
-`apps/portal/src/theme/calendar.css` — engine anatomy only
+`packages/portal-mojo/src/styles/components/calendar.css` — engine anatomy only
 (`mojo-calendar-*`: pane/head/nav/grid/weekday/cell + state classes), all
 colors via theme tokens; component tokens `--mojo-cal-anchor-fill`,
 `--mojo-cal-range-fill`, `--mojo-cal-range-fill-hover` (accent tints:

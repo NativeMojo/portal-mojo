@@ -33,8 +33,8 @@ Perimeter control: block an abusive IP right now, whitelist a customer's NAT,
 maintain country and datacenter CIDR sets synced to the firewall fleet, set
 geographic policy — and prove the policy does what you think with a built-in
 simulator before it bites real traffic. Demo: showcase → Admin → **Network
-security**. Styles: `apps/{portal,showcase}/src/theme/admin-network.css`
-(byte-identical).
+security**. Styles:
+`packages/portal-mojo/src/styles/components/admin-network.css`.
 
 ## Surfaces
 

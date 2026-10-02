@@ -113,5 +113,5 @@ Sorting is the server's default unless `defaultParams` carries `sort`.
   a permanently empty picker in global context.
 - The dropdown's trigger/footer classes (`.multiselect-trigger`,
   `.multiselect-footer`, `.multiselect-done`) live in
-  `multiselect-dropdown.css` — consuming apps must import it alongside
-  `collection-multiselect.css` (the reference `theme.css` imports both).
+  `multiselect-dropdown.css` — `portal-mojo/styles.css` imports it alongside
+  `collection-multiselect.css`.

@@ -101,5 +101,5 @@ strings.
   to the label, duplicating every row — not carried).
 - The dropdown is mounted in the shared top-layer Popover, so overflow
   containers and native dialogs do not clip it.
-- Styles live in `apps/portal/src/theme/combobox.css` (tokens only, both
+- Styles live in `packages/portal-mojo/src/styles/components/combobox.css` (tokens only, both
   themes); consuming apps must include it.
