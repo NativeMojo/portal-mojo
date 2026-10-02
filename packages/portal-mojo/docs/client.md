@@ -62,6 +62,11 @@ desc; filters are Django lookups (`field`, `field__in=a,b`,
 triple is `dr_field/dr_start/dr_end`; datetimes serialize as epoch seconds;
 unknown params are silently ignored by the server.
 
+`mojoGet`, `mojoSave` and `mojoDelete` take an optional last argument,
+`{ unscoped?: boolean }` — the record-route opt-out from a registered
+endpoint scope (see "Record routes vs custom views" below). `defineModel`
+passes it for you.
+
 The executable mock coerces comparisons narrowly: both operands must be
 fully numeric for numeric comparison; temporal comparison only recognizes
 canonical `YYYY[-MM[-DD]]` or full ISO datetime shapes; everything else is
@@ -103,10 +108,13 @@ readers with a comment.
 
 ## Endpoint scoping — the middle tier
 
-The model layer scopes reliably; everything hand-rolled with `useQuery` +
-`mojoCall` historically forgot the scope param — the largest bug class in the
-first consumer audit (eight files, every one a raw read or verb missing its
-`group`). The middle tier makes the raw path as safe as the blessed one:
+The model layer needs no scope on record routes — `<endpoint>/<id>` gets,
+saves, deletes and actions send none, because the server binds the row's own
+group (see "Record routes vs custom views" below). Everything hand-rolled
+with `useQuery` + `mojoCall` historically forgot the scope param — the largest
+bug class in the first consumer audit (eight files, every one a raw read or
+verb missing its `group`). The middle tier makes the raw path as safe as the
+blessed one:
 apps *declare* their scoped endpoint families once, and every helper —
 plus a dev tripwire in the transport itself — enforces the declaration.
 
@@ -161,14 +169,21 @@ or a spinner that never resolves: state the wait honestly at the call site
   `withFreshAuth` with the scope injected; resolves `env.data as T`.
   Action-shaped `{key: payload}` saves belong to `mojoAction`, not here.
 
-### `mojoAction` body injection
+### `mojoAction` sends no scope
 
-`mojoAction(endpoint, id, action, payload?)` consults the same registry:
-for a scope-registered family with an active group, the scope key is
-injected into the action POST body alongside `{[action]: payload}` — the
-wallet-verbs class: actions the backend refuses for brand-scoped operators
-without `group`. With nothing registered (the base admin) the injection is
-inert.
+`mojoAction(endpoint, id, action, payload?)` posts exactly
+`{[action]: payload}` to `<endpoint>/<id>` and never adds a scope key, on any
+family, with or without an active group. Two reasons:
+
+- A REST record route needs no group. django-mojo authorizes the request
+  against the **row's own** group, whatever the caller sends.
+- A `group` in the body is not only a selector there: the save handler
+  writes it as the row's `group` field, and its presence turns the action
+  into a full field save. An action on a record read outside the active
+  group could move that record to the active group.
+
+The call is declared `unscoped: true`, so it passes the dev tripwire on a
+registered-REQUIRED family. Earlier versions injected the scope here.
 
 ### The dev tripwire — and `unscoped: true`
 
@@ -181,6 +196,24 @@ for the rare genuinely-global call to a scoped family, mark it
 `{ unscoped: true }` — an explicit, greppable opt-out. Production builds
 skip the check (`import.meta.env.DEV` only); it is a development tripwire,
 not a runtime gate.
+
+### Record routes vs custom views
+
+Two kinds of URL end in an id, and only the caller knows which it has:
+
+- **REST record routes** — the model's own `<endpoint>/<id>` (get, save,
+  delete, POST_SAVE_ACTIONS). The server binds the row's group; send no
+  scope. `defineModel`'s record hooks and `mojoAction` already declare these
+  `unscoped: true`. A raw call to one does the same:
+  `mojoGet(endpoint, id, { unscoped: true })`.
+- **Custom views on a record path** — `requests/<id>/resend`, a download by
+  id, any view the backend gates with a group permission decorator. These
+  read the group from the request and **do** need it: keep using `mojoRpc` /
+  `mojoScopedCall` / `useScopedQuery`, which inject it.
+
+No path rule can tell the two apart, so the tripwire does not try. A
+collection create (`POST <endpoint>`) is not a record route: the group on
+the request decides where the new row lands, so pass it in the body.
 
 ## Mock admin contracts
 
