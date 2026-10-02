@@ -193,13 +193,23 @@ async function doRefresh(): Promise<boolean> {
         return false;
     }
     const persistent = sessionIsPersistent();
+    // The answer is for the session whose refresh token was sent. When the
+    // stored one is no longer that token, the session was replaced while this
+    // was in flight: a save that changed the password (tokensReplaced), a new
+    // sign-in, a sign-out. A late pair is signed with a key the server has
+    // dropped, and a late 401 is about a token nobody holds any more; either
+    // one, acted on, would undo the session that replaced it.
+    const superseded = (): boolean => getRefreshToken() !== refresh;
+    const sessionUsable = (): boolean => checkTokenStatus().action !== 'logout';
     try {
         const body = await mojoCall(REFRESH_PATH, { method: 'POST', body: { refresh_token: refresh } });
+        if (superseded()) return sessionUsable();
         const pkg = body.data as { access_token: string; refresh_token?: string };
         setTokens(pkg.access_token, pkg.refresh_token, persistent);
         emitAuth('refreshed');
         return true;
     } catch (error) {
+        if (superseded()) return sessionUsable();
         const status = error instanceof Error && 'status' in error ? (error as { status: number }).status : 0;
         if (status === 401 || status === 403) {
             emitAuth('unauthorized');
