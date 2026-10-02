@@ -38,18 +38,38 @@ globalThis.localStorage = {
 };
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+// Section 4's wrapped-data probe: no mock route answers a wrapped
+// `{status:true, data:{success:false}}` inside a 2xx, so a stub path is put in
+// front of the real mock. Every other path still reaches the real mock.
+const MOCK = '/packages/portal-mojo/src/client/mock.ts';
+const WRAPPED_PATH = '/__probe/wrapped-refusal';
+const wrappedProbe = globalThis.__wrappedProbe = { calls: [] };
+const probeMock = `export * from '${MOCK}'; import { mockFetch as real } from '${MOCK}';
+export const mockFetch = async (path, opts) => {
+    if (path !== '${WRAPPED_PATH}') return real(path, opts);
+    globalThis.__wrappedProbe.calls.push(opts.method ?? 'GET');
+    return { status: true, data: { success: false, code: 'NOT_LIVE', error: 'deploy queued', step: 'queued' } };
+};`;
 const server = await createServer({
     root,
     appType: 'custom',
     logLevel: 'silent',
     server: { middlewareMode: true },
+    plugins: [{
+        name: 'wrapped-refusal-probe', enforce: 'pre',
+        resolveId: (id) => (id === '/__probe_mock.ts' ? id : null),
+        load: (id) => (id === '/__probe_mock.ts' ? probeMock : null),
+        transform(source, id) {
+            if (id.endsWith('/client/client.ts')) return source.replaceAll("import('./mock')", "import('/__probe_mock.ts')");
+        },
+    }],
 });
 
 try {
     const actionResult = await server.ssrLoadModule('/packages/portal-mojo/src/client/action-result.ts');
     const client = await server.ssrLoadModule('/packages/portal-mojo/src/client/client.ts');
     const errors = await server.ssrLoadModule('/packages/portal-mojo/src/client/errors.ts');
-    const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
+    const mock = await server.ssrLoadModule(MOCK);
     const { readActionResult, mojoAction, ActionRefusedError } = actionResult;
     // The reader and the error moved to errors.ts (#5922); action-result.ts
     // re-exports the same objects, so imports from either place agree.
@@ -219,6 +239,17 @@ try {
     assert.equal(cors.data.status, false, 'a wrapped data.status:false must resolve as data');
     client.installAuthHooks({ async preRequest() {}, authHeader: () => `Bearer ${token}` });
 
+    // A wrapped data.success:false is ordinary data on EVERY method (e.g. a
+    // successful POST webapp/rollback answers success:false for a queued
+    // deploy): a raw mojoCall resolves it unchanged and never throws.
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
+        const wrapped = await client.mojoCall(WRAPPED_PATH, { method, ...(method === 'GET' || method === 'DELETE' ? {} : { body: { probe: 1 } }) })
+            .catch((err) => assert.fail(`${method}: a wrapped data.success:false must resolve, not throw ${err?.name}: ${err?.message}`));
+        assert.deepEqual(wrapped, { status: true, data: { success: false, code: 'NOT_LIVE', error: 'deploy queued', step: 'queued' } },
+            `${method}: a wrapped data.success:false must resolve with the reply unchanged`);
+    }
+    assert.deepEqual(wrappedProbe.calls, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], 'each method must reach the probe once');
+
     // A refusal is deterministic: the query defaults never retry it.
     const { retry } = client.mojoQueryDefaults().queries;
     assert.equal(retry(0, refusal), false, 'an ActionRefusedError must not retry');
@@ -251,4 +282,5 @@ try {
     console.log('action-result contract verified');
 } finally {
     await server.close();
+    delete globalThis.__wrappedProbe;
 }
