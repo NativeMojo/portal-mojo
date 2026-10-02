@@ -221,8 +221,8 @@ surfaces local rejection through the same alert region.
 
 ## Styling
 
-Import `theme/record-feed.css` after the token declarations (the portal and
-showcase theme aggregators already do). It uses only the mission-control
+`src/styles/components/record-feed.css` ships in `portal-mojo/styles.css`;
+the app declares the tokens. It uses only the mission-control
 tokens and supports both `data-theme` values. Override the default bounded
 height with `--record-feed-height` on a wrapper/component class.
 

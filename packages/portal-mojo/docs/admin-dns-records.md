@@ -62,4 +62,4 @@ Confirmation shows identity, TTL, unchanged/removed/added values, and contextual
 
 The central mock is the only DNS state owner and mirrors id-less envelopes, global-versus-tenant authorization, active/provider/credential gates, complete replacement, Route 53 delete, GoDaddy floor/refusal/spent placeholders, Mojo, unknown records, and structured types. Mutation verification is mock-only. Live verification may read a zone and open/cancel an editor, but must never POST or DELETE DNS records.
 
-Both Portal and Showcase import `theme/admin-dns.css`; all colors use theme tokens. Run `npm run verify:admin-dns-records` with the orchestration-owned typecheck/build/browser pass.
+`src/styles/components/admin-dns.css` ships in `portal-mojo/styles.css`; all colors use theme tokens. Run `npm run verify:admin-dns-records` with the orchestration-owned typecheck/build/browser pass.

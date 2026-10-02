@@ -107,8 +107,8 @@ sticky delegation, staging, unconfigured, and malformed-response evidence.
 Its only custody fixture is a private `material_present` boolean; no PEM is
 stored or serialized.
 
-Portal and Showcase both import `theme/admin-dns-certificates.css`, which uses
-semantic tokens only. The executable demo is **Develop → Components → DNS
+`src/styles/components/admin-dns-certificates.css` ships in
+`portal-mojo/styles.css` and uses semantic tokens only. The executable demo is **Develop → Components → DNS
 certificates & ACME** with manager, viewer, platform-house, and unconfigured
 legs. Run:
 
