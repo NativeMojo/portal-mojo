@@ -594,15 +594,10 @@ try {
     })).data.count, 0, 'and the rows are gone afterwards');
 
     // ── 15. Theme discipline ──────────────────────────────────────────
-    const [themePortal, themeShowcase] = await Promise.all([
-        read('apps/portal/src/theme/admin-jobs.css'),
-        read('apps/showcase/src/theme/admin-jobs.css'),
-    ]);
-    assert.equal(themePortal, themeShowcase, 'the two theme dirs keep admin-jobs.css byte-identical');
-    assert.doesNotMatch(stripComments(themePortal), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
-    for (const app of ['apps/portal/src/theme.css', 'apps/showcase/src/theme.css']) {
-        assert.match(await read(app), /@import "\.\/theme\/admin-jobs\.css";/, `${app} imports the stylesheet`);
-    }
+    const packageCss = await read('packages/portal-mojo/src/styles/components/admin-jobs.css');
+    assert.doesNotMatch(stripComments(packageCss), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-jobs\.css" layer\(portal-mojo\);/,
+        'the package stylesheet imports it');
     // Docs + showcase are part of the deliverable, not optional.
     const docs = await read('packages/portal-mojo/docs/admin-jobs.md');
     assert.match(docs, /django-mojo #1309/, 'the run-now gap names its django-mojo item');

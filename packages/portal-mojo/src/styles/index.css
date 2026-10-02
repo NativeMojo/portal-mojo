@@ -1,0 +1,65 @@
+@layer theme, base, components, utilities, portal-mojo;
+/* portal-mojo/styles.css: every component style the package's markup needs.
+
+   - Import it from the app's Tailwind CSS entry, after `@import "tailwindcss"`,
+     and without a layer() of your own. The package layers itself.
+   - The `portal-mojo` layer sits after Tailwind's `utilities`, so package rules
+     still beat utilities, and any unlayered app rule beats the package.
+   - The `@source` below makes Tailwind scan the package's own markup, so the
+     app needs no `@source` line for portal-mojo.
+   - Colour tokens are the app's to declare; ./required-tokens.json lists them.
+   - Order matters: component files first, ./core.css last. */
+@source "../";
+@import "./components/popover.css" layer(portal-mojo);
+@import "./components/taginput.css" layer(portal-mojo);
+@import "./components/drawer.css" layer(portal-mojo);
+@import "./components/combobox.css" layer(portal-mojo);
+@import "./components/location-address.css" layer(portal-mojo);
+@import "./components/collection-multiselect.css" layer(portal-mojo);
+@import "./components/detail-primitives.css" layer(portal-mojo);
+@import "./components/calendar.css" layer(portal-mojo);
+@import "./components/markdown.css" layer(portal-mojo);
+@import "./components/record-feed.css" layer(portal-mojo);
+@import "./components/right-panel.css" layer(portal-mojo);
+@import "./components/admin-assistant.css" layer(portal-mojo);
+@import "./components/admin-security.css" layer(portal-mojo);
+@import "./components/admin-dashboard.css" layer(portal-mojo);
+@import "./components/admin-cloudwatch.css" layer(portal-mojo);
+@import "./components/admin-monitoring.css" layer(portal-mojo);
+@import "./components/admin-bouncer.css" layer(portal-mojo);
+@import "./components/admin-incidents.css" layer(portal-mojo);
+@import "./components/admin-rules.css" layer(portal-mojo);
+@import "./components/admin-devices.css" layer(portal-mojo);
+@import "./components/admin-jobs.css" layer(portal-mojo);
+@import "./components/admin-network.css" layer(portal-mojo);
+@import "./components/admin-dns.css" layer(portal-mojo);
+@import "./components/admin-dns-certificates.css" layer(portal-mojo);
+@import "./components/admin-dns-registrar.css" layer(portal-mojo);
+@import "./components/admin-storage.css" layer(portal-mojo);
+@import "./components/admin-shortlinks.css" layer(portal-mojo);
+@import "./components/admin-messaging.css" layer(portal-mojo);
+@import "./components/admin-phonehub.css" layer(portal-mojo);
+@import "./components/admin-push.css" layer(portal-mojo);
+@import "./components/admin-signin.css" layer(portal-mojo);
+@import "./components/multiselect-dropdown.css" layer(portal-mojo);
+@import "./components/datepicker.css" layer(portal-mojo);
+@import "./components/formview.css" layer(portal-mojo);
+@import "./components/tabs.css" layer(portal-mojo);
+@import "./components/form-wizard.css" layer(portal-mojo);
+@import "./components/dataview.css" layer(portal-mojo);
+@import "./components/detailview.css" layer(portal-mojo);
+@import "./components/timepicker.css" layer(portal-mojo);
+@import "./components/collection-select.css" layer(portal-mojo);
+@import "./components/daterange.css" layer(portal-mojo);
+@import "./components/datetimepicker.css" layer(portal-mojo);
+@import "./components/auth.css" layer(portal-mojo);
+@import "./components/idioms.css" layer(portal-mojo);
+@import "./components/guardrail.css" layer(portal-mojo);
+@import "./components/file-upload.css" layer(portal-mojo);
+@import "./components/image-editor.css" layer(portal-mojo);
+@import "./components/charts-c2.css" layer(portal-mojo);
+@import "./components/group-admin.css" layer(portal-mojo);
+@import "./components/user-admin.css" layer(portal-mojo);
+@import "./components/loading.css" layer(portal-mojo);
+@import "./components/worldmap.css" layer(portal-mojo);
+@import "./core.css" layer(portal-mojo);

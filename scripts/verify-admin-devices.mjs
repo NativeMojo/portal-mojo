@@ -171,15 +171,10 @@ try {
     assert.doesNotMatch(stripComments(dossier), /reverse_dns|ip_version/, 'two fields GeoLocatedIP never had');
 
     // ── 8. Theme discipline ──
-    const [themePortal, themeShowcase] = await Promise.all([
-        read('apps/portal/src/theme/admin-devices.css'),
-        read('apps/showcase/src/theme/admin-devices.css'),
-    ]);
-    assert.equal(themePortal, themeShowcase, 'the two theme dirs keep admin-devices.css byte-identical');
-    assert.doesNotMatch(stripComments(themePortal), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
-    for (const app of ['apps/portal/src/theme.css', 'apps/showcase/src/theme.css']) {
-        assert.match(await read(app), /@import "\.\/theme\/admin-devices\.css";/, `${app} imports the stylesheet`);
-    }
+    const packageCss = await read('packages/portal-mojo/src/styles/components/admin-devices.css');
+    assert.doesNotMatch(stripComments(packageCss), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-devices\.css" layer\(portal-mojo\);/,
+        'the package stylesheet imports it');
     // ReactNode slots, never HTML strings (architecture rule 6).
     const surfaces = await Promise.all([
         'packages/portal-mojo/src/admin/security/devices/LoginLocationMap.tsx',

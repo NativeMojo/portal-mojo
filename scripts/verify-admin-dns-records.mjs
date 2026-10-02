@@ -206,8 +206,7 @@ try {
     assert.match(detailSource, /modal\.detail/);
     assert(!JSON.stringify(dns.DNS_ADMIN_SECTION.routes).includes(':id'));
     assert.match(panelSource, /DNS_MANAGE_PERMISSIONS/);
-    assert.match(await read('apps/portal/src/theme.css'), /admin-dns\.css/);
-    assert.match(await read('apps/showcase/src/theme.css'), /admin-dns\.css/);
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-dns\.css" layer\(portal-mojo\);/);
     assert.match(await read('apps/showcase/src/pages/components/demos-admin-dns-records.tsx'), /<DomainsPage \/>/);
     assert.match(await read('packages/portal-mojo/docs/admin-dns-records.md'), /GET-to-POST race/);
 

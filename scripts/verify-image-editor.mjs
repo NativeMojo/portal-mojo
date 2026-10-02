@@ -104,17 +104,16 @@ try {
         'operation sequences have a hard work bound',
     );
 
-    const [editorSource, portalCss, showcaseCss] = await Promise.all([
+    const [editorSource, packageStyles] = await Promise.all([
         readFile(new URL('../packages/portal-mojo/src/ui/image-editor/ImageEditor.tsx', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/portal/src/theme/image-editor.css', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/showcase/src/theme/image-editor.css', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/styles/index.css', import.meta.url), 'utf8'),
     ]);
     assert.match(editorSource, /saveGeneration/);
     assert.match(editorSource, /loadGeneration/);
     assert.match(editorSource, /controller\.abort\(\)/, 'source replacement and unmount abort URL work');
     assert.match(editorSource, /canvas\.toBlob|pixelSurfaceToBlob/);
     assert(!/download\s*=|\.click\(\)/.test(editorSource), 'save never auto-downloads');
-    assert.equal(portalCss, showcaseCss, 'both themes carry byte-identical editor styles');
+    assert.match(packageStyles, /@import "\.\/components\/image-editor\.css" layer\(portal-mojo\);/, 'the package stylesheet imports the editor styles');
     await stat(new URL('../packages/portal-mojo/docs/image-editor.md', import.meta.url));
     await stat(new URL('../apps/showcase/src/pages/components/demos-image-editor.tsx', import.meta.url));
     console.log('verify-image-editor: math, raster, history, and three-legged contracts passed');
