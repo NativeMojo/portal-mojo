@@ -42,10 +42,12 @@ export async function savePhoneConfigImperative(qc:QueryClient,id:number|null,sc
     const row=sanitizePhoneConfigRow(response.data as PhoneConfigRow);
     qc.setQueryData(PhoneConfigModel.keys.one(row.id),row);await qc.invalidateQueries({queryKey:PhoneConfigModel.keys.root});return row;
 }
-// PhoneConfig returns `success` as its provider verdict; envelope `status`
-// only says the REST action ran. A failed test resolves for inline display.
+// PhoneConfig returns `success` as its provider verdict, flat on the wire
+// (the action dict verbatim). A failed test is an answer, not a refusal:
+// `refusal:'return'` keeps unwrap from rejecting it, so it resolves for
+// inline display.
 export async function testPhoneConfigImperative(id:number):Promise<{status:boolean;message:string;testMode:boolean;errorCode:string|null}>{
-    const response=await mojoCall(`${PhoneConfigModel.endpoint}/${id}`,{method:'POST',body:{test_connection:1}});
+    const response=await mojoCall(`${PhoneConfigModel.endpoint}/${id}`,{method:'POST',body:{test_connection:1},refusal:'return'});
     const data=(response.data??response) as Record<string,unknown>;
     const status=data.success===true;
     return {status,testMode:data.test_mode===true,errorCode:typeof data.error==='string'?data.error:null,message:typeof data.message==='string'?data.message:status?'Connection verified.':'The server did not confirm the provider connection.'};

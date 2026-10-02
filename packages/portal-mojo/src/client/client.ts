@@ -4,7 +4,9 @@
 //   - Envelope: {status, ...} — status:false carries error/message. Unwrapped
 //     HERE, at exactly one boundary. A failed save REJECTS (MojoError); it is
 //     never resolved as success. (web-mojo's Model.save() never-rejects trap
-//     is deliberately not carried forward.)
+//     is deliberately not carried forward.) A handler's flat refusal inside
+//     the 200 — top-level `success:false` — rejects too (ActionRefusedError,
+//     #5922) unless the call passes `refusal: 'return'`.
 //   - Lists: {status, data: T[], count, size, start} → MojoList<T>.
 //   - Singles: {status, data: T} → T.
 //   - Paging: start/size. Sort: 'field' | '-field'. Filters: Django lookups.
@@ -15,7 +17,7 @@
 //
 // With VITE_MOJO_API unset the transport is the in-memory mock; set it to a
 // django-mojo origin and the same code talks to the real backend.
-import { MojoError } from './errors';
+import { ActionRefusedError, MojoError, readActionResult } from './errors';
 import { assertScoped } from './endpoint-scope';
 import { DUID_HEADER, getDuid } from './duid';
 import type { MojoList, Params } from './types';
@@ -48,7 +50,8 @@ export function apiOrigin(): string {
  * TanStack Query defaults tuned for the mojo protocol — spread these into the
  * app's QueryClient:
  *   · 4xx MojoErrors never retry (a 404/401/403 is deterministic — retrying
- *     it only delays the error surfacing, e.g. the group-context fallback)
+ *     it only delays the error surfacing, e.g. the group-context fallback);
+ *     nor does an inside-the-200 refusal (the same request gets the same no)
  *   · networkMode 'always' under the mock (an in-memory backend can't be
  *     offline; online-pausing would wedge failures forever), 'online' for
  *     real backends.
@@ -59,6 +62,7 @@ export function mojoQueryDefaults() {
             networkMode: (usingMockTransport() ? 'always' : 'online') as 'always' | 'online',
             retry: (failureCount: number, error: unknown): boolean => {
                 if (error instanceof MojoError && error.status >= 400 && error.status < 500) return false;
+                if (error instanceof ActionRefusedError) return false;
                 return failureCount < 1;
             },
             // No refetch storm on window focus (web-mojo parity: freshness
@@ -91,6 +95,12 @@ export interface FetchOpts {
     /** Explicit opt-out from a registered endpoint scope (scoped.ts) — for
      *  genuinely global calls inside a scoped family. Greppable, never silent. */
     unscoped?: boolean;
+    /** A flat `success:false` inside the 200 is a handler's refusal: by
+     *  default ('reject') unwrap rejects it with ActionRefusedError. 'return'
+     *  resolves it as a result, for calls whose `success:false` is a real
+     *  answer (a connection test) or that read the refusal themselves (the
+     *  action layer). Greppable, never silent. */
+    refusal?: 'reject' | 'return';
 }
 
 export interface Envelope {
@@ -177,6 +187,12 @@ async function unwrap(path: string, opts: FetchOpts): Promise<Envelope> {
             body.error_code,
             body.data,
         );
+    }
+    // Flat only: a top-level success:false is always the handler's own reply
+    // (model actions answer flat). A wrapped data.success:false can be
+    // ordinary data on a successful POST, so it stays data here.
+    if ((body as { success?: unknown }).success === false && opts.refusal !== 'return') {
+        throw new ActionRefusedError(path, readActionResult(body));
     }
     return body;
 }

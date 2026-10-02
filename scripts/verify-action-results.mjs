@@ -51,6 +51,10 @@ try {
     const errors = await server.ssrLoadModule('/packages/portal-mojo/src/client/errors.ts');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
     const { readActionResult, mojoAction, ActionRefusedError } = actionResult;
+    // The reader and the error moved to errors.ts (#5922); action-result.ts
+    // re-exports the same objects, so imports from either place agree.
+    assert.equal(readActionResult, errors.readActionResult, 'action-result must re-export the errors.ts reader');
+    assert.equal(ActionRefusedError, errors.ActionRefusedError, 'action-result must re-export the errors.ts error');
 
     // ── 1. readActionResult fixture matrix ────────────────────────────
     const flatRefusal = readActionResult({ success: false, code: 'WRONG_STATUS', error: 'User is already disabled' });
@@ -83,6 +87,14 @@ try {
     assert.equal(diagnostic.code, undefined, 'a diagnostic refusal has no semantic code');
     assert.equal(diagnostic.error, undefined, 'a diagnostic refusal has no error text');
     assert.equal(diagnostic.payload.key_count, 0, 'diagnostic data stays readable from payload');
+
+    // A refusal with no string error falls back to a string message
+    // (diagnostics and provider refusals put the human text there).
+    assert.equal(readActionResult({ success: false, message: 'm' }).error, 'm', 'a refused message must become the error text');
+    assert.equal(readActionResult({ status: true, message: 'ok' }).error, undefined, 'a success message is not error text');
+    // django-mojo JsonResponse injects a numeric code (the HTTP status) when
+    // a body has none: only string codes are refusal codes.
+    assert.equal(readActionResult({ success: false, error: 'x', code: 200 }).code, undefined, 'a numeric code must be ignored');
 
     // Merge order: the action dict WINS over envelope fields.
     const merged = readActionResult({ status: true, note: 'env', data: { note: 'action' } });
@@ -198,9 +210,14 @@ try {
     await client.mojoCall(configPath, { method: 'DELETE' });
 
     // Wrapped data.status:false (storage tester on a non-S3 manager) is data
-    // on a POST: unwrap must not reject it.
+    // on a POST: unwrap must not reject it. The storage manager holds the grant.
+    const storageLogin = await mock.mockFetch('/api/login', {
+        method: 'POST', body: { username: 'storage.manager@nativemojo.com', password: 'mojo' },
+    });
+    client.installAuthHooks({ async preRequest() {}, authHeader: () => `Bearer ${storageLogin.data.access_token}` });
     const cors = await client.mojoCall('/api/fileman/manager/4104', { method: 'POST', body: { check_cors: 1 } });
     assert.equal(cors.data.status, false, 'a wrapped data.status:false must resolve as data');
+    client.installAuthHooks({ async preRequest() {}, authHeader: () => `Bearer ${token}` });
 
     // A refusal is deterministic: the query defaults never retry it.
     const { retry } = client.mojoQueryDefaults().queries;
@@ -215,6 +232,15 @@ try {
     assert.match(modelSource, /readActionResult\(body\)/, 'useAction must normalize through the one reader');
     assert.match(modelSource, /throw new ActionRefusedError\(action, result\)/, 'useAction must throw the typed refusal');
     assert.match(modelSource, /def\.refusal \?\? 'reject'/, "the refusal mode must default to 'reject'");
+
+    assert.match(modelSource, /refusal: 'return'/, "useAction must opt out of unwrap's refusal check to name the action");
+    const actionSource = await readFile(new URL('../packages/portal-mojo/src/client/action-result.ts', import.meta.url), 'utf8');
+    assert.match(actionSource, /refusal: 'return'/, "mojoAction must opt out of unwrap's refusal check to name the action");
+    const phoneSource = await readFile(new URL('../packages/portal-mojo/src/admin/phonehub/api.ts', import.meta.url), 'utf8');
+    assert.match(phoneSource, /test_connection:1\},refusal:'return'/, "the Phone Hub test must opt out: its flat success:false is a verdict");
+    const clientSource = await readFile(new URL('../packages/portal-mojo/src/client/client.ts', import.meta.url), 'utf8');
+    const unwrapSource = clientSource.slice(clientSource.indexOf('async function unwrap('), clientSource.indexOf('export function mojoCall('));
+    assert.match(unwrapSource, /new ActionRefusedError\(path, readActionResult\(body\)\)/, 'unwrap must build the refusal through the one reader');
 
     const tableSource = await readFile(new URL('../packages/portal-mojo/src/ui/ModelTable.tsx', import.meta.url), 'utf8');
     assert.doesNotMatch(tableSource, /action-result/, 'ModelTable must not import action-result (#1937 boundary)');

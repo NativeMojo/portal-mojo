@@ -219,6 +219,8 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
                         method: 'POST',
                         body: { [bodyKey]: payload },
                         unscoped: true,
+                        // Read the refusal below, to name the action and honour def.refusal.
+                        refusal: 'return',
                     }));
                     // Handlers refuse INSIDE the 200 — normalize, and reject
                     // unless this action declared the flag a diagnostic.
