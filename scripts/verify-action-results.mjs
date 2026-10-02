@@ -15,7 +15,11 @@
 //      throws ActionRefusedError(ALREADY_DISABLED) on the duplicate;
 //   3. source wiring: useAction normalizes + throws with the
 //      `refusal ?? 'reject'` default, and ui/ModelTable.tsx never imports
-//      action-result (the #1937 boundary).
+//      action-result (the #1937 boundary);
+//   4. the unwrap boundary itself (#5922): a raw mojoCall REJECTS a flat
+//      inside-the-200 refusal with ActionRefusedError, `refusal:'return'`
+//      opts out, a wrapped `data.success`/`data.status:false` stays data, and
+//      the query defaults never retry a refusal.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -151,6 +155,59 @@ try {
             return true;
         },
     );
+
+    // ── 4. the unwrap boundary rejects a flat refusal (#5922) ─────────
+    const userPath = `/api/user/${target.id}`;
+    const disableRaw = (opts = {}) => client.mojoCall(userPath, { method: 'POST', body: { disable: { reason: 'admin' } }, unscoped: true, ...opts });
+    await mojoAction('/api/user', target.id, 'disable', { reason: 'admin' });
+    // The regression: before #5922 this resolved, so a raw caller showed
+    // success when the server had refused.
+    let refusal;
+    await assert.rejects(
+        () => disableRaw(),
+        (err) => {
+            assert(err instanceof ActionRefusedError, 'a raw mojoCall must reject a flat success:false with ActionRefusedError');
+            assert(err instanceof errors.MojoError, 'the raw refusal must remain a MojoError');
+            assert.equal(err.status, 200, 'the HTTP layer succeeded — the handler refused');
+            assert.equal(err.errorCode, 'ALREADY_DISABLED');
+            assert.equal(err.message, 'User is already disabled', 'the message is the server text');
+            assert.equal(err.data.code, 'ALREADY_DISABLED', 'data carries the full reply');
+            assert.equal(err.result.payload.code, 'ALREADY_DISABLED', 'result.payload carries the full reply');
+            refusal = err;
+            return true;
+        },
+    );
+    // Opt-out: the flat refusal is a result, read by the one reader.
+    const returned = await disableRaw({ refusal: 'return' });
+    assert.equal(returned.success, false, "refusal:'return' must resolve with the flat reply");
+    assert.equal(readActionResult(returned).ok, false);
+
+    // PhoneConfig test_connection answers flat on the real wire (rest.py
+    // returns the action dict verbatim): the default rejects, the opt-out
+    // resolves with the provider verdict.
+    const probe = await client.mojoCall('/api/phonehub/config', { method: 'POST', body: { name: 'Refusal probe', provider: 'twilio', test_mode: false } });
+    const configPath = `/api/phonehub/config/${probe.data.id}`;
+    await assert.rejects(
+        () => client.mojoCall(configPath, { method: 'POST', body: { test_connection: 1 } }),
+        (err) => err instanceof ActionRefusedError && err.status === 200,
+        'a flat provider verdict without the opt-out must reject',
+    );
+    const verdict = await client.mojoCall(configPath, { method: 'POST', body: { test_connection: 1 }, refusal: 'return' });
+    assert.equal(verdict.success, false, "refusal:'return' must resolve the flat provider verdict");
+    assert.equal(verdict.message, 'twilio credentials are incomplete');
+    await client.mojoCall(configPath, { method: 'DELETE' });
+
+    // Wrapped data.status:false (storage tester on a non-S3 manager) is data
+    // on a POST: unwrap must not reject it.
+    const cors = await client.mojoCall('/api/fileman/manager/4104', { method: 'POST', body: { check_cors: 1 } });
+    assert.equal(cors.data.status, false, 'a wrapped data.status:false must resolve as data');
+
+    // A refusal is deterministic: the query defaults never retry it.
+    const { retry } = client.mojoQueryDefaults().queries;
+    assert.equal(retry(0, refusal), false, 'an ActionRefusedError must not retry');
+    assert.equal(retry(0, new errors.MojoError('offline', 0)), true, 'a status-0 MojoError still retries once');
+
+    await mojoAction('/api/user', target.id, 'reactivate');
     client.installAuthHooks(null);
 
     // ── 3. source wiring ──────────────────────────────────────────────
