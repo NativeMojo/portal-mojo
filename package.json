@@ -27,6 +27,7 @@
         "verify:admin-navigation": "node scripts/verify-admin-navigation.mjs",
         "verify:personas": "node scripts/verify-personas.mjs",
         "verify:action-results": "node scripts/verify-action-results.mjs",
+        "verify:token-replacement": "node scripts/verify-token-replacement.mjs",
         "verify:endpoint-scoping": "node scripts/verify-endpoint-scoping.mjs",
         "verify:admin-entrypoints": "node scripts/verify-admin-entrypoints.mjs",
         "verify:admin-credentials": "node scripts/verify-admin-credentials.mjs",

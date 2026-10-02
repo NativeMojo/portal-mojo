@@ -34,6 +34,15 @@ status, semantic `error_code`, and structured safe failure evidence. Nothing out
 parses envelopes; `mojoCall(path, {method, params, body})` is the typed
 escape hatch for protocol modules and returns the unwrapped `Envelope`.
 
+**Replacement tokens.** An envelope may carry `tokens: {access_token,
+refresh_token}` beside `data`. django-mojo sends it when the request ended every
+other session of the caller's own account — today a save that changed the
+caller's own password (for example an admin using "Set password" on their own
+row). The tokens the request was sent with are already dead, so the boundary
+stores the new pair through the auth hook `tokensReplaced`, in the storage the
+session already lives in. Callers do nothing; the realtime socket reconnects
+with the new token. No `tokens` means no change.
+
 `FetchOpts.beforeSend` is an optional synchronous final validity check, invoked
 after the auth gate refreshes credentials and before headers/network activity.
 The packaged app uses it to recheck its source-generation binding at the cookie

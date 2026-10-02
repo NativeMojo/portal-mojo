@@ -4974,7 +4974,8 @@ function signinFetch(method: string, body: Record<string, unknown>, headers: Rec
 // set live, which is why the portal ships no DOB force-verify affordance.
 const USER_NO_SAVE = new Set(['id', 'pk', 'auth_key', 'last_activity', 'is_dob_verified', 'created', 'has_passkey', 'is_online']);
 
-function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUser): unknown {
+function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUser, callerAuthTime?: number): unknown {
+    let passwordChanged = false;
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
     for (const [key, value] of Object.entries(body)) {
@@ -4989,6 +4990,7 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
         if (pw.length < 8) {
             return { status: false, error: 'Password is too weak. Use a longer password or include a mix of uppercase, lowercase, numbers, and special characters', error_code: 400 };
         }
+        passwordChanged = true;
     }
     // set_org parity: the FK arrives as an id (or null to clear), serializes
     // back as the basic sub-graph.
@@ -5052,7 +5054,16 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
             actionResp = resp;
         }
     }
-    return actionResp ?? { status: true, data: serializeUser(user, 'default') };
+    if (actionResp) return actionResp;
+    const resp: Record<string, unknown> = { status: true, data: serializeUser(user, 'default') };
+    // on_rest_save_and_respond parity: a changed password ends every other
+    // session, and the caller's OWN change answers with a replacement pair
+    // beside `data`, keeping the session's auth_time. An admin setting someone
+    // else's password gets none.
+    if (passwordChanged && caller && caller.id === user.id) {
+        resp.tokens = tokenPair(user, ACCESS_TTL, callerAuthTime);
+    }
+    return resp;
 }
 
 // ── Group save + POST_SAVE_ACTIONS ────────────────────────────────────
@@ -6044,6 +6055,12 @@ function userFromBearer(headers: Record<string, string> | undefined): MockUser |
     const now = Math.floor(Date.now() / 1000);
     if (!payload || typeof payload.exp !== 'number' || now >= payload.exp) return undefined;
     return db.users.find((u) => u.id === Number(payload.uid));
+}
+
+/** The bearer's auth_time claim, when it carries one. */
+function authTimeFromBearer(headers: Record<string, string> | undefined): number | undefined {
+    const payload = decodeMockJwt((headers?.['Authorization'] ?? '').replace(/^Bearer /, ''));
+    return payload && typeof payload.auth_time === 'number' ? payload.auth_time : undefined;
 }
 
 function hasGlobalPermission(user: MockUser | undefined, permissions: string[]): boolean {
@@ -10286,7 +10303,7 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             if (caller.id !== id && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
             if (Object.keys(opts.body).some((key) => USER_ACTIONS.has(key))
                 && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
-            return saveUser(user, opts.body, userFromBearer(opts.headers));
+            return saveUser(user, opts.body, userFromBearer(opts.headers), authTimeFromBearer(opts.headers));
         }
         return { status: true, data: serializeUser(user, 'default'), graph: 'default' };
     }

@@ -741,6 +741,11 @@ export function initAuth(): void {
             const token = getAccessToken();
             return token ? `Bearer ${token}` : null;
         },
+        tokensReplaced(tokens) {
+            // Same storage the session already lives in (remember-me), read
+            // before setTokens clears both.
+            setTokens(tokens.access_token, tokens.refresh_token, sessionIsPersistent());
+        },
     });
     if (getRefreshToken()) startAutoRefresh();
 }
