@@ -203,7 +203,8 @@ Two kinds of URL end in an id, and only the caller knows which it has:
 
 - **REST record routes** — the model's own `<endpoint>/<id>` (get, save,
   delete, POST_SAVE_ACTIONS). The server binds the row's group; send no
-  scope. `defineModel`'s record hooks and `mojoAction` already declare these
+  scope. `defineModel`'s record hooks, the generic `useModel` and
+  `useSaveModel` (with an id) and `mojoAction` already declare these
   `unscoped: true`. A raw call to one does the same:
   `mojoGet(endpoint, id, { unscoped: true })`.
 - **Custom views on a record path** — `requests/<id>/resend`, a download by

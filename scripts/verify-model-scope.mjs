@@ -12,7 +12,7 @@
 //     client.ts's `import('./mock')` at a module that re-exports the real mock
 //     and wraps mockFetch to record {method, path, params, body}.
 //   - '/api/user' is registered REQUIRED. On code that does not declare record
-//     calls unscoped, cases A-D reject at the assertScoped tripwire and nothing
+//     calls unscoped, cases A-E reject at the assertScoped tripwire and nothing
 //     reaches the recorder.
 //   - A collection create is NOT a record call: it still sends only the
 //     caller's `changes` (case D passes `group` there by hand).
@@ -61,6 +61,7 @@ try {
     const { setActiveGroupSignal } = await server.ssrLoadModule('/packages/portal-mojo/src/client/active-group.ts');
     const { GroupContext } = await server.ssrLoadModule('/packages/portal-mojo/src/client/group-context.ts');
     const { defineModel } = await server.ssrLoadModule('/packages/portal-mojo/src/client/model.ts');
+    const { useSaveModel } = await server.ssrLoadModule('/packages/portal-mojo/src/client/hooks.ts');
     const { mojoAction } = await server.ssrLoadModule('/packages/portal-mojo/src/client/action-result.ts');
 
     // Auth hooks installed directly with a mock-minted token (the
@@ -82,7 +83,7 @@ try {
 
     let probe = null;
     const Probe = ({ oneId }) => {
-        probe = { disable: M.useAction('disable'), reactivate: M.useAction('reactivate'), save: M.useSave(), remove: M.useDelete(), one: M.useOne(oneId) };
+        probe = { disable: M.useAction('disable'), reactivate: M.useAction('reactivate'), save: M.useSave(), remove: M.useDelete(), one: M.useOne(oneId), genericSave: useSaveModel('/api/user') };
         return null;
     };
     // A group is active in the React context throughout: record calls must
@@ -133,6 +134,13 @@ try {
     await run(() => probe.remove.mutateAsync({ id: created.id }));
     noScope(sent('DELETE', `/api/user/${created.id}`), 'D: useDelete');
 
+    // ── E. Update through the generic useSaveModel hook ──
+    fixture.calls.length = 0;
+    await run(() => probe.genericSave.mutateAsync({ id: target.id, changes: { display_name: 'y' } }));
+    call = sent('POST', path);
+    assert.deepEqual(call.body, { display_name: 'y' }, 'E: a generic update must send exactly the caller\'s changes');
+    noScope(call, 'E: useSaveModel with an id');
+
     // ── F. mojoAction: no injection, with a group active in the signal ──
     setActiveGroupSignal(4);
     fixture.calls.length = 0;
@@ -143,7 +151,7 @@ try {
     noScope(call, 'F: mojoAction');
     await mojoAction('/api/user', target.id, 'reactivate');
 
-    console.log('Model scope: action, update, get, delete and mojoAction send no group on record routes and pass a required family; a collection create sends only the caller\'s changes.');
+    console.log('Model scope: action, update (useSave and useSaveModel), get, delete and mojoAction send no group on record routes and pass a required family; a collection create sends only the caller\'s changes.');
 } finally {
     await React.act(async () => root.unmount());
     qc.clear();
