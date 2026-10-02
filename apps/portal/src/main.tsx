@@ -37,7 +37,8 @@ const adminSearch = new URLSearchParams(window.location.search);
 if (adminSearch.has('group')) {
     adminSearch.delete('group');
     const query = adminSearch.toString();
-    window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    // Keep the entry's state, as the package's own URL rewrites do (#5925).
+    window.history.replaceState(window.history.state, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
 }
 
 // Hash routing so the built dist works from any static mount (including
