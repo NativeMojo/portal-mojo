@@ -4631,6 +4631,7 @@
         "Eyebrow",
         "FlatRow",
         "code",
+        "SettingValue",
         "Badge",
         "p",
         "div",
@@ -4640,7 +4641,7 @@
       "category": "record",
       "parent": "SettingDetail",
       "target": null,
-      "fingerprint": "1e9beda6626c5deab8ec",
+      "fingerprint": "e823c89adf7b8083e1ce",
       "categories": [
         "record"
       ]
@@ -4703,6 +4704,92 @@
       "fingerprint": "fac7211628308949f13a",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:publish:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "publish",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "publish",
+      "target": null,
+      "fingerprint": "622258479c1afd64e88d",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:apply:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "apply",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "apply",
+      "target": null,
+      "fingerprint": "d36cfa155b6c5d07673c",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:restore:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "restore",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "restore",
+      "target": null,
+      "fingerprint": "49d84fb6cab7bd107a0d",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:FleetContent:apply:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "FleetContent",
+      "launcher": "apply",
+      "body": [],
+      "category": "confirmation",
+      "parent": "FleetContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:apply",
+      "fingerprint": "2a19277869d5b41e382b",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:FleetContent:restore:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "FleetContent",
+      "launcher": "restore",
+      "body": [],
+      "category": "confirmation",
+      "parent": "FleetContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:restore",
+      "fingerprint": "c48ec1b4d9ffec1aaa30",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:FleetContent:handler:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "FleetContent",
+      "launcher": "publish",
+      "body": [
+        "publish"
+      ],
+      "category": "confirmation",
+      "parent": "onPublish",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:publish",
+      "fingerprint": "af0f7d975c46f3edceb8",
+      "categories": [
+        "confirmation"
       ]
     },
     {
@@ -5254,7 +5341,7 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "e900e0cb36e1a90879ec",
+      "fingerprint": "26947e6af1eff9ecbe86",
       "categories": [
         "dependency"
       ]
@@ -5268,7 +5355,7 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "800662a3b74191de8e00",
+      "fingerprint": "e900e0cb36e1a90879ec",
       "categories": [
         "dependency"
       ]
@@ -5282,13 +5369,27 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "2ac6a99fb7d422c46da3",
+      "fingerprint": "800662a3b74191de8e00",
       "categories": [
         "dependency"
       ]
     },
     {
       "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:4",
+      "file": "packages/portal-mojo/src/admin/domains/operations.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "2ac6a99fb7d422c46da3",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:5",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",
@@ -8871,7 +8972,7 @@
       "owner": "SettingDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "546d0a8db559cce6d640"
+      "fingerprint": "a28bbbe80f2eb2feb727"
     },
     {
       "file": "packages/portal-mojo/src/admin/jobs/RunnerDetail.tsx",
