@@ -26,8 +26,8 @@ export function SysPermsSection({ user }: { user: UserRow }) {
 export function AppPermsSection({ user }: { user: UserRow }) {
     return (
         <>
-            <Eyebrow>App permissions</Eyebrow>
-            <p className="dim" style={{ margin: '0 0 12px' }}>Toggles autosave as soon as you flip them.</p>
+            <Eyebrow>Product permissions</Eyebrow>
+            <p className="dim" style={{ margin: '0 0 12px' }}>User grants can apply across groups. To give access to just one group, edit that membership instead. Changes save automatically.</p>
             {/* Registry NAME (not a snapshot) so late registrations re-render. */}
             <FormView model={UserModel} row={user} tabs={USER_APP_PERMS_TABSET} />
         </>

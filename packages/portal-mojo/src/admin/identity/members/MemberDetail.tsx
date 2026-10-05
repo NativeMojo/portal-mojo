@@ -3,16 +3,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCan, type PermSpec } from '../../../client/runtime';
 import {
     Badge, DetailView, Eyebrow, FlatRow, FormView, JsonBlock, MetricCard,
-    ModelTable, confirmGuardrail, fmt, formModal, toast, type Column, type DetailMenuEntry,
+    ModelTable, confirmGuardrail, fmt, formModal, toast, getFormTabs, formTabsVersion, subscribeFormTabs,
+    type Column, type DetailMenuEntry,
 } from '../../../ui';
 import { LOGS_ADMIN_PERMISSIONS, LogModel, type LogRow } from '../../monitoring';
 import {
     MEMBER_READ_PERMISSIONS,
+    MEMBER_APP_PERMS_TABSET,
     MEMBER_SAVE_PERMISSIONS,
     MemberModel,
     effectiveMemberGrants,
     getMemberPermissions,
     ignoredMemberGrants,
+    isEditableMemberPermission,
     memberPermissionFields,
     memberPermissionsVersion,
     rawMemberGrants,
@@ -123,6 +126,7 @@ export function MemberDetail({
     const resend = MemberModel.useAction('resend_invite');
     const { can: canSave } = useCan(MEMBER_SAVE_PERMISSIONS);
     useSyncExternalStore(subscribeMemberPermissions, memberPermissionsVersion, memberPermissionsVersion);
+    useSyncExternalStore(subscribeFormTabs, formTabsVersion, formTabsVersion);
 
     if (readLoading) return <div className="detail-loading"><span className="skel skel-block" /></div>;
     if (!canRead) return <div className="modal-pad text-bad">Access denied</div>;
@@ -141,6 +145,18 @@ export function MemberDetail({
     const raw = rawMemberGrants(member.permissions);
     const catalog = getMemberPermissions();
     const catalogNames = new Set(catalog.map((permission) => permission.name));
+    // Product editors may only write grants accepted by the member catalog.
+    // Tab registration must not expose system/derived grants or unrelated fields.
+    const productTabs = getFormTabs(MEMBER_APP_PERMS_TABSET).map((tab) => ({
+        ...tab,
+        fields: tab.fields.filter((field) => {
+            if (!field.name.startsWith('permissions.')) return false;
+            const name = field.name.slice('permissions.'.length);
+            return catalogNames.has(name) && isEditableMemberPermission(name);
+        }),
+    })).filter((tab) => tab.fields.length > 0);
+    const productFieldNames = new Set(productTabs.flatMap((tab) => tab.fields.map((field) => field.name)));
+    const groupFields = memberPermissionFields().filter((field) => !productFieldNames.has(field.name));
     const deploymentOnly = raw.filter((name) => !catalogNames.has(name) && !ignoredMemberGrants(member.permissions).includes(name));
 
     const editRole = async () => {
@@ -236,13 +252,13 @@ export function MemberDetail({
                     key: 'Permissions', label: 'Permissions', icon: 'bi-shield-lock', render: () => (
                         <>
                             <Eyebrow>Per-group authorization</Eyebrow>
-                            <p className="dim">Role labels are not authorization. Protected changes may be rejected by <code>MEMBER_PERMS_PROTECTION</code>; failed autosaves revert and show the server error.</p>
+                            <p className="dim">Access for this group. Changes save automatically; a rejected change is restored with an explanation.</p>
                             {canSave
                                 ? (
                                     <FormView
                                         model={MemberModel}
                                         row={member}
-                                        fields={memberPermissionFields()}
+                                        fields={groupFields}
                                         beforeSave={({ changes }) => confirmGrantEscalation(member, changes)}
                                         onSaved={() => { void MemberModel.invalidate(qc); }}
                                     />
@@ -254,6 +270,19 @@ export function MemberDetail({
                         </>
                     ),
                 },
+                ...(productTabs.length > 0 ? [{
+                    key: 'ProductPermissions', label: 'Product permissions', icon: 'bi-puzzle', render: () => (
+                        <>
+                            <Eyebrow>Product permissions</Eyebrow>
+                            <p className="dim">These grants apply only to this membership’s group. Changes save automatically.</p>
+                            {canSave ? (
+                                <FormView model={MemberModel} row={member} tabs={productTabs}
+                                    beforeSave={({ changes }) => confirmGrantEscalation(member, changes)}
+                                    onSaved={() => { void MemberModel.invalidate(qc); }} />
+                            ) : <GrantSummary member={member} />}
+                        </>
+                    ),
+                }] : []),
                 { divider: 'Activity' },
                 {
                     key: 'Audit', label: 'Audit', icon: 'bi-clock-history',

@@ -12,6 +12,7 @@ import {
   MEMBERS_ADMIN_SECTION,
   openMemberAdmissionDialog,
   registerMemberPermissions,
+  MEMBER_APP_PERMS_TABSET,
 } from 'portal-mojo/admin';
 ```
 
@@ -103,6 +104,16 @@ and read-only rather than disappearing. Permission switches autosave through
 `FormView`; a deployment's `MEMBER_PERMS_PROTECTION` remains authoritative,
 and rejected changes revert with the server error shown.
 
+For a larger product catalog, also register native `FormView` tabs under
+`MEMBER_APP_PERMS_TABSET` with `registerFormTabs` from `portal-mojo/ui`.
+Use dotted `permissions.<grant>` fields and retain the corresponding
+`registerMemberPermissions` definitions. A separate **Product permissions**
+detail section appears when this tabset is populated. Fields covered by those
+tabs leave the ordinary **Permissions** section, so each grant has one editor.
+Both forms save the same membership row with the same gates, partial-dict
+merge, escalation confirmation and rejection handling. The tabset creates no
+new grant semantics: the backend still decides what each key authorizes.
+
 ## Composition
 
 `MEMBERS_ADMIN_SECTION` is root-relative and dual-mounts as `/members` in the
@@ -110,3 +121,8 @@ standalone Admin and `/system/members` when embedded. It never consumes active
 group context. `GroupMembersPanel` is the reusable Group-detail composition;
 pass optional `onNavigateUser` and `onNavigateGroup` callbacks to connect
 sibling identity details without coupling the package to an app.
+
+Member product tabs only render `permissions.<grant>` fields whose grant is
+registered through `registerMemberPermissions()` and editable. System/derived
+grants, unregistered names and unrelated fields (such as `group` or `user`)
+are ignored; tabs with no valid fields do not appear.
