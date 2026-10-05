@@ -15,7 +15,7 @@ const server = await createServer({ root, appType: 'custom', logLevel: 'silent',
 try {
     const me = await server.ssrLoadModule('/packages/portal-mojo/src/client/me.ts');
     const models = await server.ssrLoadModule('/apps/portal/src/models.ts');
-    const authConfig = await server.ssrLoadModule('/apps/portal/src/pages/group-sections/auth-config.ts');
+    const authConfig = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/groups/group-sections/auth-config.ts');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
 
     assert(models.GROUP_VIEW_PERMS.every((permission) => permission.startsWith('sys.')));
@@ -25,10 +25,18 @@ try {
     }), false, 'member-only grants cannot satisfy global Group Admin');
 
     const routeSource = await readFile(new URL('../apps/portal/src/pages/admin-routes.tsx', import.meta.url), 'utf8');
+    const identityDomain = await server.ssrLoadModule('/packages/portal-mojo/src/admin/domains/identity.ts');
+    const personalKeysSource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx', import.meta.url), 'utf8');
     const menuSource = await readFile(new URL('../apps/portal/src/menus.ts', import.meta.url), 'utf8');
-    const identitySource = await readFile(new URL('../apps/portal/src/pages/group-sections/IdentitySection.tsx', import.meta.url), 'utf8');
-    assert.match(routeSource, /Guarded permission=\{GROUP_VIEW_PERMS\}/);
-    assert.match(menuSource, /admin:groups[^\n]+permissions: GROUP_VIEW_PERMS/);
+    const identitySource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx', import.meta.url), 'utf8');
+    assert.match(routeSource, /adminSectionRoutes\(ADMIN_SECTIONS\)/);
+    assert.doesNotMatch(routeSource, /path: ['\"]groups['\"]|path: ['\"]apikeys['\"]/);
+    assert(identityDomain.GROUPS_ADMIN_SECTION.permissions.every((permission) => permission.startsWith('sys.')));
+    assert(identityDomain.GROUPS_ADMIN_SECTION.routes[0].permissions.every((permission) => permission.startsWith('sys.')));
+    assert(identityDomain.PERSONAL_API_KEYS_ADMIN_SECTION.permissions.every((permission) => permission.startsWith('sys.')));
+    assert.doesNotMatch(menuSource, /admin:groups|admin:personal-api-keys/);
+    assert.match(personalKeysSource, /onRowClick=\{openKey\}/);
+    assert.doesNotMatch(personalKeysSource, /rowExpand=/);
     assert.doesNotMatch(identitySource, /CollectionSelect/);
     assert.match(identitySource, /changes: \{ parent: null \}/);
 

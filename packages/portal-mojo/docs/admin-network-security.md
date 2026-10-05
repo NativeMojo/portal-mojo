@@ -163,7 +163,7 @@ flag is detected, `true` REQUIRES the flag (rare), absent/`null` means don't
 care.
 
 `geofence-data.ts` is the ONE definition of the lossy projection between that
-DSL and the friendly form. `apps/portal/src/pages/group-sections/geofence-data.ts`
+DSL and the friendly form. `packages/portal-mojo/src/admin/identity/groups/group-sections/geofence-data.ts`
 is a re-export shim over it, so the platform page and the group panel cannot
 drift. `GeofenceRuleEditor` is the ONE editor both render.
 
