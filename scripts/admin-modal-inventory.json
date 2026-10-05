@@ -2794,15 +2794,15 @@
         "FlatRow",
         "GrantSummary",
         "p",
-        "code",
         "FormView",
+        "code",
         "AuditTable",
         "JsonBlock"
       ],
       "category": "record",
       "parent": "MemberDetail",
       "target": null,
-      "fingerprint": "36fa77ec1affd6df02cd",
+      "fingerprint": "0e4a961b1e8528eb1bed",
       "categories": [
         "record"
       ]
@@ -3991,7 +3991,7 @@
       "category": "record",
       "parent": "UserDetailLoaded",
       "target": null,
-      "fingerprint": "a0d8dad1ab95f4314236",
+      "fingerprint": "5bb0823687b1251033ef",
       "categories": [
         "record"
       ]
@@ -8823,7 +8823,14 @@
       "owner": "MemberDetail",
       "key": "'Permissions'",
       "label": "Permissions",
-      "fingerprint": "1637faff88aa4b590afd"
+      "fingerprint": "6a0ce55fda85a9683c18"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",
+      "owner": "MemberDetail",
+      "key": "'ProductPermissions'",
+      "label": "Product permissions",
+      "fingerprint": "289953cca1d6fc9ececa"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",
@@ -8927,15 +8934,15 @@
       "file": "packages/portal-mojo/src/admin/identity/users/UserDetail.tsx",
       "owner": "UserDetailLoaded",
       "key": "'SysPerms'",
-      "label": "Sys Perms",
-      "fingerprint": "8ddb76aee2178cf12039"
+      "label": "System permissions",
+      "fingerprint": "c26d98a9da4db9c41bce"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/users/UserDetail.tsx",
       "owner": "UserDetailLoaded",
       "key": "'AppPerms'",
-      "label": "App Perms",
-      "fingerprint": "929425f0a5c7cc663fcd"
+      "label": "Product permissions",
+      "fingerprint": "44be1693f897f193b0e7"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/users/UserDetail.tsx",
