@@ -134,7 +134,7 @@ function NavRow({
     return (
         <NavLink
             to={item.route}
-            end={item.route === '/'}
+            end={item.exact || item.route === '/'}
             aria-label={collapsed ? label : undefined}
             data-tooltip={collapsed ? label : undefined}
             className={`nav-item${depth > 0 ? ' nav-child' : ''}${active ? ' nav-active' : ''}`}
@@ -229,7 +229,7 @@ function AccordionItem({
         <div className={`nav-accordion${open ? ' nav-accordion-open' : ''}`}>
             <button
                 type="button"
-                className={`nav-item nav-parent${active ? ' nav-active' : ''}`}
+                className={`nav-item nav-parent${active ? ' nav-branch-current' : ''}`}
                 aria-expanded={collapsed ? undefined : open}
                 aria-controls={collapsed ? undefined : disclosureId}
                 aria-label={collapsed ? label : undefined}

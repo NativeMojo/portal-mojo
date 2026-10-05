@@ -28,7 +28,7 @@ import {
     GeofenceRuleEditor, makeRuleEditorValue, ruleFromEditorValue,
     type RuleEditorValue,
 } from 'portal-mojo/admin/security';
-import { GroupModel, type GroupRow } from '../../models';
+import { GroupModel, type GroupRow } from '../models';
 import {
     GROUP_GEOFENCE_EDIT_PERMS, buildGroupRulePayload, describeRule, isAdvancedRule,
     type GeoRulesConfig, type GeofenceRule, type RuleClause,

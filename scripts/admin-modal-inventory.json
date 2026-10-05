@@ -4073,6 +4073,495 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx:resetOverrides:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx",
+      "owner": "resetOverrides",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "resetOverrides",
+      "target": null,
+      "fingerprint": "be32446d85114f042c5c",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx:AuthConfigBody:resetOverrides:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx",
+      "owner": "AuthConfigBody",
+      "launcher": "resetOverrides",
+      "body": [],
+      "category": "confirmation",
+      "parent": "AuthConfigBody",
+      "target": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx:resetOverrides",
+      "fingerprint": "690830e32c96eda8c0db",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx",
+      "owner": "openAuthConfigDialog",
+      "launcher": "modal.open",
+      "body": [
+        "AuthConfigBody"
+      ],
+      "category": "editor",
+      "parent": "openAuthConfigDialog",
+      "target": null,
+      "fingerprint": "748d1cab042efc135bac",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx:generateUuid:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx",
+      "owner": "generateUuid",
+      "launcher": "modal.confirm",
+      "body": [
+        "br",
+        "code"
+      ],
+      "category": "confirmation",
+      "parent": "generateUuid",
+      "target": null,
+      "fingerprint": "f80269eec388e2600752",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx:IdentitySection:generateUuid:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx",
+      "owner": "IdentitySection",
+      "launcher": "generateUuid",
+      "body": [],
+      "category": "confirmation",
+      "parent": "IdentitySection",
+      "target": "packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx:generateUuid",
+      "fingerprint": "65741e1750b48ef4d307",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/MembersSection.tsx:MembersSection:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/MembersSection.tsx",
+      "owner": "MembersSection",
+      "launcher": "modal.detail",
+      "body": [
+        "UserDetail"
+      ],
+      "category": "record",
+      "parent": "MembersSection",
+      "target": null,
+      "fingerprint": "7e138348408b1df6e216",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx:runAddSubGroupFlow:formModal:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx",
+      "owner": "runAddSubGroupFlow",
+      "launcher": "formModal",
+      "body": [],
+      "category": "editor",
+      "parent": "runAddSubGroupFlow",
+      "target": null,
+      "fingerprint": "35763f2a359b5a07d59f",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx:SubGroupsSection:runAddSubGroupFlow:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx",
+      "owner": "SubGroupsSection",
+      "launcher": "runAddSubGroupFlow",
+      "body": [],
+      "category": "editor",
+      "parent": "SubGroupsSection",
+      "target": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx:runAddSubGroupFlow",
+      "fingerprint": "ce857664660aa7eee51e",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:openGroupById:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "openGroupById",
+      "launcher": "modal.detail",
+      "body": [
+        "GroupDetail"
+      ],
+      "category": "record",
+      "parent": "openGroupById",
+      "target": null,
+      "fingerprint": "3fff3f72c9ab41a90c75",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:deactivate:formModal:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "deactivate",
+      "launcher": "formModal",
+      "body": [
+        "b"
+      ],
+      "category": "editor",
+      "parent": "deactivate",
+      "target": null,
+      "fingerprint": "67889c42563015e6e4ed",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:openMemberAdmissionDialog:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "openMemberAdmissionDialog",
+      "body": [],
+      "category": "editor",
+      "parent": "GroupDetail",
+      "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog",
+      "fingerprint": "10efa841b1d7868e118f",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:runAddSubGroupFlow:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "runAddSubGroupFlow",
+      "body": [],
+      "category": "editor",
+      "parent": "GroupDetail",
+      "target": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx:runAddSubGroupFlow",
+      "fingerprint": "5c27d8d72aa47e0dae61",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:openAuthConfigDialog:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "openAuthConfigDialog",
+      "body": [],
+      "category": "editor",
+      "parent": "GroupDetail",
+      "target": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog",
+      "fingerprint": "9ff2e06244ed921da7b8",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:openGroupById:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "openGroupById",
+      "body": [],
+      "category": "record",
+      "parent": "GroupDetail",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:openGroupById",
+      "fingerprint": "7e160c5d371970a0d1df",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:deactivate:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "deactivate",
+      "body": [],
+      "category": "editor",
+      "parent": "GroupDetail",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:deactivate",
+      "fingerprint": "8211b733980bde6e16af",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:DetailView:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "DetailView",
+      "body": [
+        "DetailView",
+        "OverviewSection",
+        "IdentitySection",
+        "MembersSection",
+        "SubGroupsSection",
+        "GroupApiKeysSection",
+        "WebhookSubscriptionsSection",
+        "GeofenceSection",
+        "EventsSection",
+        "AuditSection",
+        "MetadataSection",
+        "div",
+        "Eyebrow",
+        "pre",
+        "code"
+      ],
+      "category": "record",
+      "parent": "GroupDetail",
+      "target": null,
+      "fingerprint": "82b4c6b9901aea1fbf7a",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:deactivate:1",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "deactivate",
+      "body": [],
+      "category": "editor",
+      "parent": "GroupDetail",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:deactivate",
+      "fingerprint": "8211b733980bde6e16af",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:handler:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "openGroupById",
+      "body": [
+        "openGroupById"
+      ],
+      "category": "record",
+      "parent": "openGroup",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:openGroupById",
+      "fingerprint": "b9bb0feb2eca90505443",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:handler:1",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "openGroupById",
+      "body": [
+        "openGroupById"
+      ],
+      "category": "record",
+      "parent": "openGroup",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:openGroupById",
+      "fingerprint": "b9bb0feb2eca90505443",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:GroupDetail:handler:2",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "owner": "GroupDetail",
+      "launcher": "openGroupById",
+      "body": [
+        "openGroupById"
+      ],
+      "category": "record",
+      "parent": "openGroup",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx:openGroupById",
+      "fingerprint": "b9bb0feb2eca90505443",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:addGroup:formModal:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx",
+      "owner": "addGroup",
+      "launcher": "formModal",
+      "body": [],
+      "category": "editor",
+      "parent": "addGroup",
+      "target": null,
+      "fingerprint": "5f0d8edd3848f6ce94d6",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:openGroup:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx",
+      "owner": "openGroup",
+      "launcher": "modal.detail",
+      "body": [
+        "GroupDetail"
+      ],
+      "category": "record",
+      "parent": "openGroup",
+      "target": null,
+      "fingerprint": "4d673f9c1f9b1915957e",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:GroupsPage:formModal:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx",
+      "owner": "GroupsPage",
+      "launcher": "formModal",
+      "body": [],
+      "category": "editor",
+      "parent": "GroupsPage",
+      "target": null,
+      "fingerprint": "bc65e4ebc7a08469b1c0",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:GroupsPage:handler:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx",
+      "owner": "GroupsPage",
+      "launcher": "openGroup",
+      "body": [
+        "openGroup"
+      ],
+      "category": "record",
+      "parent": "onRowClick",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:openGroup",
+      "fingerprint": "2dfde0b03b93528448e2",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:GroupsPage:handler:1",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx",
+      "owner": "GroupsPage",
+      "launcher": "addGroup",
+      "body": [
+        "addGroup"
+      ],
+      "category": "editor",
+      "parent": "onAdd",
+      "target": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx:addGroup",
+      "fingerprint": "dcb2b0543b0add00e56a",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:KeyDetail:DetailView:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "KeyDetail",
+      "launcher": "DetailView",
+      "body": [
+        "DetailView",
+        "div",
+        "code",
+        "button",
+        "ArmedButton"
+      ],
+      "category": "record",
+      "parent": "KeyDetail",
+      "target": null,
+      "fingerprint": "65359d22ba1b99804d00",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:generate:formModal:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "generate",
+      "launcher": "formModal",
+      "body": [],
+      "category": "editor",
+      "parent": "generate",
+      "target": null,
+      "fingerprint": "83cf227f8b1b7014fafe",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:generate:showSecretDialog:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "generate",
+      "launcher": "showSecretDialog",
+      "body": [
+        "b",
+        "p"
+      ],
+      "category": "action",
+      "parent": "generate",
+      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
+      "fingerprint": "d117af4c1cd9b72bfb04",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:openKey:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "openKey",
+      "launcher": "modal.detail",
+      "body": [
+        "KeyDetail"
+      ],
+      "category": "record",
+      "parent": "openKey",
+      "target": null,
+      "fingerprint": "dc3424a056f9a02188ed",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:PersonalApiKeysPage:handler:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "PersonalApiKeysPage",
+      "launcher": "openKey",
+      "body": [
+        "openKey"
+      ],
+      "category": "record",
+      "parent": "onRowClick",
+      "target": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:openKey",
+      "fingerprint": "7783b88e649d9e21a1df",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:PersonalApiKeysPage:handler:1",
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "PersonalApiKeysPage",
+      "launcher": "generate",
+      "body": [
+        "generate"
+      ],
+      "category": "nested-flow",
+      "parent": "onAdd",
+      "target": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx:generate",
+      "fingerprint": "fabd76667ab25e768b76",
+      "categories": [
+        "action",
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/domains/identity.ts:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/domains/identity.ts",
       "owner": "<module>",
@@ -4143,438 +4632,59 @@
       ]
     },
     {
-      "id": "apps/portal/src/pages/ApiKeysPage.tsx:generate:formModal:0",
-      "file": "apps/portal/src/pages/ApiKeysPage.tsx",
-      "owner": "generate",
-      "launcher": "formModal",
+      "id": "packages/portal-mojo/src/admin/domains/identity.ts:<module>:import:5",
+      "file": "packages/portal-mojo/src/admin/domains/identity.ts",
+      "owner": "<module>",
+      "launcher": "import",
       "body": [],
-      "category": "editor",
-      "parent": "generate",
+      "category": "dependency",
+      "parent": "<module>",
       "target": null,
-      "fingerprint": "83cf227f8b1b7014fafe",
+      "fingerprint": "7713ad7e70de10a166db",
       "categories": [
-        "editor"
+        "dependency"
       ]
     },
     {
-      "id": "apps/portal/src/pages/ApiKeysPage.tsx:generate:showSecretDialog:0",
-      "file": "apps/portal/src/pages/ApiKeysPage.tsx",
-      "owner": "generate",
-      "launcher": "showSecretDialog",
-      "body": [
-        "b",
-        "p"
-      ],
-      "category": "action",
-      "parent": "generate",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
-      "fingerprint": "d117af4c1cd9b72bfb04",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/ApiKeysPage.tsx:ApiKeysPage:handler:0",
-      "file": "apps/portal/src/pages/ApiKeysPage.tsx",
-      "owner": "ApiKeysPage",
-      "launcher": "generate",
-      "body": [
-        "generate"
-      ],
-      "category": "nested-flow",
-      "parent": "onAdd",
-      "target": "apps/portal/src/pages/ApiKeysPage.tsx:generate",
-      "fingerprint": "fabd76667ab25e768b76",
-      "categories": [
-        "action",
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:resetOverrides:modal.confirm:0",
-      "file": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx",
-      "owner": "resetOverrides",
-      "launcher": "modal.confirm",
+      "id": "packages/portal-mojo/src/admin/domains/identity.ts:<module>:import:6",
+      "file": "packages/portal-mojo/src/admin/domains/identity.ts",
+      "owner": "<module>",
+      "launcher": "import",
       "body": [],
-      "category": "confirmation",
-      "parent": "resetOverrides",
+      "category": "dependency",
+      "parent": "<module>",
       "target": null,
-      "fingerprint": "be32446d85114f042c5c",
+      "fingerprint": "2cee0229749fb6a3893c",
       "categories": [
-        "confirmation"
+        "dependency"
       ]
     },
     {
-      "id": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:AuthConfigBody:resetOverrides:0",
-      "file": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx",
-      "owner": "AuthConfigBody",
-      "launcher": "resetOverrides",
+      "id": "packages/portal-mojo/src/admin/identity/users/index.ts:loadPersonalApiKeysPage:import:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/index.ts",
+      "owner": "loadPersonalApiKeysPage",
+      "launcher": "import",
       "body": [],
-      "category": "confirmation",
-      "parent": "AuthConfigBody",
-      "target": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:resetOverrides",
-      "fingerprint": "690830e32c96eda8c0db",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog:modal.open:0",
-      "file": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx",
-      "owner": "openAuthConfigDialog",
-      "launcher": "modal.open",
-      "body": [
-        "AuthConfigBody"
-      ],
-      "category": "editor",
-      "parent": "openAuthConfigDialog",
+      "category": "dependency",
+      "parent": "loadPersonalApiKeysPage",
       "target": null,
-      "fingerprint": "748d1cab042efc135bac",
+      "fingerprint": "bf6d845063dea3d6a40a",
       "categories": [
-        "editor"
+        "dependency"
       ]
     },
     {
-      "id": "apps/portal/src/pages/group-sections/IdentitySection.tsx:generateUuid:modal.confirm:0",
-      "file": "apps/portal/src/pages/group-sections/IdentitySection.tsx",
-      "owner": "generateUuid",
-      "launcher": "modal.confirm",
-      "body": [
-        "br",
-        "code"
-      ],
-      "category": "confirmation",
-      "parent": "generateUuid",
+      "id": "packages/portal-mojo/src/admin/identity/groups/index.ts:loadGroupsPage:import:0",
+      "file": "packages/portal-mojo/src/admin/identity/groups/index.ts",
+      "owner": "loadGroupsPage",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "loadGroupsPage",
       "target": null,
-      "fingerprint": "f80269eec388e2600752",
+      "fingerprint": "67e26bfc15fe0139498c",
       "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/group-sections/IdentitySection.tsx:IdentitySection:generateUuid:0",
-      "file": "apps/portal/src/pages/group-sections/IdentitySection.tsx",
-      "owner": "IdentitySection",
-      "launcher": "generateUuid",
-      "body": [],
-      "category": "confirmation",
-      "parent": "IdentitySection",
-      "target": "apps/portal/src/pages/group-sections/IdentitySection.tsx:generateUuid",
-      "fingerprint": "65741e1750b48ef4d307",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/group-sections/MembersSection.tsx:MembersSection:modal.detail:0",
-      "file": "apps/portal/src/pages/group-sections/MembersSection.tsx",
-      "owner": "MembersSection",
-      "launcher": "modal.detail",
-      "body": [
-        "UserDetail"
-      ],
-      "category": "record",
-      "parent": "MembersSection",
-      "target": null,
-      "fingerprint": "44af5b3cbea623c3e7d5",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx:runAddSubGroupFlow:formModal:0",
-      "file": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx",
-      "owner": "runAddSubGroupFlow",
-      "launcher": "formModal",
-      "body": [],
-      "category": "editor",
-      "parent": "runAddSubGroupFlow",
-      "target": null,
-      "fingerprint": "35763f2a359b5a07d59f",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx:SubGroupsSection:runAddSubGroupFlow:0",
-      "file": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx",
-      "owner": "SubGroupsSection",
-      "launcher": "runAddSubGroupFlow",
-      "body": [],
-      "category": "editor",
-      "parent": "SubGroupsSection",
-      "target": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx:runAddSubGroupFlow",
-      "fingerprint": "ce857664660aa7eee51e",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:openGroupById:modal.detail:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "openGroupById",
-      "launcher": "modal.detail",
-      "body": [
-        "GroupDetail"
-      ],
-      "category": "record",
-      "parent": "openGroupById",
-      "target": null,
-      "fingerprint": "3fff3f72c9ab41a90c75",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:deactivate:formModal:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "deactivate",
-      "launcher": "formModal",
-      "body": [
-        "b"
-      ],
-      "category": "editor",
-      "parent": "deactivate",
-      "target": null,
-      "fingerprint": "67889c42563015e6e4ed",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:openMemberAdmissionDialog:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "openMemberAdmissionDialog",
-      "body": [],
-      "category": "editor",
-      "parent": "GroupDetail",
-      "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog",
-      "fingerprint": "10efa841b1d7868e118f",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:runAddSubGroupFlow:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "runAddSubGroupFlow",
-      "body": [],
-      "category": "editor",
-      "parent": "GroupDetail",
-      "target": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx:runAddSubGroupFlow",
-      "fingerprint": "5c27d8d72aa47e0dae61",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:openAuthConfigDialog:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "openAuthConfigDialog",
-      "body": [],
-      "category": "editor",
-      "parent": "GroupDetail",
-      "target": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog",
-      "fingerprint": "9ff2e06244ed921da7b8",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:openGroupById:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "openGroupById",
-      "body": [],
-      "category": "record",
-      "parent": "GroupDetail",
-      "target": "apps/portal/src/pages/GroupDetail.tsx:openGroupById",
-      "fingerprint": "7e160c5d371970a0d1df",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:deactivate:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "deactivate",
-      "body": [],
-      "category": "editor",
-      "parent": "GroupDetail",
-      "target": "apps/portal/src/pages/GroupDetail.tsx:deactivate",
-      "fingerprint": "8211b733980bde6e16af",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:DetailView:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "OverviewSection",
-        "IdentitySection",
-        "MembersSection",
-        "SubGroupsSection",
-        "GroupApiKeysSection",
-        "WebhookSubscriptionsSection",
-        "GeofenceSection",
-        "EventsSection",
-        "AuditSection",
-        "MetadataSection",
-        "div",
-        "JsonBlock"
-      ],
-      "category": "record",
-      "parent": "GroupDetail",
-      "target": null,
-      "fingerprint": "710a39a019c196bdc863",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:deactivate:1",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "deactivate",
-      "body": [],
-      "category": "editor",
-      "parent": "GroupDetail",
-      "target": "apps/portal/src/pages/GroupDetail.tsx:deactivate",
-      "fingerprint": "8211b733980bde6e16af",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:handler:0",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "openGroupById",
-      "body": [
-        "openGroupById"
-      ],
-      "category": "record",
-      "parent": "openGroup",
-      "target": "apps/portal/src/pages/GroupDetail.tsx:openGroupById",
-      "fingerprint": "b9bb0feb2eca90505443",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:handler:1",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "openGroupById",
-      "body": [
-        "openGroupById"
-      ],
-      "category": "record",
-      "parent": "openGroup",
-      "target": "apps/portal/src/pages/GroupDetail.tsx:openGroupById",
-      "fingerprint": "b9bb0feb2eca90505443",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupDetail.tsx:GroupDetail:handler:2",
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
-      "owner": "GroupDetail",
-      "launcher": "openGroupById",
-      "body": [
-        "openGroupById"
-      ],
-      "category": "record",
-      "parent": "openGroup",
-      "target": "apps/portal/src/pages/GroupDetail.tsx:openGroupById",
-      "fingerprint": "b9bb0feb2eca90505443",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupsPage.tsx:addGroup:formModal:0",
-      "file": "apps/portal/src/pages/GroupsPage.tsx",
-      "owner": "addGroup",
-      "launcher": "formModal",
-      "body": [],
-      "category": "editor",
-      "parent": "addGroup",
-      "target": null,
-      "fingerprint": "5f0d8edd3848f6ce94d6",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupsPage.tsx:openGroup:modal.detail:0",
-      "file": "apps/portal/src/pages/GroupsPage.tsx",
-      "owner": "openGroup",
-      "launcher": "modal.detail",
-      "body": [
-        "GroupDetail"
-      ],
-      "category": "record",
-      "parent": "openGroup",
-      "target": null,
-      "fingerprint": "4d673f9c1f9b1915957e",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupsPage.tsx:GroupsPage:formModal:0",
-      "file": "apps/portal/src/pages/GroupsPage.tsx",
-      "owner": "GroupsPage",
-      "launcher": "formModal",
-      "body": [],
-      "category": "editor",
-      "parent": "GroupsPage",
-      "target": null,
-      "fingerprint": "bc65e4ebc7a08469b1c0",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupsPage.tsx:GroupsPage:handler:0",
-      "file": "apps/portal/src/pages/GroupsPage.tsx",
-      "owner": "GroupsPage",
-      "launcher": "openGroup",
-      "body": [
-        "openGroup"
-      ],
-      "category": "record",
-      "parent": "onRowClick",
-      "target": "apps/portal/src/pages/GroupsPage.tsx:openGroup",
-      "fingerprint": "2dfde0b03b93528448e2",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/GroupsPage.tsx:GroupsPage:handler:1",
-      "file": "apps/portal/src/pages/GroupsPage.tsx",
-      "owner": "GroupsPage",
-      "launcher": "addGroup",
-      "body": [
-        "addGroup"
-      ],
-      "category": "editor",
-      "parent": "onAdd",
-      "target": "apps/portal/src/pages/GroupsPage.tsx:addGroup",
-      "fingerprint": "dcb2b0543b0add00e56a",
-      "categories": [
-        "editor"
+        "dependency"
       ]
     },
     {
@@ -4631,6 +4741,7 @@
         "Eyebrow",
         "FlatRow",
         "code",
+        "SettingValue",
         "Badge",
         "p",
         "div",
@@ -4640,7 +4751,7 @@
       "category": "record",
       "parent": "SettingDetail",
       "target": null,
-      "fingerprint": "1e9beda6626c5deab8ec",
+      "fingerprint": "e823c89adf7b8083e1ce",
       "categories": [
         "record"
       ]
@@ -4703,6 +4814,92 @@
       "fingerprint": "fac7211628308949f13a",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:publish:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "publish",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "publish",
+      "target": null,
+      "fingerprint": "622258479c1afd64e88d",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:apply:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "apply",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "apply",
+      "target": null,
+      "fingerprint": "d36cfa155b6c5d07673c",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:restore:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "restore",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "restore",
+      "target": null,
+      "fingerprint": "49d84fb6cab7bd107a0d",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:FleetContent:apply:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "FleetContent",
+      "launcher": "apply",
+      "body": [],
+      "category": "confirmation",
+      "parent": "FleetContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:apply",
+      "fingerprint": "2a19277869d5b41e382b",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:FleetContent:restore:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "FleetContent",
+      "launcher": "restore",
+      "body": [],
+      "category": "confirmation",
+      "parent": "FleetContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:restore",
+      "fingerprint": "c48ec1b4d9ffec1aaa30",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:FleetContent:handler:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "FleetContent",
+      "launcher": "publish",
+      "body": [
+        "publish"
+      ],
+      "category": "confirmation",
+      "parent": "onPublish",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:publish",
+      "fingerprint": "af0f7d975c46f3edceb8",
+      "categories": [
+        "confirmation"
       ]
     },
     {
@@ -5254,7 +5451,7 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "e900e0cb36e1a90879ec",
+      "fingerprint": "26947e6af1eff9ecbe86",
       "categories": [
         "dependency"
       ]
@@ -5268,7 +5465,7 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "800662a3b74191de8e00",
+      "fingerprint": "e900e0cb36e1a90879ec",
       "categories": [
         "dependency"
       ]
@@ -5282,13 +5479,27 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "2ac6a99fb7d422c46da3",
+      "fingerprint": "800662a3b74191de8e00",
       "categories": [
         "dependency"
       ]
     },
     {
       "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:4",
+      "file": "packages/portal-mojo/src/admin/domains/operations.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "2ac6a99fb7d422c46da3",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:5",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",
@@ -8079,34 +8290,6 @@
       ]
     },
     {
-      "id": "apps/portal/src/pages/admin-routes.tsx:<module>:import:0",
-      "file": "apps/portal/src/pages/admin-routes.tsx",
-      "owner": "<module>",
-      "launcher": "import",
-      "body": [],
-      "category": "dependency",
-      "parent": "<module>",
-      "target": null,
-      "fingerprint": "67e26bfc15fe0139498c",
-      "categories": [
-        "dependency"
-      ]
-    },
-    {
-      "id": "apps/portal/src/pages/admin-routes.tsx:<module>:import:1",
-      "file": "apps/portal/src/pages/admin-routes.tsx",
-      "owner": "<module>",
-      "launcher": "import",
-      "body": [],
-      "category": "dependency",
-      "parent": "<module>",
-      "target": null,
-      "fingerprint": "b37ab53856cbd4e4f4f6",
-      "categories": [
-        "dependency"
-      ]
-    },
-    {
       "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:FreshAuthDialog:dialog:0",
       "file": "apps/portal/src/pages/auth/FreshAuthHost.tsx",
       "owner": "FreshAuthDialog",
@@ -8797,81 +8980,88 @@
       "fingerprint": "fd7066e384065e745555"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Overview'",
       "label": "Overview",
       "fingerprint": "d163f3c9ac9ad908d0b7"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Identity'",
       "label": "Identity",
       "fingerprint": "da633352e0723d217cf3"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Members'",
       "label": "Members",
       "fingerprint": "84a99cfd4d119595d387"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'SubGroups'",
       "label": "Sub-Groups",
       "fingerprint": "9a009162cd58f21c1018"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'ApiKeys'",
       "label": "API Keys",
       "fingerprint": "143f9d10a73701b077b6"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Webhooks'",
       "label": "Webhooks",
       "fingerprint": "b65e5c5c95e0fe4b08c4"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Geofencing'",
       "label": "Geofencing",
       "fingerprint": "892d67b62b0b451cd12e"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Events'",
       "label": "Events",
       "fingerprint": "e010d77e4a797dc7e905"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Audit'",
       "label": "Audit",
       "fingerprint": "9e7bcc98b837e62f08f1"
     },
     {
-      "file": "apps/portal/src/pages/GroupDetail.tsx",
+      "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
       "owner": "GroupDetail",
       "key": "'Metadata'",
       "label": "Metadata",
-      "fingerprint": "b600363ca17b5cd5783a"
+      "fingerprint": "77f5f38feddb400c38c7"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "owner": "KeyDetail",
+      "key": "'details'",
+      "label": "Details",
+      "fingerprint": "ad31d3a8458dc284dc10"
     },
     {
       "file": "packages/portal-mojo/src/admin/settings/SettingDetail.tsx",
       "owner": "SettingDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "546d0a8db559cce6d640"
+      "fingerprint": "a28bbbe80f2eb2feb727"
     },
     {
       "file": "packages/portal-mojo/src/admin/jobs/RunnerDetail.tsx",

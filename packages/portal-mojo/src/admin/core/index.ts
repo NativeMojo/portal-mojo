@@ -207,8 +207,8 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
             const labeled = section.routes.filter((route) => route.label);
             const destinations: MenuItem[] = labeled.length > 0 ? labeled.map((route) => ({
                 id: `admin:${section.id}:${route.path || 'index'}`, label: route.label!, keywords: [section.title],
-                route: absolutePath(base, route.path), permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
-            })) : [{ id: `admin:${section.id}`, label: section.title, keywords: [section.title], route: absolutePath(base), permissionClauses: [section.permissions] }];
+                route: absolutePath(base, route.path), exact: true, permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
+            })) : [{ id: `admin:${section.id}`, label: section.title, keywords: [section.title], route: absolutePath(base), exact: true, permissionClauses: [section.permissions] }];
             if (section.navigationGroup === null) {
                 items.push(...destinations.map((destination) => ({ ...destination, icon: section.icon })));
                 continue;
@@ -227,8 +227,8 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
         const base = relativePath(mount, section.basePath ?? section.id);
         items.push({
             label: section.title, icon: section.icon, permissions: section.permissions,
-            ...(base ? { route: absolutePath(base) } : {}),
-            children: labeled.map((route) => ({ label: route.label!, route: absolutePath(base, route.path), permissions: route.permissions })),
+            ...(base ? { route: absolutePath(base), exact: true } : {}),
+            children: labeled.map((route) => ({ label: route.label!, route: absolutePath(base, route.path), exact: true, permissions: route.permissions })),
         });
     }
     return { name: opts.name ?? 'admin', scope: 'admin', presentation: opts.presentation ?? 'static', items };

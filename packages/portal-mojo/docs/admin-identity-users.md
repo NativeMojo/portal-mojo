@@ -25,7 +25,12 @@ reason per batch; rows already in the target state are ineligible.
 
 The detail preserves all 14 sections: Overview, Profile, Personal, Security,
 OAuth, Groups, Sys Perms, conditional App Perms, API Keys, Devices, Logins,
-Audit, Notifications, and Metadata. Subsidiary count/list queries are enabled
+Audit, Notifications, and Metadata. Permission sections are labeled **System
+permissions** and **Product permissions** in the UI. Consuming apps install
+their product tabs with `registerFormTabs(USER_APP_PERMS_TABSET, tabs)`; the
+section stays absent when none are registered. User grants can cover multiple
+groups; use a Member product permission for a single group.
+Subsidiary count/list queries are enabled
 only when their exact system permission is present. Logs use
 `sys.view_logs | sys.manage_logs | sys.security`; incident events use
 `sys.view_security | sys.security`. Permission revocation therefore removes

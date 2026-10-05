@@ -3,6 +3,7 @@ import { GLOBAL_CREDENTIAL_PERMS } from '../credentials/models';
 import { MEMBER_READ_PERMISSIONS } from '../identity/members/models';
 import { USER_VIEW_PERMISSIONS } from '../identity/users/models';
 import { SIGNIN_ADMIN_PERMISSIONS } from '../signin/api';
+import { GROUP_VIEW_PERMS } from '../identity/groups/group-permissions';
 
 export const USERS_ADMIN_SECTION: AdminSection = {
     id: 'users', basePath: '', title: 'Users', icon: 'bi-people', navigationGroup: 'identity-access', permissions: USER_VIEW_PERMISSIONS,
@@ -27,4 +28,21 @@ export const SIGNIN_ADMIN_SECTION: AdminSection = {
     routes: [{ path: '', loadComponent: () => import('../signin/SigninPage').then(({ SigninPage }) => ({ default: SigninPage })), permissions: SIGNIN_ADMIN_PERMISSIONS }],
 };
 
-export const IDENTITY_ADMIN_SECTIONS = [USERS_ADMIN_SECTION, MEMBERS_ADMIN_SECTION, CREDENTIALS_ADMIN_SECTION, SIGNIN_ADMIN_SECTION] as const;
+export const GROUPS_ADMIN_SECTION: AdminSection = {
+    id: 'groups', basePath: '', title: 'Groups', icon: 'bi-diagram-3', navigationGroup: 'identity-access', permissions: GROUP_VIEW_PERMS,
+    routes: [{ path: 'groups', label: 'Groups', loadComponent: () => import('../identity/groups/GroupsPage').then(({ GroupsPage }) => ({ default: GroupsPage })), permissions: GROUP_VIEW_PERMS }],
+};
+
+export const PERSONAL_API_KEYS_ADMIN_SECTION: AdminSection = {
+    id: 'personal-api-keys', basePath: '', title: 'Personal API Keys', icon: 'bi-key', navigationGroup: 'identity-access', permissions: USER_VIEW_PERMISSIONS,
+    routes: [{ path: 'apikeys', label: 'Personal API Keys', loadComponent: () => import('../identity/users/PersonalApiKeysPage').then(({ PersonalApiKeysPage }) => ({ default: PersonalApiKeysPage })) }],
+};
+
+export const IDENTITY_ADMIN_SECTIONS = [
+    GROUPS_ADMIN_SECTION,
+    PERSONAL_API_KEYS_ADMIN_SECTION,
+    USERS_ADMIN_SECTION,
+    MEMBERS_ADMIN_SECTION,
+    CREDENTIALS_ADMIN_SECTION,
+    SIGNIN_ADMIN_SECTION,
+] as const;

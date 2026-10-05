@@ -85,7 +85,7 @@ try {
     const rulesTab = await server.ssrLoadModule('/packages/portal-mojo/src/admin/network/geofence/RulesTab.tsx');
     const geoip = await server.ssrLoadModule('/packages/portal-mojo/src/admin/security/geoip/models.ts');
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
-    const shim = await server.ssrLoadModule('/apps/portal/src/pages/group-sections/geofence-data.ts');
+    const shim = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/groups/group-sections/geofence-data.ts');
 
     // ── 1. Permissions: sys.-pinned, fail-closed, member grants rejected ──
     const CLAUSES = {
@@ -319,10 +319,10 @@ try {
         assert(shim[name] !== undefined, `the shim re-exports ${name}`);
         assert.equal(shim[name], gf[name], `${name} is the SAME identity — one projection, not a copy`);
     }
-    const shimSource = await read('apps/portal/src/pages/group-sections/geofence-data.ts');
+    const shimSource = await read('packages/portal-mojo/src/admin/identity/groups/group-sections/geofence-data.ts');
     assert.doesNotMatch(stripComments(shimSource), /\bfunction\b|COUNTRY_NAMES\s*[:=]/,
         'the app file is a pure re-export shim — no second implementation, no second country table');
-    const sectionSource = await read('apps/portal/src/pages/group-sections/GeofenceSection.tsx');
+    const sectionSource = await read('packages/portal-mojo/src/admin/identity/groups/group-sections/GeofenceSection.tsx');
     assert.doesNotMatch(stripComments(sectionSource), /FriendlyEditor/, 'the private editor is gone');
     assert.match(sectionSource, /<GeofenceRuleEditor/, 'the group panel renders the SHARED editor');
     // The group surface can only tighten: it never writes platform rules.
