@@ -115,7 +115,7 @@
       "purpose": "SchemaForm: collect and save fields"
     },
     {
-      "id": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog:modal.open:0",
+      "id": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx:openAuthConfigDialog:modal.open:0",
       "fingerprint": "748d1cab042efc135bac",
       "category": "editor",
       "purpose": "AuthConfigBody: collect and save fields"

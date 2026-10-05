@@ -3,7 +3,7 @@
 // (model_name=account.Group, model_id=<id>) with the source's columns —
 // Date / Category badge / Title.
 import { Badge, Eyebrow, fmt } from 'portal-mojo/ui';
-import type { GroupRow } from '../../models';
+import type { GroupRow } from '../models';
 import { IncidentEventModel } from './models';
 
 export function EventsSection({ group }: { group: GroupRow }) {
