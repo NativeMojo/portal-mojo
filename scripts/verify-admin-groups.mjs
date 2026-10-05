@@ -29,8 +29,23 @@ try {
     const personalKeysSource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx', import.meta.url), 'utf8');
     const menuSource = await readFile(new URL('../apps/portal/src/menus.ts', import.meta.url), 'utf8');
     const identitySource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx', import.meta.url), 'utf8');
+    const registry = await server.ssrLoadModule('/packages/portal-mojo/src/admin/registry.ts');
+    const adminCore = await server.ssrLoadModule('/packages/portal-mojo/src/admin/core/index.ts');
     assert.match(routeSource, /adminSectionRoutes\(ADMIN_SECTIONS\)/);
     assert.doesNotMatch(routeSource, /path: ['\"]groups['\"]|path: ['\"]apikeys['\"]/);
+    const registeredIds = registry.ADMIN_SECTIONS.map((section) => section.id);
+    assert(registeredIds.includes('groups'), 'ADMIN_SECTIONS registers the native Groups directory');
+    assert(registeredIds.includes('personal-api-keys'), 'ADMIN_SECTIONS registers the native Personal API Keys directory');
+    const adminMenu = adminCore.adminSectionsMenu(registry.ADMIN_SECTIONS, { grouped: true });
+    const flattenMenu = (items) => items.flatMap((item) => [item, ...(item.children ? flattenMenu(item.children) : [])]);
+    const menuItems = flattenMenu(adminMenu.items);
+    assert(menuItems.some((item) => item.route === '/groups'), 'adminSectionsMenu exposes the Groups route');
+    assert(menuItems.some((item) => item.route === '/apikeys'), 'adminSectionsMenu exposes the Personal API Keys route');
+    assert.deepEqual(
+        menuItems.map((item) => item.route).filter((route) => ['/groups', '/apikeys', '/users', '/members', '/api-keys', '/webhook-subscriptions', '/system/sign-in'].includes(route)),
+        ['/groups', '/apikeys', '/users', '/members', '/api-keys', '/webhook-subscriptions', '/system/sign-in'],
+        'adminSectionsMenu preserves the reference identity directory order',
+    );
     assert(identityDomain.GROUPS_ADMIN_SECTION.permissions.every((permission) => permission.startsWith('sys.')));
     assert(identityDomain.GROUPS_ADMIN_SECTION.routes[0].permissions.every((permission) => permission.startsWith('sys.')));
     assert(identityDomain.PERSONAL_API_KEYS_ADMIN_SECTION.permissions.every((permission) => permission.startsWith('sys.')));

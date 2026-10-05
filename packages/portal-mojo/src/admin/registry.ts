@@ -17,10 +17,10 @@ import { ASSISTANT_ADMIN_SECTION } from './domains/assistant';
 /** Stable historical order; menus, denied fallback and first-visible routing depend on it. */
 export const ADMIN_SECTIONS: readonly AdminSection[] = [
     DASHBOARD_ADMIN_SECTION,
-    USERS_ADMIN_SECTION,
-    MEMBERS_ADMIN_SECTION,
     GROUPS_ADMIN_SECTION,
     PERSONAL_API_KEYS_ADMIN_SECTION,
+    USERS_ADMIN_SECTION,
+    MEMBERS_ADMIN_SECTION,
     CREDENTIALS_ADMIN_SECTION,
     SIGNIN_ADMIN_SECTION,
     MONITORING_ADMIN_SECTION,
