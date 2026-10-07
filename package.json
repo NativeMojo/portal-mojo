@@ -50,7 +50,7 @@
         "verify:admin-jobs": "node scripts/verify-admin-jobs.mjs",
         "verify:admin-network": "node scripts/verify-admin-network.mjs",
         "verify:admin-dns": "node scripts/verify-admin-dns.mjs",
-        "verify:admin-edge": "node scripts/verify-admin-edge.mjs",
+        "verify:admin-edge": "node scripts/verify-admin-edge.mjs && node scripts/verify-admin-edge-dialogs.mjs",
         "verify:admin-dns-records": "node scripts/verify-admin-dns-records.mjs",
         "verify:admin-dns-certificates": "node scripts/verify-admin-dns-certificates.mjs",
         "verify:admin-dns-registrar": "node scripts/verify-admin-dns-registrar.mjs",

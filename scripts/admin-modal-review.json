@@ -362,13 +362,13 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:openDeclareUpstream:modal.open:0",
-      "fingerprint": "1e9d9e00269fa4a291fb",
+      "fingerprint": "75a8577e0a2e334ccdc7",
       "category": "editor",
       "purpose": "DeclareUpstreamDialog: collect and save fields"
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:openBlocklistEditor:modal.open:0",
-      "fingerprint": "809cea3a8dad63c83eff",
+      "fingerprint": "b9499c5fc6734798003d",
       "category": "editor",
       "purpose": "BlocklistEditor: collect and save fields"
     }

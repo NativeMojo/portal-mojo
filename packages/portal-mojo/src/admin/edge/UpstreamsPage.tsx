@@ -7,7 +7,7 @@ import { EDGE_MANAGE_PERMS, EdgeUpstreamModel, upstreamTarget, type EdgeUpstream
 
 const RETIRE_CONSEQUENCE = 'Vhosts and routes that reach this upstream stop being served. They are not repointed. The upstream stays listed, disabled, so its history is kept.';
 
-function DeclareUpstreamDialog({ close }: { close: (row: EdgeUpstreamRow | null) => void }) {
+function DeclareUpstreamDialog({ pending, close }: { pending: { current: boolean }; close: (row: EdgeUpstreamRow | null) => void }) {
     const [name, setName] = useState('');
     const [kind, setKind] = useState<'http' | 'unix'>('http');
     const [host, setHost] = useState('');
@@ -25,13 +25,13 @@ function DeclareUpstreamDialog({ close }: { close: (row: EdgeUpstreamRow | null)
         const input: DeclareUpstreamInput = kind === 'http'
             ? { name: name.trim(), kind, host: host.trim().toLowerCase(), port: Number(port), group }
             : { name: name.trim(), kind, socket_path: socketPath.trim(), group };
-        setBusy(true); setError('');
+        setBusy(true); setError(''); pending.current = true;
         try {
             close(await declareUpstream(input));
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'The upstream was not declared');
         } finally {
-            setBusy(false);
+            pending.current = false; setBusy(false);
         }
     };
 
@@ -51,7 +51,9 @@ function DeclareUpstreamDialog({ close }: { close: (row: EdgeUpstreamRow | null)
 }
 
 export function openDeclareUpstream(): Promise<EdgeUpstreamRow | null> {
-    return modal.open<EdgeUpstreamRow | null>((close) => <DeclareUpstreamDialog close={close} />).then((value) => value ?? null);
+    // Escape and the backdrop are refused while the declare is in flight.
+    const pending = { current: false };
+    return modal.open<EdgeUpstreamRow | null>((close) => <DeclareUpstreamDialog pending={pending} close={close} />, { canDismiss: () => !pending.current }).then((value) => value ?? null);
 }
 
 const FILTERS: FilterDef[] = [

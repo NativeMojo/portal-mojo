@@ -17,7 +17,7 @@ function modeMeta(mode: string) {
     return BLOCKLIST_MODES.find((entry) => entry.value === mode) ?? { value: mode, label: mode, tone: 'muted' as Tone, help: '' };
 }
 
-function BlocklistEditor({ row, close }: { row: EdgeBlocklistRow | null; close: (result: 'saved' | 'deleted' | null) => void }) {
+function BlocklistEditor({ row, pending, close }: { row: EdgeBlocklistRow | null; pending: { current: boolean }; close: (result: 'saved' | 'deleted' | null) => void }) {
     const queryClient = useQueryClient();
     const [kind, setKind] = useState(row?.kind ?? 'ip');
     const [value, setValue] = useState(row?.value ?? '');
@@ -31,7 +31,7 @@ function BlocklistEditor({ row, close }: { row: EdgeBlocklistRow | null; close: 
         if (busy) return;
         const refusal = validateBlocklistValue(kind, value.trim());
         if (refusal) { setError(refusal); return; }
-        setBusy(true); setError('');
+        setBusy(true); setError(''); pending.current = true;
         try {
             // The response row is authoritative: an address comes back as its network.
             const saved = sanitizeEdgeBlocklistRow(await withFreshAuth(() => mojoSave<EdgeBlocklistRow>(EdgeBlocklistModel.endpoint, row?.id ?? null, { kind, value: value.trim(), mode, note: note.trim() })));
@@ -41,11 +41,13 @@ function BlocklistEditor({ row, close }: { row: EdgeBlocklistRow | null; close: 
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'The entry was not saved');
         } finally {
-            setBusy(false);
+            pending.current = false; setBusy(false);
         }
     };
     const remove = async () => {
-        if (!row) return;
+        if (!row || busy) return;
+        // One pending state for save and delete: neither can start over the other.
+        setBusy(true); setError(''); pending.current = true;
         try {
             await withFreshAuth(() => mojoDelete(EdgeBlocklistModel.endpoint, row.id));
             await EdgeBlocklistModel.invalidate(queryClient);
@@ -53,6 +55,8 @@ function BlocklistEditor({ row, close }: { row: EdgeBlocklistRow | null; close: 
             close('deleted');
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'The entry was not deleted');
+        } finally {
+            pending.current = false; setBusy(false);
         }
     };
 
@@ -76,7 +80,9 @@ function BlocklistEditor({ row, close }: { row: EdgeBlocklistRow | null; close: 
 }
 
 export function openBlocklistEditor(row: EdgeBlocklistRow | null = null): Promise<'saved' | 'deleted' | null> {
-    return modal.open<'saved' | 'deleted' | null>((close) => <BlocklistEditor row={row} close={close} />).then((value) => value ?? null);
+    // Escape and the backdrop are refused while a save or delete is in flight.
+    const pending = { current: false };
+    return modal.open<'saved' | 'deleted' | null>((close) => <BlocklistEditor row={row} pending={pending} close={close} />, { canDismiss: () => !pending.current }).then((value) => value ?? null);
 }
 
 const COLUMNS: Column<EdgeBlocklistRow>[] = [
