@@ -62,6 +62,11 @@ try {
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
     client.initAuth();
 
+    // Rotations are not logins: record which identity events each path emits.
+    const authEvents = [];
+    for (const name of ['login', 'rotated']) client.onAuth(name, () => authEvents.push(name));
+    const eventsOf = async (run) => { authEvents.length = 0; await run(); return [...authEvents]; };
+
     const EMAIL = 'ian@mojoverify.com';
     const bearer = () => ({ Authorization: `Bearer ${client.getAccessToken()}` });
     await client.login(EMAIL, 'mojo', { remember: false });
@@ -187,7 +192,7 @@ try {
     await gated('POST', '/api/auth/email/change/request', () => api.requestEmailChange('ian.new@mojoverify.com'));
     await assert.rejects(client.confirmEmailChange('000000'), /Invalid or expired code/);
     await api.requestEmailChange('ian.new@mojoverify.com');
-    await client.confirmEmailChange('123456');
+    assert.deepEqual(await eventsOf(() => client.confirmEmailChange('123456')), ['rotated'], "email-change confirm emits 'rotated', never 'login'");
     assert.notEqual(client.getAccessToken(), beforeEmail);
     assert.equal(client.sessionIsPersistent(), false, 'the adopted login stays in sessionStorage');
     assert.equal((await mock.mockFetch('/api/user/me', { headers: { Authorization: `Bearer ${beforeEmail}` } })).error_code, 401, 'auth_key rotation kills the old token');
@@ -200,7 +205,8 @@ try {
     // ── Sessions: revoke others, keep this one ──
     const otherDevice = await mock.mockFetch('/api/login', { method: 'POST', body: { username: NEW_EMAIL, password: 'mojo' } });
     const beforeRevoke = client.getAccessToken();
-    await gated('POST', '/api/auth/sessions/revoke', () => client.revokeOtherSessions());
+    assert.deepEqual(await eventsOf(() => gated('POST', '/api/auth/sessions/revoke', () => client.revokeOtherSessions())), ['login', 'rotated'], "sessions revoke emits 'rotated' (the 'login' is the step-up re-login)");
+    assert.deepEqual(await eventsOf(() => client.login(NEW_EMAIL, 'mojo', { remember: false }).then((r) => (r.kind === 'mfa' ? client.completeMfaTotp(r.mfaToken, '123456', { remember: false }) : null))), ['login'], "an explicit sign-in emits 'login'");
     assert.notEqual(client.getAccessToken(), beforeRevoke, 'the returned login is adopted');
     assert.equal(client.sessionIsPersistent(), false);
     assert.equal((await mock.mockFetch('/api/user/me', { headers: { Authorization: `Bearer ${otherDevice.data.access_token}` } })).error_code, 401, 'other sessions die');

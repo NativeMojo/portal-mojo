@@ -133,7 +133,12 @@ export function subscribeAuth(cb: () => void): () => void {
 
 // ── Auth events ───────────────────────────────────────────────────────
 
-export type AuthEvent = 'login' | 'logout' | 'refreshed' | 'refresh-failed' | 'unauthorized';
+/**
+ * 'login' — an explicit, completed sign-in (password/MFA/passkey/magic/reset/
+ * exchange). 'rotated' — the SAME user's session re-issued by a credential
+ * change (sessions revoke, email-change confirm): new tokens, not a login.
+ */
+export type AuthEvent = 'login' | 'rotated' | 'logout' | 'refreshed' | 'refresh-failed' | 'unauthorized';
 const eventListeners = new Map<AuthEvent, Set<(detail?: unknown) => void>>();
 
 export function onAuth(event: AuthEvent, cb: (detail?: unknown) => void): () => void {
@@ -309,7 +314,7 @@ export const GRANT_SIGN_IN_AGAIN = 'Sign in again to continue';
  * access + refresh pair. Serialised behind any in-flight refresh so a
  * refresh that started on the old session can never land on top of it.
  */
-async function adoptGrant(data: TokenGrant | null | undefined, remember = true): Promise<AuthUser> {
+async function adoptGrant(data: TokenGrant | null | undefined, remember = true, event: 'login' | 'rotated' = 'login'): Promise<AuthUser> {
     if (!data || typeof data.access_token !== 'string' || !data.access_token
         || typeof data.refresh_token !== 'string' || !data.refresh_token) {
         throw new Error(GRANT_SIGN_IN_AGAIN);
@@ -318,7 +323,7 @@ async function adoptGrant(data: TokenGrant | null | undefined, remember = true):
     setTokens(data.access_token, data.refresh_token, remember);
     startAutoRefresh();
     const user = data.user ?? {};
-    emitAuth('login', user);
+    emitAuth(event, user);
     return user;
 }
 
@@ -642,11 +647,12 @@ export function passkeyErrorMessage(error: unknown): string {
  * Finish a code-flow email change (`POST /api/auth/email/change/confirm
  * {code}`, rest/user.py:1953-1994). The server commits the new address,
  * rotates auth_key (every other session dies) and answers with a NEW login,
- * adopted here into the storage this session already uses.
+ * adopted here into the storage this session already uses. Emits 'rotated'
+ * (never 'login': no explicit sign-in happened).
  */
 export async function confirmEmailChange(code: string): Promise<AuthUser> {
     const body = await mojoCall('/api/auth/email/change/confirm', { method: 'POST', body: { code } });
-    return adoptGrant(body.data as TokenGrant, sessionIsPersistent());
+    return adoptGrant(body.data as TokenGrant, sessionIsPersistent(), 'rotated');
 }
 
 /**
@@ -657,7 +663,7 @@ export async function confirmEmailChange(code: string): Promise<AuthUser> {
  */
 export async function revokeOtherSessions(): Promise<AuthUser> {
     const body = await withFreshAuth(() => mojoCall('/api/auth/sessions/revoke', { method: 'POST', body: {} }));
-    return adoptGrant(body.data as TokenGrant, sessionIsPersistent());
+    return adoptGrant(body.data as TokenGrant, sessionIsPersistent(), 'rotated');
 }
 
 // ── Fresh-auth (step-up) challenges ───────────────────────────────────

@@ -20,6 +20,7 @@ initAuth();                       // installs the pre-request gate + Authorizati
 void handleAuthCodeFromURL();     // returning from the hosted /auth pages (no-op otherwise)
 onAuth('login',  () => queryClient.invalidateQueries());   // identity changed →
 onAuth('logout', () => queryClient.invalidateQueries());   // every cached answer is suspect
+onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issued session
 ```
 
 ## Session mechanics
@@ -37,8 +38,17 @@ onAuth('logout', () => queryClient.invalidateQueries());   // every cached answe
   untouched. Adoption waits for an in-flight refresh, and a refresh that
   completes after the stored session changed (new login, logout, another
   tab) is discarded instead of written over it.
-- Events for `onAuth`: `'login' | 'logout' | 'refreshed' | 'refresh-failed'
-  | 'unauthorized'`.
+- Events for `onAuth`: `'login' | 'rotated' | 'logout' | 'refreshed' |
+  'refresh-failed' | 'unauthorized'`.
+  - `'login'` — an explicit, completed sign-in (password, MFA step, passkey,
+    magic link, password reset, hosted-auth exchange).
+  - `'rotated'` — the SAME user's session re-issued by a credential change
+    (`revokeOtherSessions()`, `confirmEmailChange()`): new tokens in the same
+    storage, but NOT a login — never treat it as one (the packaged Admin
+    source session reopens a logout tombstone only on `'login'`). Invalidate
+    caches on it where you do on `'login'`.
+  - `'logout'` / `'unauthorized'` — the session ended; the toolkit modal
+    stack closes every open dialog on both.
 
 Both localStorage and sessionStorage keep the existing token keys. Refresh
 preserves the chosen storage, including sessions with only a valid refresh token
