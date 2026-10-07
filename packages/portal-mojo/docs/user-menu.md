@@ -90,8 +90,8 @@ interface UserMenuItem {
   (state is keyed by avatar id).
 - No avatar request while signed out or when `avatar` is null.
 - Popover is controlled; outside-mousedown closes without moving focus.
-- Tokens only — `apps/portal/src/theme/user-menu.css`; both themes from the
-  token swap. Reuses `.seg`/`.seg-btn`, `.chip-primary`, `.spin`,
+- Tokens only — `src/styles/components/user-menu.css`, shipped in
+  `portal-mojo/styles.css`; both themes from the token swap. Reuses `.seg`/`.seg-btn`, `.chip-primary`, `.spin`,
   `.btn-primary`/`.btn-compact`, `.chip-muted`.
 
 ## Signed-out matrix
@@ -128,4 +128,5 @@ menu. Theme picks apply immediately and keep the menu open.
   `ThemeProvider` for the theme control; `ToastHost` for the failure toast.
 - Don't also render a theme toggle button in the same bar — the menu owns it.
 - `onSignOut` that never settles leaves Sign out pending; resolve or reject.
-- Apps must ship `theme/user-menu.css` (the package ships no CSS).
+- Apps must import `portal-mojo/styles.css` and declare the tokens; the
+  UserMenu styles ship in it.
