@@ -90,16 +90,22 @@ let authWired = false;
 function wireAuth(): void {
     if (authWired || typeof window === 'undefined') return;
     authWired = true;
-    onAuth('logout', closeAll);
-    onAuth('unauthorized', closeAll);
-    let seenUid: string | null = null;
-    const observe = () => {
-        const snap = getAuthSnapshot();
-        if (seenUid != null && (!snap.authenticated || snap.uid !== seenUid)) closeAll();
-        seenUid = snap.authenticated ? snap.uid : null;
-    };
-    observe();
-    subscribeAuth(observe);
+    // Best-effort: a harness or host that stubs the auth module (or has no
+    // storage) must never stop a modal from opening.
+    try {
+        onAuth('logout', closeAll);
+        onAuth('unauthorized', closeAll);
+        let seenUid: string | null = null;
+        const observe = () => {
+            try {
+                const snap = getAuthSnapshot();
+                if (seenUid != null && (!snap.authenticated || snap.uid !== seenUid)) closeAll();
+                seenUid = snap.authenticated ? snap.uid : null;
+            } catch { /* auth unavailable: nothing to observe */ }
+        };
+        observe();
+        subscribeAuth(observe);
+    } catch { /* auth module stubbed or unavailable: modals still open */ }
 }
 
 export interface ModalOptions {
