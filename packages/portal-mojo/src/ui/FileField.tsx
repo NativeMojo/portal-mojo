@@ -99,13 +99,18 @@ export function FileField(props: FileFieldProps) {
         }
     }, [queue]);
 
-    useEffect(() => () => {
-        mounted.current = false;
-        generation.current += 1;
-        editController.current?.abort();
-        revokeLocal();
-        if (desired.current !== undefined && candidate.current != null) reportOrphan(candidate.current);
-        queue.cancelAll();
+    useEffect(() => {
+        // Re-arm on (re)mount: StrictMode's probe unmount runs the cleanup
+        // below, and without this the remount stays "unmounted" forever.
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            generation.current += 1;
+            editController.current?.abort();
+            revokeLocal();
+            if (desired.current !== undefined && candidate.current != null) reportOrphan(candidate.current);
+            queue.cancelAll();
+        };
     }, [queue, reportOrphan, revokeLocal]);
 
     const active = queue.snapshot.activeCount > 0 || queue.snapshot.queuedCount > 0;
