@@ -55,6 +55,7 @@ const SkeletonDemo = lazyDemo(() => import('./demos-display'), 'SkeletonDemo');
 const AccessDemo = lazyDemo(() => import('./demos-display'), 'AccessDemo');
 const PopoverDemo = lazyDemo(() => import('./demos-popover'), 'PopoverDemo');
 const UserMenuDemo = lazyDemo(() => import('./demos-user-menu'), 'UserMenuDemo');
+const AccountDemo = lazyDemo(() => import('./demos-account'), 'AccountDemo');
 const TagInputDemo = lazyDemo(() => import('./demos-taginput'), 'TagInputDemo');
 const DrawerDemo = lazyDemo(() => import('./demos-drawer'), 'DrawerDemo');
 const RightPanelDemo = lazyDemo(() => import('./demos-right-panel'), 'RightPanelDemo');
@@ -407,6 +408,16 @@ const GROUPS: DemoGroup[] = [
                 key: 'skeleton', title: 'Skeletons', icon: 'bi-body-text',
                 blurb: 'The loading silhouette: avatar + stacked lines, cycled widths, pills.',
                 render: () => <SkeletonDemo />,
+            },
+        ],
+    },
+    {
+        title: 'Account',
+        sections: [
+            {
+                key: 'account', title: 'AccountModal', icon: 'bi-person-vcard',
+                blurb: 'The self-service My account modal (portal-mojo/account): Profile, Passkeys, Security, Sessions, Notifications, API keys on one rail — with CamActive notification kinds and an armed 440 step-up.',
+                render: () => <AccountDemo />,
             },
         ],
     },

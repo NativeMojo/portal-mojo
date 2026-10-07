@@ -47,6 +47,9 @@ export type MockUser = User & { created: number; requires_mfa: boolean };
 
 const PRIVATE_USER_FIELDS = new Set(['created', 'requires_mfa']);
 
+/** Users whose password is unusable (OAuth/passkey-only) — `has_password: false`. */
+const passwordlessUsers = new Set<number>();
+
 function serializeUser(u: MockUser, graph: 'list' | 'default' = 'list'): User {
     const row: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(u)) {
@@ -56,6 +59,7 @@ function serializeUser(u: MockUser, graph: 'list' | 'default' = 'list'): User {
         delete row.is_online; // list-graph-only field
         row.requires_mfa = u.requires_mfa;
         row.has_passkey = db.passkeys.some((p) => p.user === u.id && p.is_enabled);
+        row.has_password = !passwordlessUsers.has(u.id);
     }
     return row as unknown as User;
 }
@@ -4698,10 +4702,13 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
         case 'revoke_sessions':
             // Handler returns its own payload — the response is NOT the row.
             return { status: true, message: 'Sessions revoked. Re-authenticate to continue.' };
-        case 'disable_totp':
+        case 'disable_totp': {
             // on_action_disable_totp: clears enrollment (no-ops when nothing
             // is enrolled) and answers its own {status:true} payload.
+            const state = totpState.get(user.id);
+            if (state) state.enabled = false;
             return { status: true };
+        }
         default:
             return null;
     }
@@ -5079,9 +5086,75 @@ function signinFetch(method: string, body: Record<string, unknown>, headers: Rec
 // NO_SAVE_FIELDS parity (account/models/user.py RestMeta): silently dropped,
 // never an error — matching rest.py's strip. NOTE is_dob_verified IS in this
 // set live, which is why the portal ships no DOB force-verify affordance.
-const USER_NO_SAVE = new Set(['id', 'pk', 'auth_key', 'last_activity', 'is_dob_verified', 'created', 'has_passkey', 'is_online']);
+// Live NO_SAVE_FIELDS (user.py:188-192) plus the graph-only/derived keys the
+// mock row carries (id/pk/created/has_passkey/has_password/is_online) and
+// `current_password`, which set_new_password reads off the request, never
+// off the row.
+const USER_NO_SAVE = new Set([
+    'id', 'pk', 'auth_key', 'last_activity', 'is_dob_verified', 'requires_password_change',
+    'secrets', 'mojo_secrets', 'secret', 'permanent_password', 'protected_metadata', 'unusable_password', 'totp',
+    'created', 'has_passkey', 'has_password', 'is_online', 'current_password',
+]);
+
+/** user.py ADMIN_ONLY_FIELDS (:80-83) — `users`/`manage_users`/superuser only. */
+const USER_ADMIN_ONLY_FIELDS = ['is_email_verified', 'is_phone_verified', 'requires_mfa', 'is_active', 'org'];
+
+/**
+ * The live owner rules a save must pass (user.py on_rest_pre_save :1005-1100,
+ * _handle_existing_user_pre_save, set_is_superuser/set_is_staff :626-634,
+ * set_permissions :636-650, set_new_password :819-828, the rest.py `protected`
+ * metadata guard). Only CHANGED values trip the field guards — except
+ * is_superuser/is_staff, whose setters refuse a non-superuser even unchanged.
+ */
+function userSaveRefusal(user: MockUser, body: Record<string, unknown>, caller: MockUser | undefined): Record<string, unknown> | null {
+    if (!caller) return null;
+    const superuser = caller.is_superuser === true;
+    const admin = superuser || hasGlobalPermission(caller, ['users', 'manage_users']);
+    const deny = (error: string) => ({ status: false, error, error_code: 403 });
+    const target = user as unknown as Record<string, unknown>;
+    const current = (key: string): unknown => {
+        const value = target[key];
+        if (key === 'org') return value && typeof value === 'object' ? (value as { id?: unknown }).id ?? null : value ?? null;
+        return value ?? null;
+    };
+    const changed = (key: string): boolean => {
+        if (!(key in body)) return false;
+        const next = key === 'org' && body[key] != null && body[key] !== '' ? Number(body[key]) : body[key] ?? null;
+        return JSON.stringify(next) !== JSON.stringify(current(key));
+    };
+    if ('is_superuser' in body && !superuser) return deny('Only a superuser can grant superuser status');
+    if ('is_staff' in body && !superuser) return deny('Only a superuser can grant staff status');
+    if (isPlainObject(body.permissions) && Object.keys(body.permissions).length > 0 && !admin) return deny('permission denied');
+    for (const field of USER_ADMIN_ONLY_FIELDS) {
+        if (changed(field) && !admin) return deny(`You are not allowed to change ${field}`);
+    }
+    if (!admin) {
+        if (changed('email') || changed('username')) return deny('You are not allowed to change email or username');
+        if ('phone_number' in body) {
+            const next = body.phone_number;
+            const normalized = next == null || next === '' ? null : normalizePhone(String(next)) ?? String(next);
+            if (user.phone_number && normalized != null && normalized !== user.phone_number) {
+                return deny('Use the phone change flow to update an existing phone number');
+            }
+        }
+        if (changed('dob') && current('dob') != null) return deny('Date of birth cannot be changed after registration');
+    }
+    if ('password' in body) return deny('You are not allowed to change password');
+    if (isPlainObject(body.metadata) && 'protected' in body.metadata && !superuser) return deny('permission denied');
+    if ('new_password' in body) {
+        if (caller.id !== user.id && !admin) return deny('You are not allowed to change password');
+        const supplied = body.current_password;
+        if (!supplied && !admin) return { status: false, error: 'You must provide your current password', error_code: 400 };
+        if (supplied && (passwordlessUsers.has(user.id) || supplied !== MOCK_PASSWORD)) {
+            return { status: false, error: 'Incorrect current password', error_code: 400 };
+        }
+    }
+    return null;
+}
 
 function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUser): unknown {
+    const refusal = userSaveRefusal(user, body, caller);
+    if (refusal) return refusal;
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
     for (const [key, value] of Object.entries(body)) {
@@ -5096,6 +5169,7 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
         if (pw.length < 8) {
             return { status: false, error: 'Password is too weak. Use a longer password or include a mix of uppercase, lowercase, numbers, and special characters', error_code: 400 };
         }
+        passwordlessUsers.delete(user.id);
     }
     // set_org parity: the FK arrives as an id (or null to clear), serializes
     // back as the basic sub-graph.
@@ -5661,16 +5735,35 @@ function b64url(s: string): string {
     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+/**
+ * auth_key rotation parity (sessions/revoke, email change confirm): every
+ * token carries the user's current epoch as `ak` once one has been rotated,
+ * and a token minted under an older epoch is dead everywhere — exactly what
+ * rotating the server-side signing key does to every other session.
+ */
+const authEpochs = new Map<number, number>();
+
+function rotateAuthKey(userId: number): void {
+    authEpochs.set(userId, (authEpochs.get(userId) ?? 0) + 1);
+}
+
+function epochMatches(payload: Record<string, unknown>): boolean {
+    const current = authEpochs.get(Number(payload.uid)) ?? 0;
+    return (typeof payload.ak === 'number' ? payload.ak : 0) === current;
+}
+
 /** Real-shaped JWT (decodable header.payload) with a fake signature. */
 function mintJwt(user: User, ttlSec: number, extra: Record<string, unknown> = {}): string {
     const now = Math.floor(Date.now() / 1000);
     const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+    const epoch = authEpochs.get(user.id);
     const payload = b64url(JSON.stringify({
         uid: user.id,
         email: user.email,
         name: user.display_name,
         iat: now,
         exp: now + ttlSec,
+        ...(epoch ? { ak: epoch } : {}),
         ...extra,
     }));
     return `${header}.${payload}.mock-signature`;
@@ -5830,7 +5923,7 @@ function authFetch(path: string, body: Record<string, unknown>, params: Params =
             const payload = decodeMockJwt(String(body.refresh_token ?? ''));
             const user = payload && db.users.find((u) => u.id === Number(payload.uid));
             const now = Math.floor(Date.now() / 1000);
-            if (!payload || !user || typeof payload.exp !== 'number' || now >= payload.exp) {
+            if (!payload || !user || typeof payload.exp !== 'number' || now >= payload.exp || !epochMatches(payload)) {
                 return { status: false, error: 'token is invalid or expired', error_code: 401 };
             }
             // A refresh is NOT a fresh authentication: auth_time carries forward.
@@ -5942,6 +6035,7 @@ export interface MockRequestHistoryEntry {
 }
 
 const requestHistory: MockRequestHistoryEntry[] = [];
+const OWNER_SCOPED_LISTS = new Set(['/api/account/passkeys', '/api/account/api_keys', '/api/account/oauth_connection', '/api/user/device', '/api/account/logins']);
 
 export function getMockRequestHistory(): MockRequestHistoryEntry[] {
     return requestHistory.map((entry) => ({
@@ -5964,6 +6058,324 @@ let armedReauth: { method: string; path: string } | null = null;
 /** Mock-only one-shot fresh-auth challenge, matched by BOTH method and path. */
 export function armMockReauth(method: string, path: string): void {
     armedReauth = { method: method.toUpperCase(), path };
+}
+
+interface MockOnceArm {
+    method: string; path: string; extraDelayMs: number; stripGrantTokens: boolean;
+    mapData?: (data: Record<string, unknown>) => Record<string, unknown>;
+}
+let armedOnce: MockOnceArm | null = null;
+
+/**
+ * Mock-only one-shot response shaping, matched by BOTH method and path:
+ * `extraDelayMs` holds the answer back (to stage an in-flight race);
+ * `stripGrantTokens` drops access_token/refresh_token from a login grant —
+ * the shape of django-mojo's forced_password_response after auth_key rotated.
+ */
+export function armMockResponseOnce(method: string, path: string, opts: {
+    extraDelayMs?: number;
+    stripGrantTokens?: boolean;
+    /** Rewrite the envelope's `data` (e.g. pin a known WebAuthn challenge). */
+    mapData?: (data: Record<string, unknown>) => Record<string, unknown>;
+}): void {
+    armedOnce = { method: method.toUpperCase(), path, extraDelayMs: opts.extraDelayMs ?? 0, stripGrantTokens: opts.stripGrantTokens ?? false, mapData: opts.mapData };
+}
+
+// ── Self-service account (the AccountModal wire) ──────────────────────
+// Shape-level parity with django-mojo account/rest/passkeys.py (register),
+// rest/totp.py, rest/user.py (email/phone/username change, sessions/revoke)
+// and rest/verify.py. Every one-time value is fixed so flows are drivable:
+// TOTP and every emailed/SMS'd code is 123456. The fresh-auth gate on these
+// paths is the generic armMockReauth(method, path) one-shot above.
+
+interface MockTotpState {
+    secret: string | null;
+    enabled: boolean;
+    codes: string[];
+}
+
+const MOCK_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+const MOCK_ACCOUNT_CODE = '123456';
+const totpState = new Map<number, MockTotpState>();
+const pendingPasskeyRegistrations = new Map<string, { uid: number }>();
+const pendingEmailChanges = new Map<number, { email: string; code: string }>();
+const pendingPhoneChanges = new Map<string, { uid: number; phone: string; code: string }>();
+const pendingVerifyCodes = new Map<string, string>(); // `${uid}:email|phone` → code
+let accountSequence = 0;
+
+/** The registered-kinds catalogue the preferences GET carries (notification_kinds.py). */
+const MOCK_NOTIFICATION_KINDS: { kind: string; label: string; description: string; channels: string[] | null }[] = [
+    { kind: 'general', label: 'General', description: 'Messages from this service', channels: null },
+];
+
+/** Seeded users that already require MFA start with an enrolled authenticator. */
+function mockTotp(user: MockUser): MockTotpState {
+    let state = totpState.get(user.id);
+    if (!state) {
+        state = user.requires_mfa
+            ? { secret: MOCK_TOTP_SECRET, enabled: true, codes: mockRecoveryCodes() }
+            : { secret: null, enabled: false, codes: [] };
+        totpState.set(user.id, state);
+    }
+    return state;
+}
+
+function mockRecoveryCodes(): string[] {
+    const hex = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0');
+    return Array.from({ length: 8 }, () => `${hex()}-${hex()}-${hex()}`);
+}
+
+/** A deterministic stand-in QR (a data: SVG — the server sends data:image/png). */
+function mockQrDataUrl(seed: string): string {
+    const finder = (dx: number, dy: number) => dx === 0 || dx === 6 || dy === 0 || dy === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+    const cells: string[] = [];
+    for (let y = 0; y < 21; y++) {
+        for (let x = 0; x < 21; x++) {
+            let on: boolean;
+            if (x < 7 && y < 7) on = finder(x, y);
+            else if (x > 13 && y < 7) on = finder(x - 14, y);
+            else if (x < 7 && y > 13) on = finder(x, y - 14);
+            else if ((x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12)) on = false;
+            else on = ((seed.charCodeAt((x * 21 + y) % seed.length) * (x + 3) * (y + 7)) % 5) < 2;
+            if (on) cells.push(`<rect x="${x}" y="${y}" width="1" height="1"/>`);
+        }
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 25 25" shape-rendering="crispEdges"><rect x="-2" y="-2" width="25" height="25" fill="#fff"/><g fill="#000">${cells.join('')}</g></svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+function missingParam(name: string): Record<string, unknown> {
+    return { status: false, error: `Missing required parameter: ${name}`, error_code: 400 };
+}
+
+function serializePasskeyRow(p: MockPasskey): Record<string, unknown> {
+    const owner = db.users.find((u) => u.id === p.user);
+    const { user: _uid, ...rest } = p;
+    return { ...rest, user: owner ? userBasic(owner) : null };
+}
+
+/**
+ * The signed-in user's self-service routes. Returns undefined for any path
+ * it does not own so the main dispatcher continues.
+ */
+function accountSelfFetch(path: string, method: string, opts: MockFetchOpts): unknown {
+    const owned = path.startsWith('/api/account/passkeys/register/')
+        || path === '/api/account/totp' || path.startsWith('/api/account/totp/')
+        || path === '/api/auth/sessions/revoke'
+        || path.startsWith('/api/auth/email/change/') || path.startsWith('/api/auth/phone/change/')
+        || path.startsWith('/api/auth/verify/') || path === '/api/auth/username/change';
+    if (!owned) return undefined;
+    const user = userFromBearer(opts.headers);
+    // django-mojo's email change confirm also takes an unauthenticated ec:
+    // link token; the code flow (the only one the portal drives) needs auth.
+    if (!user) return permissionDenied(401);
+    const body = opts.body ?? {};
+
+    // ── Passkey registration (passkeys.py:59-150) ──
+    if (path === '/api/account/passkeys/register/begin' && method === 'POST') {
+        const challenge_id = `reg-${user.id}-${++accountSequence}`;
+        pendingPasskeyRegistrations.set(challenge_id, { uid: user.id });
+        const exclude = db.passkeys.filter((p) => p.user === user.id)
+            .map((p) => ({ type: 'public-key', id: b64url(p.credential_id) }));
+        return {
+            status: true,
+            data: {
+                challenge_id,
+                publicKey: {
+                    rp: { id: 'localhost', name: 'Mojo' },
+                    user: { id: b64url(`mock-user-${user.id}`), name: user.username, displayName: user.display_name },
+                    challenge: b64url(`mock-registration-${accountSequence}`),
+                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                    timeout: 60000,
+                    attestation: 'none',
+                    ...(exclude.length ? { excludeCredentials: exclude } : {}),
+                },
+                expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            },
+        };
+    }
+    if (path === '/api/account/passkeys/register/complete' && method === 'POST') {
+        if (!body.challenge_id) return missingParam('challenge_id');
+        if (!isPlainObject(body.credential)) return missingParam('credential');
+        const challengeId = String(body.challenge_id);
+        const pending = pendingPasskeyRegistrations.get(challengeId);
+        if (!pending) return { status: false, error: 'Challenge not found or expired', error_code: 403 };
+        if (pending.uid !== user.id) return { status: false, error: 'Challenge does not belong to this user', error_code: 403 };
+        const credential = body.credential;
+        const response = isPlainObject(credential.response) ? credential.response : {};
+        if (typeof credential.rawId !== 'string' || credential.id !== credential.rawId) {
+            return { status: false, error: 'Credential id does not match rawId', error_code: 403 };
+        }
+        if (typeof response.clientDataJSON !== 'string' || typeof response.attestationObject !== 'string') {
+            return { status: false, error: 'Invalid registration response', error_code: 403 };
+        }
+        const transports = Array.isArray(credential.transports) ? credential.transports.map(String) : [];
+        const friendly = typeof body.friendly_name === 'string' && body.friendly_name ? body.friendly_name : null;
+        const nowSec = Math.floor(Date.now() / 1000);
+        let row = db.passkeys.find((p) => p.credential_id === credential.rawId);
+        if (row && row.user !== user.id) return { status: false, error: 'Credential already registered to another user', error_code: 403 };
+        if (row) {
+            row.transports = transports.join(',') || null;
+            if (friendly) row.friendly_name = friendly;
+            row.is_enabled = true;
+            row.last_used = null;
+        } else {
+            row = {
+                id: Math.max(70, ...db.passkeys.map((p) => p.id)) + 1,
+                user: user.id,
+                friendly_name: friendly,
+                credential_id: String(credential.rawId),
+                rp_id: 'localhost',
+                is_enabled: true,
+                sign_count: 0,
+                transports: transports.join(',') || null,
+                aaguid: null,
+                last_used: null,
+                created: nowSec,
+            };
+            db.passkeys.unshift(row);
+        }
+        pendingPasskeyRegistrations.delete(challengeId);
+        return { status: true, data: serializePasskeyRow(row), graph: 'default' };
+    }
+
+    // ── TOTP (totp.py:41-139) ──
+    if (path === '/api/account/totp/setup' && method === 'POST') {
+        const state = mockTotp(user);
+        state.secret = MOCK_TOTP_SECRET;
+        state.enabled = false;
+        const uri = `otpauth://totp/Mojo:${encodeURIComponent(user.username)}?secret=${MOCK_TOTP_SECRET}&issuer=Mojo`;
+        return { status: true, data: { secret: MOCK_TOTP_SECRET, uri, qr_code: mockQrDataUrl(uri) } };
+    }
+    if (path === '/api/account/totp/confirm' && method === 'POST') {
+        if (!body.code) return missingParam('code');
+        const state = mockTotp(user);
+        if (!state.secret) return { status: false, error: 'TOTP setup not started. Call /api/account/totp/setup first.', error_code: 400 };
+        if (String(body.code).trim() !== MOCK_TOTP_CODE) return { status: false, error: 'Invalid code', error_code: 400 };
+        state.enabled = true;
+        state.codes = mockRecoveryCodes();
+        user.requires_mfa = true;
+        return { status: true, data: { is_enabled: true, recovery_codes: [...state.codes] } };
+    }
+    if (path === '/api/account/totp' && method === 'DELETE') {
+        // Deliberately leaves requires_mfa alone (totp.py:97-105).
+        mockTotp(user).enabled = false;
+        return { status: true };
+    }
+    if (path === '/api/account/totp/recovery-codes' && method === 'GET') {
+        const state = mockTotp(user);
+        if (!state.enabled) return { status: false, error: 'TOTP is not enabled for this account', error_code: 400 };
+        return { status: true, data: { remaining: state.codes.length, codes: state.codes.map((c) => `${c.slice(0, 4)}-xxxx-xxxx`) } };
+    }
+    if (path === '/api/account/totp/recovery-codes/regenerate' && method === 'POST') {
+        if (!body.code) return missingParam('code');
+        const state = mockTotp(user);
+        if (!state.enabled) return { status: false, error: 'TOTP is not enabled for this account', error_code: 400 };
+        if (String(body.code).trim() !== MOCK_TOTP_CODE) return { status: false, error: 'Invalid TOTP code', error_code: 403 };
+        state.codes = mockRecoveryCodes();
+        return { status: true, data: { is_enabled: true, recovery_codes: [...state.codes] } };
+    }
+
+    // ── Sessions (user.py:2331-2355) ──
+    if (path === '/api/auth/sessions/revoke' && method === 'POST') {
+        rotateAuthKey(user.id);
+        return { status: true, data: { ...tokenPair(user), user: serializeUser(user) } };
+    }
+
+    // ── Email change (user.py:1620-1717, 1953-1994) ──
+    if (path === '/api/auth/email/change/request' && method === 'POST') {
+        const email = String(body.email ?? '').toLowerCase().trim();
+        if (!email) return missingParam('email');
+        if (!/[^@]+@[^@]+\.[^@]+/.test(email)) return { status: false, error: 'Invalid email address', error_code: 400 };
+        if (email === user.email.toLowerCase()) return { status: false, error: 'New email must be different from current email', error_code: 400 };
+        if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === email)) return { status: false, error: 'Email already in use', error_code: 400 };
+        pendingEmailChanges.set(user.id, { email, code: MOCK_ACCOUNT_CODE });
+        return body.method === 'code'
+            ? { status: true, message: 'A verification code has been sent to your new email address.' }
+            : { status: true, message: 'A confirmation link has been sent to your new email address.' };
+    }
+    if (path === '/api/auth/email/change/confirm' && method === 'POST') {
+        if (!body.code && !body.token) return { status: false, error: 'token or code is required', error_code: 400 };
+        const pending = pendingEmailChanges.get(user.id);
+        if (!pending || String(body.code ?? '').trim() !== pending.code) return { status: false, error: 'Invalid or expired code', error_code: 400 };
+        pendingEmailChanges.delete(user.id);
+        if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === pending.email)) return { status: false, error: 'Email already in use', error_code: 400 };
+        user.email = pending.email;
+        user.is_email_verified = true;
+        rotateAuthKey(user.id);
+        return { status: true, data: { ...tokenPair(user), user: serializeUser(user) } };
+    }
+    if (path === '/api/auth/email/change/cancel' && method === 'POST') {
+        pendingEmailChanges.delete(user.id);
+        return { status: true, message: 'Pending email change has been cancelled.' };
+    }
+
+    // ── Phone change (user.py:2124-2277) ──
+    if (path === '/api/auth/phone/change/request' && method === 'POST') {
+        const raw = String(body.phone_number ?? '').trim();
+        if (!raw) return missingParam('phone_number');
+        const normalized = normalizePhone(raw);
+        if (!normalized) return { status: false, error: 'Invalid phone number format', error_code: 400 };
+        if (normalized === user.phone_number) return { status: false, error: 'New phone number must be different from current phone number', error_code: 400 };
+        if (db.users.some((u) => u.id !== user.id && u.phone_number === normalized)) return { status: false, error: 'Phone number already in use', error_code: 400 };
+        for (const [token, entry] of pendingPhoneChanges) if (entry.uid === user.id) pendingPhoneChanges.delete(token);
+        const session_token = `pc:mock-${user.id}-${++accountSequence}`;
+        pendingPhoneChanges.set(session_token, { uid: user.id, phone: normalized, code: MOCK_ACCOUNT_CODE });
+        // Top-level, NOT under data — exactly the live JsonResponse.
+        return { status: true, session_token, message: 'A verification code has been sent to your new phone number.' };
+    }
+    if (path === '/api/auth/phone/change/confirm' && method === 'POST') {
+        if (!body.session_token) return missingParam('session_token');
+        if (!body.code) return missingParam('code');
+        const pending = pendingPhoneChanges.get(String(body.session_token));
+        if (!pending || String(body.code).trim() !== pending.code) return { status: false, error: 'Invalid or expired code', error_code: 400 };
+        if (pending.uid !== user.id) return { status: false, error: 'Session mismatch', error_code: 403 };
+        pendingPhoneChanges.delete(String(body.session_token));
+        if (db.users.some((u) => u.id !== user.id && u.phone_number === pending.phone)) return { status: false, error: 'Phone number is no longer available', error_code: 400 };
+        user.phone_number = pending.phone;
+        user.is_phone_verified = true;
+        return { status: true, message: 'Phone number updated successfully.' };
+    }
+    if (path === '/api/auth/phone/change/cancel' && method === 'POST') {
+        for (const [token, entry] of pendingPhoneChanges) if (entry.uid === user.id) pendingPhoneChanges.delete(token);
+        return { status: true, message: 'Pending phone number change has been cancelled.' };
+    }
+
+    // ── Verification (verify.py) ──
+    const verify = path.match(/^\/api\/auth\/verify\/(email|phone)\/(send|confirm)$/);
+    if (verify && method === 'POST') {
+        const channel = verify[1] as 'email' | 'phone';
+        const key = `${user.id}:${channel}`;
+        if (verify[2] === 'send') {
+            if (channel === 'email') {
+                if (user.is_email_verified) return { status: true, message: 'Email is already verified' };
+                if (!user.email) return { status: false, error: 'No email address on account', error_code: 400 };
+            } else {
+                if (user.is_phone_verified) return { status: true, message: 'Phone is already verified' };
+                if (!user.phone_number) return { status: false, error: 'No phone number on account', error_code: 400 };
+            }
+            pendingVerifyCodes.set(key, MOCK_ACCOUNT_CODE);
+            return { status: true, message: channel === 'email' && body.method !== 'code' ? 'Verification email sent' : 'Verification code sent' };
+        }
+        if (!body.code) return missingParam('code');
+        if (pendingVerifyCodes.get(key) !== String(body.code).trim()) return { status: false, error: 'Invalid or expired code', error_code: 400 };
+        pendingVerifyCodes.delete(key);
+        if (channel === 'email') user.is_email_verified = true;
+        else user.is_phone_verified = true;
+        return { status: true, message: channel === 'email' ? 'Email verified' : 'Phone verified' };
+    }
+
+    // ── Username change (user.py:2280-2324) ──
+    if (path === '/api/auth/username/change' && method === 'POST') {
+        const next = String(body.username ?? '').toLowerCase().trim();
+        if (!next) return missingParam('username');
+        if (next === user.username) return { status: false, error: 'New username must be different from current username', error_code: 400 };
+        if (!/^[a-z0-9._@+-]{3,}$/.test(next)) return { status: false, error: 'Invalid username', error_code: 400 };
+        if (db.users.some((u) => u.id !== user.id && u.username === next)) return { status: false, error: 'Username already taken', error_code: 400 };
+        user.username = next;
+        return { status: true, data: { username: user.username } };
+    }
+    return { status: false, error: `Method not allowed: ${method} ${path}`, error_code: 405 };
 }
 
 let dnsConfigMalformed = false;
@@ -6149,7 +6561,7 @@ function userFromBearer(headers: Record<string, string> | undefined): MockUser |
     if (!bearer) return undefined;
     const payload = decodeMockJwt(bearer);
     const now = Math.floor(Date.now() / 1000);
-    if (!payload || typeof payload.exp !== 'number' || now >= payload.exp) return undefined;
+    if (!payload || typeof payload.exp !== 'number' || now >= payload.exp || !epochMatches(payload)) return undefined;
     return db.users.find((u) => u.id === Number(payload.uid));
 }
 
@@ -8850,6 +9262,23 @@ async function messagingFetch(path:string,opts:MockFetchOpts):Promise<unknown|un
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
     const method = (opts.method ?? 'GET').toUpperCase();
+    const arm = armedOnce?.method === method && armedOnce.path === path ? armedOnce : null;
+    if (arm) armedOnce = null;
+    const result = await mockFetchInner(path, opts);
+    if (!arm) return result;
+    if (arm.extraDelayMs > 0) await mockDelay(arm.extraDelayMs, opts.signal);
+    if (arm.mapData && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
+        return { ...(result as Record<string, unknown>), data: arm.mapData((result as { data: Record<string, unknown> }).data) };
+    }
+    if (arm.stripGrantTokens && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
+        const { access_token: _a, refresh_token: _r, ...rest } = (result as { data: Record<string, unknown> }).data;
+        return { ...(result as Record<string, unknown>), data: { ...rest, requires_password_change: true } };
+    }
+    return result;
+}
+
+async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknown> {
+    const method = (opts.method ?? 'GET').toUpperCase();
     const key = `${method} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     const safeDnsParams = path === '/api/dnsman/credential/group-choice'
@@ -8859,7 +9288,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         || path.startsWith('/api/aws/cloudwatch/')
         || path.startsWith('/api/assistant/memory/')
         ? { ...(opts.params ?? {}) }
-        : undefined;
+        // Owner-scoped credential/device lists: only the owner filter (a
+        // users-grant caller is served EVERY row without it).
+        : method === 'GET' && OWNER_SCOPED_LISTS.has(path)
+            ? { user: opts.params?.user }
+            : undefined;
     const locationObservables = path.startsWith('/api/location/') ? {
         ...('input' in (opts.params ?? {}) ? { input_length: String(opts.params?.input ?? '').length } : {}),
         ...('session_token' in (opts.params ?? {}) ? { has_session_token: Boolean(opts.params?.session_token) } : {}),
@@ -9055,6 +9488,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (cloudWatchResult !== undefined) return cloudWatchResult;
     const edgeResult = edgeFetch(path, opts);
     if (edgeResult !== undefined) return edgeResult;
+    const accountResult = accountSelfFetch(path, method, opts);
+    if (accountResult !== undefined) return accountResult;
     if (path === '/api/auth/generate_api_key') {
         // account/rest/user_api_key.py generate_api_key: mints a long-lived
         // key for the CALLER (@requires_auth — needs the bearer, unlike the
@@ -10676,10 +11111,16 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { ...result, graph: 'default', data: (result.data as unknown as MockIncidentEvent[]).map(serializeIncidentEvent) };
     }
     // ── Passkeys — /api/account/passkeys (save: friendly_name/is_enabled) ──
+    // Passkey VIEW/SAVE_PERMS carry `owner` beside the users tier
+    // (models/rest.py:927-954): without a global grant a caller reaches only
+    // their own rows; with one, the list is unscoped unless ?user= filters it.
     const onePasskey = path.match(/^\/api\/account\/passkeys\/(\d+)$/);
     if (onePasskey) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
         const pk = db.passkeys.find((p) => p.id === Number(onePasskey[1]));
         if (!pk) return { status: false, error: 'Passkey not found', error_code: 404 };
+        if (pk.user !== caller.id && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
         if (opts.method === 'DELETE') {
             db.passkeys = db.passkeys.filter((p) => p.id !== pk.id);
             return { status: 'deleted' };
@@ -10694,8 +11135,13 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: { ...rest, user: owner ? userBasic(owner) : null }, graph: 'default' };
     }
     if (path === '/api/account/passkeys') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const visible = hasGlobalPermission(caller, ['users', 'manage_users'])
+            ? db.passkeys
+            : db.passkeys.filter((p) => p.user === caller.id);
         const result = listRows(
-            db.passkeys as unknown as Record<string, unknown>[],
+            visible as unknown as Record<string, unknown>[],
             opts.params ?? {},
             (p) => `${p.friendly_name ?? ''} ${p.credential_id}`,
             '-created',
@@ -10753,13 +11199,32 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             db.notificationPrefs.set(targetId, current);
             return { status: true, data: { preferences: current } };
         }
-        return { status: true, data: { preferences: db.notificationPrefs.get(targetId) ?? {} } };
+        // `"*"` is the reserved per-channel master switch: stored and merged
+        // like any kind; the GET also carries the registered kinds catalogue
+        // and the valid channels (django-mojo notification kinds registry).
+        return {
+            status: true,
+            data: {
+                preferences: db.notificationPrefs.get(targetId) ?? {},
+                kinds: MOCK_NOTIFICATION_KINDS.map((k) => ({ ...k, channels: k.channels ? [...k.channels] : null })),
+                channels: ['email', 'in_app', 'push'],
+            },
+        };
     }
     if (path === '/api/user/me') {
         // The first authed mock endpoint — meaningless without a session,
         // exactly like the real backend's @requires_auth.
         const user = userFromBearer(opts.headers);
         if (!user) return { status: false, error: 'permission denied', error_code: 401 };
+        // on_user_me → User.on_rest_request(request, request.user.pk): a POST
+        // is the owner's own save through the SAME rules as /api/user/<id>.
+        if (method === 'DELETE') return permissionDenied();
+        if (method === 'POST') {
+            const body = opts.body ?? {};
+            if (Object.keys(body).some((key) => USER_ACTIONS.has(key))
+                && !hasGlobalPermission(user, ['users', 'manage_users'])) return permissionDenied();
+            return saveUser(user, body, user);
+        }
         return { status: true, data: meDict(user) };
     }
     const memberMatch = path.match(/^\/api\/group\/(\d+)\/member$/);

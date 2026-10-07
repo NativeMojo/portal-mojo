@@ -30,6 +30,7 @@ export * from './MultiSelectDropdown';
 export * as dateFns from './date/fns';
 export * from './detail';
 export * from './modal';
+export * from './secret-dialog';
 export * from './safe-node';
 export * from './RouteError';
 export * from './route-error';

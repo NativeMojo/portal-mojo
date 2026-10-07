@@ -9,8 +9,13 @@
 // django-mojo's NO_SAVE_FIELDS (user.py RestMeta, read 2026-08-05), so the
 // server silently DROPS the write and the source UI toasts a success that
 // never happened. The verified badge still renders from the row.
+//
+// `model` (default UserModel) lets the signed-in user's own surfaces save
+// through portal-mojo/account's MeSaveModel (`/api/user/me`). Self-saves
+// cannot replace a date of birth once set (the server 403s), so with any
+// non-admin model a set DOB renders read-only.
 import { Badge, Eyebrow, FlatRow, FormView } from '../../../../ui';
-import type { Field } from '../../../../client/runtime';
+import type { Field, ModelDef } from '../../../../client/runtime';
 import { UserModel, type UserRow } from '../models';
 
 const NAME_FIELDS: Field[] = [
@@ -35,11 +40,19 @@ const ADDRESS_FIELDS: Field[] = [
     { name: 'metadata.country', type: 'text', label: 'Country', columns: 6 },
 ];
 
-export function PersonalSection({ user }: { user: UserRow }) {
+export interface PersonalSectionProps {
+    user: UserRow;
+    /** Save surface; default UserModel (admin). Pass MeSaveModel for self. */
+    model?: Pick<ModelDef<UserRow>, 'useSave'>;
+}
+
+export function PersonalSection({ user, model = UserModel }: PersonalSectionProps) {
+    const dobLocked = model !== UserModel && Boolean(user.dob);
+    const detailFields = dobLocked ? DETAIL_FIELDS.filter((field) => field.name !== 'dob') : DETAIL_FIELDS;
     return (
         <>
             <Eyebrow>Name</Eyebrow>
-            <FormView model={UserModel} row={user} fields={NAME_FIELDS} />
+            <FormView model={model} row={user} fields={NAME_FIELDS} />
 
             <Eyebrow>Details</Eyebrow>
             <FlatRow label="DOB status">
@@ -54,13 +67,13 @@ export function PersonalSection({ user }: { user: UserRow }) {
                     )
                     : <span className="dim-italic">Not set</span>}
             </FlatRow>
-            <FormView model={UserModel} row={user} fields={DETAIL_FIELDS} />
+            <FormView model={model} row={user} fields={detailFields} />
 
             <Eyebrow>Address</Eyebrow>
             <FlatRow label="On file">
                 {addressSummary(user) || <span className="dim-italic">Not set</span>}
             </FlatRow>
-            <FormView model={UserModel} row={user} fields={ADDRESS_FIELDS} />
+            <FormView model={model} row={user} fields={ADDRESS_FIELDS} />
         </>
     );
 }

@@ -19,18 +19,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
     getAuthSnapshot, isPasskeySupported, login, loginWithPasskey,
-    sessionIsPersistent, setFreshAuthHandler,
+    passkeyErrorMessage, sessionIsPersistent, setFreshAuthHandler,
     type MfaChallenge,
 } from 'portal-mojo/client/runtime';
 import { MfaPanel } from './MfaPanel';
-
-function errorMessage(error: unknown): string {
-    if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') return 'Passkey prompt was dismissed';
-        return error.message;
-    }
-    return 'Something went wrong. Please try again.';
-}
 
 interface Pending {
     resolve: (ok: boolean) => void;
@@ -105,7 +97,7 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
                 settle(true);
             }
         } catch (err) {
-            setError(errorMessage(err));
+            setError(passkeyErrorMessage(err));
             setBusy(false);
         }
     };
@@ -117,7 +109,7 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
             await loginWithPasskey(username.trim() || undefined, { remember });
             settle(true);
         } catch (err) {
-            setError(errorMessage(err));
+            setError(passkeyErrorMessage(err));
             setBusy(false);
         }
     };

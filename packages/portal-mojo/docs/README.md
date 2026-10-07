@@ -53,6 +53,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [loading.md](loading.md) | `Spinner`, `busy()`/`busyWhile()` blocking overlay, `ViewLoader`, `InlineLoader`, `Busy` — the anti-flash delay rule and skeleton-vs-loader guidance |
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
 | [user-menu.md](user-menu.md) | Top-nav account menu — avatar trigger, identity header, theme control, app items, pending Sign out, signed-out matrix, keyboard map |
+| [account.md](account.md) | `portal-mojo/account` — the self-service My account modal: six flat sections (profile, passkeys, security, sessions, notifications, API keys), every wire contract it speaks, one-time-secret/fresh-auth invariants, product-portal mounting recipe |
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |
 | [location-address.md](location-address.md) | Six-endpoint LocationClient, private provider sessions, stale guards, controlled AddressField, atomic form patching |

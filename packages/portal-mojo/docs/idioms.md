@@ -66,6 +66,18 @@ handle.dismiss(); // optional early resolution
 - `onUndo` typically fires the inverse mutation; surface ITS failure with a
   normal `toast.error` — the undo toast itself is done by then.
 
+## toast.action / actionToast
+
+```ts
+toast.action('Your other sessions stay signed in.', 'Sign out everywhere else', () => revokeOthers(), { timeout: 10000 });
+```
+
+The undo card with a named button: a follow-up OFFER after something
+already happened (not an inverse). Clicking dismisses at once and calls
+`onAction`; otherwise the card auto-dismisses after `timeout` (default
+10000ms). Returns `{ dismiss }`. Surface the action's own outcome with a
+normal toast.
+
 ## toast.progress / progressToast
 
 ```ts
