@@ -7,6 +7,9 @@ import {
     sendMagicLink, loginWithMagicToken, handleMagicTokenFromURL,
     forgotPassword, resetPasswordWithCode, resetPasswordWithToken,
     loginWithPasskey, isPasskeySupported,
+    // self-service, signed in (the AccountModal's wire — see account.md)
+    registerPasskey, isPasskeyRegistrationSupported, suggestPasskeyName,
+    passkeyErrorMessage, confirmEmailChange, revokeOtherSessions,
 } from 'portal-mojo/client';
 ```
 
@@ -84,3 +87,26 @@ magic-link (`sendMagicLink` → `loginWithMagicToken`), password reset (code
 and token variants), passkeys (`loginWithPasskey`; ceremony fully ported,
 mock validates shape only). All reject with the server's message on
 failure.
+
+## Self-service credential changes (signed in)
+
+- `isPasskeyRegistrationSupported()` — `PublicKeyCredential` **and**
+  `navigator.credentials.create` (`isPasskeySupported()` only checks `get`).
+- `registerPasskey(name?)` — fresh-auth `POST /api/account/passkeys/register/begin`
+  → `navigator.credentials.create` → fresh-auth `…/register/complete
+  {challenge_id, credential, friendly_name}`. `transports` rides at the
+  credential's top level; `id === rawId`. Returns the saved row; callers
+  refresh `PasskeyModel` and `me`. Default name `suggestPasskeyName()`.
+- `passkeyErrorMessage(err)` — one copy for every passkey ceremony (login,
+  step-up, registration): NotAllowedError → "Passkey prompt was dismissed",
+  InvalidStateError → already registered, SecurityError → wrong domain/HTTPS,
+  AbortError → cancelled; anything else (server text) as written.
+- `confirmEmailChange(code)` — `POST /api/auth/email/change/confirm`; the
+  server rotates `auth_key` and answers a new login, adopted into the
+  storage this session already uses (`sessionIsPersistent()`).
+- `revokeOtherSessions()` — fresh-auth `POST /api/auth/sessions/revoke`;
+  every other session dies, the returned login is adopted so this one stays.
+
+Registration ceremony built; real-authenticator check pending. The rest of
+the account wire (TOTP, recovery codes, phone, verify, preferences) is in
+[account.md](account.md).
