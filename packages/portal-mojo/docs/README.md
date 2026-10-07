@@ -51,6 +51,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [image-editor.md](image-editor.md) | Full-resolution crop/transform/filter composition, bounded history, PNG Blob results, modal helper, and ImageField pre-upload editing |
 | [loading.md](loading.md) | `Spinner`, `busy()`/`busyWhile()` blocking overlay, `ViewLoader`, `InlineLoader`, `Busy` — the anti-flash delay rule and skeleton-vs-loader guidance |
 | [popover.md](popover.md) | Anchored top-layer popover shell — placement, reposition, outside/Escape close, the dialog stacking story |
+| [user-menu.md](user-menu.md) | Top-nav account menu — avatar trigger, identity header, theme control, app items, pending Sign out, signed-out matrix, keyboard map |
 | [taginput.md](taginput.md) | Chip/tag entry — CSV wire shape, keyboard matrix, validation + inline errors |
 | [combobox.md](combobox.md) | The house autocomplete — options with descriptions/meta, commit-only change pipeline, allowCustom, ARIA |
 | [location-address.md](location-address.md) | Six-endpoint LocationClient, private provider sessions, stale guards, controlled AddressField, atomic form patching |
