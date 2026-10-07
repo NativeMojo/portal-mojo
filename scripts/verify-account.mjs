@@ -23,7 +23,15 @@ globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 
 const created = [];
 let nextCredential = null;
-class FakePublicKeyCredential {}
+let lastCredentialId = null;
+const unknownSignals = [];
+class FakePublicKeyCredential {
+    static signalUnknownCredential(options) {
+        unknownSignals.push(options);
+        if (FakePublicKeyCredential.throwOnSignal) throw new Error('signal refused');
+        return Promise.resolve();
+    }
+}
 dom.window.PublicKeyCredential = FakePublicKeyCredential;
 const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
 Object.defineProperty(dom.window.navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36' });
@@ -35,6 +43,7 @@ Object.defineProperty(dom.window.navigator, 'credentials', {
             created.push(options);
             if (nextCredential) { const value = nextCredential; nextCredential = null; return value(); }
             const raw = new TextEncoder().encode(`cred-${created.length}-${Date.now()}`);
+            lastCredentialId = b64url(raw);
             return {
                 id: b64url(raw),
                 rawId: raw.buffer,
@@ -112,6 +121,20 @@ try {
     assert.equal(registered.transports, 'internal,hybrid', 'transports ride at the credential top level');
     const second = await gated('POST', '/api/account/passkeys/register/complete', () => client.registerPasskey());
     assert.equal(second.friendly_name, 'Mac — Chrome', 'the default name is the suggested one');
+
+    // create() succeeded but complete never saved it → signalUnknownCredential, then rethrow.
+    assert.equal(unknownSignals.length, 0, 'a saved passkey is never signalled unknown');
+    client.setFreshAuthHandler(async () => false);
+    for (const throwOnSignal of [false, true]) {
+        FakePublicKeyCredential.throwOnSignal = throwOnSignal;
+        mock.armMockReauth('POST', '/api/account/passkeys/register/complete');
+        await assert.rejects(client.registerPasskey('Orphan'), (error) => client.isReauthRequired(error), 'a dismissed complete step-up rethrows the original 440');
+        const orphan = created.at(-1);
+        assert.equal(unknownSignals.length, throwOnSignal ? 2 : 1, 'the orphaned credential is signalled unknown');
+        assert.deepEqual(unknownSignals.at(-1), { rpId: orphan.publicKey.rp?.id || 'localhost', credentialId: lastCredentialId }, 'signalled with the rpId + base64url credential id');
+    }
+    FakePublicKeyCredential.throwOnSignal = false;
+    client.setFreshAuthHandler(reLogin(EMAIL));
 
     const begin = await mock.mockFetch('/api/account/passkeys/register/begin', { method: 'POST', headers: bearer(), body: {} });
     const mismatched = await mock.mockFetch('/api/account/passkeys/register/complete', {

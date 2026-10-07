@@ -200,6 +200,12 @@ caller's preferences ▸ one "General" row.
   to the typed key.
 - **Avatar URL in component state only** (`useAvatarUrl`, the
   [user-menu.md](user-menu.md) rule); the `me` cache holds `{id}`.
+- **Orphaned passkeys are signalled.** When `navigator.credentials.create`
+  succeeded but `register/complete` failed (or its step-up was dismissed),
+  `registerPasskey` best-effort calls
+  `PublicKeyCredential.signalUnknownCredential({rpId, credentialId})` so the
+  authenticator can drop the unsaved credential, then rethrows the original
+  error.
 - **Passkeys are host-bound**: the Add dialog says which host the passkey
   will work on. Registration options carry no `authenticatorSelection` yet
   (django-mojo #7191).

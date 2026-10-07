@@ -615,11 +615,31 @@ export async function registerPasskey(name?: string): Promise<RegisteredPasskey>
         transports: attestation.getTransports?.() ?? [],
     };
     const friendly_name = name?.trim() || suggestPasskeyName();
-    const complete = await withFreshAuth(() => mojoCall('/api/account/passkeys/register/complete', {
-        method: 'POST',
-        body: { challenge_id, credential: payload, friendly_name },
-    }));
-    return complete.data as RegisteredPasskey;
+    try {
+        const complete = await withFreshAuth(() => mojoCall('/api/account/passkeys/register/complete', {
+            method: 'POST',
+            body: { challenge_id, credential: payload, friendly_name },
+        }));
+        return complete.data as RegisteredPasskey;
+    } catch (error) {
+        // The authenticator now holds a credential the server never saved
+        // (complete failed, or its step-up was dismissed): tell the
+        // authenticator to forget it where the browser supports that.
+        signalUnknownPasskey(publicKey.rp?.id || window.location.hostname, rawId);
+        throw error;
+    }
+}
+
+type SignalUnknownCredential = (options: { rpId: string; credentialId: string }) => Promise<void>;
+
+/** Best-effort WebAuthn Signal API call; never throws, never blocks. */
+function signalUnknownPasskey(rpId: string, credentialId: string): void {
+    try {
+        const ctor = window.PublicKeyCredential as unknown as { signalUnknownCredential?: SignalUnknownCredential } | undefined;
+        const signal = ctor?.signalUnknownCredential;
+        if (typeof signal !== 'function') return;
+        void Promise.resolve(signal.call(ctor, { rpId, credentialId })).catch(() => {});
+    } catch { /* unsupported or refused — the orphan stays, as before */ }
 }
 
 /**
