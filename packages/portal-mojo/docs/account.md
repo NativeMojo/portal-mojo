@@ -85,7 +85,9 @@ unreachable there anyway.
    off → confirm whose copy says two-step sign-in stays required when
    `requires_mfa`), Recovery codes card ("N of 8 left", warn tone at ≤2;
    View → masked hints; Regenerate → code → shown-once set), Password card
-   (Change → current + new + confirm with `PasswordStrengthMeter`; a
+   (Change → current + new + confirm with `PasswordStrengthMeter`, then a
+   `toast.action` offering **Sign out everywhere else** → `revokeOtherSessions()`
+   — a password change does not rotate `auth_key`; a
    passwordless account gets "Email me a link" → `forgotPassword(email,
    'link')`).
 4. **Sessions** — up to four device cards (browser on OS, place · "active

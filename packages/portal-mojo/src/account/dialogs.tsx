@@ -27,7 +27,7 @@ import {
 import {
     changePassword, confirmEmailChange, confirmPhoneChange, confirmTotp, confirmVerificationCode,
     getMaskedRecoveryCodes, passkeyErrorMessage, registerPasskey, regenerateRecoveryCodes,
-    requestEmailChange, requestPhoneChange, safeQrDataUrl, sendVerificationCode, startTotpSetup,
+    requestEmailChange, requestPhoneChange, revokeOtherSessions, safeQrDataUrl, sendVerificationCode, startTotpSetup,
     suggestPasskeyName,
 } from './api';
 import { MeSaveModel, PasskeyModel, accountKeys, invalidateMe } from './models';
@@ -472,6 +472,13 @@ function ChangePasswordDialog({ lock, close }: { lock: DismissLock; close: (valu
         try {
             await changePassword(current, next);
             toast.success('Password changed');
+            // A password change does not rotate auth_key: other sessions live on.
+            toast.action('Other devices stay signed in.', 'Sign out everywhere else', () => {
+                revokeOtherSessions().then(
+                    () => toast.success('Signed out of every other session'),
+                    (err) => toast.error(accountErrorMessage(err)),
+                );
+            });
             close(true);
         } catch (err) {
             setError(accountErrorMessage(err));

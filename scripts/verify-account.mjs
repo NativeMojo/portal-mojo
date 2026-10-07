@@ -18,7 +18,7 @@ import { createServer } from 'vite';
 // mounted module checks (dialogs, cache boundary). It does not claim native
 // <dialog>/focus/layout coverage — the browser pass owns that.
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/' });
-for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLFormElement', 'HTMLDialogElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'CustomEvent', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
+for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLFormElement', 'HTMLDialogElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'CustomEvent', 'Node', 'MutationObserver', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 dom.window.HTMLDialogElement.prototype.showModal = function showModal() { this.open = true; };
 dom.window.HTMLDialogElement.prototype.close = function close() { this.open = false; };
@@ -662,6 +662,28 @@ try {
     await click('Close');
     await act(() => sessionsModal);
     assert.equal(openDialogs().length, 0);
+
+    // ── Password change offers "Sign out everywhere else" (auth_key does not rotate) ──
+    await act(async () => {
+        root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(GuardedHost), React.createElement(ui.ToastHost), React.createElement(Probe)));
+    });
+    let passwordChanged;
+    await act(async () => { passwordChanged = account.openChangePasswordDialog(); });
+    const passwordInputs = [...document.querySelectorAll('dialog[open] input[type="password"]')];
+    await type(passwordInputs[0], 'mojo');
+    await type(passwordInputs[1], 'Brand-new-pass-789');
+    await type(passwordInputs[2], 'Brand-new-pass-789');
+    await act(async () => { document.querySelector('dialog[open] form').requestSubmit(); });
+    assert.equal(await act(() => passwordChanged), true, 'the password change completes');
+    await wait(50);
+    const revokes = () => mock.getMockCallCounts()['POST /api/auth/sessions/revoke'] ?? 0;
+    const revokesBefore = revokes();
+    rotatedFrom = client.getAccessToken();
+    await click('Sign out everywhere else');
+    await wait(600);
+    assert.equal(revokes() - revokesBefore, 1, 'the toast action revokes the other sessions');
+    assert.notEqual(client.getAccessToken(), rotatedFrom, 'and keeps this session on the rotated login');
+    assert(!button('Sign out everywhere else'), 'the action toast dismisses on click');
 
     await act(async () => root.unmount());
     console.error = originalError;
