@@ -106,14 +106,14 @@ export {
     OAuthConnectionModel,
     PasskeyModel,
     useGenerateUserApiKey,
-} from '../../../account/models';
+} from '../../../account/credential-models';
 export type {
     ApiKeyRow,
     GeneratedKeyReceipt,
     GenerateUserApiKeyVariables,
     OAuthConnectionRow,
     PasskeyRow,
-} from '../../../account/models';
+} from '../../../account/credential-models';
 
 // LoginEventRow / LoginEventModel are re-exported from the canonical module
 // above. The local copy carried a phantom `event_type?: string` field that

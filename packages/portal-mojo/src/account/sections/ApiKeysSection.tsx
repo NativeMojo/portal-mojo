@@ -15,7 +15,7 @@
 // admin/identity/users/sections/ApiKeysSection) and the self-service
 // AccountModal (user = me, isSelf). Styled by the app's user-admin.css.
 import { Badge, Eyebrow, fmt, formModal, modal, showSecretDialog, toast } from '../../ui';
-import { ApiKeyModel, useGenerateUserApiKey } from '../models';
+import { ApiKeyModel, useGenerateUserApiKey } from '../credential-models';
 
 /** The identity fields the section names a key's owner by. */
 export interface ApiKeysOwner {

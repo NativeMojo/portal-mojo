@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react';
 import { useCan, useMe } from '../client/runtime';
 import { Badge, fmt, formModal, modal, toast } from '../ui';
-import { PasskeyModel, type PasskeyRow } from './models';
+import { PasskeyModel, type PasskeyRow } from './credential-models';
 
 const USER_ADMIN_PERMISSIONS = ['sys.users', 'sys.manage_users'];
 

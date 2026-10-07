@@ -352,7 +352,7 @@ try {
 
     // ── Module: exports, boundaries, mounted flows ────────────────────
     const read = (path) => readFile(new URL(`../packages/portal-mojo/src/${path}`, import.meta.url), 'utf8');
-    const sources = Object.fromEntries(await Promise.all(['account/index.ts', 'account/AccountModal.tsx', 'account/AccountSections.tsx', 'account/dialogs.tsx', 'account/models.ts', 'account/api.ts', 'account/PasskeyList.tsx', 'account/NotificationPreferences.tsx', 'account/sections/ApiKeysSection.tsx'].map(async (path) => [path, await read(path)])));
+    const sources = Object.fromEntries(await Promise.all(['account/index.ts', 'account/AccountModal.tsx', 'account/AccountSections.tsx', 'account/dialogs.tsx', 'account/models.ts', 'account/credential-models.ts', 'account/api.ts', 'account/PasskeyList.tsx', 'account/NotificationPreferences.tsx', 'account/sections/ApiKeysSection.tsx'].map(async (path) => [path, await read(path)])));
     for (const [path, source] of Object.entries(sources)) {
         assert.doesNotMatch(source, /from ['"](?:\.\.\/)+admin(?:\/index)?['"]/, `${path} must not import the admin barrel`);
     }
@@ -360,7 +360,7 @@ try {
     // (`useMutation<…>(`) included. Only the reviewed model hooks may use them.
     const { readdir } = await import('node:fs/promises');
     const accountDir = new URL('../packages/portal-mojo/src/account/', import.meta.url);
-    const allowedHooks = { 'models.ts': { useMutation: 2, useQuery: 2 } };
+    const allowedHooks = { 'models.ts': { useMutation: 1, useQuery: 2 }, 'credential-models.ts': { useMutation: 1, useQuery: 0 } };
     for (const entry of await readdir(accountDir, { recursive: true })) {
         if (!/\.tsx?$/.test(entry)) continue;
         const source = await readFile(new URL(entry, accountDir), 'utf8');
@@ -370,6 +370,11 @@ try {
         }
     }
     assert.match(sources['account/PasskeyList.tsx'], /PasskeyModel\.useList\(\{ user: userId/, 'passkey reads always carry ?user=');
+    // The admin graph imports the credential models eagerly: that file must
+    // stay a leaf of portal-mojo/account (no account/api, models, dialogs…).
+    assert.doesNotMatch(sources['account/credential-models.ts'], /from ['"]\.\/(?!\.)/, 'credential-models imports nothing else from portal-mojo/account');
+    const adminUserModels = await readFile(new URL('../packages/portal-mojo/src/admin/identity/users/models.ts', import.meta.url), 'utf8');
+    assert.doesNotMatch(adminUserModels, /account\/(?:models|api)['"]/, 'admin user models import the credential leaf, never account/models or account/api');
     assert.match(sources['account/dialogs.tsx'], /safeQrDataUrl\(step\.qr\)/, 'the QR is re-checked at the <img> sink');
 
     const React = await import('react');
