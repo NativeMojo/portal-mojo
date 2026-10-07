@@ -162,7 +162,7 @@ The editor shows the saved value from the response.
 
 - **Claim-reserved.** The plan for this page asked for a superuser control to
   claim a reserved name. django-mojo removed the reserved-name mechanism, its
-  field and its action (commit `bc2c57b1`, in every release since v1.10.0), so
+  field and its action (commit `bc2c57b1`, in every release since v1.7.1), so
   there is nothing for such a control to call.
 - **`mojosec_policy`.** Shown read-only on the vhost detail. It is set by the
   platform and never sent from here.
