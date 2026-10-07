@@ -3,6 +3,7 @@
 // event handler; no JSX modal state to hoist. The z-index/backdrop stack
 // manager web-mojo needed does not exist here: <dialog> stacks natively.
 import { useLayoutEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { getAuthSnapshot, onAuth, subscribeAuth } from '../client/auth';
 
 export type ModalSize = 'sm' | 'md' | 'lg';
 
@@ -61,6 +62,37 @@ const listeners = new Set<() => void>();
 
 function emit() {
     listeners.forEach((fn) => fn());
+}
+
+/**
+ * Close EVERY open modal/drawer, resolving each await with null. Bypasses
+ * canDismiss — this is the session ending, not the user dismissing.
+ */
+function closeAll(): void {
+    if (stack.length === 0) return;
+    const open = stack;
+    stack = [];
+    emit();
+    // resolve() is each item's settled-guarded close; the item is already
+    // gone, so a drawer's exit animation has nothing left to play.
+    for (const item of open) item.resolve(null);
+}
+
+// The stack is module state, so it outlives the host that renders it: an
+// app that mounts <ModalHost> under its auth guard unmounts it on sign-out
+// and REMOUNTS it on the next sign-in — every dialog body would come back,
+// re-run its mount effects, for whoever signed in. A session ending (this
+// tab's logout / unauthorized) or a change of identity seen through storage
+// (another tab signing out or in as someone else) therefore empties it.
+if (typeof window !== 'undefined') {
+    onAuth('logout', closeAll);
+    onAuth('unauthorized', closeAll);
+    let seenUid = getAuthSnapshot().uid;
+    subscribeAuth(() => {
+        const snap = getAuthSnapshot();
+        if (seenUid != null && (!snap.authenticated || snap.uid !== seenUid)) closeAll();
+        seenUid = snap.authenticated ? snap.uid : null;
+    });
 }
 
 export interface ModalOptions {
@@ -168,6 +200,9 @@ function drawer<T = unknown>(opts: DrawerOptions<T>): Promise<T | null> {
 
 export const modal = {
     open,
+
+    /** Close every open modal and drawer; each await resolves null. */
+    closeAll,
 
     /** Detail modal: large, flush body — the Modal.detail() envelope. */
     detail(render: (close: (value: unknown) => void) => ReactNode): Promise<unknown> {

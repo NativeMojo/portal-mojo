@@ -53,6 +53,9 @@ Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, co
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 let client;
+// Hoisted so the catch below can restore it: a failure in the mounted half
+// (console.error captured) would otherwise exit 1 with no message.
+const originalError = console.error;
 try {
     client = await server.ssrLoadModule('/packages/portal-mojo/src/client/index.ts');
     const api = await server.ssrLoadModule('/packages/portal-mojo/src/account/api.ts');
@@ -247,7 +250,6 @@ try {
     const ui = await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
     const account = await server.ssrLoadModule('/packages/portal-mojo/src/account/index.ts');
     const consoleErrors = [];
-    const originalError = console.error;
     console.error = (...args) => { consoleErrors.push(args.map(String).join(' ')); };
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, ...client.mojoQueryDefaults().queries } } });
     let probe = null;
@@ -332,11 +334,76 @@ try {
     await closed;
     assert.equal(openDialogs().length, 0);
 
+    // ── An open enrol dialog never survives a sign-out / sign-in ──
+    // Mount the host the way an app's auth guard does: only while signed in.
+    const setupCalls = () => mock.getMockCallCounts()['POST /api/account/totp/setup'] ?? 0;
+    let setHostOn;
+    function GuardedHost() {
+        const auth = client.useAuthSnapshot();
+        const [on, setOn] = React.useState(true);
+        setHostOn = setOn;
+        return auth.authenticated && on ? React.createElement(ui.ModalHost) : null;
+    }
+    await act(async () => {
+        root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(GuardedHost), React.createElement(Probe)));
+    });
+    const settle = (promise) => { const box = { value: 'pending' }; void promise.then((v) => { box.value = v; }); return box; };
+
+    // Layer 1 — the "started" flag belongs to the OPEN, not the mount.
+    let before = setupCalls();
+    let enrol;
+    await act(async () => { enrol = settle(account.openTotpEnrolDialog({ replacing: false })); });
+    await wait(600);
+    assert.equal(setupCalls() - before, 1, 'opening the enrol dialog runs setup once');
+    await act(async () => { setHostOn(false); });
+    await act(async () => { setHostOn(true); });
+    await wait(600);
+    assert.equal(setupCalls() - before, 1, 'a host remount never re-runs setup');
+    assert(document.querySelector('dialog[open] [role="alert"]')?.textContent.includes('Setup was interrupted'), 'a remounted enrol dialog offers Try again instead');
+
+    // Layer 2 — setup refuses to run for a different identity than it opened for.
+    const other = (await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'showcase.operator@nativemojo.com', password: 'mojo' } })).data;
+    const stored = { access: localStorage.getItem('access_token'), refresh: localStorage.getItem('refresh_token') };
+    localStorage.setItem('access_token', other.access_token); // silent: no auth notification
+    localStorage.setItem('refresh_token', other.refresh_token);
+    before = setupCalls();
+    await click('Try again');
+    await wait(600);
+    assert.equal(setupCalls() - before, 0, 'setup never runs for another uid');
+    assert.equal(enrol.value, false, 'the enrol dialog resolves (false) for another uid');
+    assert.equal(openDialogs().length, 0);
+    localStorage.setItem('access_token', stored.access);
+    localStorage.setItem('refresh_token', stored.refresh);
+
+    // Layer 3 — logout empties the stack; signing in as someone else shows nothing.
+    await act(async () => { enrol = settle(account.openTotpEnrolDialog({ replacing: false })); });
+    await wait(600);
+    before = setupCalls();
+    await act(async () => { client.logout(); });
+    await wait(0);
+    assert.equal(enrol.value, false, 'logout resolves the open enrol dialog');
+    await act(async () => { await client.login('showcase.operator@nativemojo.com', 'mojo'); });
+    await wait(600);
+    assert.equal(setupCalls() - before, 0, 'no totp/setup call after logout → login as another uid');
+    assert.equal(openDialogs().length, 0, 'the modal stack is empty after logout → login');
+
+    // Identity change seen through storage (another tab): no logout event here.
+    await act(async () => { enrol = settle(account.openTotpEnrolDialog({ replacing: false })); });
+    await wait(600);
+    before = setupCalls();
+    const viewerGrant = (await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'groups.viewer@nativemojo.com', password: 'mojo' } })).data;
+    await act(async () => { client.setTokens(viewerGrant.access_token, viewerGrant.refresh_token, true); });
+    await wait(600);
+    assert.equal(enrol.value, false, 'an identity change closes the open enrol dialog');
+    assert.equal(openDialogs().length, 0);
+    assert.equal(setupCalls() - before, 0, 'no setup call for the identity that replaced it');
+
     await act(async () => root.unmount());
     console.error = originalError;
     assert.deepEqual(consoleErrors.filter((line) => !/inert/.test(line)), [], 'no console errors while mounted');
     console.log('account module verified (no admin barrel, MeSaveModel me write, status-only cache, TOTP shown-once lock + no secret in any cache, six sections render)');
 } catch (error) {
+    console.error = originalError;
     console.error(error);
     process.exitCode = 1;
 } finally {

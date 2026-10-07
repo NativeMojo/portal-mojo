@@ -186,6 +186,11 @@ caller's preferences ▸ one "General" row.
   saved these somewhere safe" is ticked; Copy + a local `recovery-codes.txt`
   download (object URL revoked). Copy: "Save these codes now. They will not
   be shown again. Old codes no longer work."
+- **Dialogs die with the session.** Sign-out / `'unauthorized'` / a uid
+  change closes the AccountModal and every dialog over it (the modal stack
+  empties). Authenticator setup runs once per OPEN (never again on a host
+  remount) and only for the uid the dialog was opened for — otherwise it
+  closes with the sign-in copy.
 - **Fresh auth**: every server-gated call is wrapped in `withFreshAuth`; a
   dismissed step-up reads "For your security, sign in again to make this
   change." The step-up is the app's FreshAuthHost — never an ad-hoc password

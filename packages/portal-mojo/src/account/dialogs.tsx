@@ -18,7 +18,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
-    downloadBlob, isReauthRequired, useMe, type Me,
+    downloadBlob, getAuthSnapshot, isReauthRequired, useMe, type Me,
 } from '../client/runtime';
 import {
     ImageField, PasswordStrengthMeter, copyText, modal, toast,
@@ -189,10 +189,32 @@ export function RecoveryCodesPanel({ codes, step, onDone }: { codes: string[]; s
 
 // ── Authenticator app (TOTP) enrolment ────────────────────────────────
 
+/**
+ * Per-OPEN state for the enrol dialog. It lives in the openTotpEnrolDialog
+ * closure, not a useRef: a host that unmounts and remounts the stack (an
+ * auth guard around <ModalHost>) remounts the body, and a ref would reset and
+ * run setup again. `uid` is who the dialog was opened for — setup REPLACES
+ * that user's secret, so it never runs for anyone else.
+ */
+interface TotpRun { started: boolean; uid: string | null }
+
 export function openTotpEnrolDialog(opts: { replacing: boolean }): Promise<boolean> {
     const lock = newLock();
-    return modal.open<boolean | null>((close) => <TotpEnrolDialog replacing={opts.replacing} lock={lock} close={close} />, { size: 'md', canDismiss: () => !lock.locked })
+    const run: TotpRun = { started: false, uid: getAuthSnapshot().uid };
+    if (run.uid == null) {
+        toast.error(FRESH_AUTH_COPY);
+        return Promise.resolve(false);
+    }
+    return modal.open<boolean | null>((close) => <TotpEnrolDialog replacing={opts.replacing} run={run} lock={lock} close={close} />, { size: 'md', canDismiss: () => !lock.locked })
         .then((v) => v === true);
+}
+
+/** False (and the dialog closed with the sign-in copy) once the session is not the one it opened for. */
+function sameTotpUser(run: TotpRun, close: (value: boolean | null) => void): boolean {
+    if (getAuthSnapshot().uid === run.uid) return true;
+    toast.error(FRESH_AUTH_COPY);
+    close(null);
+    return false;
 }
 
 type TotpStep =
@@ -201,7 +223,7 @@ type TotpStep =
     | { kind: 'scan'; secret: string; uri: string; qr: string | null }
     | { kind: 'codes'; codes: string[] };
 
-function TotpEnrolDialog({ replacing, lock, close }: { replacing: boolean; lock: DismissLock; close: (value: boolean | null) => void }) {
+function TotpEnrolDialog({ replacing, run, lock, close }: { replacing: boolean; run: TotpRun; lock: DismissLock; close: (value: boolean | null) => void }) {
     const qc = useQueryClient();
     const uid = useMe().data?.id ?? null;
     const [step, setStep] = useState<TotpStep>({ kind: 'loading' });
@@ -210,7 +232,7 @@ function TotpEnrolDialog({ replacing, lock, close }: { replacing: boolean; lock:
     const [error, setError] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [phase, setPhase] = useState<'scan' | 'code'>('scan');
-    const started = useRef(false);
+    const mounted = useRef(false);
     useLock(lock, busy || step.kind === 'codes' || step.kind === 'loading');
 
     const refresh = () => Promise.all([
@@ -219,6 +241,7 @@ function TotpEnrolDialog({ replacing, lock, close }: { replacing: boolean; lock:
     ]);
 
     const begin = async () => {
+        if (!sameTotpUser(run, close)) return;
         setStep({ kind: 'loading' });
         setPhase('scan');
         try {
@@ -233,10 +256,16 @@ function TotpEnrolDialog({ replacing, lock, close }: { replacing: boolean; lock:
     };
 
     useEffect(() => {
-        // Guard StrictMode's double effect: setup REPLACES the secret, so it
-        // must run once per dialog.
-        if (started.current) return;
-        started.current = true;
+        // Once per OPEN (not per mount): setup REPLACES the secret, so neither
+        // StrictMode's double effect nor a host remount may run it again.
+        if (mounted.current) return; // StrictMode re-run of THIS instance
+        mounted.current = true;
+        if (run.started) {
+            // A remount lost the setup this open already ran; never re-run it unasked.
+            setStep({ kind: 'failed', error: 'Setup was interrupted. Try again to get a new code.' });
+            return;
+        }
+        run.started = true;
         void begin();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -244,6 +273,7 @@ function TotpEnrolDialog({ replacing, lock, close }: { replacing: boolean; lock:
     const confirm = async (e: FormEvent) => {
         e.preventDefault();
         if (code.length !== 6) { setError('Enter the 6-digit code from your app.'); return; }
+        if (!sameTotpUser(run, close)) return;
         setBusy(true);
         setError('');
         try {

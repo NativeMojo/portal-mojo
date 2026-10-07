@@ -14,7 +14,7 @@
 // fresh-auth step-ups come from the app's FreshAuthHost. Styles: the app's
 // theme/account.css (tokens only, both themes).
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { hostedAuthUrl, logout, redirectToHostedAuth, useAuthSnapshot, useMe, type Me } from '../client/runtime';
+import { hostedAuthUrl, logout, onAuth, redirectToHostedAuth, useAuthSnapshot, useMe, type Me } from '../client/runtime';
 import { fmt, modal, toast, useAvatarUrl, type UserMenuAuthMode } from '../ui';
 import type { NotificationKind } from './api';
 import {
@@ -140,10 +140,16 @@ export function AccountModal({
     }, [active]);
 
     // The session ended underneath us (sign out elsewhere, refresh failure):
-    // there is no account to show.
+    // there is no account to show. The auth events cover an app that drops
+    // this host on sign-out before the snapshot effect can run; the toolkit
+    // modal stack closes the child dialogs on the same events.
     useEffect(() => {
         if (!auth.authenticated) onClose();
     }, [auth.authenticated, onClose]);
+    useEffect(() => {
+        const offs = [onAuth('logout', onClose), onAuth('unauthorized', onClose)];
+        return () => { for (const off of offs) off(); };
+    }, [onClose]);
 
     const [avatarSrc, onAvatarError] = useAvatarUrl(me?.avatar?.id ?? null);
     const name = (typeof me?.display_name === 'string' && me.display_name) || (typeof me?.email === 'string' && me.email) || auth.email || 'My account';
