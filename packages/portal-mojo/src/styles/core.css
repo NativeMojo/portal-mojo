@@ -208,14 +208,6 @@ button { font: inherit; color: inherit; }
 }
 .topnav-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink-strong); letter-spacing: -0.01em; }
 .topnav-right { display: flex; align-items: center; gap: 14px; }
-.user-chip { display: flex; align-items: center; gap: 8px; }
-.user-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--accent-soft); color: var(--accent);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 750;
-}
-.user-name { font-size: 13.5px; font-weight: 600; color: var(--ink-strong); }
 
 /* ============================================================ Panels & toolbar */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }

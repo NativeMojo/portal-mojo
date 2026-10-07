@@ -54,6 +54,7 @@ const DisplayDemo = lazyDemo(() => import('./demos-display'), 'DisplayDemo');
 const SkeletonDemo = lazyDemo(() => import('./demos-display'), 'SkeletonDemo');
 const AccessDemo = lazyDemo(() => import('./demos-display'), 'AccessDemo');
 const PopoverDemo = lazyDemo(() => import('./demos-popover'), 'PopoverDemo');
+const UserMenuDemo = lazyDemo(() => import('./demos-user-menu'), 'UserMenuDemo');
 const TagInputDemo = lazyDemo(() => import('./demos-taginput'), 'TagInputDemo');
 const DrawerDemo = lazyDemo(() => import('./demos-drawer'), 'DrawerDemo');
 const RightPanelDemo = lazyDemo(() => import('./demos-right-panel'), 'RightPanelDemo');
@@ -280,6 +281,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'popover', title: 'Popover', icon: 'bi-front',
                 blurb: 'Anchored top-layer primitive every dropdown control mounts in — stacks above native-<dialog> modals via the HTML Popover API.',
                 render: () => <PopoverDemo />,
+            },
+            {
+                key: 'user-menu', title: 'UserMenu', icon: 'bi-person-circle',
+                blurb: 'The top-nav account menu: avatar trigger, identity header, Light/Dark/System theme control, app items, pending-aware Sign out — full menu keyboard model.',
+                render: () => <UserMenuDemo />,
             },
             {
                 key: 'modals', title: 'Modals', icon: 'bi-window-stack',

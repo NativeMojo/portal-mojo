@@ -36,6 +36,7 @@ export * from './RouteError';
 export * from './route-error';
 export * from './password';
 export * from './Popover';
+export * from './UserMenu';
 export * from './TagInput';
 export * from './toast';
 export * from './FileDrop';

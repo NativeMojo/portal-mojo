@@ -7,6 +7,7 @@ import { useUploadQueue } from './UploadQueue';
 import { fileRelationId } from './field-wire';
 import { toast } from './toast';
 import { imageEditorModal, type ImageEditorModalOptions } from './image-editor';
+import { safePreviewUrl } from './safe-url';
 
 export type FileFieldState = 'keep' | 'clear' | 'replacement-in-progress' | 'replacement-failed'
     | 'completed-awaiting-attach' | 'attach-failed' | 'edit-pending' | 'edit-ready' | 'edit-failed';
@@ -52,16 +53,6 @@ export function reconcileFileOwnerResult(expected: number | null, result: FileFi
 }
 
 interface PreviewRow { url?: unknown; thumbnail?: unknown; filename?: unknown }
-
-function safePreviewUrl(value: unknown): string | null {
-    if (typeof value !== 'string' || value.trim() !== value || !value || value.startsWith('//')) return null;
-    if (value.startsWith('/')) return /[\r\n\\]/.test(value) ? null : value;
-    try {
-        const url = new URL(value);
-        return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password
-            ? value : null;
-    } catch { return null; }
-}
 
 /**
  * Controlled django-mojo File relation editor. Browser File values, object
