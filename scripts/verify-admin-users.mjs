@@ -44,7 +44,9 @@ try {
     const menuSource = await readFile(new URL('../apps/portal/src/menus.ts', import.meta.url), 'utf8');
     const querySource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/users/sections/queries.ts', import.meta.url), 'utf8');
     // The key-generation boundary moved to portal-mojo/account (admin re-exports it).
-    const modelSource = await readFile(new URL('../packages/portal-mojo/src/account/models.ts', import.meta.url), 'utf8');
+    // The credential models (ApiKeyModel + useGenerateUserApiKey) live beside the account models since the eager-chunk split.
+    const modelSource = await readFile(new URL('../packages/portal-mojo/src/account/models.ts', import.meta.url), 'utf8')
+        + await readFile(new URL('../packages/portal-mojo/src/account/credential-models.ts', import.meta.url), 'utf8');
     const mockSource = await readFile(new URL('../packages/portal-mojo/src/client/mock.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(mainSource, /path:\s*['"]users['"]/);
     assert.doesNotMatch(menuSource, /admin:users/);
