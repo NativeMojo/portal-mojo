@@ -84,15 +84,22 @@ function closeAll(): void {
 // re-run its mount effects, for whoever signed in. A session ending (this
 // tab's logout / unauthorized) or a change of identity seen through storage
 // (another tab signing out or in as someone else) therefore empties it.
-if (typeof window !== 'undefined') {
+// Wired on the first open (never at import: no storage reads in non-DOM
+// consumers of the package).
+let authWired = false;
+function wireAuth(): void {
+    if (authWired || typeof window === 'undefined') return;
+    authWired = true;
     onAuth('logout', closeAll);
     onAuth('unauthorized', closeAll);
-    let seenUid = getAuthSnapshot().uid;
-    subscribeAuth(() => {
+    let seenUid: string | null = null;
+    const observe = () => {
         const snap = getAuthSnapshot();
         if (seenUid != null && (!snap.authenticated || snap.uid !== seenUid)) closeAll();
         seenUid = snap.authenticated ? snap.uid : null;
-    });
+    };
+    observe();
+    subscribeAuth(observe);
 }
 
 export interface ModalOptions {
@@ -103,6 +110,7 @@ export interface ModalOptions {
 }
 
 function open<T>(render: (close: (value: T) => void) => ReactNode, opts: ModalOptions = {}): Promise<T | null> {
+    wireAuth();
     return new Promise<T | null>((resolve) => {
         const id = nextId++;
         let settled = false;
@@ -152,6 +160,7 @@ function drawerWidthPx(width: DrawerWidth | undefined): number {
 }
 
 function drawer<T = unknown>(opts: DrawerOptions<T>): Promise<T | null> {
+    wireAuth();
     const body = opts.render ?? (() => opts.content ?? null);
     let dismissable = opts.dismissable ?? true;
     if (!dismissable && !opts.render) {
