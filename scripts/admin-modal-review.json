@@ -362,7 +362,7 @@
     },
     {
       "id": "packages/portal-mojo/src/account/dialogs.tsx:openTotpEnrolDialog:modal.open:0",
-      "fingerprint": "5b8cbd08a0043b82ca6f",
+      "fingerprint": "54dd6302a63b4383a366",
       "category": "action",
       "purpose": "TotpEnrolDialog: authenticator QR/key, code confirm, shown-once recovery codes locked until saved"
     },
