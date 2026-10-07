@@ -737,6 +737,109 @@ function buildAcmeDelegations(): MockAcmeDelegation[] {
     ];
 }
 
+// ── Edge — vhosts, routes, upstreams, fleet blocklist ────────────────
+// Sources: mojo/apps/edge/models/{vhost,route,upstream,blocklist}.py,
+// mojo/apps/edge/rest/, mojo/apps/edge/validators.py.
+interface MockEdgeUpstream {
+    id: number;
+    created: number;
+    modified: number;
+    group: number | null;
+    name: string;
+    kind: string;
+    host: string | null;
+    port: number | null;
+    socket_path: string | null;
+    is_enabled: boolean;
+    [field: string]: unknown;
+}
+
+interface MockEdgeVhost {
+    id: number;
+    created: number;
+    modified: number;
+    domain: number;
+    label: string;
+    kind: string;
+    upstream: number | null;
+    certificate: number | null;
+    pool: string;
+    spa: boolean;
+    body_size_mb: number;
+    quiet_paths: string[];
+    serve_static: boolean;
+    mojosec_policy: Record<string, unknown>;
+    redirect_to: string | null;
+    is_enabled: boolean;
+    [field: string]: unknown;
+}
+
+interface MockEdgeRoute {
+    id: number;
+    created: number;
+    modified: number;
+    vhost: number;
+    path_prefix: string;
+    upstream: number;
+    [field: string]: unknown;
+}
+
+interface MockEdgeBlocklistEntry {
+    id: number;
+    created: number;
+    modified: number;
+    kind: string;
+    value: string;
+    mode: string;
+    note: string;
+    [field: string]: unknown;
+}
+
+function buildEdgeUpstreams(): MockEdgeUpstream[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8601, created: now - 300 * 86400, modified: now - 30 * 86400, group: null, name: 'mojo-api', kind: 'http', host: '127.0.0.1', port: 8001, socket_path: null, is_enabled: true },
+        { id: 8602, created: now - 300 * 86400, modified: now - 30 * 86400, group: null, name: 'mojo-asgi', kind: 'unix', host: null, port: null, socket_path: '/run/mojo/asgi.sock', is_enabled: true },
+        { id: 8603, created: now - 90 * 86400, modified: now - 5 * 86400, group: 1, name: 'acme-backend', kind: 'http', host: '10.0.4.12', port: 8080, socket_path: null, is_enabled: true },
+        // Retired: rows that reach it stop being served; the select filters it out.
+        { id: 8604, created: now - 400 * 86400, modified: now - 60 * 86400, group: null, name: 'legacy-api', kind: 'http', host: '10.0.9.9', port: 9000, socket_path: null, is_enabled: false },
+        { id: 8605, created: now - 50 * 86400, modified: now - 50 * 86400, group: 2, name: 'globex-backend', kind: 'http', host: '10.0.7.20', port: 8080, socket_path: null, is_enabled: true },
+    ];
+}
+
+function buildEdgeVhosts(): MockEdgeVhost[] {
+    const now = Math.floor(Date.now() / 1000);
+    const base = { pool: 'default', spa: false, body_size_mb: 50, quiet_paths: [] as string[], serve_static: false, mojosec_policy: {}, redirect_to: null, upstream: null };
+    return [
+        { ...base, id: 8701, created: now - 80 * 86400, modified: now - 3 * 86400, domain: 8201, label: 'api', kind: 'api', upstream: 8603, certificate: 8401, quiet_paths: ['/health'], serve_static: true, is_enabled: true },
+        { ...base, id: 8702, created: now - 70 * 86400, modified: now - 9 * 86400, domain: 8201, label: 'www', kind: 'site', certificate: 8401, spa: true, is_enabled: true },
+        { ...base, id: 8703, created: now - 40 * 86400, modified: now - 2 * 86400, domain: 8201, label: 'app', kind: 'site_api', certificate: 8401, spa: true, quiet_paths: ['/api/health'], body_size_mb: 200, mojosec_policy: { version: 1, impossible_path_families: ['php_runtime', 'wordpress'], response_class: 'site_api' }, is_enabled: true },
+        { ...base, id: 8704, created: now - 70 * 86400, modified: now - 70 * 86400, domain: 8201, label: '', kind: 'redirect', certificate: 8401, redirect_to: 'www.acme.example', is_enabled: true },
+        // A disabled duplicate of 8702's name: a staged replacement.
+        { ...base, id: 8705, created: now - 86400, modified: now - 3600, domain: 8201, label: 'www', kind: 'site', certificate: 8401, is_enabled: false },
+        // House row: platform property, hidden from non-superuser lists.
+        { ...base, id: 8706, created: now - 200 * 86400, modified: now - 20 * 86400, domain: 8209, label: 'portal', kind: 'api', upstream: 8601, certificate: 8408, is_enabled: true },
+    ];
+}
+
+function buildEdgeRoutes(): MockEdgeRoute[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8801, created: now - 40 * 86400, modified: now - 40 * 86400, vhost: 8703, path_prefix: '/api', upstream: 8603 },
+        { id: 8802, created: now - 40 * 86400, modified: now - 2 * 86400, vhost: 8703, path_prefix: '/ws', upstream: 8602 },
+    ];
+}
+
+function buildEdgeBlocklist(): MockEdgeBlocklistEntry[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8901, created: now - 30 * 86400, modified: now - 12 * 86400, kind: 'ip', value: '203.0.113.0/24', mode: 'enforce', note: 'Credential stuffing, March' },
+        { id: 8902, created: now - 2 * 86400, modified: now - 2 * 86400, kind: 'ua', value: 'sqlmap', mode: 'log', note: 'Watching before enforcing' },
+        { id: 8903, created: now - 20 * 86400, modified: now - 20 * 86400, kind: 'ip', value: '198.51.100.7/32', mode: 'allow', note: 'Partner monitor, exempt' },
+        { id: 8904, created: now - 60 * 86400, modified: now - 10 * 86400, kind: 'ua', value: 'curl/7\\.', mode: 'off', note: 'Parked: broke a customer integration' },
+    ];
+}
+
 function buildDnsRecords(): Map<number, MockDnsRecord[]> {
     return new Map([
         [8201, [
@@ -4233,6 +4336,10 @@ const db = {
     dnsCertificates: buildDnsCertificates(),
     acmeDelegations: buildAcmeDelegations(),
     dnsRecords: buildDnsRecords(),
+    edgeUpstreams: buildEdgeUpstreams(),
+    edgeVhosts: buildEdgeVhosts(),
+    edgeRoutes: buildEdgeRoutes(),
+    edgeBlocklist: buildEdgeBlocklist(),
     metricPermissions: new Map<string, { view_permissions: string | string[] | null; write_permissions: string | string[] | null }>([
         ['global', { view_permissions: 'view_metrics', write_permissions: ['write_metrics', 'metrics'] }],
         ['group-1', { view_permissions: ['view_metrics', 'metrics'], write_permissions: null }],
@@ -6663,6 +6770,594 @@ function permissionDenied(code = 403): Record<string, unknown> {
     return { status: false, error: 'permission denied', error_code: code };
 }
 
+// ══ Edge — wire implementation (mojo/apps/edge) ═════════════════════
+
+/** `BlocklistEntry.RestMeta.VIEW_PERMS`; SAVE and DELETE share the manage clause. */
+const EDGE_BLOCKLIST_VIEW_GRANTS = ['view_security', 'manage_security', 'security'];
+const EDGE_BLOCKLIST_MANAGE_GRANTS = ['manage_security', 'security'];
+/** `settings.EDGE_POOLS` default. */
+const EDGE_DECLARED_POOLS = ['default'];
+const EDGE_SOCKET_BASE = '/run/mojo';
+const EDGE_LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const EDGE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const EDGE_UPSTREAM_HOST_RE = /^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/;
+const EDGE_PATH_RE = /^\/[A-Za-z0-9._/-]{0,127}$/;
+const EDGE_UA_RE = /^[A-Za-z0-9()[\]|?^.*+\\/_-]{1,256}$/;
+const EDGE_MOJOSEC_FAMILIES = ['admin_tools', 'php_runtime', 'secret_files', 'wordpress'];
+const EDGE_MOJOSEC_CLASSES = ['reverse_proxy', 'spa_fallback', 'static_site', 'site_api', 'redirect'];
+const EDGE_VHOST_KINDS = ['api', 'site', 'site_api', 'redirect'];
+
+function edgeRefuse(error: string, code = 400): Record<string, unknown> {
+    return { status: false, error, error_code: code };
+}
+
+function edgePlatformOnly(what: string): Record<string, unknown> {
+    return edgeRefuse(`${what} is restricted to platform administrators`, 403);
+}
+
+function edgeServerName(domainName: string, label: string): string {
+    return label === '' ? domainName : `${label}.${domainName}`;
+}
+
+function edgeServerNameError(name: string): string | null {
+    if (!name) return 'a vhost requires a server name';
+    if (name.length > 253) return 'server name is too long';
+    const parts = (name.startsWith('*.') ? name.slice(2) : name).split('.');
+    if (parts.length < 2) return `${name} is not a fully qualified domain name`;
+    return parts.every((part) => EDGE_LABEL_RE.test(part)) ? null : `${name} is not a valid server name`;
+}
+
+function edgeRequestPathError(path: unknown, what: string): string | null {
+    if (typeof path !== 'string' || !EDGE_PATH_RE.test(path)) return `${what} must start with '/' and use only letters, digits, '.', '_', '-' and '/' (max 128 characters)`;
+    if (path.includes('//')) return `${what} may not contain '//'`;
+    if (path.split('/').some((part) => part === '..')) return `${what} may not contain a '..' segment`;
+    return null;
+}
+
+function edgeCertificateCovers(certificate: MockDnsCertificate, serverName: string): boolean {
+    const target = serverName.toLowerCase();
+    for (const name of [certificate.common_name, ...certificate.sans]) {
+        if (typeof name !== 'string' || !name) continue;
+        const candidate = name.toLowerCase();
+        if (candidate === target) return true;
+        if (candidate.startsWith('*.')) {
+            const suffix = candidate.slice(1);
+            if (target.endsWith(suffix)) {
+                const remainder = target.slice(0, -suffix.length);
+                if (remainder && !remainder.includes('.')) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function edgeMojosecPolicy(value: unknown): { policy: Record<string, unknown> } | { error: string } {
+    if (value == null || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)) return { policy: {} };
+    if (typeof value !== 'object' || Array.isArray(value)) return { error: 'mojosec_policy must be an object' };
+    const raw = value as Record<string, unknown>;
+    const keys = Object.keys(raw).sort().join(',');
+    if (keys !== 'impossible_path_families,response_class,version') return { error: 'mojosec_policy requires version, impossible_path_families, and response_class only' };
+    if (typeof raw.version !== 'number' || !Number.isInteger(raw.version) || raw.version < 1 || raw.version > 65535) return { error: 'mojosec_policy version must be 1-65535' };
+    const families = raw.impossible_path_families;
+    if (!Array.isArray(families) || families.length > 4 || families.some((family) => !EDGE_MOJOSEC_FAMILIES.includes(family as string)) || new Set(families).size !== families.length) {
+        return { error: 'mojosec_policy impossible_path_families contains an unknown or duplicate family' };
+    }
+    if (!EDGE_MOJOSEC_CLASSES.includes(raw.response_class as string)) return { error: 'mojosec_policy response_class is not registered' };
+    return { policy: { version: raw.version, impossible_path_families: [...families].sort(), response_class: raw.response_class } };
+}
+
+/** `validators.validate_vhost`, in the server's order and with its messages. */
+function edgeValidateVhost(row: MockEdgeVhost, persisted: boolean): string | null {
+    const label = row.label ?? '';
+    if (label !== '' && label !== '*' && (typeof label !== 'string' || !EDGE_LABEL_RE.test(label))) {
+        return "label must be empty (apex), '*', or a single DNS label of letters, digits and hyphens";
+    }
+    if (!row.pool || !EDGE_NAME_RE.test(row.pool)) return "pool must be lowercase letters, digits, '-' or '_'";
+    if (!EDGE_DECLARED_POOLS.includes(row.pool)) return `${row.pool} is not a declared pool (${[...EDGE_DECLARED_POOLS].sort().join(', ')})`;
+    if (typeof row.body_size_mb !== 'number' || !Number.isInteger(row.body_size_mb)) return 'body_size_mb must be an integer';
+    if (row.body_size_mb < 1 || row.body_size_mb > 4096) return 'body_size_mb must be between 1 and 4096';
+    const policy = edgeMojosecPolicy(row.mojosec_policy);
+    if ('error' in policy) return policy.error;
+    row.mojosec_policy = policy.policy;
+    if (!EDGE_VHOST_KINDS.includes(row.kind)) return `unknown vhost kind '${row.kind}'`;
+    if (Object.keys(row.mojosec_policy).length) {
+        const expected = row.kind === 'api' ? 'reverse_proxy' : row.kind === 'site' ? (row.spa ? 'spa_fallback' : 'static_site') : row.kind;
+        if (row.mojosec_policy.response_class !== expected) return `mojosec_policy response_class for ${row.kind} must be ${expected}`;
+    }
+    if (row.kind === 'api') {
+        if (row.upstream == null) return 'an api vhost requires an upstream';
+    } else if (row.upstream != null) return `a ${row.kind} vhost has no whole-host upstream (site_api proxies per-route)`;
+    if (row.kind === 'redirect') {
+        if (typeof row.redirect_to !== 'string' || !row.redirect_to) return 'a redirect vhost requires redirect_to';
+        if (row.redirect_to.startsWith('*.')) return 'a redirect target cannot be a wildcard';
+        const refusal = edgeServerNameError(row.redirect_to);
+        if (refusal) return refusal;
+    } else if (row.redirect_to) return `a ${row.kind} vhost has no redirect target`;
+    if (row.spa && !['site', 'site_api'].includes(row.kind)) return `spa applies to site and site_api vhosts, not ${row.kind}`;
+    if (row.serve_static && !['api', 'site_api'].includes(row.kind)) return `serve_static applies to api and site_api vhosts, not ${row.kind}`;
+    const quietPaths = row.quiet_paths ?? [];
+    if (!Array.isArray(quietPaths)) return 'quiet_paths must be a list of paths';
+    if (quietPaths.length && !['api', 'site_api'].includes(row.kind)) return `quiet_paths applies to api and site_api vhosts, not ${row.kind}`;
+    for (const path of quietPaths) {
+        const refusal = edgeRequestPathError(path, 'a quiet path');
+        if (refusal) return refusal;
+    }
+    if (new Set(quietPaths).size !== quietPaths.length) return 'quiet_paths contains a duplicate';
+    const routes = persisted ? db.edgeRoutes.filter((route) => route.vhost === row.id) : [];
+    if (row.kind === 'site_api') {
+        // Prefixes load only for a stored row, so a CREATE carrying quiet
+        // paths always reports "none declared".
+        const prefixes = routes.map((route) => route.path_prefix);
+        for (const path of quietPaths) {
+            if (!prefixes.some((prefix) => path.startsWith(prefix))) {
+                return `quiet path ${path} is not under any route prefix (${[...prefixes].sort().join(', ') || 'none declared'})`;
+            }
+        }
+    } else if (routes.length) {
+        return `a ${row.kind} vhost cannot carry routes — delete them before changing kind`;
+    }
+    const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+    if (!domain) return 'a vhost requires a domain';
+    const serverName = edgeServerName(domain.name, label);
+    const nameRefusal = edgeServerNameError(serverName);
+    if (nameRefusal) return nameRefusal;
+    if (row.is_enabled) {
+        const certificate = db.dnsCertificates.find((candidate) => candidate.id === row.certificate);
+        if (!certificate) return 'a vhost requires a certificate';
+        if (certificate.domain !== row.domain) return "the certificate must belong to this vhost's domain";
+        if (!edgeCertificateCovers(certificate, serverName)) return `certificate ${certificate.common_name} does not cover ${serverName}`;
+        // `edge_vhost_unique_enabled_server_name`.
+        if (db.edgeVhosts.some((other) => other.id !== row.id && other.is_enabled && other.domain === row.domain && other.label === label)) {
+            return `an enabled vhost already serves ${serverName}`;
+        }
+    }
+    return null;
+}
+
+function edgeNumberOrNull(value: unknown): number | null {
+    if (value == null || value === '') return null;
+    const id = typeof value === 'object' ? Number((value as Record<string, unknown>).id) : Number(value);
+    return Number.isFinite(id) ? id : null;
+}
+
+/** Copies the writable fields from a request body; `alias_of` and ids are pinned. */
+function edgeApplyVhostBody(row: MockEdgeVhost, body: Record<string, unknown>): void {
+    if ('label' in body) row.label = body.label == null ? '' : String(body.label);
+    if ('kind' in body) row.kind = String(body.kind);
+    if ('upstream' in body) row.upstream = edgeNumberOrNull(body.upstream);
+    if ('certificate' in body) row.certificate = edgeNumberOrNull(body.certificate);
+    if ('pool' in body) row.pool = String(body.pool ?? '');
+    if ('spa' in body) row.spa = body.spa === true;
+    if ('body_size_mb' in body) row.body_size_mb = body.body_size_mb as number;
+    if ('quiet_paths' in body) row.quiet_paths = (body.quiet_paths ?? []) as string[];
+    if ('serve_static' in body) row.serve_static = body.serve_static === true;
+    if ('mojosec_policy' in body) row.mojosec_policy = (body.mojosec_policy ?? {}) as Record<string, unknown>;
+    if ('redirect_to' in body) row.redirect_to = body.redirect_to == null || body.redirect_to === '' ? null : String(body.redirect_to);
+    if ('is_enabled' in body) row.is_enabled = body.is_enabled === true;
+}
+
+function serializeEdgeUpstream(row: MockEdgeUpstream, graph = 'default'): Record<string, unknown> {
+    if (graph === 'basic') return { id: row.id, name: row.name, kind: row.kind };
+    const group = row.group == null ? null : db.groups.find((candidate) => candidate.id === row.group);
+    return {
+        id: row.id, created: row.created, modified: row.modified, name: row.name, kind: row.kind,
+        host: row.host, port: row.port, socket_path: row.socket_path, is_enabled: row.is_enabled,
+        group: group ? groupBasic(group) : null,
+    };
+}
+
+function serializeEdgeVhost(row: MockEdgeVhost, graph = 'default'): Record<string, unknown> {
+    const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+    const serverName = domain ? edgeServerName(domain.name, row.label) : null;
+    if (graph === 'basic') return { id: row.id, kind: row.kind, is_enabled: row.is_enabled, server_name: serverName };
+    // `domain: basic` carries no group: house-ness is not readable off a vhost.
+    const domainBasic = domain ? { id: domain.id, name: domain.name, provider: domain.provider, status: domain.status, expires: domain.expires } : null;
+    if (graph === 'list') {
+        return { id: row.id, created: row.created, kind: row.kind, pool: row.pool, is_enabled: row.is_enabled, server_name: serverName, domain: domainBasic };
+    }
+    const upstream = row.upstream == null ? null : db.edgeUpstreams.find((candidate) => candidate.id === row.upstream);
+    const certificate = row.certificate == null ? null : db.dnsCertificates.find((candidate) => candidate.id === row.certificate);
+    return {
+        id: row.id, created: row.created, modified: row.modified, label: row.label, kind: row.kind,
+        pool: row.pool, spa: row.spa, body_size_mb: row.body_size_mb, quiet_paths: [...row.quiet_paths],
+        serve_static: row.serve_static, mojosec_policy: { ...row.mojosec_policy }, redirect_to: row.redirect_to,
+        is_enabled: row.is_enabled, server_name: serverName, domain: domainBasic,
+        upstream: upstream ? serializeEdgeUpstream(upstream, 'basic') : null,
+        certificate: certificate ? { id: certificate.id, common_name: certificate.common_name, status: certificate.status, not_after: certificate.not_after } : null,
+    };
+}
+
+function serializeEdgeRoute(row: MockEdgeRoute): Record<string, unknown> {
+    const vhost = db.edgeVhosts.find((candidate) => candidate.id === row.vhost);
+    const upstream = db.edgeUpstreams.find((candidate) => candidate.id === row.upstream);
+    return {
+        id: row.id, created: row.created, modified: row.modified, path_prefix: row.path_prefix,
+        vhost: vhost ? serializeEdgeVhost(vhost, 'basic') : null,
+        upstream: upstream ? serializeEdgeUpstream(upstream, 'basic') : null,
+    };
+}
+
+function serializeEdgeBlocklistEntry(row: MockEdgeBlocklistEntry): Record<string, unknown> {
+    return { id: row.id, created: row.created, modified: row.modified, kind: row.kind, value: row.value, mode: row.mode, note: row.note };
+}
+
+function edgeParseIpv6(text: string): number[] | null {
+    if (!/^[0-9A-Fa-f:.]+$/.test(text) || !text.includes(':')) return null;
+    let source = text;
+    const tail = source.slice(source.lastIndexOf(':') + 1);
+    if (tail.includes('.')) {
+        const v4 = ipv4ToInt(tail);
+        if (v4 == null) return null;
+        source = `${source.slice(0, source.lastIndexOf(':') + 1)}${Math.floor(v4 / 65536).toString(16)}:${(v4 % 65536).toString(16)}`;
+    }
+    const halves = source.split('::');
+    if (halves.length > 2) return null;
+    const parse = (part: string): number[] | null => {
+        if (part === '') return [];
+        const groups = part.split(':');
+        if (groups.some((group) => !/^[0-9A-Fa-f]{1,4}$/.test(group))) return null;
+        return groups.map((group) => parseInt(group, 16));
+    };
+    const head = parse(halves[0]!);
+    const rest = halves.length === 2 ? parse(halves[1]!) : [];
+    if (!head || !rest) return null;
+    if (halves.length === 1) return head.length === 8 ? head : null;
+    if (head.length + rest.length > 7) return null;
+    return [...head, ...new Array<number>(8 - head.length - rest.length).fill(0), ...rest];
+}
+
+function edgeFormatIpv6(groups: number[]): string {
+    let bestStart = -1;
+    let bestLength = 0;
+    for (let index = 0; index < 8;) {
+        if (groups[index] !== 0) { index += 1; continue; }
+        let end = index;
+        while (end < 8 && groups[end] === 0) end += 1;
+        if (end - index > bestLength) { bestStart = index; bestLength = end - index; }
+        index = end;
+    }
+    const hex = groups.map((group) => group.toString(16));
+    if (bestLength < 2) return hex.join(':');
+    return `${hex.slice(0, bestStart).join(':')}::${hex.slice(bestStart + bestLength).join(':')}`;
+}
+
+/** `str(ipaddress.ip_network(value, strict=False))`, or null when it cannot parse. */
+function edgeNormalizeIpNetwork(value: string): string | null {
+    const pieces = value.split('/');
+    if (pieces.length > 2) return null;
+    const [address = '', prefixRaw] = pieces;
+    if (prefixRaw !== undefined && !/^\d{1,3}$/.test(prefixRaw)) return null;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(address)) {
+        const numeric = ipv4ToInt(address);
+        const prefix = prefixRaw === undefined ? 32 : Number(prefixRaw);
+        if (numeric == null || prefix > 32) return null;
+        const size = 2 ** (32 - prefix);
+        const network = Math.floor(numeric / size) * size;
+        return `${[24, 16, 8, 0].map((shift) => Math.floor(network / 2 ** shift) % 256).join('.')}/${prefix}`;
+    }
+    const groups = edgeParseIpv6(address);
+    const prefix = prefixRaw === undefined ? 128 : Number(prefixRaw);
+    if (!groups || prefix > 128) return null;
+    const masked = groups.map((group, index) => {
+        const keep = Math.max(0, Math.min(16, prefix - index * 16));
+        return keep === 16 ? group : group - (group % 2 ** (16 - keep));
+    });
+    return `${edgeFormatIpv6(masked)}/${prefix}`;
+}
+
+/** `validators.validate_blocklist_entry`; normalizes an `ip` value in place. */
+function edgeValidateBlocklistEntry(entry: MockEdgeBlocklistEntry): string | null {
+    if (!['ip', 'ua'].includes(entry.kind)) return `unknown blocklist kind '${entry.kind}'`;
+    if (!['allow', 'off', 'log', 'enforce'].includes(entry.mode)) return `unknown blocklist mode '${entry.mode}'`;
+    if (typeof entry.value !== 'string' || !entry.value) return 'a blocklist entry requires a value';
+    if (entry.kind === 'ip') {
+        const network = edgeNormalizeIpNetwork(entry.value);
+        if (network == null) return `'${entry.value}' is not an IP address or CIDR network`;
+        entry.value = network;
+    } else {
+        if (!EDGE_UA_RE.test(entry.value)) return 'a user-agent pattern may use letters, digits and the regex characters ()[]|?^.*+-/_\\ only (max 256 characters, no spaces, quotes or braces)';
+        if ((entry.value.length - entry.value.replace(/\\+$/, '').length) % 2 === 1) return 'a user-agent pattern cannot end with an unescaped backslash';
+        try { new RegExp(entry.value); } catch (error) { return `user-agent pattern does not compile: ${error instanceof Error ? error.message : 'invalid pattern'}`; }
+    }
+    // `edge_blocklist_kind_value_uniq`.
+    if (db.edgeBlocklist.some((other) => other.id !== entry.id && other.kind === entry.kind && other.value === entry.value)) {
+        return `a ${entry.kind} blocklist entry for ${entry.value} already exists`;
+    }
+    return null;
+}
+
+/** `validators.validate_upstream`. */
+function edgeValidateUpstream(row: MockEdgeUpstream): string | null {
+    if (!row.name || !EDGE_NAME_RE.test(row.name)) return "upstream name must be lowercase letters, digits, '-' or '_'";
+    if (row.kind === 'http') {
+        if (row.socket_path) return 'an http upstream has no socket path';
+        const host = row.host ?? '';
+        if (!EDGE_UPSTREAM_HOST_RE.test(host)) return 'upstream host must be a hostname or IPv4 address (letters, digits, dots and hyphens only)';
+        if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return 'link-local addresses cannot be an upstream';
+        if (typeof row.port !== 'number' || !Number.isInteger(row.port)) return 'upstream port must be an integer';
+        if (row.port < 1 || row.port > 65535) return 'upstream port must be between 1 and 65535';
+    } else if (row.kind === 'unix') {
+        if (row.host || row.port) return 'a unix upstream has no host or port';
+        const path = row.socket_path ?? '';
+        if (!path) return 'a unix upstream requires a socket path';
+        if (/[\n\r;\0]/.test(path)) return 'socket path contains an illegal character';
+        const resolved: string[] = [];
+        for (const part of path.split('/')) {
+            if (part === '' || part === '.') continue;
+            if (part === '..') resolved.pop(); else resolved.push(part);
+        }
+        const real = `/${resolved.join('/')}`;
+        if (!path.startsWith('/') || !(real === EDGE_SOCKET_BASE || real.startsWith(`${EDGE_SOCKET_BASE}/`))) return `socket path must resolve under ${EDGE_SOCKET_BASE}`;
+    } else return `unknown upstream kind '${row.kind}'`;
+    // `edge_upstream_group_name_uniq` / `edge_upstream_house_name_uniq`.
+    if (db.edgeUpstreams.some((other) => other.id !== row.id && other.group === row.group && other.name === row.name)) {
+        return `an upstream named ${row.name} already exists in this scope`;
+    }
+    return null;
+}
+
+function edgeNextId(rows: readonly { id: number }[], floor: number): number {
+    return Math.max(floor, ...rows.map((row) => row.id)) + 1;
+}
+
+function edgeFetch(path: string, opts: MockFetchOpts): Record<string, unknown> | undefined {
+    if (!path.startsWith('/api/edge/')) return undefined;
+    const method = (opts.method ?? 'GET').toUpperCase();
+    const caller = userFromBearer(opts.headers);
+    const now = Math.floor(Date.now() / 1000);
+    const body = opts.body ?? {};
+    const domainGroup = (domainId: number): number | null | undefined => {
+        const domain = db.dnsDomains.find((candidate) => candidate.id === domainId);
+        return domain ? domain.group : undefined;
+    };
+    /** The model permission for a row whose tenancy resolves to `group`. */
+    const scopedCan = (group: number | null | undefined, manage: boolean): boolean => (group == null
+        ? hasGlobalPermission(caller, manage ? DNS_MANAGE_GRANTS : DNS_VIEW_GRANTS)
+        : dnsMemberCan(caller, group, manage));
+
+    // ── Upstream declare / retire — platform administrators only ──
+    if (path === '/api/edge/upstream/declare' || path === '/api/edge/upstream/retire') {
+        if (!caller) return permissionDenied(401);
+        if (method !== 'POST') return edgeRefuse('Method not allowed', 405);
+        const declaring = path.endsWith('/declare');
+        // The gate runs first: a caller who may not act learns that before
+        // the payload is parsed.
+        if (!caller.is_superuser) return edgePlatformOnly(declaring ? 'Declaring an edge upstream' : 'Retiring an edge upstream');
+        if (!declaring) {
+            if (body.upstream == null || body.upstream === '') return edgeRefuse('missing required parameter: upstream');
+            const row = db.edgeUpstreams.find((candidate) => candidate.id === Number(body.upstream));
+            if (!row) return edgeRefuse('Upstream not found', 404);
+            row.is_enabled = false;
+            row.modified = now;
+            return { status: true, data: serializeEdgeUpstream(row), graph: 'default' };
+        }
+        for (const required of ['name', 'kind']) {
+            if (body[required] == null || body[required] === '') return edgeRefuse(`missing required parameter: ${required}`);
+        }
+        if (body.kind !== 'http' && body.kind !== 'unix') return edgeRefuse("kind must be 'http' or 'unix'");
+        let group: number | null = null;
+        if (body.group) {
+            if (!db.groups.some((candidate) => candidate.id === Number(body.group))) return edgeRefuse('Group not found', 404);
+            group = Number(body.group);
+        }
+        let port: number | null = null;
+        if (body.port != null) {
+            port = Number(body.port);
+            if (!Number.isInteger(port) || body.port === '' || typeof body.port === 'boolean') return edgeRefuse('port must be an integer');
+        }
+        const row: MockEdgeUpstream = {
+            id: edgeNextId(db.edgeUpstreams, 8600), created: now, modified: now, group,
+            name: String(body.name), kind: body.kind,
+            host: body.host == null ? null : String(body.host), port,
+            socket_path: body.socket_path == null ? null : String(body.socket_path), is_enabled: true,
+        };
+        const refusal = edgeValidateUpstream(row);
+        if (refusal) return edgeRefuse(refusal);
+        db.edgeUpstreams.push(row);
+        return { status: true, data: serializeEdgeUpstream(row), graph: 'default' };
+    }
+
+    // ── Upstreams — read, and `is_enabled` only on write ──
+    const upstreamMatch = path.match(/^\/api\/edge\/upstream(?:\/(\d+))?$/);
+    if (upstreamMatch) {
+        if (!caller) return permissionDenied(401);
+        if (upstreamMatch[1]) {
+            const row = db.edgeUpstreams.find((candidate) => candidate.id === Number(upstreamMatch[1]));
+            if (!row) return edgeRefuse('Upstream not found', 404);
+            if (method === 'DELETE') return edgeRefuse('Upstream deletion is not allowed', 403);
+            if (!scopedCan(row.group, method !== 'GET')) return permissionDenied();
+            if (method === 'POST') {
+                // NO_SAVE_FIELDS pins everything that decides where traffic goes.
+                if ('is_enabled' in body) { row.is_enabled = body.is_enabled === true; row.modified = now; }
+            }
+            return { status: true, data: serializeEdgeUpstream(row), graph: 'default' };
+        }
+        if (method !== 'GET') return edgeRefuse('Upstream creation is not allowed', 403);
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        // An active group sees its own rows plus the shared house rows.
+        const rows = groupId > 0 ? db.edgeUpstreams.filter((row) => row.group === groupId || row.group == null) : db.edgeUpstreams;
+        const { group: _group, ...params } = opts.params ?? {};
+        const result = listRows(rows as unknown as Record<string, unknown>[], params, (row) => `${row.name} ${row.kind}`, 'name');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockEdgeUpstream[]).map((row) => serializeEdgeUpstream(row)) };
+    }
+
+    // ── Vhosts ──
+    const vhostMatch = path.match(/^\/api\/edge\/vhost(?:\/(\d+))?$/);
+    if (vhostMatch) {
+        if (!caller) return permissionDenied(401);
+        const graph = String(opts.params?.graph ?? (vhostMatch[1] ? 'default' : 'list'));
+        if (vhostMatch[1]) {
+            const row = db.edgeVhosts.find((candidate) => candidate.id === Number(vhostMatch[1]));
+            if (!row) return edgeRefuse('Vhost not found', 404);
+            const group = domainGroup(row.domain);
+            // Model permission first, then the house guard: no status-code
+            // oracle over the platform's own serving inventory.
+            if (!scopedCan(group, false)) return permissionDenied();
+            if (group == null && !caller.is_superuser) return edgePlatformOnly('House vhosts');
+            if (method !== 'GET' && !scopedCan(group, true)) return permissionDenied();
+            if (method === 'DELETE') {
+                db.edgeVhosts = db.edgeVhosts.filter((candidate) => candidate.id !== row.id);
+                db.edgeRoutes = db.edgeRoutes.filter((route) => route.vhost !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST') {
+                if ('domain' in body && edgeNumberOrNull(body.domain) !== row.domain) return edgeRefuse('a vhost cannot be moved to another domain');
+                const draft: MockEdgeVhost = { ...row, quiet_paths: [...row.quiet_paths], mojosec_policy: { ...row.mojosec_policy } };
+                edgeApplyVhostBody(draft, body);
+                const refusal = edgeValidateVhost(draft, true);
+                if (refusal) return edgeRefuse(refusal);
+                Object.assign(row, draft, { modified: now });
+            }
+            return { status: true, data: serializeEdgeVhost(row, graph), graph };
+        }
+        if (method === 'DELETE') return edgeRefuse('DELETE not allowed on the collection', 403);
+        if (method === 'POST') {
+            const domainId = edgeNumberOrNull(body.domain);
+            const group = domainId == null ? undefined : domainGroup(domainId);
+            if (domainId != null && group === null && !caller.is_superuser) return edgePlatformOnly('Creating a vhost on a house domain');
+            if (!scopedCan(group, true)) return permissionDenied();
+            if (domainId == null || group === undefined) return edgeRefuse('a vhost requires a domain');
+            const draft: MockEdgeVhost = {
+                id: edgeNextId(db.edgeVhosts, 8700), created: now, modified: now, domain: domainId,
+                label: '', kind: 'site', upstream: null, certificate: null, pool: 'default', spa: false,
+                body_size_mb: 50, quiet_paths: [], serve_static: false, mojosec_policy: {}, redirect_to: null, is_enabled: true,
+            };
+            edgeApplyVhostBody(draft, body);
+            const refusal = edgeValidateVhost(draft, false);
+            if (refusal) return edgeRefuse(refusal);
+            // The column is NOT NULL even for a disabled row.
+            if (draft.certificate == null || !db.dnsCertificates.some((candidate) => candidate.id === draft.certificate)) return edgeRefuse('a vhost requires a certificate');
+            db.edgeVhosts.push(draft);
+            return { status: true, data: serializeEdgeVhost(draft, 'default'), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        const { group: _group, domain__group: domainGroupFilter, ...params } = opts.params ?? {};
+        let rows = groupId > 0 ? db.edgeVhosts.filter((row) => domainGroup(row.domain) === groupId) : db.edgeVhosts;
+        // House rows never reach a non-superuser list, global grant or not.
+        if (!caller.is_superuser) rows = rows.filter((row) => domainGroup(row.domain) != null);
+        if (domainGroupFilter != null && domainGroupFilter !== '') rows = rows.filter((row) => domainGroup(row.domain) === Number(domainGroupFilter));
+        const result = listRows(rows as unknown as Record<string, unknown>[], params, (row) => `${row.label} ${row.kind} ${row.pool}`, 'label');
+        return { ...result, graph, data: (result.data as unknown as MockEdgeVhost[]).map((row) => serializeEdgeVhost(row, graph)) };
+    }
+
+    // ── Routes — site_api proxied prefixes ──
+    const routeMatch = path.match(/^\/api\/edge\/route(?:\/(\d+))?$/);
+    if (routeMatch) {
+        if (!caller) return permissionDenied(401);
+        const vhostGroup = (vhostId: number): number | null | undefined => {
+            const vhost = db.edgeVhosts.find((candidate) => candidate.id === vhostId);
+            return vhost ? domainGroup(vhost.domain) : undefined;
+        };
+        const validate = (route: MockEdgeRoute): string | null => {
+            const prefixRefusal = edgeRequestPathError(route.path_prefix, 'a route prefix');
+            if (prefixRefusal) return prefixRefusal;
+            if (route.path_prefix === '/') return "a route prefix cannot be '/' — use kind=api for a whole-host proxy";
+            const vhost = db.edgeVhosts.find((candidate) => candidate.id === route.vhost);
+            if (!vhost) return 'a route requires a vhost';
+            if (vhost.kind !== 'site_api') return `routes belong to site_api vhosts, not ${vhost.kind}`;
+            const upstream = db.edgeUpstreams.find((candidate) => candidate.id === route.upstream);
+            if (!upstream) return 'a route requires an upstream';
+            if (upstream.group != null && upstream.group !== domainGroup(vhost.domain)) return "the upstream must be a shared one or belong to this vhost's group";
+            // `edge_route_vhost_prefix_uniq`.
+            if (db.edgeRoutes.some((other) => other.id !== route.id && other.vhost === route.vhost && other.path_prefix === route.path_prefix)) {
+                return `this vhost already has a route for ${route.path_prefix}`;
+            }
+            return null;
+        };
+        if (routeMatch[1]) {
+            const row = db.edgeRoutes.find((candidate) => candidate.id === Number(routeMatch[1]));
+            if (!row) return edgeRefuse('VhostRoute not found', 404);
+            const group = vhostGroup(row.vhost);
+            if (!scopedCan(group, false)) return permissionDenied();
+            if (group == null && !caller.is_superuser) return edgePlatformOnly('House vhost routes');
+            if (method !== 'GET' && !scopedCan(group, true)) return permissionDenied();
+            if (method === 'DELETE') {
+                db.edgeRoutes = db.edgeRoutes.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST') {
+                const draft: MockEdgeRoute = { ...row };
+                if ('path_prefix' in body) draft.path_prefix = String(body.path_prefix ?? '');
+                if ('upstream' in body) draft.upstream = edgeNumberOrNull(body.upstream) ?? 0;
+                if ('vhost' in body) draft.vhost = edgeNumberOrNull(body.vhost) ?? 0;
+                const refusal = validate(draft);
+                if (refusal) return edgeRefuse(refusal);
+                Object.assign(row, draft, { modified: now });
+            }
+            return { status: true, data: serializeEdgeRoute(row), graph: 'default' };
+        }
+        if (method === 'DELETE') return edgeRefuse('DELETE not allowed on the collection', 403);
+        if (method === 'POST') {
+            const vhostId = edgeNumberOrNull(body.vhost);
+            const group = vhostId == null ? undefined : vhostGroup(vhostId);
+            if (vhostId != null && group === null && !caller.is_superuser) return edgePlatformOnly('Creating a route on a house vhost');
+            if (!scopedCan(group, true)) return permissionDenied();
+            const draft: MockEdgeRoute = {
+                id: edgeNextId(db.edgeRoutes, 8800), created: now, modified: now, vhost: vhostId ?? 0,
+                path_prefix: String(body.path_prefix ?? ''), upstream: edgeNumberOrNull(body.upstream) ?? 0,
+            };
+            const refusal = validate(draft);
+            if (refusal) return edgeRefuse(refusal);
+            db.edgeRoutes.push(draft);
+            return { status: true, data: serializeEdgeRoute(draft), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        const { group: _group, ...params } = opts.params ?? {};
+        let rows = groupId > 0 ? db.edgeRoutes.filter((row) => vhostGroup(row.vhost) === groupId) : db.edgeRoutes;
+        if (!caller.is_superuser) rows = rows.filter((row) => vhostGroup(row.vhost) != null);
+        const result = listRows(rows as unknown as Record<string, unknown>[], params, (row) => String(row.path_prefix), 'path_prefix');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockEdgeRoute[]).map(serializeEdgeRoute) };
+    }
+
+    // ── Fleet blocklist — GLOBAL security grants only; `?group=` opens nothing ──
+    const blocklistMatch = path.match(/^\/api\/edge\/blocklist(?:\/(\d+))?$/);
+    if (blocklistMatch) {
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, EDGE_BLOCKLIST_VIEW_GRANTS)) return permissionDenied();
+        const canManage = hasGlobalPermission(caller, EDGE_BLOCKLIST_MANAGE_GRANTS);
+        const apply = (entry: MockEdgeBlocklistEntry): string | null => {
+            if ('kind' in body) entry.kind = String(body.kind);
+            if ('value' in body) entry.value = body.value == null ? '' : String(body.value);
+            if ('mode' in body) entry.mode = String(body.mode);
+            if ('note' in body) entry.note = body.note == null ? '' : String(body.note);
+            return edgeValidateBlocklistEntry(entry);
+        };
+        if (blocklistMatch[1]) {
+            const row = db.edgeBlocklist.find((candidate) => candidate.id === Number(blocklistMatch[1]));
+            if (!row) return edgeRefuse('BlocklistEntry not found', 404);
+            if (method !== 'GET' && !canManage) return permissionDenied();
+            if (method === 'DELETE') {
+                db.edgeBlocklist = db.edgeBlocklist.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST') {
+                const draft: MockEdgeBlocklistEntry = { ...row };
+                const refusal = apply(draft);
+                if (refusal) return edgeRefuse(refusal);
+                Object.assign(row, draft, { modified: now });
+            }
+            return { status: true, data: serializeEdgeBlocklistEntry(row), graph: 'default' };
+        }
+        if (method === 'DELETE') return edgeRefuse('DELETE not allowed on the collection', 403);
+        if (method === 'POST') {
+            if (!canManage) return permissionDenied();
+            const draft: MockEdgeBlocklistEntry = { id: edgeNextId(db.edgeBlocklist, 8900), created: now, modified: now, kind: 'ip', value: '', mode: 'log', note: '' };
+            const refusal = apply(draft);
+            if (refusal) return edgeRefuse(refusal);
+            db.edgeBlocklist.push(draft);
+            return { status: true, data: serializeEdgeBlocklistEntry(draft), graph: 'default' };
+        }
+        const { group: _group, ...params } = opts.params ?? {};
+        const result = listRows(db.edgeBlocklist as unknown as Record<string, unknown>[], params, (row) => `${row.value} ${row.note}`, 'kind');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockEdgeBlocklistEntry[]).map(serializeEdgeBlocklistEntry) };
+    }
+    return undefined;
+}
+// ══ end Edge wire ══════════════════════════════════════════════════
+
 // ══ Jobs engine — wire implementation ════════════════════════════════
 
 /** `requires_global_perms('view_jobs','manage_jobs','jobs')`. */
@@ -8152,6 +8847,8 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (storageResult !== undefined) return storageResult;
     const cloudWatchResult = cloudWatchFetch(path, opts);
     if (cloudWatchResult !== undefined) return cloudWatchResult;
+    const edgeResult = edgeFetch(path, opts);
+    if (edgeResult !== undefined) return edgeResult;
     if (path === '/api/auth/generate_api_key') {
         // account/rest/user_api_key.py generate_api_key: mints a long-lived
         // key for the CALLER (@requires_auth — needs the bearer, unlike the
