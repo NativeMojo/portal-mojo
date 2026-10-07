@@ -27,6 +27,7 @@
     "exports": {
         "./client": "./src/client/index.ts",
         "./client/runtime": "./src/client/runtime.ts",
+        "./account": "./src/account/index.ts",
         "./ui": "./src/ui/index.ts",
         "./ui/shell": "./src/ui/shell.ts",
         "./charts": "./src/charts/index.ts",

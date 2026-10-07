@@ -202,7 +202,7 @@ export const NOTIFICATION_CHANNELS: readonly NotificationChannel[] = ['email', '
 /** The reserved all-kinds entry: `"*".<channel> === false` silences a channel. */
 export const ALL_KINDS = '*';
 
-export type NotificationPreferences = Record<string, Partial<Record<NotificationChannel, boolean>>>;
+export type NotificationPrefsMap = Record<string, Partial<Record<NotificationChannel, boolean>>>;
 
 export interface NotificationKind {
     kind: string;
@@ -213,7 +213,7 @@ export interface NotificationKind {
 }
 
 export interface NotificationPreferencesResponse {
-    preferences: NotificationPreferences;
+    preferences: NotificationPrefsMap;
     /** The server's registered kinds, when it ships the registry. */
     kinds: NotificationKind[] | null;
 }
@@ -221,7 +221,7 @@ export interface NotificationPreferencesResponse {
 export async function getNotificationPreferences(): Promise<NotificationPreferencesResponse> {
     const body = await mojoCall('/api/account/notification/preferences');
     const data = (body.data ?? {}) as { preferences?: unknown; kinds?: unknown };
-    const preferences = data.preferences && typeof data.preferences === 'object' ? data.preferences as NotificationPreferences : {};
+    const preferences = data.preferences && typeof data.preferences === 'object' ? data.preferences as NotificationPrefsMap : {};
     const kinds = Array.isArray(data.kinds)
         ? data.kinds.filter((k): k is NotificationKind => Boolean(k) && typeof (k as NotificationKind).kind === 'string' && (k as NotificationKind).kind !== ALL_KINDS)
         : null;
@@ -229,8 +229,8 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
 }
 
 /** Partial update `{preferences: {kind: {channel: bool}}}` → the merged map. */
-export async function setNotificationPreferences(partial: NotificationPreferences): Promise<NotificationPreferences> {
+export async function setNotificationPreferences(partial: NotificationPrefsMap): Promise<NotificationPrefsMap> {
     const body = await mojoCall('/api/account/notification/preferences', { method: 'POST', body: { preferences: partial } });
     const data = (body.data ?? {}) as { preferences?: unknown };
-    return data.preferences && typeof data.preferences === 'object' ? data.preferences as NotificationPreferences : {};
+    return data.preferences && typeof data.preferences === 'object' ? data.preferences as NotificationPrefsMap : {};
 }

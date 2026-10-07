@@ -3,6 +3,27 @@
   "syntax": "Imports/aliases, generic member calls, named forwarding wrappers, literal dynamic imports, JSX bodies and literal section records. Fingerprints require explicit review for every changed expression.",
   "entries": [
     {
+      "id": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/ui/secret-dialog.tsx",
+      "owner": "showSecretDialog",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "i",
+        "span",
+        "SecretBox",
+        "button"
+      ],
+      "category": "action",
+      "parent": "showSecretDialog",
+      "target": null,
+      "fingerprint": "ccfbeaa5bbe7b795071a",
+      "categories": [
+        "action"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:chooseAdmissionMode:modal.open:0",
       "file": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx",
       "owner": "chooseAdmissionMode",
@@ -2968,6 +2989,64 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/account/PasskeyList.tsx:rename:formModal:0",
+      "file": "packages/portal-mojo/src/account/PasskeyList.tsx",
+      "owner": "rename",
+      "launcher": "formModal",
+      "body": [],
+      "category": "editor",
+      "parent": "rename",
+      "target": null,
+      "fingerprint": "7d7ac352ba4d53d466dc",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/PasskeyList.tsx:remove:modal.confirm:0",
+      "file": "packages/portal-mojo/src/account/PasskeyList.tsx",
+      "owner": "remove",
+      "launcher": "modal.confirm",
+      "body": [
+        "b"
+      ],
+      "category": "confirmation",
+      "parent": "remove",
+      "target": null,
+      "fingerprint": "99d9c315d3baf583f325",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/PasskeyList.tsx:PasskeyList:rename:0",
+      "file": "packages/portal-mojo/src/account/PasskeyList.tsx",
+      "owner": "PasskeyList",
+      "launcher": "rename",
+      "body": [],
+      "category": "editor",
+      "parent": "PasskeyList",
+      "target": "packages/portal-mojo/src/account/PasskeyList.tsx:rename",
+      "fingerprint": "70b87935d30562c4df78",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/PasskeyList.tsx:PasskeyList:remove:0",
+      "file": "packages/portal-mojo/src/account/PasskeyList.tsx",
+      "owner": "PasskeyList",
+      "launcher": "remove",
+      "body": [],
+      "category": "confirmation",
+      "parent": "PasskeyList",
+      "target": "packages/portal-mojo/src/account/PasskeyList.tsx:remove",
+      "fingerprint": "8927d1b8059a902b9093",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/identity/users/sections/OAuthSection.tsx:unlink:modal.confirm:0",
       "file": "packages/portal-mojo/src/admin/identity/users/sections/OAuthSection.tsx",
       "owner": "unlink",
@@ -3369,487 +3448,22 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:rename:formModal:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
-      "owner": "rename",
-      "launcher": "formModal",
-      "body": [],
-      "category": "editor",
-      "parent": "rename",
-      "target": null,
-      "fingerprint": "d6e542b69129a9f6cf05",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:remove:modal.confirm:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
-      "owner": "remove",
-      "launcher": "modal.confirm",
-      "body": [],
-      "category": "confirmation",
-      "parent": "remove",
-      "target": null,
-      "fingerprint": "6b3d0f7defd55e29c8df",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:PasskeysModal:rename:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
-      "owner": "PasskeysModal",
-      "launcher": "rename",
-      "body": [],
-      "category": "editor",
-      "parent": "PasskeysModal",
-      "target": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:rename",
-      "fingerprint": "180a6c6ef3258f330aa5",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:PasskeysModal:remove:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
-      "owner": "PasskeysModal",
-      "launcher": "remove",
-      "body": [],
-      "category": "confirmation",
-      "parent": "PasskeysModal",
-      "target": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:remove",
-      "fingerprint": "7e336d533fc52c10f558",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx",
-      "owner": "showSecretDialog",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "i",
-        "span",
-        "SecretBox",
-        "button"
-      ],
-      "category": "action",
-      "parent": "showSecretDialog",
-      "target": null,
-      "fingerprint": "ccfbeaa5bbe7b795071a",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openAdd:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
-      "owner": "openAdd",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "p",
-        "SchemaForm"
-      ],
-      "category": "editor",
-      "parent": "openAdd",
-      "target": null,
-      "fingerprint": "345db791d25a538a73dd",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openEdit:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
-      "owner": "openEdit",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "p",
-        "code",
-        "SchemaForm"
-      ],
-      "category": "editor",
-      "parent": "openEdit",
-      "target": null,
-      "fingerprint": "e5073579c6283f053e3d",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:clearEntry:modal.confirm:0",
-      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
-      "owner": "clearEntry",
-      "launcher": "modal.confirm",
-      "body": [
-        "code"
-      ],
-      "category": "confirmation",
-      "parent": "clearEntry",
-      "target": null,
-      "fingerprint": "333c355c5c81f7bb8898",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:ApiKeyRateLimitsEditor:openEdit:0",
-      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
-      "owner": "ApiKeyRateLimitsEditor",
-      "launcher": "openEdit",
-      "body": [],
-      "category": "editor",
-      "parent": "ApiKeyRateLimitsEditor",
-      "target": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openEdit",
-      "fingerprint": "f5b3a8a86c9db4ae29f6",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:ApiKeyRateLimitsEditor:clearEntry:0",
-      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
-      "owner": "ApiKeyRateLimitsEditor",
-      "launcher": "clearEntry",
-      "body": [],
-      "category": "confirmation",
-      "parent": "ApiKeyRateLimitsEditor",
-      "target": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:clearEntry",
-      "fingerprint": "e0ccaa77c593bb71ee45",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:ApiKeyRateLimitsEditor:handler:0",
-      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
-      "owner": "ApiKeyRateLimitsEditor",
-      "launcher": "openAdd",
-      "body": [
-        "openAdd"
-      ],
-      "category": "editor",
-      "parent": "onClick",
-      "target": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openAdd",
-      "fingerprint": "ccc8647cb3eff89c0ded",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "createKey",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "SchemaForm"
-      ],
-      "category": "editor",
-      "parent": "createKey",
-      "target": null,
-      "fingerprint": "a126443c233b9a7c5520",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:showSecretDialog:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "createKey",
-      "launcher": "showSecretDialog",
-      "body": [
-        "i",
-        "b",
-        "TokenFooter"
-      ],
-      "category": "action",
-      "parent": "createKey",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
-      "fingerprint": "036ea29759e12be2f432",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:editKey:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "editKey",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "SchemaForm"
-      ],
-      "category": "editor",
-      "parent": "editKey",
-      "target": null,
-      "fingerprint": "b5e44f67107cdb7c30ed",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:revealToken:showSecretDialog:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "revealToken",
-      "launcher": "showSecretDialog",
-      "body": [
-        "TokenFooter"
-      ],
-      "category": "action",
-      "parent": "revealToken",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
-      "fingerprint": "c919dc6a55a2ff7d9348",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:AuthorizedGroupApiKeyDetail:DetailView:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "AuthorizedGroupApiKeyDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "Eyebrow",
-        "FlatRow",
-        "div",
-        "Badge",
-        "span",
-        "p",
-        "ApiKeyRateLimitsEditor"
-      ],
-      "category": "record",
-      "parent": "AuthorizedGroupApiKeyDetail",
-      "target": null,
-      "fingerprint": "8eaf57d34e346f3e29a2",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:openDetail:modal.detail:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "openDetail",
-      "launcher": "modal.detail",
-      "body": [
-        "GroupApiKeyDetail"
-      ],
-      "category": "record",
-      "parent": "openDetail",
-      "target": null,
-      "fingerprint": "ef74344a1166ffafd31e",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:GroupApiKeysPage:handler:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "GroupApiKeysPage",
-      "launcher": "openDetail",
-      "body": [
-        "openDetail"
-      ],
-      "category": "record",
-      "parent": "onRowClick",
-      "target": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:openDetail",
-      "fingerprint": "fac7211628308949f13a",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:reveal:showSecretDialog:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "reveal",
-      "launcher": "showSecretDialog",
-      "body": [
-        "div"
-      ],
-      "category": "action",
-      "parent": "reveal",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
-      "fingerprint": "7e5d726356fae7eb4d93",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:rotate:modal.confirm:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "rotate",
-      "launcher": "modal.confirm",
-      "body": [],
-      "category": "confirmation",
-      "parent": "rotate",
-      "target": null,
-      "fingerprint": "b59f74602404075856db",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:rotate:showSecretDialog:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "rotate",
-      "launcher": "showSecretDialog",
-      "body": [],
-      "category": "action",
-      "parent": "rotate",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
-      "fingerprint": "31d8d8fe935e72a22803",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSecretPanel:reveal:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSecretPanel",
-      "launcher": "reveal",
-      "body": [],
-      "category": "action",
-      "parent": "WebhookSecretPanel",
-      "target": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:reveal",
-      "fingerprint": "366ccf32f9886137b1c9",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSecretPanel:rotate:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSecretPanel",
-      "launcher": "rotate",
-      "body": [],
-      "category": "nested-flow",
-      "parent": "WebhookSecretPanel",
-      "target": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:rotate",
-      "fingerprint": "e492870a789fa15fd529",
-      "categories": [
-        "action",
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:createSubscription:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "createSubscription",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "SchemaForm"
-      ],
-      "category": "editor",
-      "parent": "createSubscription",
-      "target": null,
-      "fingerprint": "96e0782fbe2a8d051ad3",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:editSubscription:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "editSubscription",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "SchemaForm"
-      ],
-      "category": "editor",
-      "parent": "editSubscription",
-      "target": null,
-      "fingerprint": "e92d20595cab2311113a",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSubscriptionDetail:DetailView:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSubscriptionDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "Eyebrow",
-        "FlatRow",
-        "code",
-        "div",
-        "Badge",
-        "span",
-        "WebhookSecretPanel"
-      ],
-      "category": "record",
-      "parent": "WebhookSubscriptionDetail",
-      "target": null,
-      "fingerprint": "b17e6672e2fa78873ba7",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:openDetail:modal.detail:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "openDetail",
-      "launcher": "modal.detail",
-      "body": [
-        "WebhookSubscriptionDetail"
-      ],
-      "category": "record",
-      "parent": "openDetail",
-      "target": null,
-      "fingerprint": "8148c56172ede5cb6588",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSubscriptionsPage:handler:0",
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSubscriptionsPage",
-      "launcher": "openDetail",
-      "body": [
-        "openDetail"
-      ],
-      "category": "record",
-      "parent": "onRowClick",
-      "target": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:openDetail",
-      "fingerprint": "fac7211628308949f13a",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:generate:formModal:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx",
+      "id": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:generate:formModal:0",
+      "file": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx",
       "owner": "generate",
       "launcher": "formModal",
       "body": [],
       "category": "editor",
       "parent": "generate",
       "target": null,
-      "fingerprint": "fdc3b792e847019dcf1f",
+      "fingerprint": "4910e4dfb1ce98399aae",
       "categories": [
         "editor"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:generate:showSecretDialog:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx",
+      "id": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:generate:showSecretDialog:0",
+      "file": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx",
       "owner": "generate",
       "launcher": "showSecretDialog",
       "body": [
@@ -3857,15 +3471,15 @@
       ],
       "category": "action",
       "parent": "generate",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
+      "target": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog",
       "fingerprint": "ed3e4bfa4e50f2938da0",
       "categories": [
         "action"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:revokeKey:modal.confirm:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx",
+      "id": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:revokeKey:modal.confirm:0",
+      "file": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx",
       "owner": "revokeKey",
       "launcher": "modal.confirm",
       "body": [
@@ -3880,14 +3494,14 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:ApiKeysSection:generate:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx",
+      "id": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:ApiKeysSection:generate:0",
+      "file": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx",
       "owner": "ApiKeysSection",
       "launcher": "generate",
       "body": [],
       "category": "nested-flow",
       "parent": "ApiKeysSection",
-      "target": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:generate",
+      "target": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:generate",
       "fingerprint": "fa0016db43b28d071502",
       "categories": [
         "action",
@@ -3895,14 +3509,14 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:ApiKeysSection:revokeKey:0",
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx",
+      "id": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:ApiKeysSection:revokeKey:0",
+      "file": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx",
       "owner": "ApiKeysSection",
       "launcher": "revokeKey",
       "body": [],
       "category": "confirmation",
       "parent": "ApiKeysSection",
-      "target": "packages/portal-mojo/src/admin/identity/users/sections/ApiKeysSection.tsx:revokeKey",
+      "target": "packages/portal-mojo/src/account/sections/ApiKeysSection.tsx:revokeKey",
       "fingerprint": "edb1250edae9ccb842bf",
       "categories": [
         "confirmation"
@@ -4070,6 +3684,394 @@
       "fingerprint": "86385992202ab1f506bc",
       "categories": [
         "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openAdd:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
+      "owner": "openAdd",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "openAdd",
+      "target": null,
+      "fingerprint": "345db791d25a538a73dd",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openEdit:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
+      "owner": "openEdit",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "code",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "openEdit",
+      "target": null,
+      "fingerprint": "e5073579c6283f053e3d",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:clearEntry:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
+      "owner": "clearEntry",
+      "launcher": "modal.confirm",
+      "body": [
+        "code"
+      ],
+      "category": "confirmation",
+      "parent": "clearEntry",
+      "target": null,
+      "fingerprint": "333c355c5c81f7bb8898",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:ApiKeyRateLimitsEditor:openEdit:0",
+      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
+      "owner": "ApiKeyRateLimitsEditor",
+      "launcher": "openEdit",
+      "body": [],
+      "category": "editor",
+      "parent": "ApiKeyRateLimitsEditor",
+      "target": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openEdit",
+      "fingerprint": "f5b3a8a86c9db4ae29f6",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:ApiKeyRateLimitsEditor:clearEntry:0",
+      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
+      "owner": "ApiKeyRateLimitsEditor",
+      "launcher": "clearEntry",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ApiKeyRateLimitsEditor",
+      "target": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:clearEntry",
+      "fingerprint": "e0ccaa77c593bb71ee45",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:ApiKeyRateLimitsEditor:handler:0",
+      "file": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx",
+      "owner": "ApiKeyRateLimitsEditor",
+      "launcher": "openAdd",
+      "body": [
+        "openAdd"
+      ],
+      "category": "editor",
+      "parent": "onClick",
+      "target": "packages/portal-mojo/src/admin/credentials/api-key-rate-limits.tsx:openAdd",
+      "fingerprint": "ccc8647cb3eff89c0ded",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "createKey",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "createKey",
+      "target": null,
+      "fingerprint": "a126443c233b9a7c5520",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:showSecretDialog:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "createKey",
+      "launcher": "showSecretDialog",
+      "body": [
+        "i",
+        "b",
+        "TokenFooter"
+      ],
+      "category": "action",
+      "parent": "createKey",
+      "target": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog",
+      "fingerprint": "036ea29759e12be2f432",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:editKey:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "editKey",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "editKey",
+      "target": null,
+      "fingerprint": "b5e44f67107cdb7c30ed",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:revealToken:showSecretDialog:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "revealToken",
+      "launcher": "showSecretDialog",
+      "body": [
+        "TokenFooter"
+      ],
+      "category": "action",
+      "parent": "revealToken",
+      "target": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog",
+      "fingerprint": "c919dc6a55a2ff7d9348",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:AuthorizedGroupApiKeyDetail:DetailView:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "AuthorizedGroupApiKeyDetail",
+      "launcher": "DetailView",
+      "body": [
+        "DetailView",
+        "Eyebrow",
+        "FlatRow",
+        "div",
+        "Badge",
+        "span",
+        "p",
+        "ApiKeyRateLimitsEditor"
+      ],
+      "category": "record",
+      "parent": "AuthorizedGroupApiKeyDetail",
+      "target": null,
+      "fingerprint": "8eaf57d34e346f3e29a2",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:openDetail:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "openDetail",
+      "launcher": "modal.detail",
+      "body": [
+        "GroupApiKeyDetail"
+      ],
+      "category": "record",
+      "parent": "openDetail",
+      "target": null,
+      "fingerprint": "ef74344a1166ffafd31e",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:GroupApiKeysPage:handler:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "GroupApiKeysPage",
+      "launcher": "openDetail",
+      "body": [
+        "openDetail"
+      ],
+      "category": "record",
+      "parent": "onRowClick",
+      "target": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:openDetail",
+      "fingerprint": "fac7211628308949f13a",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:reveal:showSecretDialog:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "reveal",
+      "launcher": "showSecretDialog",
+      "body": [
+        "div"
+      ],
+      "category": "action",
+      "parent": "reveal",
+      "target": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog",
+      "fingerprint": "7e5d726356fae7eb4d93",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:rotate:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "rotate",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "rotate",
+      "target": null,
+      "fingerprint": "b59f74602404075856db",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:rotate:showSecretDialog:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "rotate",
+      "launcher": "showSecretDialog",
+      "body": [],
+      "category": "action",
+      "parent": "rotate",
+      "target": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog",
+      "fingerprint": "31d8d8fe935e72a22803",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSecretPanel:reveal:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSecretPanel",
+      "launcher": "reveal",
+      "body": [],
+      "category": "action",
+      "parent": "WebhookSecretPanel",
+      "target": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:reveal",
+      "fingerprint": "366ccf32f9886137b1c9",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSecretPanel:rotate:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSecretPanel",
+      "launcher": "rotate",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "WebhookSecretPanel",
+      "target": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:rotate",
+      "fingerprint": "e492870a789fa15fd529",
+      "categories": [
+        "action",
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:createSubscription:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "createSubscription",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "createSubscription",
+      "target": null,
+      "fingerprint": "96e0782fbe2a8d051ad3",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:editSubscription:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "editSubscription",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "editSubscription",
+      "target": null,
+      "fingerprint": "e92d20595cab2311113a",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSubscriptionDetail:DetailView:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSubscriptionDetail",
+      "launcher": "DetailView",
+      "body": [
+        "DetailView",
+        "Eyebrow",
+        "FlatRow",
+        "code",
+        "div",
+        "Badge",
+        "span",
+        "WebhookSecretPanel"
+      ],
+      "category": "record",
+      "parent": "WebhookSubscriptionDetail",
+      "target": null,
+      "fingerprint": "b17e6672e2fa78873ba7",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:openDetail:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "openDetail",
+      "launcher": "modal.detail",
+      "body": [
+        "WebhookSubscriptionDetail"
+      ],
+      "category": "record",
+      "parent": "openDetail",
+      "target": null,
+      "fingerprint": "8148c56172ede5cb6588",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:WebhookSubscriptionsPage:handler:0",
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSubscriptionsPage",
+      "launcher": "openDetail",
+      "body": [
+        "openDetail"
+      ],
+      "category": "record",
+      "parent": "onRowClick",
+      "target": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx:openDetail",
+      "fingerprint": "fac7211628308949f13a",
+      "categories": [
+        "record"
       ]
     },
     {
@@ -4506,7 +4508,7 @@
       ],
       "category": "action",
       "parent": "generate",
-      "target": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog",
+      "target": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog",
       "fingerprint": "d117af4c1cd9b72bfb04",
       "categories": [
         "action"
@@ -8360,6 +8362,408 @@
       "categories": [
         "dependency"
       ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openAddPasskeyDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openAddPasskeyDialog",
+      "launcher": "modal.open",
+      "body": [
+        "AddPasskeyDialog"
+      ],
+      "category": "action",
+      "parent": "openAddPasskeyDialog",
+      "target": null,
+      "fingerprint": "b4d37e253dcce7651fc8",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openTotpEnrolDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openTotpEnrolDialog",
+      "launcher": "modal.open",
+      "body": [
+        "TotpEnrolDialog"
+      ],
+      "category": "action",
+      "parent": "openTotpEnrolDialog",
+      "target": null,
+      "fingerprint": "5b8cbd08a0043b82ca6f",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openRecoveryCodesView:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openRecoveryCodesView",
+      "launcher": "modal.open",
+      "body": [
+        "RecoveryCodesView"
+      ],
+      "category": "record",
+      "parent": "openRecoveryCodesView",
+      "target": null,
+      "fingerprint": "e4d16786e7596a98b253",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:RecoveryCodesView:openRegenerateRecoveryCodes:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "RecoveryCodesView",
+      "launcher": "openRegenerateRecoveryCodes",
+      "body": [],
+      "category": "action",
+      "parent": "RecoveryCodesView",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openRegenerateRecoveryCodes",
+      "fingerprint": "1d1eed3324438436b617",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openRegenerateRecoveryCodes:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openRegenerateRecoveryCodes",
+      "launcher": "modal.open",
+      "body": [
+        "RegenerateRecoveryCodes"
+      ],
+      "category": "action",
+      "parent": "openRegenerateRecoveryCodes",
+      "target": null,
+      "fingerprint": "4196b15b0073dfd61a81",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openChangePasswordDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openChangePasswordDialog",
+      "launcher": "modal.open",
+      "body": [
+        "ChangePasswordDialog"
+      ],
+      "category": "editor",
+      "parent": "openChangePasswordDialog",
+      "target": null,
+      "fingerprint": "ea76201d22699607935e",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openEmailChangeDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openEmailChangeDialog",
+      "launcher": "modal.open",
+      "body": [
+        "EmailChangeDialog"
+      ],
+      "category": "action",
+      "parent": "openEmailChangeDialog",
+      "target": null,
+      "fingerprint": "9aebc117dcb0f58a737d",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openPhoneChangeDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openPhoneChangeDialog",
+      "launcher": "modal.open",
+      "body": [
+        "PhoneChangeDialog"
+      ],
+      "category": "action",
+      "parent": "openPhoneChangeDialog",
+      "target": null,
+      "fingerprint": "14cbbadc6dcde59cb68c",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openVerifyDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openVerifyDialog",
+      "launcher": "modal.open",
+      "body": [
+        "VerifyDialog"
+      ],
+      "category": "action",
+      "parent": "openVerifyDialog",
+      "target": null,
+      "fingerprint": "c620446905e171a63995",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openAvatarDialog:modal.open:0",
+      "file": "packages/portal-mojo/src/account/dialogs.tsx",
+      "owner": "openAvatarDialog",
+      "launcher": "modal.open",
+      "body": [
+        "AvatarDialog"
+      ],
+      "category": "editor",
+      "parent": "openAvatarDialog",
+      "target": null,
+      "fingerprint": "77546625f94a86d77c1e",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountProfileSection:openAvatarDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountProfileSection",
+      "launcher": "openAvatarDialog",
+      "body": [],
+      "category": "editor",
+      "parent": "AccountProfileSection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openAvatarDialog",
+      "fingerprint": "9919ac628e3f956350fc",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountProfileSection:openVerifyDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountProfileSection",
+      "launcher": "openVerifyDialog",
+      "body": [],
+      "category": "action",
+      "parent": "AccountProfileSection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openVerifyDialog",
+      "fingerprint": "a7b70826dfe02d6b5bab",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountProfileSection:openEmailChangeDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountProfileSection",
+      "launcher": "openEmailChangeDialog",
+      "body": [],
+      "category": "action",
+      "parent": "AccountProfileSection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openEmailChangeDialog",
+      "fingerprint": "671df421876524b21244",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountProfileSection:openVerifyDialog:1",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountProfileSection",
+      "launcher": "openVerifyDialog",
+      "body": [],
+      "category": "action",
+      "parent": "AccountProfileSection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openVerifyDialog",
+      "fingerprint": "b9e7e95a7ade42fd65f1",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountProfileSection:openPhoneChangeDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountProfileSection",
+      "launcher": "openPhoneChangeDialog",
+      "body": [],
+      "category": "action",
+      "parent": "AccountProfileSection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openPhoneChangeDialog",
+      "fingerprint": "c34fa0b18bccfd8fffbb",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:unlink:modal.confirm:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "unlink",
+      "launcher": "modal.confirm",
+      "body": [
+        "b"
+      ],
+      "category": "confirmation",
+      "parent": "unlink",
+      "target": null,
+      "fingerprint": "4d0ae3d20c2e268e6546",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:LinkedSignIns:unlink:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "LinkedSignIns",
+      "launcher": "unlink",
+      "body": [],
+      "category": "confirmation",
+      "parent": "LinkedSignIns",
+      "target": "packages/portal-mojo/src/account/AccountSections.tsx:unlink",
+      "fingerprint": "1d199ba4fc5b9440abf9",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountPasskeysSection:openAddPasskeyDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountPasskeysSection",
+      "launcher": "openAddPasskeyDialog",
+      "body": [],
+      "category": "action",
+      "parent": "AccountPasskeysSection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openAddPasskeyDialog",
+      "fingerprint": "d313f38fdf9e1de466c6",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:turnOff:modal.confirm:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "turnOff",
+      "launcher": "modal.confirm",
+      "body": [
+        "b"
+      ],
+      "category": "confirmation",
+      "parent": "turnOff",
+      "target": null,
+      "fingerprint": "3922b1d90dcde9ea47db",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountSecuritySection:openTotpEnrolDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountSecuritySection",
+      "launcher": "openTotpEnrolDialog",
+      "body": [],
+      "category": "action",
+      "parent": "AccountSecuritySection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openTotpEnrolDialog",
+      "fingerprint": "f55844edff06d9e32bd8",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountSecuritySection:turnOff:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountSecuritySection",
+      "launcher": "turnOff",
+      "body": [],
+      "category": "confirmation",
+      "parent": "AccountSecuritySection",
+      "target": "packages/portal-mojo/src/account/AccountSections.tsx:turnOff",
+      "fingerprint": "7588dc1f0a9410d6e154",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountSecuritySection:openRecoveryCodesView:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountSecuritySection",
+      "launcher": "openRecoveryCodesView",
+      "body": [],
+      "category": "record",
+      "parent": "AccountSecuritySection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openRecoveryCodesView",
+      "fingerprint": "b68fc5f861163f499037",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountSecuritySection:openRegenerateRecoveryCodes:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountSecuritySection",
+      "launcher": "openRegenerateRecoveryCodes",
+      "body": [],
+      "category": "action",
+      "parent": "AccountSecuritySection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openRegenerateRecoveryCodes",
+      "fingerprint": "1d1eed3324438436b617",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountSecuritySection:openChangePasswordDialog:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountSecuritySection",
+      "launcher": "openChangePasswordDialog",
+      "body": [],
+      "category": "editor",
+      "parent": "AccountSecuritySection",
+      "target": "packages/portal-mojo/src/account/dialogs.tsx:openChangePasswordDialog",
+      "fingerprint": "d84e31252d77c0f51050",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:revoke:modal.confirm:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "revoke",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "revoke",
+      "target": null,
+      "fingerprint": "53f9803d5e6bd6a64267",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountSections.tsx:AccountSessionsSection:revoke:0",
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "owner": "AccountSessionsSection",
+      "launcher": "revoke",
+      "body": [],
+      "category": "confirmation",
+      "parent": "AccountSessionsSection",
+      "target": "packages/portal-mojo/src/account/AccountSections.tsx:revoke",
+      "fingerprint": "cff3920da7aeaf3cf187",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountModal.tsx:openAccountModal:modal.open:0",
+      "file": "packages/portal-mojo/src/account/AccountModal.tsx",
+      "owner": "openAccountModal",
+      "launcher": "modal.open",
+      "body": [
+        "AccountModal"
+      ],
+      "category": "record",
+      "parent": "openAccountModal",
+      "target": null,
+      "fingerprint": "0f99adcbe2ae2688289d",
+      "categories": [
+        "record"
+      ]
     }
   ],
   "sections": [
@@ -8847,48 +9251,6 @@
       "fingerprint": "ed43f3e71ce9e521a016"
     },
     {
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "AuthorizedGroupApiKeyDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "6b0d1ceef2d7ec25c6f8"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "AuthorizedGroupApiKeyDetail",
-      "key": "'permissions'",
-      "label": "Permissions",
-      "fingerprint": "848b1cf9d7aff47dc06f"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "AuthorizedGroupApiKeyDetail",
-      "key": "'limits'",
-      "label": "Rate Limits",
-      "fingerprint": "58537ba91bbf18a75b96"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSubscriptionDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "feb657e10f307b1cc5de"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSubscriptionDetail",
-      "key": "'events'",
-      "label": "Events",
-      "fingerprint": "ff4aa702e50153c9e395"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
-      "owner": "WebhookSubscriptionDetail",
-      "key": "'secret'",
-      "label": "Signing Secret",
-      "fingerprint": "075d5587fc4c791912b2"
-    },
-    {
       "file": "packages/portal-mojo/src/admin/identity/users/UserDetail.tsx",
       "owner": "UserDetailLoaded",
       "key": "'Overview'",
@@ -8985,6 +9347,48 @@
       "key": "'Metadata'",
       "label": "Metadata",
       "fingerprint": "fd7066e384065e745555"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "AuthorizedGroupApiKeyDetail",
+      "key": "'overview'",
+      "label": "Overview",
+      "fingerprint": "6b0d1ceef2d7ec25c6f8"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "AuthorizedGroupApiKeyDetail",
+      "key": "'permissions'",
+      "label": "Permissions",
+      "fingerprint": "848b1cf9d7aff47dc06f"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "AuthorizedGroupApiKeyDetail",
+      "key": "'limits'",
+      "label": "Rate Limits",
+      "fingerprint": "58537ba91bbf18a75b96"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSubscriptionDetail",
+      "key": "'overview'",
+      "label": "Overview",
+      "fingerprint": "feb657e10f307b1cc5de"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSubscriptionDetail",
+      "key": "'events'",
+      "label": "Events",
+      "fingerprint": "ff4aa702e50153c9e395"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/credentials/webhook-subscriptions.tsx",
+      "owner": "WebhookSubscriptionDetail",
+      "key": "'secret'",
+      "label": "Signing Secret",
+      "fingerprint": "075d5587fc4c791912b2"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",

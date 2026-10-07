@@ -96,8 +96,12 @@ function Avatar({ src, name, className, onError }: {
     );
 }
 
-/** Stored avatar capability for `avatarId`, fetched while mounted only. */
-function useAvatarUrl(avatarId: number | null): [string | null, () => void] {
+/**
+ * Stored avatar capability for `avatarId`, fetched while mounted only and
+ * kept in component state (never a Query cache). Returns `[src, onError]`;
+ * wire `onError` to the <img> so a dead capability falls back to initials.
+ */
+export function useAvatarUrl(avatarId: number | null): [string | null, () => void] {
     const [fetched, setFetched] = useState<{ id: number; src: string | null } | null>(null);
     const [failedSrc, setFailedSrc] = useState<string | null>(null);
 

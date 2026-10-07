@@ -54,6 +54,7 @@
 @import "./theme/demos-filters.css";
 @import "./theme/worldmap.css";
 @import "./theme/user-menu.css";
+@import "./theme/account.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";

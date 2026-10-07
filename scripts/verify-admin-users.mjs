@@ -32,6 +32,8 @@ try {
         { permissions: { users: true, manage_users: true, 'sys.users': true } },
     ), false, 'member grants cannot satisfy global Users Admin');
     assert.equal(users.UserModel.actions.change_username.response, 'payload');
+    const account = await server.ssrLoadModule('/packages/portal-mojo/src/account/models.ts');
+    for (const name of ['ApiKeyModel', 'PasskeyModel', 'OAuthConnectionModel', 'useGenerateUserApiKey']) assert.equal(users[name], account[name], `admin users re-exports the shared ${name}`);
 
     const standalone = admin.adminSectionRoutes([admin.USERS_ADMIN_SECTION]);
     const embedded = admin.adminSectionRoutes([admin.USERS_ADMIN_SECTION], { mount: '/system' });
@@ -41,7 +43,8 @@ try {
     const mainSource = await readFile(new URL('../apps/portal/src/main.tsx', import.meta.url), 'utf8');
     const menuSource = await readFile(new URL('../apps/portal/src/menus.ts', import.meta.url), 'utf8');
     const querySource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/users/sections/queries.ts', import.meta.url), 'utf8');
-    const modelSource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/users/models.ts', import.meta.url), 'utf8');
+    // The key-generation boundary moved to portal-mojo/account (admin re-exports it).
+    const modelSource = await readFile(new URL('../packages/portal-mojo/src/account/models.ts', import.meta.url), 'utf8');
     const mockSource = await readFile(new URL('../packages/portal-mojo/src/client/mock.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(mainSource, /path:\s*['"]users['"]/);
     assert.doesNotMatch(menuSource, /admin:users/);

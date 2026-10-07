@@ -73,7 +73,7 @@
       "purpose": "OAuthConnectionList: focused lifecycle, verification or operation result"
     },
     {
-      "id": "packages/portal-mojo/src/admin/credentials/secret-dialog.tsx:showSecretDialog:modal.open:0",
+      "id": "packages/portal-mojo/src/ui/secret-dialog.tsx:showSecretDialog:modal.open:0",
       "fingerprint": "ccfbeaa5bbe7b795071a",
       "category": "action",
       "purpose": "SecretBox: focused lifecycle, verification or operation result"
@@ -353,6 +353,66 @@
       "fingerprint": "88f7ed0954ae847dfe42",
       "category": "editor",
       "purpose": "Push editor with grouped fields and a live pending dismissal lock"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openAddPasskeyDialog:modal.open:0",
+      "fingerprint": "b4d37e253dcce7651fc8",
+      "category": "action",
+      "purpose": "AddPasskeyDialog: name + WebAuthn create ceremony for the caller (fresh auth), dismissal locked while pending"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openTotpEnrolDialog:modal.open:0",
+      "fingerprint": "5b8cbd08a0043b82ca6f",
+      "category": "action",
+      "purpose": "TotpEnrolDialog: authenticator QR/key, code confirm, shown-once recovery codes locked until saved"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openRecoveryCodesView:modal.open:0",
+      "fingerprint": "e4d16786e7596a98b253",
+      "category": "record",
+      "purpose": "RecoveryCodesView: remaining count and masked hints held in dialog state only"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openRegenerateRecoveryCodes:modal.open:0",
+      "fingerprint": "4196b15b0073dfd61a81",
+      "category": "action",
+      "purpose": "RegenerateRecoveryCodes: authenticator code, then a shown-once set locked until saved"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openChangePasswordDialog:modal.open:0",
+      "fingerprint": "ea76201d22699607935e",
+      "category": "editor",
+      "purpose": "ChangePasswordDialog: current + new password for the caller"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openEmailChangeDialog:modal.open:0",
+      "fingerprint": "9aebc117dcb0f58a737d",
+      "category": "action",
+      "purpose": "EmailChangeDialog: request a code to the new address, confirm adopts the re-issued login"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openPhoneChangeDialog:modal.open:0",
+      "fingerprint": "14cbbadc6dcde59cb68c",
+      "category": "action",
+      "purpose": "PhoneChangeDialog: request a code to the new number, confirm with the dialog-held session token"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openVerifyDialog:modal.open:0",
+      "fingerprint": "c620446905e171a63995",
+      "category": "action",
+      "purpose": "VerifyDialog: send and confirm a verification code for the caller email or phone"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/dialogs.tsx:openAvatarDialog:modal.open:0",
+      "fingerprint": "77546625f94a86d77c1e",
+      "category": "editor",
+      "purpose": "AvatarDialog: personal-scope image upload attached through /api/user/me, dismissal locked while uploading"
+    },
+    {
+      "id": "packages/portal-mojo/src/account/AccountModal.tsx:openAccountModal:modal.open:0",
+      "fingerprint": "0f99adcbe2ae2688289d",
+      "category": "record",
+      "purpose": "AccountModal: the signed-in user's own account (rail of flat sections)"
     }
   ],
   "lifecycle": [
@@ -393,11 +453,11 @@
       "runtimeCase": "mounted-owner-oauth-revocation"
     },
     {
-      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
+      "file": "packages/portal-mojo/src/account/PasskeyList.tsx",
       "symbol": "PasskeyModel.useDelete",
       "expression": "PasskeyModel.useDelete",
-      "fingerprint": "581ccb0b30be1ab091bd",
-      "permission": "live owner or USER_MANAGE_PERMISSIONS",
+      "fingerprint": "b7641254556600e21927",
+      "permission": "live owner or USER_MANAGE_PERMISSIONS (sys.users / sys.manage_users)",
       "rationale": "Remove this user/relying-party credential; reenrollment required, physical device retained.",
       "runtimeCase": "mounted-owner-passkey-unmount"
     },
@@ -454,6 +514,15 @@
       "permission": "JOBS_MANAGE_PERMS with an explicit channel and armed confirmation",
       "rationale": "Clears Redis queue entries and cancels pending database jobs; send confirm:yes only after the operator confirms, preserving partial per-channel results.",
       "runtimeCase": "jobs-clear-queue-armed-channel-results"
+    },
+    {
+      "file": "packages/portal-mojo/src/account/AccountSections.tsx",
+      "symbol": "OAuthConnectionModel.useDelete",
+      "expression": "OAuthConnectionModel.useDelete",
+      "fingerprint": "d4e2e43f47a8850e412b",
+      "permission": "live owner only (self-service; the list is scoped ?user=<me.id>)",
+      "rationale": "Unlink the caller's own provider association; the server refuses the last login method (400) and the provider account stays intact.",
+      "runtimeCase": "account-self-oauth-unlink"
     }
   ]
 }

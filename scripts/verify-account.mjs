@@ -5,58 +5,50 @@
 // login in the SAME storage, the TOTP / recovery-code shapes, phone change's
 // top-level session_token, and the notification master switch ("*") + kinds.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 
-function memoryStorage() {
-    const map = new Map();
-    return {
-        getItem: (key) => (map.has(key) ? map.get(key) : null),
-        setItem: (key, value) => { map.set(key, String(value)); },
-        removeItem: (key) => { map.delete(key); },
-        clear: () => map.clear(),
-        get length() { return map.size; },
-        key: (i) => [...map.keys()][i] ?? null,
-    };
-}
+// JSDOM hosts both halves: the wire calls (auth client + mock) and the
+// mounted module checks (dialogs, cache boundary). It does not claim native
+// <dialog>/focus/layout coverage — the browser pass owns that.
+const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/' });
+for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLFormElement', 'HTMLDialogElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'CustomEvent', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+dom.window.HTMLDialogElement.prototype.showModal = function showModal() { this.open = true; };
+dom.window.HTMLDialogElement.prototype.close = function close() { this.open = false; };
+dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 
 const created = [];
 let nextCredential = null;
 class FakePublicKeyCredential {}
-globalThis.window = {
-    addEventListener() {}, removeEventListener() {},
-    location: { hash: '', pathname: '/', search: '', origin: 'http://localhost' },
-    history: { replaceState() {} },
-    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
-    PublicKeyCredential: FakePublicKeyCredential,
-};
-globalThis.localStorage = memoryStorage();
-globalThis.sessionStorage = memoryStorage();
+dom.window.PublicKeyCredential = FakePublicKeyCredential;
 const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
-Object.defineProperty(globalThis, 'navigator', {
+Object.defineProperty(dom.window.navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36' });
+Object.defineProperty(dom.window.navigator, 'credentials', {
     configurable: true,
     value: {
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36',
-        credentials: {
-            async get() { throw new Error('not used'); },
-            async create(options) {
-                created.push(options);
-                if (nextCredential) { const value = nextCredential; nextCredential = null; return value(); }
-                const raw = new TextEncoder().encode(`cred-${created.length}-${Date.now()}`);
-                return {
-                    id: b64url(raw),
-                    rawId: raw.buffer,
-                    type: 'public-key',
-                    response: {
-                        clientDataJSON: new TextEncoder().encode('{"type":"webauthn.create"}').buffer,
-                        attestationObject: new Uint8Array([1, 2, 3]).buffer,
-                        getTransports: () => ['internal', 'hybrid'],
-                    },
-                };
-            },
+        async get() { throw new Error('not used'); },
+        async create(options) {
+            created.push(options);
+            if (nextCredential) { const value = nextCredential; nextCredential = null; return value(); }
+            const raw = new TextEncoder().encode(`cred-${created.length}-${Date.now()}`);
+            return {
+                id: b64url(raw),
+                rawId: raw.buffer,
+                type: 'public-key',
+                response: {
+                    clientDataJSON: new TextEncoder().encode('{"type":"webauthn.create"}').buffer,
+                    attestationObject: new Uint8Array([1, 2, 3]).buffer,
+                    getTransports: () => ['internal', 'hybrid'],
+                },
+            };
         },
     },
 });
+Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
@@ -237,8 +229,121 @@ try {
     assert.equal(totalPrompts, 10, 'every fresh-auth path prompted exactly once');
     client.setFreshAuthHandler(null);
     console.log(`account wire verified (${totalPrompts} fresh-auth retries, passkey ceremony, owner rules, rotation, TOTP, phone/email change, master switch)`);
+
+    // ── Module: exports, boundaries, mounted flows ────────────────────
+    const read = (path) => readFile(new URL(`../packages/portal-mojo/src/${path}`, import.meta.url), 'utf8');
+    const sources = Object.fromEntries(await Promise.all(['account/index.ts', 'account/AccountModal.tsx', 'account/AccountSections.tsx', 'account/dialogs.tsx', 'account/models.ts', 'account/api.ts', 'account/PasskeyList.tsx', 'account/NotificationPreferences.tsx', 'account/sections/ApiKeysSection.tsx'].map(async (path) => [path, await read(path)])));
+    for (const [path, source] of Object.entries(sources)) {
+        assert.doesNotMatch(source, /from ['"](?:\.\.\/)+admin(?:\/index)?['"]/, `${path} must not import the admin barrel`);
+    }
+    assert.doesNotMatch(sources['account/dialogs.tsx'], /\buse(?:Mutation|Query)\s*\(/, 'one-time secrets never pass through a TanStack mutation/query');
+    assert.match(sources['account/PasskeyList.tsx'], /PasskeyModel\.useList\(\{ user: userId/, 'passkey reads always carry ?user=');
+    assert.match(sources['account/dialogs.tsx'], /safeQrDataUrl\(step\.qr\)/, 'the QR is re-checked at the <img> sink');
+
+    const React = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+    const { act } = React;
+    const ui = await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
+    const account = await server.ssrLoadModule('/packages/portal-mojo/src/account/index.ts');
+    const consoleErrors = [];
+    const originalError = console.error;
+    console.error = (...args) => { consoleErrors.push(args.map(String).join(' ')); };
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, ...client.mojoQueryDefaults().queries } } });
+    let probe = null;
+    function Probe() { probe = { save: account.MeSaveModel.useSave() }; return null; }
+    const root = createRoot(document.getElementById('root'));
+    const wait = (ms) => act(() => new Promise((resolve) => setTimeout(resolve, ms)));
+    const buttons = () => [...document.querySelectorAll('button')];
+    const button = (text) => buttons().reverse().find((node) => node.textContent.trim() === text || node.getAttribute('aria-label') === text);
+    const click = async (text) => { const node = button(text); assert(node, `missing button "${text}"`); assert(!node.disabled, `"${text}" is disabled`); await act(async () => { node.click(); }); };
+    const type = async (input, value) => {
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    };
+    const openDialogs = () => [...document.querySelectorAll('dialog')].filter((node) => node.open);
+    const cacheDump = () => JSON.stringify([
+        qc.getQueryCache().getAll().map((query) => [query.queryKey, query.state.data]),
+        qc.getMutationCache().getAll().map((mutation) => [mutation.state.variables, mutation.state.data]),
+    ]);
+
+    // A fresh, unenrolled, non-admin identity for the mounted half.
+    await client.login('groups.viewer@nativemojo.com', 'mojo');
+    const viewer = (await client.mojoCall('/api/user/me')).data;
+    await act(async () => {
+        root.render(React.createElement(QueryClientProvider, { client: qc },
+            React.createElement(ui.ModalHost), React.createElement(Probe)));
+    });
+
+    // MeSaveModel: only the changes go to /api/user/me; me cache = sanitized row.
+    const saved = await act(() => probe.save.mutateAsync({ id: viewer.id, changes: { display_name: 'Viewer Renamed' } }));
+    assert.equal(saved.display_name, 'Viewer Renamed');
+    assert.equal(qc.getQueryData(['me', client.getAuthSnapshot().uid]).display_name, 'Viewer Renamed', 'MeSaveModel writes ["me", uid]');
+    await assert.rejects(async () => { await act(() => probe.save.mutateAsync({ id: viewer.id, changes: { email: 'x@example.com' } })); }, /not allowed to change email/);
+
+    // Recovery status caches enrolled + remaining only.
+    await qc.fetchQuery({ queryKey: account.accountKeys.recoveryStatus(viewer.id), queryFn: account.getRecoveryCodeStatus });
+    assert.deepEqual(Object.keys(qc.getQueryData(account.accountKeys.recoveryStatus(viewer.id))).sort(), ['enrolled', 'remaining']);
+
+    // TOTP enrolment: QR from data:, codes shown once, locked until ticked,
+    // and NOTHING one-time left in any cache afterwards.
+    let enrolled;
+    await act(async () => { enrolled = account.openTotpEnrolDialog({ replacing: false }); });
+    await wait(600);
+    const qr = document.querySelector('dialog[open] img');
+    assert(qr && /^data:image\/svg\+xml;base64,/.test(qr.getAttribute('src')), 'the QR renders from the data: image');
+    await click('Enter a key instead');
+    const secretShown = document.querySelector('[aria-label="Setup key"]').textContent.replace(/\s/g, '');
+    await click('Next');
+    await type(document.querySelector('dialog[open] input[autocomplete="one-time-code"]'), '123456');
+    await click('Turn on');
+    await wait(600);
+    const shownCodes = [...document.querySelectorAll('dialog[open] [aria-label="Recovery codes"] code')].map((node) => node.textContent);
+    assert.equal(shownCodes.length, 8, 'eight recovery codes are shown once');
+    assert(button('Done').disabled, 'Done waits for "I saved these"');
+    await act(async () => { openDialogs().at(-1).dispatchEvent(new Event('cancel', { cancelable: true })); });
+    assert.equal(openDialogs().length, 1, 'Escape cannot dismiss unsaved recovery codes');
+    await act(async () => { document.querySelector('dialog[open] input[type="checkbox"]').click(); });
+    await click('Done');
+    assert.equal(await enrolled, true);
+    assert.equal(openDialogs().length, 0);
+    await wait(400);
+    const dump = cacheDump();
+    for (const secret of [secretShown, ...shownCodes]) assert(!dump.includes(secret), `one-time value leaked into a TanStack cache: ${secret}`);
+    assert.equal(qc.getQueryState(account.accountKeys.recoveryStatus(viewer.id))?.isInvalidated, true, 'enrolment invalidates the cached status');
+    await qc.fetchQuery({ queryKey: account.accountKeys.recoveryStatus(viewer.id), queryFn: account.getRecoveryCodeStatus });
+    assert.deepEqual(qc.getQueryData(account.accountKeys.recoveryStatus(viewer.id)), { enrolled: true, remaining: 8 });
+
+    // The modal: six rail tabs, each section renders; sign-out lives in the rail.
+    let closed;
+    await act(async () => { closed = account.openAccountModal(); });
+    await wait(500);
+    const tabs = [...document.querySelectorAll('dialog[open] [role="tab"]')].map((node) => node.textContent.trim());
+    assert.deepEqual(tabs, ['Profile', 'Passkeys', 'Security', 'Sessions', 'Notifications', 'API keys']);
+    for (const tab of tabs) {
+        await act(async () => { [...document.querySelectorAll('dialog[open] [role="tab"]')].find((node) => node.textContent.trim() === tab).click(); });
+        await wait(500);
+        assert.equal(document.querySelector('dialog[open] .acct-title-section').textContent, tab);
+        assert(!document.querySelector('dialog[open] .acct-body [role="alert"].form-alert'), `${tab} renders without an error`);
+    }
+    await click('Close');
+    await closed;
+    assert.equal(openDialogs().length, 0);
+
+    await act(async () => root.unmount());
+    console.error = originalError;
+    assert.deepEqual(consoleErrors.filter((line) => !/inert/.test(line)), [], 'no console errors while mounted');
+    console.log('account module verified (no admin barrel, MeSaveModel me write, status-only cache, TOTP shown-once lock + no secret in any cache, six sections render)');
+} catch (error) {
+    console.error(error);
+    process.exitCode = 1;
 } finally {
-    // The auth client's 60s refresh watcher would otherwise hold the process open.
     client?.stopAutoRefresh();
     await server.close();
+    dom.window.close();
 }
+// The auth refresh watcher, Query gc timers and the React scheduler would
+// otherwise hold the run open.
+process.exit(process.exitCode ?? 0);
