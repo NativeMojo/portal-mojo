@@ -247,11 +247,29 @@ function ModalDialog({ item }: { item: ModalItem }) {
         item.resolve(null);
     };
 
+    // The native dialog can close WITHOUT a cancelable cancel: Chromium's
+    // second Escape with no click in between (close-watcher anti-abuse) and
+    // Android back fire a non-cancelable cancel, then close. A locked item
+    // reopens; an unlocked one settles like any other dismiss.
+    const onNativeClose = () => {
+        const dialog = ref.current;
+        if (!dialog || dialog.open || !stack.some((m) => m.id === item.id)) return; // unmount / already settled
+        if (item.canDismiss?.() === false) {
+            dialog.showModal();
+            if (!dialog.contains(document.activeElement)) {
+                (dialog.querySelector<HTMLElement>('[autofocus], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? dialog).focus();
+            }
+            return;
+        }
+        item.resolve(null);
+    };
+
     return (
         <dialog
             ref={ref}
             className={`mojo-modal mojo-modal-${item.size}${item.flush ? ' mojo-modal-flush' : ''}`}
             onCancel={(e) => { e.preventDefault(); dismiss(); }}
+            onClose={onNativeClose}
             onMouseDown={(e) => { if (e.target === ref.current) dismiss(); }}
         >
             {item.flush && <button type="button" className="btn-icon modal-fallback-close" aria-label="Close" onClick={dismiss}><i className="bi bi-x-lg" /></button>}
@@ -273,6 +291,13 @@ function DrawerDialog({ item }: { item: DrawerItem }) {
     }, []);
 
     const dismiss = () => { if (item.dismissable) item.resolve(null); };
+    // Same non-cancelable close path as ModalDialog: a non-dismissable drawer reopens.
+    const onNativeClose = () => {
+        const el = ref.current;
+        if (!el || el.open || !stack.some((m) => m.id === item.id && m.variant === 'drawer' && !m.closing)) return;
+        if (!item.dismissable) { el.showModal(); return; }
+        item.resolve(null);
+    };
     const hasHead = item.dismissable || item.eyebrow != null || item.title != null || (item.meta?.length ?? 0) > 0;
 
     return (
@@ -282,6 +307,7 @@ function DrawerDialog({ item }: { item: DrawerItem }) {
             // React's CSSProperties has no index signature for custom props.
             style={{ '--drawer-w': `${item.width}px` } as CSSProperties}
             onCancel={(e) => { e.preventDefault(); dismiss(); }}
+            onClose={onNativeClose}
             onMouseDown={(e) => { if (e.target === ref.current) dismiss(); }}
         >
             {/* The panel fills the dialog, so the dialog element is only ever

@@ -307,6 +307,15 @@ try {
     assert(button('Done').disabled, 'Done waits for "I saved these"');
     await act(async () => { openDialogs().at(-1).dispatchEvent(new Event('cancel', { cancelable: true })); });
     assert.equal(openDialogs().length, 1, 'Escape cannot dismiss unsaved recovery codes');
+    // Chromium's second Escape (no click between) / Android back: a
+    // NON-cancelable cancel, then the native dialog closes on its own.
+    let enrolSettled = false;
+    void enrolled.then(() => { enrolSettled = true; });
+    const codesDialog = openDialogs().at(-1);
+    await act(async () => { codesDialog.open = false; codesDialog.dispatchEvent(new Event('close')); });
+    await wait(0);
+    assert.equal(codesDialog.open, true, 'a native close of unsaved recovery codes reopens the dialog');
+    assert.equal(enrolSettled, false, 'the enrol promise is still pending after a native close');
     await act(async () => { document.querySelector('dialog[open] input[type="checkbox"]').click(); });
     await click('Done');
     assert.equal(await enrolled, true);
@@ -333,6 +342,25 @@ try {
     await click('Close');
     await closed;
     assert.equal(openDialogs().length, 0);
+
+    // ── Native close (non-cancelable cancel) honours canDismiss ──
+    let locked = true;
+    let lockedResult = 'pending';
+    await act(async () => {
+        void ui.modal.open(() => React.createElement('div', null, React.createElement('button', { type: 'button' }, 'Inside')), { canDismiss: () => !locked })
+            .then((value) => { lockedResult = value; });
+    });
+    const nativeDialog = openDialogs().at(-1);
+    await act(async () => { nativeDialog.open = false; nativeDialog.dispatchEvent(new Event('close')); });
+    await wait(0);
+    assert.equal(nativeDialog.open, true, 'a locked modal reopens after a native close');
+    assert(nativeDialog.contains(document.activeElement), 'focus is kept inside the reopened modal');
+    assert.equal(lockedResult, 'pending', 'a locked modal stays unresolved after a native close');
+    locked = false;
+    await act(async () => { nativeDialog.open = false; nativeDialog.dispatchEvent(new Event('close')); });
+    await wait(0);
+    assert.equal(lockedResult, null, 'an unlocked native close resolves null');
+    assert.equal(openDialogs().length, 0, 'an unlocked native close pops the stack');
 
     // ── An open enrol dialog never survives a sign-out / sign-in ──
     // Mount the host the way an app's auth guard does: only while signed in.

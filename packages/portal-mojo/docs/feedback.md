@@ -24,6 +24,10 @@ Patterns:
 - Batch prepare: open a `formModal` INSIDE a flow to collect once-per-batch
   input; resolve null to cancel the whole thing.
 - Stacked dialogs are fine (disable-reason form over a detail modal).
+- `canDismiss` also covers the dialog closing natively without a cancelable
+  `cancel` (Chromium's second Escape with no click between, Android back):
+  a locked modal reopens with focus inside; an unlocked one resolves `null`.
+  A `dismissable: false` drawer reopens the same way.
 - The stack ends with the session: `'logout'` / `'unauthorized'` auth events,
   or the signed-in uid changing (another tab), close every open dialog
   (`null`), so a host remounted after sign-in never brings a previous user's
