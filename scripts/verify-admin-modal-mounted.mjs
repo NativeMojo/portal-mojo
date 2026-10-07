@@ -35,7 +35,7 @@ const server = await createServer({ root: process.cwd(), appType: 'custom', logL
     if (id.endsWith('/account/PasskeyList.tsx')) {
         // The shared passkey list (portal-mojo/account) backs the admin modal.
         if (process.env.MODAL_REGRESSION_REF) source = execFileSync('git', ['show', `${process.env.MODAL_REGRESSION_REF}:${id.replace(process.cwd() + '/', '')}`], { encoding: 'utf8' });
-        return source.replace("from '../client/runtime'", "from '/__4156_runtime.ts'").replace("from './models'", "from '/__4156_models.ts'");
+        return source.replace("from '../client/runtime'", "from '/__4156_runtime.ts'").replace("from './models'", "from '/__4156_models.ts'").replace("from './credential-models'", "from '/__4156_models.ts'");
     }
     if (!targets.some(path => id.endsWith('/admin/' + path))) return;
     if (process.env.MODAL_REGRESSION_REF) source = execFileSync('git', ['show', `${process.env.MODAL_REGRESSION_REF}:${id.replace(process.cwd() + '/', '')}`], { encoding: 'utf8' });
