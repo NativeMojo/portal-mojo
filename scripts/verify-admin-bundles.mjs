@@ -79,7 +79,12 @@ try {
             // RouteError card is deliberately EAGER (a lazy error card cannot
             // display chunk-load failures) and put the portal entry chunk at
             // 502,515 (was 499,007, already 99.8% of the old cap).
-            if (file?.endsWith('.js')) assert((await stat(resolve(outDir, file))).size <= 520_000, `${app} eager/default chunk ${file} exceeds 520000 bytes`);
+            // 522_000: bumped from 520_000 on 2026-10-07 (#1616) — the Edge
+            // section and the blocklist route are registry entries, which are
+            // eager by design, and put the portal entry chunk at 520,161 (was
+            // 518,956 on v0.2.7, already 99.8% of the old cap). The pages
+            // themselves stay lazy.
+            if (file?.endsWith('.js')) assert((await stat(resolve(outDir, file))).size <= 522_000, `${app} eager/default chunk ${file} exceeds 522000 bytes`);
         }
         for (const sourcePath of budget.representatives) {
             const key = moduleKey(manifest, app, sourcePath);
