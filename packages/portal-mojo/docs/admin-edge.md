@@ -183,6 +183,19 @@ The editor shows the saved value from the response.
   name, a repeated route prefix, a repeated blocklist value, a repeated
   upstream name) are the mock's own words. The server reports these from a
   database constraint, and its wording was not measured.
+- The server parses a blocklist address with Python's `ipaddress` and compiles
+  a user-agent pattern with Python's `re`, and the mock follows Python, not
+  JavaScript: `010.1.2.3` and `\q` are refused, `10.0.0.0/255.0.0.0`,
+  `(?i)bot` and `a*+` are accepted. The reason after "does not compile" is the
+  mock's own wording. The editor's own check is only a first pass and never
+  compiles the pattern; the server's answer on save is the verdict.
+- A vhost update that names an upstream or certificate that does not exist is
+  refused by the mock with the same words as a missing one. The server's
+  wording for an unknown id was not measured.
+- The declare-upstream dialog and the blocklist editor refuse Escape and the
+  backdrop while their write is in flight, and the editor's save and delete
+  share one pending state. `npm run verify:admin-edge` holds each write open
+  and checks this.
 
 ## Themes and showcase
 

@@ -313,18 +313,22 @@ export function certificateCovers(certificate: { common_name?: string | null; sa
 export function validateBlocklistValue(kind: string, value: string): string | null {
     if (!value) return 'Enter a value.';
     if (kind === 'ip') {
+        // A first pass only. It must never refuse what the server accepts, so
+        // a dotted mask (10.0.0.0/255.0.0.0) and an IPv6 zone (fe80::1%eth0)
+        // pass here and the server has the last word.
         const [address = '', prefix, ...rest] = value.split('/');
         if (rest.length) return `${value} is not an IP address or CIDR network.`;
-        const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(address);
-        const isV4 = !!v4 && v4.slice(1).every((octet) => Number(octet) <= 255);
-        const isV6 = !isV4 && address.includes(':') && /^[0-9A-Fa-f:.]{2,45}$/.test(address);
+        const dotted = (text: string) => { const quad = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(text); return !!quad && quad.slice(1).every((octet) => Number(octet) <= 255); };
+        const isV4 = dotted(address);
+        const isV6 = !isV4 && address.includes(':') && /^[0-9A-Fa-f:.]{2,45}(%[^%]+)?$/.test(address);
         if (!isV4 && !isV6) return `${value} is not an IP address or CIDR network.`;
-        if (prefix !== undefined && (!/^\d{1,3}$/.test(prefix) || Number(prefix) > (isV4 ? 32 : 128))) return `${value} is not an IP address or CIDR network.`;
+        if (prefix !== undefined && !(/^\d+$/.test(prefix) ? Number(prefix) <= (isV4 ? 32 : 128) : isV4 && dotted(prefix))) return `${value} is not an IP address or CIDR network.`;
         return null;
     }
     if (!UA_PATTERN_RE.test(value)) return 'A user-agent pattern may use letters, digits and the regex characters ()[]|?^.*+-/_\\ only (max 256 characters, no spaces, quotes or braces).';
     if ((value.length - value.replace(/\\+$/, '').length) % 2 === 1) return 'A user-agent pattern cannot end with an unescaped backslash.';
-    try { new RegExp(value); } catch { return 'The user-agent pattern does not compile.'; }
+    // Whether it compiles is the server's call: it compiles with Python, and
+    // JavaScript's RegExp disagrees in both directions (`(?i)bot`, `\\q`).
     return null;
 }
 

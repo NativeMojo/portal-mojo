@@ -6865,7 +6865,8 @@ function edgeValidateVhost(row: MockEdgeVhost, persisted: boolean): string | nul
         if (row.mojosec_policy.response_class !== expected) return `mojosec_policy response_class for ${row.kind} must be ${expected}`;
     }
     if (row.kind === 'api') {
-        if (row.upstream == null) return 'an api vhost requires an upstream';
+        // An id that names no upstream cannot be stored; the wording for that case is this mock's own.
+        if (row.upstream == null || !db.edgeUpstreams.some((candidate) => candidate.id === row.upstream)) return 'an api vhost requires an upstream';
     } else if (row.upstream != null) return `a ${row.kind} vhost has no whole-host upstream (site_api proxies per-route)`;
     if (row.kind === 'redirect') {
         if (typeof row.redirect_to !== 'string' || !row.redirect_to) return 'a redirect vhost requires redirect_to';
@@ -6901,6 +6902,8 @@ function edgeValidateVhost(row: MockEdgeVhost, persisted: boolean): string | nul
     const serverName = edgeServerName(domain.name, label);
     const nameRefusal = edgeServerNameError(serverName);
     if (nameRefusal) return nameRefusal;
+    // The column is NOT NULL even for a disabled row, on create and on update.
+    if (row.certificate == null || !db.dnsCertificates.some((candidate) => candidate.id === row.certificate)) return 'a vhost requires a certificate';
     if (row.is_enabled) {
         const certificate = db.dnsCertificates.find((candidate) => candidate.id === row.certificate);
         if (!certificate) return 'a vhost requires a certificate';
@@ -6981,12 +6984,19 @@ function serializeEdgeBlocklistEntry(row: MockEdgeBlocklistEntry): Record<string
     return { id: row.id, created: row.created, modified: row.modified, kind: row.kind, value: row.value, mode: row.mode, note: row.note };
 }
 
+/** `ipaddress.IPv4Address`: four decimal octets, none written with a leading zero. */
+function edgeIpv4Strict(text: string): number | null {
+    const octets = text.split('.');
+    if (octets.length !== 4 || octets.some((octet) => !/^[0-9]{1,3}$/.test(octet) || (octet.length > 1 && octet.startsWith('0')) || Number(octet) > 255)) return null;
+    return octets.reduce((value, octet) => value * 256 + Number(octet), 0);
+}
+
 function edgeParseIpv6(text: string): number[] | null {
     if (!/^[0-9A-Fa-f:.]+$/.test(text) || !text.includes(':')) return null;
     let source = text;
     const tail = source.slice(source.lastIndexOf(':') + 1);
     if (tail.includes('.')) {
-        const v4 = ipv4ToInt(tail);
+        const v4 = edgeIpv4Strict(tail);
         if (v4 == null) return null;
         source = `${source.slice(0, source.lastIndexOf(':') + 1)}${Math.floor(v4 / 65536).toString(16)}:${(v4 % 65536).toString(16)}`;
     }
@@ -7026,23 +7036,220 @@ function edgeNormalizeIpNetwork(value: string): string | null {
     const pieces = value.split('/');
     if (pieces.length > 2) return null;
     const [address = '', prefixRaw] = pieces;
-    if (prefixRaw !== undefined && !/^\d{1,3}$/.test(prefixRaw)) return null;
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(address)) {
-        const numeric = ipv4ToInt(address);
-        const prefix = prefixRaw === undefined ? 32 : Number(prefixRaw);
-        if (numeric == null || prefix > 32) return null;
+    const numeric = edgeIpv4Strict(address);
+    if (numeric != null) {
+        let prefix = 32;
+        if (prefixRaw !== undefined) {
+            if (/^[0-9]+$/.test(prefixRaw)) prefix = Number(prefixRaw);
+            else {
+                // A netmask (255.255.0.0) or, failing that, a hostmask (0.0.255.255).
+                const mask = edgeIpv4Strict(prefixRaw);
+                if (mask == null) return null;
+                const ones = (bits: number) => { const zeros = Math.log2(2 ** 32 - bits); return Number.isInteger(zeros) ? 32 - zeros : null; };
+                const asNetmask = ones(mask);
+                const asHostmask = ones(2 ** 32 - 1 - mask);
+                if (asNetmask != null) prefix = asNetmask;
+                else if (asHostmask != null) prefix = asHostmask;
+                else return null;
+            }
+        }
+        if (prefix > 32) return null;
         const size = 2 ** (32 - prefix);
         const network = Math.floor(numeric / size) * size;
         return `${[24, 16, 8, 0].map((shift) => Math.floor(network / 2 ** shift) % 256).join('.')}/${prefix}`;
     }
-    const groups = edgeParseIpv6(address);
+    // An IPv6 zone (`fe80::1%eth0`) survives only when no host bits are masked off.
+    const zoneAt = address.indexOf('%');
+    const zone = zoneAt < 0 ? null : address.slice(zoneAt + 1);
+    if (zone != null && (!zone || zone.includes('%'))) return null;
+    const groups = edgeParseIpv6(zoneAt < 0 ? address : address.slice(0, zoneAt));
+    if (prefixRaw !== undefined && !/^[0-9]+$/.test(prefixRaw)) return null;
     const prefix = prefixRaw === undefined ? 128 : Number(prefixRaw);
     if (!groups || prefix > 128) return null;
     const masked = groups.map((group, index) => {
         const keep = Math.max(0, Math.min(16, prefix - index * 16));
         return keep === 16 ? group : group - (group % 2 ** (16 - keep));
     });
-    return `${edgeFormatIpv6(masked)}/${prefix}`;
+    const kept = zone != null && masked.every((group, index) => group === groups[index]);
+    return `${edgeFormatIpv6(masked)}${kept ? `%${zone}` : ''}/${prefix}`;
+}
+
+/**
+ * Whether Python's `re.compile` accepts a pattern drawn from the user-agent
+ * alphabet, which is what the server runs. JavaScript's RegExp disagrees both
+ * ways (`\q`, `[]`, `a*+`, `(?i)a`), so this follows Python's parser instead.
+ * Returns null when it compiles; the reason wording is this mock's own.
+ */
+function edgePythonRegexError(pattern: string): string | null {
+    const OCT = '01234567';
+    const isHex = (text: string) => /^[0-9a-fA-F]+$/.test(text);
+    const isLetter = (char: string) => /^[A-Za-z]$/.test(char);
+    const isDigit = (char: string) => char >= '0' && char <= '9';
+    let at = 0;
+    let groups = 1;
+    const closed = new Set<number>();
+    const conditionRefs: number[] = [];
+    let flags = '';
+    class Refusal extends Error {}
+    const fail = (reason: string): never => { throw new Refusal(`${reason} at position ${at}`); };
+    const take = (count: number, allowed: (char: string) => boolean) => {
+        let taken = '';
+        while (taken.length < count && at < pattern.length && allowed(pattern[at]!)) taken += pattern[at++];
+        return taken;
+    };
+    /** After a backslash. Returns a code point, 'category', 'at' or 'atom'. */
+    const escape = (inClass: boolean): number | 'category' | 'at' | 'atom' => {
+        const char = pattern[at++];
+        if (char === undefined) return fail('bad escape (end of pattern)');
+        if ('dDsSwW'.includes(char)) return 'category';
+        if (char === 'x' || char === 'u' || char === 'U') {
+            const want = char === 'x' ? 2 : char === 'u' ? 4 : 8;
+            const digits = take(want, isHex);
+            if (digits.length !== want) return fail(`incomplete escape \\${char}${digits}`);
+            const value = parseInt(digits, 16);
+            if (value > 0x10ffff) return fail(`bad escape \\${char}${digits}`);
+            return value;
+        }
+        if (char === 'N') return fail('missing {');
+        if (inClass) {
+            if (char === 'b') return 8;
+            if (OCT.includes(char)) {
+                const value = parseInt(char + take(2, (next) => OCT.includes(next)), 8);
+                if (value > 0o377) return fail('octal escape value outside of range 0-0o377');
+                return value;
+            }
+            if (isDigit(char)) return fail(`bad escape \\${char}`);
+        } else {
+            if ('AbBZ'.includes(char)) return 'at';
+            if (char === '0') return parseInt(`0${take(2, (next) => OCT.includes(next))}`, 8);
+            if (isDigit(char)) {
+                let digits = char;
+                if (at < pattern.length && isDigit(pattern[at]!)) {
+                    digits += pattern[at++];
+                    if (OCT.includes(digits[0]!) && OCT.includes(digits[1]!) && at < pattern.length && OCT.includes(pattern[at]!)) {
+                        digits += pattern[at++];
+                        const value = parseInt(digits, 8);
+                        if (value > 0o377) return fail('octal escape value outside of range 0-0o377');
+                        return value;
+                    }
+                }
+                const group = Number(digits);
+                if (group >= groups) return fail(`invalid group reference ${group}`);
+                if (!closed.has(group)) return fail('cannot refer to an open group');
+                return 'atom';
+            }
+        }
+        const control = { a: 7, f: 12, n: 10, r: 13, t: 9, v: 11 }[char];
+        if (control !== undefined) return control;
+        if (isLetter(char)) return fail(`bad escape \\${char}`);
+        return char.charCodeAt(0);
+    };
+    const charClass = () => {
+        if (pattern[at] === '^') at += 1;
+        let members = 0;
+        for (;;) {
+            const char = pattern[at++];
+            if (char === undefined) return fail('unterminated character set');
+            if (char === ']' && members > 0) return;
+            const low = char === '\\' ? escape(true) : char.charCodeAt(0);
+            members += 1;
+            if (pattern[at] !== '-') continue;
+            at += 1;
+            const next = pattern[at++];
+            if (next === undefined) return fail('unterminated character set');
+            if (next === ']') return;
+            const high = next === '\\' ? escape(true) : next.charCodeAt(0);
+            if (typeof low !== 'number' || typeof high !== 'number' || high < low) return fail('bad character range');
+        }
+    };
+    const sequence = (first: boolean): void => {
+        // 'none' (nothing yet), 'at' (an anchor), 'repeat' or 'atom'.
+        let last: 'none' | 'at' | 'repeat' | 'atom' = 'none';
+        while (at < pattern.length) {
+            const char = pattern[at]!;
+            if (char === '|' || char === ')') return;
+            at += 1;
+            if (char === '\\') {
+                const kind = escape(false);
+                last = kind === 'at' ? 'at' : 'atom';
+            } else if (char === '[') {
+                charClass();
+                last = 'atom';
+            } else if (char === '*' || char === '+' || char === '?') {
+                if (last === 'none' || last === 'at') return fail('nothing to repeat');
+                if (last === 'repeat') return fail('multiple repeat');
+                if (pattern[at] === '?' || pattern[at] === '+') at += 1;
+                last = 'repeat';
+            } else if (char === '^') {
+                last = 'at';
+            } else if (char === '(') {
+                let group: number | null = null;
+                if (pattern[at] === '?') {
+                    at += 1;
+                    const next = pattern[at++];
+                    if (next === undefined) return fail('unexpected end of pattern');
+                    if (next === '(') {
+                        const end = pattern.indexOf(')', at);
+                        if (end < 0) return fail('missing ), unterminated name');
+                        const name = pattern.slice(at, end);
+                        at = end + 1;
+                        if (!name) return fail('missing group name');
+                        if (!/^[0-9]+$/.test(name)) return fail(/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? `unknown group name '${name}'` : `bad character in group name '${name}'`);
+                        const reference = Number(name);
+                        if (!reference) return fail('bad group number');
+                        conditionRefs.push(reference);
+                        sequence(false);
+                        if (pattern[at] === '|') {
+                            at += 1;
+                            sequence(false);
+                            if (pattern[at] === '|') return fail('conditional backref with more than two branches');
+                        }
+                        if (pattern[at] !== ')') return fail('missing ), unterminated subpattern');
+                        at += 1;
+                        last = 'atom';
+                        continue;
+                    }
+                    if (!'aiLmsux'.includes(next)) return fail(`unknown extension ?${next}`);
+                    let seen = next;
+                    while (at < pattern.length && 'aiLmsux'.includes(pattern[at]!)) seen += pattern[at++];
+                    if (pattern[at] !== ')') return fail(at < pattern.length && isLetter(pattern[at]!) ? 'unknown flag' : 'missing -, : or )');
+                    at += 1;
+                    if (seen.includes('L')) return fail("bad inline flags: cannot use 'L' flag with a str pattern");
+                    if ((flags + seen).includes('a') && (flags + seen).includes('u')) return fail("bad inline flags: flags 'a', 'u' and 'L' are incompatible");
+                    if (!first || last !== 'none') return fail('global flags not at the start of the expression');
+                    flags += seen;
+                    continue;
+                }
+                group = groups;
+                groups += 1;
+                alternation(false);
+                if (pattern[at] !== ')') return fail('missing ), unterminated subpattern');
+                at += 1;
+                closed.add(group);
+                last = 'atom';
+            } else {
+                last = 'atom';
+            }
+        }
+    };
+    const alternation = (top: boolean): void => {
+        let branch = 0;
+        for (;;) {
+            sequence(top && branch === 0);
+            if (pattern[at] !== '|') return;
+            at += 1;
+            branch += 1;
+        }
+    };
+    try {
+        alternation(true);
+        if (at < pattern.length) fail('unbalanced parenthesis');
+        for (const reference of conditionRefs) if (reference >= groups) fail(`invalid group reference ${reference}`);
+        return null;
+    } catch (error) {
+        if (error instanceof Refusal) return error.message;
+        throw error;
+    }
 }
 
 /** `validators.validate_blocklist_entry`; normalizes an `ip` value in place. */
@@ -7057,7 +7264,8 @@ function edgeValidateBlocklistEntry(entry: MockEdgeBlocklistEntry): string | nul
     } else {
         if (!EDGE_UA_RE.test(entry.value)) return 'a user-agent pattern may use letters, digits and the regex characters ()[]|?^.*+-/_\\ only (max 256 characters, no spaces, quotes or braces)';
         if ((entry.value.length - entry.value.replace(/\\+$/, '').length) % 2 === 1) return 'a user-agent pattern cannot end with an unescaped backslash';
-        try { new RegExp(entry.value); } catch (error) { return `user-agent pattern does not compile: ${error instanceof Error ? error.message : 'invalid pattern'}`; }
+        const reason = edgePythonRegexError(entry.value);
+        if (reason) return `user-agent pattern does not compile: ${reason}`;
     }
     // `edge_blocklist_kind_value_uniq`.
     if (db.edgeBlocklist.some((other) => other.id !== entry.id && other.kind === entry.kind && other.value === entry.value)) {
@@ -7226,8 +7434,6 @@ function edgeFetch(path: string, opts: MockFetchOpts): Record<string, unknown> |
             edgeApplyVhostBody(draft, body);
             const refusal = edgeValidateVhost(draft, false);
             if (refusal) return edgeRefuse(refusal);
-            // The column is NOT NULL even for a disabled row.
-            if (draft.certificate == null || !db.dnsCertificates.some((candidate) => candidate.id === draft.certificate)) return edgeRefuse('a vhost requires a certificate');
             db.edgeVhosts.push(draft);
             return { status: true, data: serializeEdgeVhost(draft, 'default'), graph: 'default' };
         }

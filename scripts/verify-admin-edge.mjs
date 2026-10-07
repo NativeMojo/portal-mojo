@@ -125,7 +125,10 @@ try {
     assert.equal(models.validateBlocklistValue('ip', '2001:db8::/32'), null);
     for (const value of ['', '10.0.0.256', '10.0.0.0/33', 'example.com', '10.0.0.0/8/8']) assert.notEqual(models.validateBlocklistValue('ip', value), null, `ip ${value}`);
     assert.equal(models.validateBlocklistValue('ua', 'curl/7\\.'), null);
-    for (const value of ['bad bot', 'a"b', 'a{2}', 'abc\\', '(unclosed']) assert.notEqual(models.validateBlocklistValue('ua', value), null, `ua ${value}`);
+    for (const value of ['bad bot', 'a"b', 'a{2}', 'abc\\']) assert.notEqual(models.validateBlocklistValue('ua', value), null, `ua ${value}`);
+    // The first pass never refuses what the server accepts; compiling is the server's call.
+    for (const value of ['10.9.0.0/255.255.0.0', '10.7.7.7/0.0.0.255', '10.0.0.0/0008', 'fe80::1%eth0', 'fe80::1%eth0/64']) assert.equal(models.validateBlocklistValue('ip', value), null, `ip ${value}`);
+    for (const value of ['(?i)bot', 'a*+', '[]]', '(unclosed', '\\q']) assert.equal(models.validateBlocklistValue('ua', value), null, `ua ${value}`);
 
     // ── 7. The mock speaks the server contract ──
     const login = async (email) => {
@@ -230,6 +233,14 @@ try {
     const createdApi = await post('/api/edge/vhost', manager, models.buildVhostPayload({ kind: 'api', domain: 8201, label: 'orders', certificate: 8401, pool: 'default', is_enabled: true, upstream: 8603, serve_static: true, quiet_paths: ['/health'], body_size_mb: 100 }, { create: true }));
     assert.equal(createdApi.status, true, createdApi.error);
     assert.deepEqual({ name: createdApi.data.server_name, upstream: createdApi.data.upstream.id, quiet: createdApi.data.quiet_paths, size: createdApi.data.body_size_mb }, { name: 'orders.acme.example', upstream: 8603, quiet: ['/health'], size: 100 });
+    // A reference that names nothing is refused, on create and on update, and a
+    // stored vhost cannot lose its certificate even while disabled.
+    await refused(post('/api/edge/vhost', manager, { ...base, label: 'ghost', kind: 'api', upstream: 999999 }), /an api vhost requires an upstream/);
+    await refused(post(`/api/edge/vhost/${createdApi.data.id}`, manager, { upstream: 999999 }), /an api vhost requires an upstream/);
+    await refused(post(`/api/edge/vhost/${createdApi.data.id}`, manager, { certificate: null }), /a vhost requires a certificate/);
+    await refused(post(`/api/edge/vhost/${createdApi.data.id}`, manager, { certificate: null, is_enabled: false }), /a vhost requires a certificate/);
+    await refused(post(`/api/edge/vhost/${createdApi.data.id}`, manager, { certificate: 999999, is_enabled: false }), /a vhost requires a certificate/);
+    assert.deepEqual({ upstream: (await call(`/api/edge/vhost/${createdApi.data.id}`, manager)).data.upstream.id, certificate: (await call(`/api/edge/vhost/${createdApi.data.id}`, manager)).data.certificate.id }, { upstream: 8603, certificate: 8401 }, 'a refused update changes nothing');
     const createdSite = await post('/api/edge/vhost', manager, models.buildVhostPayload({ kind: 'site', domain: 8201, label: 'docs', certificate: 8401, pool: 'default', is_enabled: true, spa: true, body_size_mb: 50 }, { create: true }));
     assert.equal(createdSite.data.spa, true);
     const createdRedirect = await post('/api/edge/vhost', manager, models.buildVhostPayload({ kind: 'redirect', domain: 8201, label: 'old', certificate: 8401, pool: 'default', is_enabled: true, redirect_to: 'www.acme.example' }, { create: true }));
@@ -299,6 +310,24 @@ try {
     await refused(post('/api/edge/blocklist', securityManager, { kind: 'ua', value: 'bad bot' }), /a user-agent pattern may use/);
     await refused(post('/api/edge/blocklist', securityManager, { kind: 'ua', value: 'abc\\' }), /cannot end with an unescaped backslash/);
     await refused(post('/api/edge/blocklist', securityManager, { kind: 'ua', value: '(unclosed' }), /does not compile/);
+    // The server parses with Python's `ipaddress` and compiles with Python's
+    // `re`. Every verdict below was taken from Python 3.12, not from JavaScript.
+    for (const value of ['010.1.2.3/8', '::ffff:01.2.3.4', '10.0.0.0/255.0.255.0', 'fe80::1%', '10.0.0.0/33', '1.2.3.4/8/9']) {
+        await refused(post('/api/edge/blocklist', securityManager, { kind: 'ip', value }), /is not an IP address or CIDR network/);
+    }
+    for (const [value, stored] of [['10.9.0.0/255.255.0.0', '10.9.0.0/16'], ['10.7.7.7/0.0.0.255', '10.7.7.0/24'], ['10.6.0.0/0016', '10.6.0.0/16'], ['fe80::1%eth0', 'fe80::1%eth0/128'], ['fe80::1%eth0/64', 'fe80::/64']]) {
+        const made = await post('/api/edge/blocklist', securityManager, { kind: 'ip', value });
+        assert.equal(made.data?.value, stored, `${value}: ${made.error}`);
+        await call(`/api/edge/blocklist/${made.data.id}`, securityManager, { method: 'DELETE' });
+    }
+    for (const value of ['\\q', 'a[]', 'a**', '\\1', 'a|(?i)b', '(?L)a', '[z-a]', '[\\d-a]', '(?(2)a)(b)']) {
+        await refused(post('/api/edge/blocklist', securityManager, { kind: 'ua', value }), /user-agent pattern does not compile/);
+    }
+    for (const value of ['(?i)bot', 'a*+', '[]]', '(a)\\1', 'wget/1\\.', '(a)(?(1)b|c)']) {
+        const made = await post('/api/edge/blocklist', securityManager, { kind: 'ua', value });
+        assert.equal(made.status, true, `${value}: ${made.error}`);
+        await call(`/api/edge/blocklist/${made.data.id}`, securityManager, { method: 'DELETE' });
+    }
     await refused(post('/api/edge/blocklist', securityManager, { kind: 'asn', value: '1' }), /unknown blocklist kind/);
     await refused(post('/api/edge/blocklist', securityManager, { kind: 'ip', value: '10.5.0.0/16', mode: 'block' }), /unknown blocklist mode/);
     const flipped = await post(`/api/edge/blocklist/${normalized.data.id}`, securityManager, { mode: 'enforce' });
