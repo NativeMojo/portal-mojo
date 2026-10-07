@@ -145,9 +145,15 @@ export function FormWizard(props: FormWizardProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [resetKey]);
 
-    useEffect(() => () => {
-        mounted.current = false;
-        generation.current += 1;
+    useEffect(() => {
+        // StrictMode replays this effect in development; without re-arming,
+        // the replayed cleanup leaves the flag false for the real mount and
+        // every onNext/onFinish result is discarded with the wizard still busy.
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            generation.current += 1;
+        };
     }, []);
 
     useEffect(() => {
