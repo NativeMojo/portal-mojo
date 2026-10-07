@@ -195,6 +195,9 @@ async function doRefresh(): Promise<boolean> {
     const persistent = sessionIsPersistent();
     try {
         const body = await mojoCall(REFRESH_PATH, { method: 'POST', body: { refresh_token: refresh } });
+        // The session changed while this POST was in flight (a new login was
+        // adopted, or logout): never write the old session's pair over it.
+        if (getRefreshToken() !== refresh) return getRefreshToken() != null;
         const pkg = body.data as { access_token: string; refresh_token?: string };
         setTokens(pkg.access_token, pkg.refresh_token, persistent);
         emitAuth('refreshed');
@@ -296,7 +299,22 @@ interface TokenGrant {
     expires_in?: number;
 }
 
-function adoptGrant(data: TokenGrant, remember = true): AuthUser {
+/** Copy for a grant that carries no usable session (e.g. a forced-password answer). */
+export const GRANT_SIGN_IN_AGAIN = 'Sign in again to continue';
+
+/**
+ * Store a TokenGrant as THE session. Validates first — a django-mojo
+ * forced_password_response, for one, answers without tokens after auth_key
+ * rotated — and leaves storage untouched (rejecting) when the grant has no
+ * access + refresh pair. Serialised behind any in-flight refresh so a
+ * refresh that started on the old session can never land on top of it.
+ */
+async function adoptGrant(data: TokenGrant | null | undefined, remember = true): Promise<AuthUser> {
+    if (!data || typeof data.access_token !== 'string' || !data.access_token
+        || typeof data.refresh_token !== 'string' || !data.refresh_token) {
+        throw new Error(GRANT_SIGN_IN_AGAIN);
+    }
+    if (refreshPromise) await refreshPromise;
     setTokens(data.access_token, data.refresh_token, remember);
     startAutoRefresh();
     const user = data.user ?? {};
@@ -317,7 +335,7 @@ export async function login(username: string, password: string, opts: LoginOptio
     if (data.mfa_required) {
         return { kind: 'mfa', mfaToken: data.mfa_token ?? '', methods: data.mfa_methods ?? [], expiresIn: data.expires_in ?? 300 };
     }
-    return { kind: 'authenticated', user: adoptGrant(data, opts.remember ?? true) };
+    return { kind: 'authenticated', user: await adoptGrant(data, opts.remember ?? true) };
 }
 
 // ── MFA completion (deferred from A1; landed with the C3 pages) ───────
@@ -752,7 +770,7 @@ async function doExchange(code: string): Promise<AuthUser | null> {
         // block exchanging the fresh one-time login code.
         if (checkTokenStatus().action === 'logout') clearTokens({ silent: true });
         const body = await mojoCall('/api/auth/exchange', { method: 'POST', body: { code } });
-        return adoptGrant(body.data as TokenGrant);
+        return await adoptGrant(body.data as TokenGrant);
     } catch (error) {
         emitAuth('refresh-failed', error);
         return null;

@@ -30,6 +30,13 @@ onAuth('logout', () => queryClient.invalidateQueries());   // every cached answe
 - `useAuthSnapshot()` → `{authenticated, uid, email}` — live, cross-tab.
 - `logout()` is client-side (django-mojo has no logout endpoint) and emits
   `'logout'`.
+- Every flow that answers with a login grant adopts it only when it carries
+  an `access_token` + `refresh_token` pair; anything else (e.g. django-mojo's
+  `forced_password_response` after `auth_key` rotated) rejects with
+  `GRANT_SIGN_IN_AGAIN` ("Sign in again to continue") and leaves storage
+  untouched. Adoption waits for an in-flight refresh, and a refresh that
+  completes after the stored session changed (new login, logout, another
+  tab) is discarded instead of written over it.
 - Events for `onAuth`: `'login' | 'logout' | 'refreshed' | 'refresh-failed'
   | 'unauthorized'`.
 

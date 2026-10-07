@@ -5952,6 +5952,19 @@ export function armMockReauth(method: string, path: string): void {
     armedReauth = { method: method.toUpperCase(), path };
 }
 
+interface MockOnceArm { method: string; path: string; extraDelayMs: number; stripGrantTokens: boolean }
+let armedOnce: MockOnceArm | null = null;
+
+/**
+ * Mock-only one-shot response shaping, matched by BOTH method and path:
+ * `extraDelayMs` holds the answer back (to stage an in-flight race);
+ * `stripGrantTokens` drops access_token/refresh_token from a login grant —
+ * the shape of django-mojo's forced_password_response after auth_key rotated.
+ */
+export function armMockResponseOnce(method: string, path: string, opts: { extraDelayMs?: number; stripGrantTokens?: boolean }): void {
+    armedOnce = { method: method.toUpperCase(), path, extraDelayMs: opts.extraDelayMs ?? 0, stripGrantTokens: opts.stripGrantTokens ?? false };
+}
+
 // ── Self-service account (the AccountModal wire) ──────────────────────
 // Shape-level parity with django-mojo account/rest/passkeys.py (register),
 // rest/totp.py, rest/user.py (email/phone/username change, sessions/revoke)
@@ -8338,6 +8351,20 @@ async function messagingFetch(path:string,opts:MockFetchOpts):Promise<unknown|un
 
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
+    const method = (opts.method ?? 'GET').toUpperCase();
+    const arm = armedOnce?.method === method && armedOnce.path === path ? armedOnce : null;
+    if (arm) armedOnce = null;
+    const result = await mockFetchInner(path, opts);
+    if (!arm) return result;
+    if (arm.extraDelayMs > 0) await mockDelay(arm.extraDelayMs, opts.signal);
+    if (arm.stripGrantTokens && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
+        const { access_token: _a, refresh_token: _r, ...rest } = (result as { data: Record<string, unknown> }).data;
+        return { ...(result as Record<string, unknown>), data: { ...rest, requires_password_change: true } };
+    }
+    return result;
+}
+
+async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknown> {
     const method = (opts.method ?? 'GET').toUpperCase();
     const key = `${method} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);

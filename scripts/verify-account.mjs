@@ -74,11 +74,14 @@ try {
     let prompts = 0;
     // The handler is a real re-login (password, then the TOTP step once the
     // account requires MFA) — exactly what FreshAuthHost does.
-    const reLogin = (email) => async () => {
-        prompts += 1;
+    const signIn = async (email) => {
         const remember = client.sessionIsPersistent();
         const result = await client.login(email, 'mojo', { remember });
         if (result.kind === 'mfa') await client.completeMfaTotp(result.mfaToken, '123456', { remember });
+    };
+    const reLogin = (email) => async () => {
+        prompts += 1;
+        await signIn(email);
         return true;
     };
     client.setFreshAuthHandler(reLogin(EMAIL));
@@ -202,6 +205,36 @@ try {
     assert.equal(client.sessionIsPersistent(), false);
     assert.equal((await mock.mockFetch('/api/user/me', { headers: { Authorization: `Bearer ${otherDevice.data.access_token}` } })).error_code, 401, 'other sessions die');
     assert.equal((await client.mojoCall('/api/user/me')).data.email, NEW_EMAIL, 'this session stays signed in');
+
+    // ── A grant without a token pair is refused; storage stays untouched ──
+    // (django-mojo's forced_password_response after auth_key rotated).
+    const storageDump = () => JSON.stringify([localStorage, sessionStorage].map((store) => ['access_token', 'refresh_token'].map((key) => store.getItem(key))));
+    const beforeTokenless = storageDump();
+    mock.armMockResponseOnce('POST', '/api/auth/sessions/revoke', { stripGrantTokens: true });
+    await assert.rejects(client.revokeOtherSessions(), (error) => error.message === 'Sign in again to continue', 'a tokenless grant rejects with the sign-in copy');
+    assert.equal(storageDump(), beforeTokenless, 'a tokenless grant leaves both storages untouched');
+    await signIn(NEW_EMAIL); // the server rotated auth_key: sign back in
+
+    // ── adoptGrant waits for an in-flight refresh ──
+    let refreshSettled = false;
+    mock.armMockResponseOnce('POST', '/api/token/refresh', { extraDelayMs: 600 });
+    const slowRefresh = client.refreshTokens().then((ok) => { refreshSettled = true; return ok; });
+    await signIn(NEW_EMAIL);
+    assert.equal(refreshSettled, true, 'a login adopted during a refresh waits for that refresh to settle');
+    await slowRefresh;
+    assert.equal(client.sessionIsPersistent(), false);
+    assert.equal((await client.mojoCall('/api/user/me')).data.email, NEW_EMAIL, 'the adopted login is the live session');
+
+    // ── A refresh that completes after the session changed never lands on it ──
+    const swapped = (await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'showcase.operator@nativemojo.com', password: 'mojo' } })).data;
+    mock.armMockResponseOnce('POST', '/api/token/refresh', { extraDelayMs: 600 });
+    const staleRefresh = client.refreshTokens();
+    client.setTokens(swapped.access_token, swapped.refresh_token, false);
+    await staleRefresh;
+    assert.equal(client.getAccessToken(), swapped.access_token, 'a stale refresh does not overwrite the changed session');
+    assert.equal(client.getRefreshToken(), swapped.refresh_token);
+    client.clearTokens({ silent: true });
+    await client.login(NEW_EMAIL, 'mojo', { remember: false }).then((result) => (result.kind === 'mfa' ? client.completeMfaTotp(result.mfaToken, '123456', { remember: false }) : null));
 
     // ── Phone change: top-level session_token ──
     const raw = await mock.mockFetch('/api/auth/phone/change/request', { method: 'POST', headers: bearer(), body: { phone_number: '+15555550177' } });
