@@ -120,6 +120,7 @@ try {
         "import { initAuth } from 'portal-mojo/client';",
         "import { usingMockTransport } from 'portal-mojo/client/runtime';",
         "import { Badge } from 'portal-mojo/ui';",
+        "import { openAccountModal } from 'portal-mojo/account';",
         "import { ThemeProvider } from 'portal-mojo/ui/shell';",
         "import { SeriesChart } from 'portal-mojo/charts';",
         "import { ADMIN_SECTIONS } from 'portal-mojo/admin';",
@@ -134,7 +135,7 @@ try {
         "import { ASSISTANT_ADMIN_SECTION } from 'portal-mojo/admin/assistant';",
         "import { AssistantLauncher } from 'portal-mojo/admin/assistant/launcher';",
         "const routes: AdminRoute[] = USERS_ADMIN_SECTION.routes;",
-        "document.querySelector('#app')!.textContent = String([initAuth, usingMockTransport, Badge, ThemeProvider, SeriesChart, ADMIN_SECTIONS, REGISTRY_ADMIN_SECTIONS, adminSectionRoutes, routes, SECURITY_OPERATIONS_ADMIN_SECTION, MONITORING_ADMIN_SECTION, JOBS_ADMIN_SECTION, DNS_ADMIN_SECTION, EMAIL_ADMIN_SECTION, ASSISTANT_ADMIN_SECTION, AssistantLauncher].length);",
+        "document.querySelector('#app')!.textContent = String([initAuth, usingMockTransport, Badge, ThemeProvider, SeriesChart, ADMIN_SECTIONS, REGISTRY_ADMIN_SECTIONS, adminSectionRoutes, routes, SECURITY_OPERATIONS_ADMIN_SECTION, MONITORING_ADMIN_SECTION, JOBS_ADMIN_SECTION, DNS_ADMIN_SECTION, EMAIL_ADMIN_SECTION, ASSISTANT_ADMIN_SECTION, AssistantLauncher, openAccountModal].length);",
         '',
     ].join('\n'));
 
@@ -145,7 +146,7 @@ try {
     const installed = JSON.parse(await readFile(join(consumerDir, 'node_modules/portal-mojo/package.json'), 'utf8'));
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
-    assert.deepEqual(Object.keys(installed.exports).sort(), ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './styles.css', './ui', './ui/shell']);
+    assert.deepEqual(Object.keys(installed.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './styles.css', './ui', './ui/shell']);
     // The installed stylesheets meet the same contract as the source: every
     // file imported in layer(portal-mojo), no orphan, and the token list exact.
     assert.equal(installed.exports['./styles.css'], './src/styles/index.css', 'installed portal-mojo/styles.css must resolve to src/styles/index.css');

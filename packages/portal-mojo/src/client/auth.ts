@@ -133,7 +133,12 @@ export function subscribeAuth(cb: () => void): () => void {
 
 // ── Auth events ───────────────────────────────────────────────────────
 
-export type AuthEvent = 'login' | 'logout' | 'refreshed' | 'refresh-failed' | 'unauthorized';
+/**
+ * 'login' — an explicit, completed sign-in (password/MFA/passkey/magic/reset/
+ * exchange). 'rotated' — the SAME user's session re-issued by a credential
+ * change (sessions revoke, email-change confirm): new tokens, not a login.
+ */
+export type AuthEvent = 'login' | 'rotated' | 'logout' | 'refreshed' | 'refresh-failed' | 'unauthorized';
 const eventListeners = new Map<AuthEvent, Set<(detail?: unknown) => void>>();
 
 export function onAuth(event: AuthEvent, cb: (detail?: unknown) => void): () => void {
@@ -195,6 +200,9 @@ async function doRefresh(): Promise<boolean> {
     const persistent = sessionIsPersistent();
     try {
         const body = await mojoCall(REFRESH_PATH, { method: 'POST', body: { refresh_token: refresh } });
+        // The session changed while this POST was in flight (a new login was
+        // adopted, or logout): never write the old session's pair over it.
+        if (getRefreshToken() !== refresh) return getRefreshToken() != null;
         const pkg = body.data as { access_token: string; refresh_token?: string };
         setTokens(pkg.access_token, pkg.refresh_token, persistent);
         emitAuth('refreshed');
@@ -296,11 +304,26 @@ interface TokenGrant {
     expires_in?: number;
 }
 
-function adoptGrant(data: TokenGrant, remember = true): AuthUser {
+/** Copy for a grant that carries no usable session (e.g. a forced-password answer). */
+export const GRANT_SIGN_IN_AGAIN = 'Sign in again to continue';
+
+/**
+ * Store a TokenGrant as THE session. Validates first — a django-mojo
+ * forced_password_response, for one, answers without tokens after auth_key
+ * rotated — and leaves storage untouched (rejecting) when the grant has no
+ * access + refresh pair. Serialised behind any in-flight refresh so a
+ * refresh that started on the old session can never land on top of it.
+ */
+async function adoptGrant(data: TokenGrant | null | undefined, remember = true, event: 'login' | 'rotated' = 'login'): Promise<AuthUser> {
+    if (!data || typeof data.access_token !== 'string' || !data.access_token
+        || typeof data.refresh_token !== 'string' || !data.refresh_token) {
+        throw new Error(GRANT_SIGN_IN_AGAIN);
+    }
+    if (refreshPromise) await refreshPromise;
     setTokens(data.access_token, data.refresh_token, remember);
     startAutoRefresh();
     const user = data.user ?? {};
-    emitAuth('login', user);
+    emitAuth(event, user);
     return user;
 }
 
@@ -317,7 +340,7 @@ export async function login(username: string, password: string, opts: LoginOptio
     if (data.mfa_required) {
         return { kind: 'mfa', mfaToken: data.mfa_token ?? '', methods: data.mfa_methods ?? [], expiresIn: data.expires_in ?? 300 };
     }
-    return { kind: 'authenticated', user: adoptGrant(data, opts.remember ?? true) };
+    return { kind: 'authenticated', user: await adoptGrant(data, opts.remember ?? true) };
 }
 
 // ── MFA completion (deferred from A1; landed with the C3 pages) ───────
@@ -499,6 +522,170 @@ export async function loginWithPasskey(username?: string, opts: PasskeyLoginOpti
     return adoptGrant(body.data as TokenGrant, opts.remember ?? true);
 }
 
+// ── Passkey registration (self-service, signed in) ────────────────────
+// django-mojo account/rest/passkeys.py:59-150 + utils/passkeys.py:143-201.
+// Both legs are @requires_fresh_auth, so each runs under withFreshAuth. The
+// pair is retry-safe: complete matches on credential_id and the challenge is
+// deleted only after a successful complete, so a 440 on complete re-prompts
+// and replays complete with the SAME challenge and credential.
+
+/** Registration needs `create`, not just the `get` that login checks. */
+export function isPasskeyRegistrationSupported(): boolean {
+    return typeof window !== 'undefined'
+        && typeof window.PublicKeyCredential !== 'undefined'
+        && typeof navigator.credentials?.create === 'function';
+}
+
+/**
+ * A friendly default passkey name from this browser — web-mojo
+ * Passkey.suggestName() (core/models/Passkeys.js:42-59), e.g. "Mac — Chrome".
+ */
+export function suggestPasskeyName(userAgent?: string): string {
+    const ua = userAgent ?? (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+    let device = 'Device';
+    if (/iPad/.test(ua)) device = 'iPad';
+    else if (/iPhone/.test(ua)) device = 'iPhone';
+    else if (/Macintosh|MacIntel/.test(ua)) device = 'Mac';
+    else if (/Android/.test(ua)) device = 'Android';
+    else if (/Windows/.test(ua)) device = 'Windows PC';
+    else if (/Linux/.test(ua)) device = 'Linux';
+    let browser = '';
+    if (/Edg\//.test(ua)) browser = 'Edge';
+    else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
+    else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+    else if (/Firefox\//.test(ua)) browser = 'Firefox';
+    return browser ? `${device} — ${browser}` : device;
+}
+
+interface PasskeyRegisterBeginResponse {
+    challenge_id: string;
+    publicKey: Omit<PublicKeyCredentialCreationOptions, 'challenge' | 'user' | 'excludeCredentials'> & {
+        challenge: unknown;
+        user: { id: unknown; name: string; displayName: string };
+        excludeCredentials?: { id: unknown; type: string; transports?: string[] }[];
+    };
+    expiresAt?: string;
+}
+
+/** The saved Passkey row `register/complete` answers with (default graph). */
+export interface RegisteredPasskey {
+    id: number;
+    friendly_name: string | null;
+    [field: string]: unknown;
+}
+
+/**
+ * Register a passkey for the signed-in user on THIS browser/authenticator.
+ * `name` defaults to suggestPasskeyName(). Rejects with the authenticator's
+ * DOMException (NotAllowedError, InvalidStateError, …) or the server's
+ * MojoError — pass either to passkeyErrorMessage(). Callers refresh the
+ * passkey list and `me` (has_passkey) afterwards.
+ */
+export async function registerPasskey(name?: string): Promise<RegisteredPasskey> {
+    if (!isPasskeyRegistrationSupported()) throw new Error('Passkeys are not supported in this browser');
+
+    const begin = await withFreshAuth(() => mojoCall('/api/account/passkeys/register/begin', { method: 'POST', body: {} }));
+    const { challenge_id, publicKey } = begin.data as unknown as PasskeyRegisterBeginResponse;
+
+    const options: PublicKeyCredentialCreationOptions = {
+        ...publicKey,
+        challenge: base64urlToBuffer(String(publicKey.challenge)),
+        user: { ...publicKey.user, id: base64urlToBuffer(String(publicKey.user.id)) },
+        excludeCredentials: publicKey.excludeCredentials?.map((c) => ({
+            type: 'public-key' as const,
+            id: base64urlToBuffer(String(c.id)),
+            transports: c.transports as AuthenticatorTransport[] | undefined,
+        })),
+    };
+
+    const credential = (await navigator.credentials.create({ publicKey: options })) as PublicKeyCredential | null;
+    if (!credential) throw new Error('No credential received from authenticator');
+    const attestation = credential.response as AuthenticatorAttestationResponse;
+    const rawId = bufferToBase64url(credential.rawId);
+    // The server rejects id ≠ rawId; `transports` rides at the credential's
+    // TOP level (utils/passkeys.py:200), not inside `response`.
+    const payload = {
+        id: credential.id,
+        rawId,
+        type: credential.type,
+        response: {
+            clientDataJSON: bufferToBase64url(attestation.clientDataJSON),
+            attestationObject: bufferToBase64url(attestation.attestationObject),
+        },
+        transports: attestation.getTransports?.() ?? [],
+    };
+    const friendly_name = name?.trim() || suggestPasskeyName();
+    try {
+        const complete = await withFreshAuth(() => mojoCall('/api/account/passkeys/register/complete', {
+            method: 'POST',
+            body: { challenge_id, credential: payload, friendly_name },
+        }));
+        return complete.data as RegisteredPasskey;
+    } catch (error) {
+        // The authenticator now holds a credential the server never saved
+        // (complete failed, or its step-up was dismissed): tell the
+        // authenticator to forget it where the browser supports that.
+        signalUnknownPasskey(publicKey.rp?.id || window.location.hostname, rawId);
+        throw error;
+    }
+}
+
+type SignalUnknownCredential = (options: { rpId: string; credentialId: string }) => Promise<void>;
+
+/** Best-effort WebAuthn Signal API call; never throws, never blocks. */
+function signalUnknownPasskey(rpId: string, credentialId: string): void {
+    try {
+        const ctor = window.PublicKeyCredential as unknown as { signalUnknownCredential?: SignalUnknownCredential } | undefined;
+        const signal = ctor?.signalUnknownCredential;
+        if (typeof signal !== 'function') return;
+        void Promise.resolve(signal.call(ctor, { rpId, credentialId })).catch(() => {});
+    } catch { /* unsupported or refused — the orphan stays, as before */ }
+}
+
+/**
+ * User-facing copy for a failed passkey ceremony (login, step-up or
+ * registration). Authenticator DOMExceptions map to fixed copy; anything
+ * else — including server refusals — is shown as written.
+ */
+export function passkeyErrorMessage(error: unknown): string {
+    const name = error != null && typeof error === 'object' && typeof (error as { name?: unknown }).name === 'string'
+        ? (error as { name: string }).name : '';
+    switch (name) {
+        case 'NotAllowedError': return 'Passkey prompt was dismissed';
+        case 'InvalidStateError': return 'This authenticator already holds a passkey for your account';
+        case 'SecurityError': return 'Passkeys aren’t available on this domain (HTTPS and a matching domain are required)';
+        case 'AbortError': return 'Passkey request was cancelled';
+        default: break;
+    }
+    if (error instanceof Error && error.message) return error.message;
+    return 'Something went wrong. Please try again.';
+}
+
+// ── Self-service credential changes that re-issue the session ─────────
+
+/**
+ * Finish a code-flow email change (`POST /api/auth/email/change/confirm
+ * {code}`, rest/user.py:1953-1994). The server commits the new address,
+ * rotates auth_key (every other session dies) and answers with a NEW login,
+ * adopted here into the storage this session already uses. Emits 'rotated'
+ * (never 'login': no explicit sign-in happened).
+ */
+export async function confirmEmailChange(code: string): Promise<AuthUser> {
+    const body = await mojoCall('/api/auth/email/change/confirm', { method: 'POST', body: { code } });
+    return adoptGrant(body.data as TokenGrant, sessionIsPersistent(), 'rotated');
+}
+
+/**
+ * Sign out every OTHER session (`POST /api/auth/sessions/revoke`,
+ * rest/user.py:2331-2355, fresh-auth gated): auth_key rotates and the
+ * returned login keeps THIS session alive. Never the `revoke_sessions` user
+ * action — that one kills the caller's own session too.
+ */
+export async function revokeOtherSessions(): Promise<AuthUser> {
+    const body = await withFreshAuth(() => mojoCall('/api/auth/sessions/revoke', { method: 'POST', body: {} }));
+    return adoptGrant(body.data as TokenGrant, sessionIsPersistent(), 'rotated');
+}
+
 // ── Fresh-auth (step-up) challenges ───────────────────────────────────
 // django-mojo's freshness gate (account/services/fresh_auth.py): sensitive
 // operations can require that the JWT's `auth_time` claim — stamped at the
@@ -609,7 +796,7 @@ async function doExchange(code: string): Promise<AuthUser | null> {
         // block exchanging the fresh one-time login code.
         if (checkTokenStatus().action === 'logout') clearTokens({ silent: true });
         const body = await mojoCall('/api/auth/exchange', { method: 'POST', body: { code } });
-        return adoptGrant(body.data as TokenGrant);
+        return await adoptGrant(body.data as TokenGrant);
     } catch (error) {
         emitAuth('refresh-failed', error);
         return null;

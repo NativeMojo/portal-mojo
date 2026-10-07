@@ -24,7 +24,8 @@ import { createPortal } from 'react-dom';
 type Level = 'success' | 'error' | 'info' | 'warning';
 
 interface BasicToast { id: number; kind: 'basic'; level: Level; message: string }
-interface UndoToastItem { id: number; kind: 'undo'; message: string; onUndo?: () => void }
+/** The undo card; `label` renames its button (toast.action — a follow-up offer). */
+interface UndoToastItem { id: number; kind: 'undo'; message: string; onUndo?: () => void; label?: string }
 interface ProgressToastItem {
     id: number;
     kind: 'progress';
@@ -129,6 +130,21 @@ export function progressToast(label: string, opts: { onCancel?: () => void } = {
     };
 }
 
+/**
+ * A follow-up OFFER on the undo card's grammar: the message, one action
+ * button named `label` (click dismisses at once and runs `onAction`), and an
+ * auto-dismiss after `timeout` ms (default 10000) that leaves things as they are.
+ */
+export function actionToast(message: string, label: string, onAction: () => void, opts: { timeout?: number } = {}): UndoToastHandle {
+    const id = nextId++;
+    toasts = [...toasts, { id, kind: 'undo', message, onUndo: onAction, label }];
+    emit();
+    const timer = setTimeout(() => remove(id), opts.timeout ?? 10_000);
+    return {
+        dismiss: () => { clearTimeout(timer); remove(id); },
+    };
+}
+
 export const toast = {
     success: (m: string) => push('success', m),
     error: (m: string) => push('error', m),
@@ -139,6 +155,8 @@ export const toast = {
     undo: undoToast,
     /** Persistent progress card with a bar. See progressToast(). */
     progress: progressToast,
+    /** A message with one follow-up action button. See actionToast(). */
+    action: actionToast,
 };
 
 const ICONS: Record<Level, string> = {
@@ -250,7 +268,7 @@ export function ToastHost() {
                                 className="undo-btn"
                                 onClick={() => { remove(t.id); t.onUndo?.(); }}
                             >
-                                Undo
+                                {t.label ?? 'Undo'}
                             </button>
                         </div>
                     );

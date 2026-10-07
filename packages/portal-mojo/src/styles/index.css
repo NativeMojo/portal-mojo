@@ -63,4 +63,5 @@
 @import "./components/loading.css" layer(portal-mojo);
 @import "./components/worldmap.css" layer(portal-mojo);
 @import "./components/user-menu.css" layer(portal-mojo);
+@import "./components/account.css" layer(portal-mojo);
 @import "./core.css" layer(portal-mojo);
