@@ -5928,6 +5928,7 @@ export interface MockRequestHistoryEntry {
 }
 
 const requestHistory: MockRequestHistoryEntry[] = [];
+const OWNER_SCOPED_LISTS = new Set(['/api/account/passkeys', '/api/account/api_keys', '/api/account/oauth_connection', '/api/user/device', '/api/account/logins']);
 
 export function getMockRequestHistory(): MockRequestHistoryEntry[] {
     return requestHistory.map((entry) => ({
@@ -5952,7 +5953,10 @@ export function armMockReauth(method: string, path: string): void {
     armedReauth = { method: method.toUpperCase(), path };
 }
 
-interface MockOnceArm { method: string; path: string; extraDelayMs: number; stripGrantTokens: boolean }
+interface MockOnceArm {
+    method: string; path: string; extraDelayMs: number; stripGrantTokens: boolean;
+    mapData?: (data: Record<string, unknown>) => Record<string, unknown>;
+}
 let armedOnce: MockOnceArm | null = null;
 
 /**
@@ -5961,8 +5965,13 @@ let armedOnce: MockOnceArm | null = null;
  * `stripGrantTokens` drops access_token/refresh_token from a login grant —
  * the shape of django-mojo's forced_password_response after auth_key rotated.
  */
-export function armMockResponseOnce(method: string, path: string, opts: { extraDelayMs?: number; stripGrantTokens?: boolean }): void {
-    armedOnce = { method: method.toUpperCase(), path, extraDelayMs: opts.extraDelayMs ?? 0, stripGrantTokens: opts.stripGrantTokens ?? false };
+export function armMockResponseOnce(method: string, path: string, opts: {
+    extraDelayMs?: number;
+    stripGrantTokens?: boolean;
+    /** Rewrite the envelope's `data` (e.g. pin a known WebAuthn challenge). */
+    mapData?: (data: Record<string, unknown>) => Record<string, unknown>;
+}): void {
+    armedOnce = { method: method.toUpperCase(), path, extraDelayMs: opts.extraDelayMs ?? 0, stripGrantTokens: opts.stripGrantTokens ?? false, mapData: opts.mapData };
 }
 
 // ── Self-service account (the AccountModal wire) ──────────────────────
@@ -8357,6 +8366,9 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     const result = await mockFetchInner(path, opts);
     if (!arm) return result;
     if (arm.extraDelayMs > 0) await mockDelay(arm.extraDelayMs, opts.signal);
+    if (arm.mapData && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
+        return { ...(result as Record<string, unknown>), data: arm.mapData((result as { data: Record<string, unknown> }).data) };
+    }
     if (arm.stripGrantTokens && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
         const { access_token: _a, refresh_token: _r, ...rest } = (result as { data: Record<string, unknown> }).data;
         return { ...(result as Record<string, unknown>), data: { ...rest, requires_password_change: true } };
@@ -8375,7 +8387,11 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         || path.startsWith('/api/aws/cloudwatch/')
         || path.startsWith('/api/assistant/memory/')
         ? { ...(opts.params ?? {}) }
-        : undefined;
+        // Owner-scoped credential/device lists: only the owner filter (a
+        // users-grant caller is served EVERY row without it).
+        : method === 'GET' && OWNER_SCOPED_LISTS.has(path)
+            ? { user: opts.params?.user }
+            : undefined;
     const locationObservables = path.startsWith('/api/location/') ? {
         ...('input' in (opts.params ?? {}) ? { input_length: String(opts.params?.input ?? '').length } : {}),
         ...('session_token' in (opts.params ?? {}) ? { has_session_token: Boolean(opts.params?.session_token) } : {}),

@@ -4,6 +4,10 @@
 // reads, the /api/user/me owner rules, session rotation adopting the new
 // login in the SAME storage, the TOTP / recovery-code shapes, phone change's
 // top-level session_token, and the notification master switch ("*") + kinds.
+// Mounted half: no one-time value (TOTP secret, recovery codes, API token,
+// phone session_token, rotated logins) in any Query/Mutation cache or in
+// storage outside the session's token pair; ?user= on every owner list;
+// dialogs never outlive the session; locked modals survive a native close.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -119,6 +123,29 @@ try {
     assert(options.excludeCredentials?.length > 0 && options.excludeCredentials.every((c) => c.id instanceof ArrayBuffer), 'excludeCredentials ids are decoded to bytes');
     assert.equal(registered.friendly_name, 'Work laptop', 'friendly_name is trimmed and sent');
     assert.equal(registered.transports, 'internal,hybrid', 'transports ride at the credential top level');
+    // Decode by BYTES: pin known base64url values (no padding, '-' and '_'
+    // in play) on begin and compare what reached navigator.credentials.create.
+    const knownChallenge = Uint8Array.from({ length: 32 }, (_, i) => (251 + i * 37) & 0xff);
+    const knownUserId = Uint8Array.from([0xff, 0xfe, 0xfb, 0x00, 0x3e, 0x3f, 0x01]);
+    const knownExclude = Uint8Array.from([0xfb, 0xef, 0xbe, 0xff, 0xfa]);
+    assert(/[-_]/.test(b64url(knownChallenge) + b64url(knownUserId) + b64url(knownExclude)), 'the known values exercise the url alphabet');
+    mock.armMockResponseOnce('POST', '/api/account/passkeys/register/begin', {
+        mapData: (data) => ({
+            ...data,
+            publicKey: {
+                ...data.publicKey,
+                challenge: b64url(knownChallenge),
+                user: { ...data.publicKey.user, id: b64url(knownUserId) },
+                excludeCredentials: [{ type: 'public-key', id: b64url(knownExclude), transports: ['internal'] }],
+            },
+        }),
+    });
+    await client.registerPasskey('Byte check');
+    const pinned = created.at(-1).publicKey;
+    assert.deepEqual([...new Uint8Array(pinned.challenge)], [...knownChallenge], 'publicKey.challenge decodes to the exact bytes');
+    assert.deepEqual([...new Uint8Array(pinned.user.id)], [...knownUserId], 'publicKey.user.id decodes to the exact bytes');
+    assert.deepEqual([...new Uint8Array(pinned.excludeCredentials[0].id)], [...knownExclude], 'excludeCredentials[].id decodes to the exact bytes');
+
     const second = await gated('POST', '/api/account/passkeys/register/complete', () => client.registerPasskey());
     assert.equal(second.friendly_name, 'Mac — Chrome', 'the default name is the suggested one');
 
@@ -265,6 +292,34 @@ try {
     client.clearTokens({ silent: true });
     await client.login(NEW_EMAIL, 'mojo', { remember: false }).then((result) => (result.kind === 'mfa' ? client.completeMfaTotp(result.mfaToken, '123456', { remember: false }) : null));
 
+    // ── A dismissed step-up adopts nothing ──
+    client.setFreshAuthHandler(async () => false);
+    const beforeDismissed = storageDump();
+    mock.armMockReauth('POST', '/api/auth/sessions/revoke');
+    let dismissedEvents;
+    await assert.rejects(async () => { dismissedEvents = await eventsOf(() => client.revokeOtherSessions()); }, (error) => client.isReauthRequired(error), 'a dismissed step-up rejects with the 440');
+    assert.deepEqual(authEvents, [], 'a dismissed step-up emits no login/rotated');
+    assert.equal(dismissedEvents, undefined);
+    assert.equal(storageDump(), beforeDismissed, 'a dismissed step-up leaves both storages untouched');
+    client.setFreshAuthHandler(reLogin(NEW_EMAIL));
+
+    // ── Rotations adopt into the storage the session came from: localStorage too ──
+    client.clearTokens({ silent: true });
+    await client.login(NEW_EMAIL, 'mojo', { remember: true }).then((result) => (result.kind === 'mfa' ? client.completeMfaTotp(result.mfaToken, '123456', { remember: true }) : null));
+    assert.equal(client.sessionIsPersistent(), true);
+    const beforePersistent = localStorage.getItem('access_token');
+    await client.revokeOtherSessions();
+    assert.notEqual(localStorage.getItem('access_token'), beforePersistent, 'the rotated login is adopted');
+    assert(localStorage.getItem('access_token') && localStorage.getItem('refresh_token'), 'a persistent session rotates into localStorage');
+    assert.equal(sessionStorage.getItem('access_token') ?? sessionStorage.getItem('refresh_token'), null, 'nothing lands in sessionStorage');
+    await api.requestEmailChange('ian.persist@mojoverify.com');
+    await client.confirmEmailChange('123456');
+    assert(localStorage.getItem('access_token') && sessionStorage.getItem('access_token') == null, 'email-change confirm also keeps localStorage');
+    await api.requestEmailChange(NEW_EMAIL);
+    await client.confirmEmailChange('123456');
+    client.clearTokens({ silent: true });
+    await client.login(NEW_EMAIL, 'mojo', { remember: false }).then((result) => (result.kind === 'mfa' ? client.completeMfaTotp(result.mfaToken, '123456', { remember: false }) : null));
+
     // ── Phone change: top-level session_token ──
     const raw = await mock.mockFetch('/api/auth/phone/change/request', { method: 'POST', headers: bearer(), body: { phone_number: '+15555550177' } });
     assert.equal(typeof raw.session_token, 'string', 'session_token is top-level');
@@ -301,7 +356,19 @@ try {
     for (const [path, source] of Object.entries(sources)) {
         assert.doesNotMatch(source, /from ['"](?:\.\.\/)+admin(?:\/index)?['"]/, `${path} must not import the admin barrel`);
     }
-    assert.doesNotMatch(sources['account/dialogs.tsx'], /\buse(?:Mutation|Query)\s*\(/, 'one-time secrets never pass through a TanStack mutation/query');
+    // Direct TanStack hooks anywhere in the module — generic-typed calls
+    // (`useMutation<…>(`) included. Only the reviewed model hooks may use them.
+    const { readdir } = await import('node:fs/promises');
+    const accountDir = new URL('../packages/portal-mojo/src/account/', import.meta.url);
+    const allowedHooks = { 'models.ts': { useMutation: 2, useQuery: 2 } };
+    for (const entry of await readdir(accountDir, { recursive: true })) {
+        if (!/\.tsx?$/.test(entry)) continue;
+        const source = await readFile(new URL(entry, accountDir), 'utf8');
+        for (const hook of ['useMutation', 'useQuery']) {
+            const uses = (source.match(new RegExp(`\\b${hook}\\s*[<(]`, 'g')) ?? []).length;
+            assert.equal(uses, allowedHooks[entry]?.[hook] ?? 0, `account/${entry}: ${uses} direct ${hook} call(s) — one-time values must never pass through a TanStack mutation/query`);
+        }
+    }
     assert.match(sources['account/PasskeyList.tsx'], /PasskeyModel\.useList\(\{ user: userId/, 'passkey reads always carry ?user=');
     assert.match(sources['account/dialogs.tsx'], /safeQrDataUrl\(step\.qr\)/, 'the QR is re-checked at the <img> sink');
 
@@ -332,6 +399,29 @@ try {
         qc.getQueryCache().getAll().map((query) => [query.queryKey, query.state.data]),
         qc.getMutationCache().getAll().map((mutation) => [mutation.state.variables, mutation.state.data]),
     ]);
+    // Every storage entry except the session's own token pair.
+    const nonTokenStorage = () => JSON.stringify([localStorage, sessionStorage].map((store) => {
+        const out = {};
+        for (let i = 0; i < store.length; i++) {
+            const key = store.key(i);
+            if (key !== 'access_token' && key !== 'refresh_token') out[key] = store.getItem(key);
+        }
+        return out;
+    }));
+    const assertNoSecrets = (label, secrets) => {
+        const caches = cacheDump();
+        const stored = nonTokenStorage();
+        for (const secret of secrets) {
+            assert(typeof secret === 'string' && secret.length >= 8, `${label}: the secret was captured for the check`);
+            assert(!caches.includes(secret), `${label}: a one-time value leaked into a Query/Mutation cache`);
+            assert(!stored.includes(secret), `${label}: a one-time value leaked into storage`);
+        }
+    };
+    const clickMatch = async (pattern) => {
+        const node = buttons().reverse().find((candidate) => pattern.test(candidate.textContent.trim()));
+        assert(node, `missing button ${pattern}`);
+        await act(async () => { node.click(); });
+    };
 
     // A fresh, unenrolled, non-admin identity for the mounted half.
     await client.login('groups.viewer@nativemojo.com', 'mojo');
@@ -383,13 +473,28 @@ try {
     assert.equal(await enrolled, true);
     assert.equal(openDialogs().length, 0);
     await wait(400);
-    const dump = cacheDump();
-    for (const secret of [secretShown, ...shownCodes]) assert(!dump.includes(secret), `one-time value leaked into a TanStack cache: ${secret}`);
+    assertNoSecrets('TOTP enrolment', [secretShown, ...shownCodes]);
     assert.equal(qc.getQueryState(account.accountKeys.recoveryStatus(viewer.id))?.isInvalidated, true, 'enrolment invalidates the cached status');
     await qc.fetchQuery({ queryKey: account.accountKeys.recoveryStatus(viewer.id), queryFn: account.getRecoveryCodeStatus });
     assert.deepEqual(qc.getQueryData(account.accountKeys.recoveryStatus(viewer.id)), { enrolled: true, remaining: 8 });
 
+    // Regenerate: the new shown-once set never reaches a cache or storage.
+    let regenerated;
+    await act(async () => { regenerated = account.openRegenerateRecoveryCodes(); });
+    await type(document.querySelector('dialog[open] input[autocomplete="one-time-code"]'), '123456');
+    await click('Regenerate');
+    await wait(600);
+    const regenCodes = [...document.querySelectorAll('dialog[open] [aria-label="Recovery codes"] code')].map((node) => node.textContent);
+    assert.equal(regenCodes.length, 8, 'regenerate shows a fresh set once');
+    await act(async () => { document.querySelector('dialog[open] input[type="checkbox"]').click(); });
+    await click('Done');
+    assert.equal(await regenerated, true);
+    await wait(400);
+    assertNoSecrets('recovery-code regenerate', regenCodes);
+
     // The modal: six rail tabs, each section renders; sign-out lives in the rail.
+    // Every owner-scoped list the sections make carries ?user=<me>.
+    mock.clearMockRequestHistory();
     let closed;
     await act(async () => { closed = account.openAccountModal(); });
     await wait(500);
@@ -401,9 +506,43 @@ try {
         assert.equal(document.querySelector('dialog[open] .acct-title-section').textContent, tab);
         assert(!document.querySelector('dialog[open] .acct-body [role="alert"].form-alert'), `${tab} renders without an error`);
     }
+    const ownerLists = mock.getMockRequestHistory().filter((entry) => entry.method === 'GET' && entry.params && 'user' in entry.params);
+    assert.deepEqual([...new Set(ownerLists.map((entry) => entry.path))].sort(), ['/api/account/api_keys', '/api/account/logins', '/api/account/oauth_connection', '/api/account/passkeys', '/api/user/device'], 'every owner-scoped list was exercised');
+    for (const entry of ownerLists) assert.equal(String(entry.params.user), String(viewer.id), `${entry.path} carries ?user=<me>`);
+
+    // API key generate: the token is shown once and lands in no cache/storage.
+    await act(async () => { [...document.querySelectorAll('dialog[open] [role="tab"]')].find((node) => node.textContent.trim() === 'API keys').click(); });
+    await wait(500);
+    await clickMatch(/Generate key$/);
+    await wait(50);
+    await type(openDialogs().at(-1).querySelector('input'), 'CI key');
+    await click('Generate');
+    await wait(600);
+    const apiToken = document.querySelector('dialog[open] [aria-label="Generated API key"]')?.textContent;
+    await click('Close'); // the secret dialog
+    await wait(600);
+    assertNoSecrets('API-key generate', [apiToken]);
+
     await click('Close');
     await closed;
     assert.equal(openDialogs().length, 0);
+
+    // Phone change request: the session_token stays in dialog state.
+    let phoneChanged;
+    await act(async () => { phoneChanged = account.openPhoneChangeDialog(); });
+    await wait(300);
+    await type(document.querySelector('dialog[open] input[type="tel"]'), '+15555550913');
+    await click('Send code');
+    await wait(600);
+    assert(document.querySelector('dialog[open] input[autocomplete="one-time-code"]'), `phone change reached the code step (${document.querySelector('dialog[open] [role="alert"]')?.textContent ?? 'no alert'})`);
+    const phoneTokenShape = /pc:mock-/;
+    assert.doesNotMatch(cacheDump(), phoneTokenShape, 'phone change request: the session_token never reaches a cache');
+    assert.doesNotMatch(nonTokenStorage(), phoneTokenShape, 'phone change request: the session_token never reaches storage');
+    await type(document.querySelector('dialog[open] input[autocomplete="one-time-code"]'), '123456');
+    await clickMatch(/^(Add|Change) phone$/);
+    assert.equal(await act(() => phoneChanged), true);
+    await wait(400);
+    assert.doesNotMatch(cacheDump() + nonTokenStorage(), phoneTokenShape, 'phone change confirm: no session_token left behind');
 
     // ── Native close (non-cancelable cancel) honours canDismiss ──
     let locked = true;
@@ -481,12 +620,48 @@ try {
     await act(async () => { enrol = settle(account.openTotpEnrolDialog({ replacing: false })); });
     await wait(600);
     before = setupCalls();
-    const viewerGrant = (await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'groups.viewer@nativemojo.com', password: 'mojo' } })).data;
-    await act(async () => { client.setTokens(viewerGrant.access_token, viewerGrant.refresh_token, true); });
+    const operatorUid = client.getAuthSnapshot().uid;
+    const otherGrant = (await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'support.viewer@nativemojo.com', password: 'mojo' } })).data;
+    assert(otherGrant.access_token && otherGrant.refresh_token, 'a full grant for the replacing identity');
+    await act(async () => { client.setTokens(otherGrant.access_token, otherGrant.refresh_token, true); });
+    assert(client.getAuthSnapshot().authenticated && client.getAuthSnapshot().uid !== operatorUid, 'still signed in, as someone else');
     await wait(600);
     assert.equal(enrol.value, false, 'an identity change closes the open enrol dialog');
     assert.equal(openDialogs().length, 0);
     assert.equal(setupCalls() - before, 0, 'no setup call for the identity that replaced it');
+
+    // ── Rotations through the UI: the new login reaches storage only as the
+    // session's token pair — never a cache — and the old token is gone ──
+    const allStorage = () => JSON.stringify([localStorage, sessionStorage].map((store) => Array.from({ length: store.length }, (_, i) => store.getItem(store.key(i)))));
+    let rotatedFrom = client.getAccessToken();
+    let emailChanged;
+    await act(async () => { emailChanged = account.openEmailChangeDialog(); });
+    await wait(300);
+    await type(document.querySelector('dialog[open] input[type="email"]'), 'support.viewer.renamed@nativemojo.com');
+    await click('Send code');
+    await wait(600);
+    assert(document.querySelector('dialog[open] input[autocomplete="one-time-code"]'), `email change reached the code step (${document.querySelector('dialog[open] [role="alert"]')?.textContent ?? openDialogs().length + ' dialogs'})`);
+    await type(document.querySelector('dialog[open] input[autocomplete="one-time-code"]'), '123456');
+    await click('Change email');
+    assert.equal(await act(() => emailChanged), true, 'the email change completes');
+    await wait(400);
+    assert.notEqual(client.getAccessToken(), rotatedFrom, 'email-change confirm adopted a new login');
+    assertNoSecrets('email-change confirm', [client.getAccessToken(), client.getRefreshToken()]);
+    assert(!allStorage().includes(rotatedFrom), 'email-change confirm: the old token is gone from storage');
+
+    rotatedFrom = client.getAccessToken();
+    let sessionsModal;
+    await act(async () => { sessionsModal = account.openAccountModal({ initialSection: 'sessions' }); });
+    await wait(500);
+    await click('Sign out everywhere else');
+    await click('Sign out others');
+    await wait(600);
+    assert.notEqual(client.getAccessToken(), rotatedFrom, 'sessions revoke adopted a new login');
+    assertNoSecrets('sessions revoke', [client.getAccessToken(), client.getRefreshToken()]);
+    assert(!allStorage().includes(rotatedFrom), 'sessions revoke: the old token is gone from storage');
+    await click('Close');
+    await act(() => sessionsModal);
+    assert.equal(openDialogs().length, 0);
 
     await act(async () => root.unmount());
     console.error = originalError;
