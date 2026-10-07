@@ -72,7 +72,10 @@ four cards in plain words; the following steps show only that shape's settings.
 request. It sends each knob the chosen kind does not carry as its empty value,
 so a draft that visited another shape cannot leak that shape's settings, and
 an edit that changes kind clears what the old kind held. It never sends
-`mojosec_policy`.
+`mojosec_policy`. A vhost that carries an edge evidence policy therefore cannot
+change kind, or its single-page-app switch on a `site`, from here: the server
+requires the policy's response class to match and refuses, and its message is
+shown.
 
 Shared rules, each mirrored by a validator in `edge/models.ts`:
 
@@ -127,7 +130,8 @@ at review.
 In edit mode routes are read-only, with a pointer to the detail view, which
 owns adding, changing and deleting them. Changing a `site_api` vhost to
 another kind while it has routes is blocked with the count; the server refuses
-it too.
+it too. Until the stored routes have been read, or if that read fails, the
+wizard does not judge quiet paths against them and leaves that to the server.
 
 ## Vhost detail
 

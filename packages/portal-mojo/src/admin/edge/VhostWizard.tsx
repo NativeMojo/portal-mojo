@@ -59,6 +59,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
     const [pool, setPool] = useState(row?.pool ?? 'default');
     const [enabled, setEnabled] = useState(row?.is_enabled ?? true);
     const [storedRoutes, setStoredRoutes] = useState<string[] | null>(editing ? null : []);
+    const [routesUnread, setRoutesUnread] = useState(false);
     const nextRouteKey = useRef(1);
     // Finish reruns whole on every retry, so what already landed is recorded
     // here and skipped: never a second vhost, never a duplicate route.
@@ -77,7 +78,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
     useEffect(() => {
         if (!row || row.kind !== 'site_api') { if (editing) setStoredRoutes([]); return; }
         let live = true;
-        listVhostRoutes(row.id).then((rows) => { if (live) setStoredRoutes(rows.map((route) => route.path_prefix)); }).catch(() => { if (live) setStoredRoutes([]); });
+        listVhostRoutes(row.id).then((rows) => { if (live) setStoredRoutes(rows.map((route) => route.path_prefix)); }).catch(() => { if (live) setRoutesUnread(true); });
         return () => { live = false; };
     }, [editing, row]);
 
@@ -121,7 +122,8 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
                 if (refusal) throw new Error(refusal);
             }
             if (new Set(cleanQuietPaths).size !== cleanQuietPaths.length) throw new Error('A quiet path is listed twice.');
-            if (kind === 'site_api') {
+            // Stored routes not read yet, or unreadable: the server checks.
+            if (kind === 'site_api' && !(editing && storedRoutes == null)) {
                 const uncovered = quietPathUncovered(cleanQuietPaths, routePrefixes);
                 if (uncovered) throw new Error(`Quiet path ${uncovered} is not under any route prefix.`);
             }
@@ -211,7 +213,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
                 {kind === 'redirect' && <label className="field"><span className="field-label">Redirect to <em>*</em></span><input className="input" value={redirectTo} disabled={busy} onChange={(event) => setRedirectTo(event.target.value)} placeholder="www.example.com" autoComplete="off" /><span className="field-help">A host name only: no https://, path or port.</span></label>}
                 {(kind === 'site' || kind === 'site_api') && <label className="field switch-field"><input type="checkbox" checked={spa} disabled={busy} onChange={(event) => setSpa(event.target.checked)} /> Single-page app: unknown paths return index.html instead of a 404</label>}
                 {kind === 'site_api' && (editing
-                    ? <div className="edge-note"><b>Routes</b><span>{storedRoutes == null ? 'Loading…' : storedRoutes.length ? storedRoutes.join(', ') : 'None yet.'} Manage routes in the detail view.</span></div>
+                    ? <div className="edge-note"><b>Routes</b><span>{storedRoutes == null ? (routesUnread ? 'Could not be read.' : 'Loading…') : storedRoutes.length ? storedRoutes.join(', ') : 'None yet.'} Manage routes in the detail view.</span></div>
                     : <div className="field edge-route-list">
                         <span className="field-label">Routes <em>*</em></span>
                         {routes.map((route) => <div className="edge-route-row" key={route.key}>
@@ -256,7 +258,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
         return editing ? [shape, name, knobs, serving] : [shape, name, knobs, serving, review];
         // The check* closures read the same state listed here.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bodySize, certificate, certificateId, covered, createdId, domain, editing, enabled, kind, label, locked, pool, quietPaths, redirectTo, routes, serveStatic, serverName, spa, storedRoutes, superuser, upstream]);
+    }, [bodySize, certificate, certificateId, covered, createdId, domain, editing, enabled, kind, label, locked, pool, quietPaths, redirectTo, routes, routesUnread, serveStatic, serverName, spa, storedRoutes, superuser, upstream]);
 
     return <FormWizard mode={editing ? 'tabs' : 'wizard'} sections={sections} onBusyChange={onBusyChange} onCancel={() => onDone(null)} onFinish={finish} finishText="Create vhost" saveText="Save changes" busyText="Saving…" />;
 }
