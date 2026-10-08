@@ -200,8 +200,8 @@ export async function mojoList<T>(endpoint: string, params: Params = {}): Promis
     };
 }
 
-export async function mojoGet<T>(endpoint: string, id: number | string): Promise<T> {
-    const body = await unwrap(`${endpoint}/${id}`, {});
+export async function mojoGet<T>(endpoint: string, id: number | string, opts: { unscoped?: boolean } = {}): Promise<T> {
+    const body = await unwrap(`${endpoint}/${id}`, { unscoped: opts.unscoped });
     return body.data as T;
 }
 
@@ -226,10 +226,12 @@ export async function mojoMetrics(params: Params): Promise<MetricsResponse> {
     };
 }
 
-/** Create (no id) or update (with id). Rejects on any failure. */
-export async function mojoSave<T>(endpoint: string, id: number | string | null, changes: Record<string, unknown>): Promise<T> {
+/** Create (no id) or update (with id). Rejects on any failure. `unscoped`
+ *  is the record-route opt-out from a registered scope (FetchOpts.unscoped);
+ *  mojoGet and mojoDelete take the same option. */
+export async function mojoSave<T>(endpoint: string, id: number | string | null, changes: Record<string, unknown>, opts: { unscoped?: boolean } = {}): Promise<T> {
     const path = id == null ? endpoint : `${endpoint}/${id}`;
-    const body = await unwrap(path, { method: 'POST', body: changes });
+    const body = await unwrap(path, { method: 'POST', body: changes, unscoped: opts.unscoped });
     return body.data as T;
 }
 
@@ -238,8 +240,8 @@ export async function mojoSave<T>(endpoint: string, id: number | string | null, 
  * envelope's only non-boolean status; it passes the unwrap's `=== false`
  * failure check by design). Failures reject like every other call.
  */
-export async function mojoDelete(endpoint: string, id: number | string): Promise<void> {
-    await unwrap(`${endpoint}/${id}`, { method: 'DELETE' });
+export async function mojoDelete(endpoint: string, id: number | string, opts: { unscoped?: boolean } = {}): Promise<void> {
+    await unwrap(`${endpoint}/${id}`, { method: 'DELETE', unscoped: opts.unscoped });
 }
 
 /** Trigger a browser download of an in-memory file. Shared by safe client exports. */

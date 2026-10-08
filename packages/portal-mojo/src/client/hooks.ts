@@ -32,7 +32,8 @@ export function useModel<T>(endpoint: string, id: number | string | null, saniti
     return useQuery({
         queryKey: [endpoint, 'one', id],
         queryFn: async () => {
-            const row = await mojoGet<T>(endpoint, id!);
+            // A REST record route: the server binds the row's own group (#5923).
+            const row = await mojoGet<T>(endpoint, id!, { unscoped: true });
             return sanitizeRow ? sanitizeRow(row) : row;
         },
         enabled: id != null,
@@ -43,8 +44,11 @@ export function useModel<T>(endpoint: string, id: number | string | null, saniti
 export function useSaveModel<T>(endpoint: string) {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, changes }: { id: number | string | null; changes: Record<string, unknown> }) =>
-            mojoSave<T>(endpoint, id, changes),
+        // With an id this is a REST record route: the server binds the row's
+        // own group (#5923). A create still sends only the caller's changes.
+        mutationFn: ({ id, changes }: { id: number | string | null; changes: Record<string, unknown> }) => id == null
+            ? mojoSave<T>(endpoint, id, changes)
+            : mojoSave<T>(endpoint, id, changes, { unscoped: true }),
         onSuccess: () => qc.invalidateQueries({ queryKey: [endpoint] }),
     });
 }
