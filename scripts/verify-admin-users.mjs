@@ -116,6 +116,25 @@ try {
     const listed = await mock.mockFetch('/api/account/api_keys', { headers: ordinary, params: { size: 100 } });
     assert.equal(containsSecret(listed), false, 'ordinary key reads contain no signing material');
 
+    // Owner scoping matches the server: a users-grant caller is served every
+    // user's keys unless ?user= narrows them; anyone else only their own, and
+    // asking for another user's is an empty 200.
+    const managerMe = (await mock.mockFetch('/api/user/me', { headers: manager })).data;
+    const ordinaryMe = (await mock.mockFetch('/api/user/me', { headers: ordinary })).data;
+    assert.notEqual(managerMe.id, ordinaryMe.id);
+    const keyIds = (response) => response.data.map((row) => row.id);
+    assert(listed.data.length > 0 && keyIds(listed).includes(minted.data.id), 'an ordinary caller lists their own keys');
+    const managerAll = await mock.mockFetch('/api/account/api_keys', { headers: manager, params: { size: 100 } });
+    assert(keyIds(managerAll).includes(minted.data.id), 'a users-grant caller with no ?user= is served other users\' keys');
+    assert(managerAll.data.length > listed.data.length, 'the unfiltered manager list spans more than one owner');
+    const managerOwn = await mock.mockFetch('/api/account/api_keys', { headers: manager, params: { size: 100, user: managerMe.id } });
+    assert(!keyIds(managerOwn).includes(minted.data.id), '?user=<self> narrows a users-grant caller to their own keys');
+    const managerTarget = await mock.mockFetch('/api/account/api_keys', { headers: manager, params: { size: 100, user: ordinaryMe.id } });
+    assert.deepEqual(keyIds(managerTarget).sort(), keyIds(listed).sort(), '?user=<other> serves that user\'s keys to a users-grant caller');
+    const ordinaryOther = await mock.mockFetch('/api/account/api_keys', { headers: ordinary, params: { size: 100, user: managerMe.id } });
+    assert.equal(ordinaryOther.status, true);
+    assert.deepEqual(ordinaryOther.data, [], 'an ordinary caller asking for another user gets an empty list');
+
     console.log('admin users contract verified');
 } finally {
     await server.close();

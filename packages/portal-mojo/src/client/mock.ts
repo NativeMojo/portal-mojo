@@ -11581,16 +11581,18 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
     if (path === '/api/account/api_keys') {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
+        // Server parity (rest.py on_rest_list): a users/manage_users caller
+        // gets every user's rows unless ?user= narrows them; anyone else gets
+        // their own, and ?user=<other> is ANDed on — an empty 200, not a 403.
         const canManageOthers = hasGlobalPermission(caller, ['users', 'manage_users']);
-        const requestedUser = opts.params?.user == null ? null : Number(opts.params.user);
-        if (requestedUser != null && requestedUser !== caller.id && !canManageOthers) return permissionDenied();
-        const params: Params = { ...(opts.params ?? {}), user: requestedUser ?? caller.id };
+        const visible = canManageOthers ? db.apiKeys : db.apiKeys.filter((k) => k.user === caller.id);
+        const params: Params = { ...(opts.params ?? {}) };
         const search = (k: Record<string, unknown>) => String(k.label ?? '');
         if (params.download_format) {
-            const full = listRows(db.apiKeys as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.apiKeys.length }, search, '-id');
+            const full = listRows(visible as unknown as Record<string, unknown>[], { ...params, start: 0, size: db.apiKeys.length }, search, '-id');
             return exportRows((full.data as unknown as MockApiKey[]).map(serializeApiKey), params, 'UserAPIKey');
         }
-        const result = listRows(db.apiKeys as unknown as Record<string, unknown>[], params, search, '-id');
+        const result = listRows(visible as unknown as Record<string, unknown>[], params, search, '-id');
         return { ...result, data: (result.data as unknown as MockApiKey[]).map(serializeApiKey) };
     }
     // ══ Jobs engine — /api/jobs/* (mojo/apps/jobs) ═══════════════════

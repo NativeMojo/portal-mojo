@@ -54,6 +54,15 @@ revoke remains armed because it rotates the secret and cannot be undone. There
 is no delete action. This page does not use the separate group credential
 endpoint.
 
+The page lists the signed-in user's own keys only. The endpoint serves every
+user's keys to a caller holding `users` or `manage_users` who sends no `user`,
+so the page passes `fixedParams={{ user: me.id }}`: every list and export
+request carries it, and it cannot be cleared from the URL, a saved view or a
+preset. Until the signed-in user is loaded the page shows a placeholder and
+mounts no table, so no unscoped list or export can go out. An administrator
+reads another user's keys per user, in that user's detail under Users. Plain
+users reach their own keys in "My account".
+
 The Personal API Keys route was added to the package identity section registry
 alongside Users, Members, Groups, Credentials and Sign-in. Compatibility page
 paths in the reference app re-export the package-owned pages, and its menu and
