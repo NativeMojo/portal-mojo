@@ -62,6 +62,7 @@ the inventory using `node scripts/verify-admin-modals.mjs --write-inventory`.
 | Storage/shortlinks | Bucket, FileManager, File, shortlink; owner/backend/test/CORS/upload/rendition/share | FileManager/shortlink/share active state; no File disable promise; bucket empty only |
 | Email/support | Domain, mailbox, sent message, template, contact; credentials/onboarding/audit/reconcile/test/template/status | Preserve evidence; separate mailbox directions and support status |
 | Phone/Push | Number, SMS, config, device, delivery, template; lookup/test/config editors | Config/template lifecycle; number/SMS/device/delivery evidence retained |
+| Edge | Vhost with nested routes; shape-first wizard, route editor, upstream declare/retire, blocklist entry editor | Vhost and upstream enabled state; upstreams retire and are never deleted; vhost, route and blocklist deletion are retained operations |
 | Assistant/settings | Conversation, Skill, Setting; feed continuation, scoped memory, typed settings editor | Owner-only continuation; Skill active selection; memory is scoped editing |
 
 ## Resource lifecycle matrix
@@ -84,6 +85,9 @@ the inventory using `node scripts/verify-admin-modals.mjs --write-inventory`.
 | Push config / template | Existing active selection with separate manage/test grants |
 | Assistant conversation | Retain history; no arbitrary REST save or invented archive |
 | Assistant Skill | Existing `is_active` save requires `sys.view_admin`; authoritative reload after mutation |
+| Edge vhost | Enable/disable from the header; Edit and Delete in the header menu. Disabling keeps the row and is how a replacement is staged |
+| Edge upstream | `is_enabled` only. Retire (platform administrators) disables and keeps the row; server `CAN_DELETE=False` |
+| Edge blocklist entry | Mode is the lifecycle: `off` parks an entry without losing it. Deletion is a retained operation |
 | Other logs/devices/history | Read-only by default, even where low-level REST supports DELETE |
 
 The public low-level exported delete APIs remain compatible. Built-in controls
@@ -101,6 +105,9 @@ conversation archival require backend work before new lifecycle UI is added.
 | DNS record-set removal | DNS manage gate, provider capability and record coordinator. Preview all values, apex/service impact and exact name/type; stale-state preflight and reconcile failures; no domain deletion |
 | Empty bucket | `sys.manage_aws OR sys.files`, then fresh auth; header to focused armed confirmation and exact case-sensitive bucket name. Removes objects, versions, markers and multipart uploads; retains bucket. Display partial/unknown outcomes and always refresh |
 | Jobs retention purge | `sys.manage_jobs OR sys.jobs`; dry-run estimate bound to normalized days/status plus generation. Editing/replacing preview resets arming. Ignore stale/unmounted responses; lock inputs/dismissal during execution. Report actual cutoff and cascade-inclusive counts; rejection requires another preview |
+| Edge vhost deletion | `sys.manage_dns OR sys.security`; house vhosts are platform administrators only. Header menu to a focused confirmation naming the address. Stops serving the name and deletes its routes with it; the confirmation points at Disable as the reversible choice |
+| Edge route removal | Same grant, inside the vhost's Routes content with an armed control naming the prefix. Requests under the prefix stop being proxied. A quiet path left without a covering route makes the vhost's next save fail, and the server's message is shown |
+| Edge blocklist entry removal | `sys.manage_security OR sys.security`; armed control in the entry's editor. The entry leaves every node within about ten minutes. `off` is the reversible choice |
 | Queue/consumer cleanup | Jobs manage grant, exact channel/scope and armed confirmation; queue clear sends `confirm:yes` only after consent and may cancel pending database jobs. Report partial outcomes |
 
 Other non-row removals retain their scoped editor semantics: rate-limit override

@@ -80,6 +80,8 @@ if (import.meta.env.DEV) {
 // into fresh 401 error states instead of stale rows).
 mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
 mojo.onAuth('logout', () => { void queryClient.invalidateQueries(); });
+// A rotation (sessions revoke, email change) re-issues the same user's session.
+mojo.onAuth('rotated', () => { void queryClient.invalidateQueries(); });
 
 const root = createRoot(document.getElementById('root')!);
 let router: ReturnType<typeof createAdminRouter> | undefined;

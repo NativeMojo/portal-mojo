@@ -17,12 +17,21 @@ is a Promise that resolves when its dialog closes.
 | `modal.detail((close) => <DetailView …/>)` | detail-sized shell for record views |
 | `modal.drawer<T>({title, content\|render, …})` | `T \| null` — right slide-over (below) |
 | `formModal({title, fields, initial?, submitText?, intro?})` | `FormData \| null` (see forms.md) |
+| `modal.closeAll()` | closes every open modal/drawer; each await resolves `null` |
 
 Patterns:
 - Danger confirms: `danger: true` styles the confirm button destructively.
 - Batch prepare: open a `formModal` INSIDE a flow to collect once-per-batch
   input; resolve null to cancel the whole thing.
 - Stacked dialogs are fine (disable-reason form over a detail modal).
+- `canDismiss` also covers the dialog closing natively without a cancelable
+  `cancel` (Chromium's second Escape with no click between, Android back):
+  a locked modal reopens with focus inside; an unlocked one resolves `null`.
+  A `dismissable: false` drawer reopens the same way.
+- The stack ends with the session: `'logout'` / `'unauthorized'` auth events,
+  or the signed-in uid changing (another tab), close every open dialog
+  (`null`), so a host remounted after sign-in never brings a previous user's
+  dialog back.
 
 ## confirmGuardrail — the "are you sure, and here is why" stop
 

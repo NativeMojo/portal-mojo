@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { scanAdminModals, scanLifecycleReferences, classifyModalEntries } from './admin-modal-scanner.mjs';
 import ts from 'typescript';
 
-const roots = ['packages/portal-mojo/src/admin', 'apps/portal/src/pages'];
+// The shared credential surfaces live outside admin/ (portal-mojo/account and
+// the moved show-once secret dialog) but back admin flows, so they stay in
+// the inventory.
+const roots = ['packages/portal-mojo/src/admin', 'packages/portal-mojo/src/account', 'packages/portal-mojo/src/ui/secret-dialog.tsx', 'apps/portal/src/pages'];
 const files = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(`${dir}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${dir}/${e.name}`] : []);
-const targets = roots.flatMap(files).sort();
+const targets = roots.flatMap(root => statSync(root).isFile() ? [root] : files(root)).sort();
 const config = ts.readConfigFile('packages/portal-mojo/tsconfig.json', ts.sys.readFile);
 const options = ts.parseJsonConfigFileContent(config.config, ts.sys, 'packages/portal-mojo').options;
 const program = ts.createProgram(targets, options);

@@ -21,7 +21,7 @@ import {
     Badge, Eyebrow, FlatRow, FormView,
     fmt, modal, toast, type Field,
 } from 'portal-mojo/ui';
-import { GroupModel, type GroupRow } from '../../models';
+import { GroupModel, type GroupRow } from '../models';
 import { EOD_HOUR_OPTIONS, GROUP_KIND_COMBO_OPTIONS, kindLabel } from './models';
 
 const IDENTITY_FIELDS: Field[] = [

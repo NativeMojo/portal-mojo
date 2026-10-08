@@ -4,6 +4,7 @@ export * from './Guarded';
 export * from './menu-registry';
 export * from './SidebarNav';
 export * from './RightPanel';
+export * from './UserMenu';
 export * from './RouteError';
 export * from './route-error';
 export * from './modal';

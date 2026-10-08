@@ -1,0 +1,98 @@
+/* ── UserMenu — portal-mojo/ui <UserMenu> ─────────────────────────────────
+   The top-nav account menu: avatar trigger + an anchored <Popover> holding
+   the identity header, the Light/Dark/System theme control, app items and
+   Sign out. Tokens only — both themes come from the token swap. Reuses the
+   house .seg/.seg-btn segmented control and .chip tones. */
+
+/* ── Trigger ─────────────────────────────────────────────────────────── */
+.user-menu-trigger {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-width: 0; max-width: 260px;
+    padding: 3px 9px 3px 3px;
+    border: 1px solid transparent; border-radius: 999px;
+    background: none; color: var(--ink-strong);
+    font: inherit; cursor: pointer;
+}
+.user-menu-trigger:hover,
+.user-menu-trigger.is-open { background: var(--surface2); border-color: var(--line); }
+.user-menu-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.user-menu-sm { gap: 6px; padding: 2px 7px 2px 2px; }
+
+.user-menu-avatar {
+    flex: none; overflow: hidden;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-weight: 750; line-height: 1; user-select: none;
+}
+.user-menu-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.user-menu-md .user-menu-avatar-trigger { width: 28px; height: 28px; font-size: 11px; }
+.user-menu-sm .user-menu-avatar-trigger { width: 24px; height: 24px; font-size: 10px; }
+
+.user-menu-name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13.5px; font-weight: 600;
+}
+.user-menu-sm .user-menu-name { font-size: 12.5px; }
+.user-menu-caret { flex: none; font-size: 10.5px; color: var(--mute); transition: transform 140ms ease; }
+.user-menu-trigger.is-open .user-menu-caret { transform: rotate(180deg); }
+
+/* Phone width: the avatar alone is the trigger. */
+@media (max-width: 720px) {
+    .user-menu-trigger .user-menu-name,
+    .user-menu-trigger .user-menu-caret { display: none; }
+    .user-menu-trigger, .user-menu-sm { padding: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .user-menu-caret { transition: none; }
+}
+
+/* ── Menu ────────────────────────────────────────────────────────────── */
+.user-menu-pop { width: 280px; max-width: calc(100vw - 16px); }
+
+.user-menu-identity {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 14px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.user-menu-avatar-lg { width: 42px; height: 42px; font-size: 15px; }
+.user-menu-who { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.user-menu-who-name,
+.user-menu-who-email { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-menu-who-name { font-size: 14px; font-weight: 700; color: var(--ink-strong); }
+.user-menu-who-email { font-size: 12.5px; color: var(--mute); }
+.user-menu-tag { margin-top: 5px; }
+
+.user-menu { padding: 5px; max-height: min(70vh, 520px); overflow-y: auto; }
+
+.user-menu-theme { padding: 6px 5px 4px; }
+.user-menu-theme-label {
+    display: block; padding: 0 5px 5px;
+    font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--mute);
+}
+.user-menu-seg { display: flex; width: 100%; box-sizing: border-box; }
+.user-menu-seg .seg-btn {
+    flex: 1; min-width: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 4.5px 6px; font-size: 12px;
+}
+.user-menu-seg .seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.user-menu-item {
+    display: flex; align-items: center; gap: 9px;
+    width: 100%; box-sizing: border-box; text-align: left;
+    padding: 7px 10px; border: none; border-radius: 7px;
+    background: none; color: var(--ink);
+    font: inherit; font-size: 13.5px; font-weight: 550;
+    text-decoration: none; cursor: pointer;
+}
+.user-menu-item i { flex: none; width: 15px; text-align: center; font-size: 13.5px; color: var(--mute); }
+.user-menu-item:hover,
+.user-menu-item:focus-visible { background: var(--surface2); color: var(--ink-strong); outline: none; }
+.user-menu-item.is-danger,
+.user-menu-item.is-danger i { color: var(--bad); }
+.user-menu-item.is-danger:hover,
+.user-menu-item.is-danger:focus-visible { background: var(--bad-soft); color: var(--bad); }
+.user-menu-item[aria-disabled="true"] { opacity: 0.7; cursor: progress; }
+.user-menu-sep { height: 1px; margin: 5px 0; background: var(--line); }

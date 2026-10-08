@@ -13,6 +13,8 @@ import {
     // Fresh-auth (step-up) challenge surface
     REAUTH_STATUS, isReauthRequired, setFreshAuthHandler, requestFreshAuth,
     withFreshAuth, sessionIsPersistent,
+    // shared passkey error copy (LoginPage, MfaPanel, FreshAuthHost)
+    passkeyErrorMessage,
     type MfaChallenge, type FreshAuthHandler, type MfaCompletionOptions,
 } from 'portal-mojo/client';
 
@@ -80,6 +82,8 @@ answers with a full TokenGrant).
 - **Passkey**: `loginWithPasskey(username?, {remember})` behind `isPasskeySupported()`;
   no username → discoverable-credential prompt. The ceremony is fully built;
   REAL-authenticator verification is deferred (mock validates shape only).
+  Failures read through `passkeyErrorMessage()` (one copy for login, the MFA
+  passkey step and the fresh-auth modal).
   The remember choice is explicit because MFA and fresh-auth passkey paths
   must not promote a sessionStorage session into localStorage.
 
@@ -193,9 +197,10 @@ the first matching 440, retry success, and later normal calls reproducible.
   deployment-specific providers (`GET /api/auth/config` → `login.methods`),
   and no way to exercise the round-trip against the mock or without real
   provider credentials. Hosted pages cover OAuth deployments today.
-- **Passkey real-authenticator verification** — the ceremony is fully
-  built on auth.ts; verifying against a real authenticator + a live
-  django-mojo passkey registration is Ian's post-merge pass.
+- **Passkey real-authenticator verification** — login and registration
+  ceremonies are built on auth.ts (`loginWithPasskey`, `registerPasskey` —
+  the AccountModal's Add a passkey, see [account.md](account.md)).
+  Registration ceremony built; real-authenticator check pending.
 
 ## Pitfalls
 

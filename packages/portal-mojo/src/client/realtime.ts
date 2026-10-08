@@ -296,6 +296,18 @@ export class RealtimeClient {
             if (this.lifecycle === 'ready') this.clearPong();
             return;
         }
+        if (frame.type === 'ping') {
+            // Server-initiated heartbeat (django-mojo >= 1.32: every 20 s,
+            // idle cull at 90 s). Answered from this handler, not a timer, so
+            // a throttled background tab still proves the socket alive; it
+            // also counts as proof of life for our own pong deadline. A
+            // framework frame: never dispatched to consumers.
+            if (this.lifecycle === 'ready') {
+                socket.send(JSON.stringify({ type: 'pong' }));
+                this.clearPong();
+            }
+            return;
+        }
         if (frame.type === 'subscribed' || frame.type === 'unsubscribed') {
             if (typeof frame.topic === 'string') this.completeTopic(frame.type, frame.topic);
             return;

@@ -10,19 +10,18 @@
 // the public, admin-targetable verification sender (NOT the JWT-scoped
 // auth/verify/email/send).
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
-import { mojoCall, useCan, useMe, withFreshAuth, type Field } from '../../../../client/runtime';
+import { useEffect, useState } from 'react';
+import { mojoCall, withFreshAuth, type Field } from '../../../../client/runtime';
 import {
-    Badge,
     ImageField,
     PasswordStrengthMeter,
-    fmt,
     formModal,
     modal,
     toast,
     type FileFieldOwnerResult,
 } from '../../../../ui';
-import { PasskeyModel, USER_MANAGE_PERMISSIONS, UserModel, type UserRow } from '../models';
+import { PasskeyList } from '../../../../account/PasskeyList';
+import { UserModel, type UserRow } from '../models';
 import { OAuthConnectionList } from './OAuthSection';
 import { openGroupDetail, useAdminCaller } from './shared';
 
@@ -664,106 +663,14 @@ function AvatarModal({ user, onClose, onPendingChange }: { user: UserRow; onClos
 }
 
 /**
- * Manage passkeys — list / rename / enable-disable / delete over
- * /api/account/passkeys (?user=<id>): the two REST-editable fields are
- * friendly_name and is_enabled; delete is real (CAN_DELETE).
+ * Manage passkeys — the shared portal-mojo/account PasskeyList (rename /
+ * enable-disable / remove over /api/account/passkeys?user=<id>).
  */
 function PasskeysModal({ userId, onClose }: { userId: number; onClose: () => void }) {
-    const admin = useCan(USER_MANAGE_PERMISSIONS).can;
-    const allowed = useMe().data?.id === userId || admin;
-    const permission = useRef(allowed); permission.current = allowed;
-    useEffect(() => { permission.current = allowed; return () => { permission.current = false; }; }, [allowed]);
-    const { data, isPending } = PasskeyModel.useList({ user: userId, size: 25, sort: '-created' });
-    const save = PasskeyModel.useSave();
-    const del = PasskeyModel.useDelete();
-    const rows = data?.rows ?? [];
-
-    const rename = async (id: number, current: string | null) => {
-        const data = await formModal({
-            title: 'Edit passkey',
-            submitText: 'Save',
-            fields: [{
-                name: 'friendly_name', type: 'text', label: 'Name', required: true,
-                placeholder: 'My iPhone', help: 'A friendly name to identify this passkey',
-            }],
-            initial: { friendly_name: current ?? '' },
-        });
-        const name = data?.friendly_name;
-        if (!permission.current || typeof name !== 'string' || !name.trim()) return;
-        try {
-            await save.mutateAsync({ id, changes: { friendly_name: name.trim() } });
-            toast.success('Passkey updated');
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update passkey');
-        }
-    };
-
-    const toggleEnabled = async (id: number, next: boolean) => {
-        if (!permission.current) return;
-        try {
-            await save.mutateAsync({ id, changes: { is_enabled: next } });
-            toast.success(next ? 'Passkey enabled' : 'Passkey disabled');
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update passkey');
-        }
-    };
-
-    const remove = async (id: number) => {
-        const ok = await modal.confirm({
-            title: 'Delete passkey',
-            message: `Remove ${rows.find(row => row.id === id)?.friendly_name || 'Unnamed passkey'} for ${rows.find(row => row.id === id)?.rp_id || 'unknown relying party'}, user #${userId}? Reenrollment is required to restore it. The physical device is not erased.`,
-            confirmText: 'Delete',
-            danger: true,
-        });
-        if (!ok || !permission.current) return;
-        try {
-            await del.mutateAsync({ id });
-            toast.success('Passkey deleted');
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to delete passkey');
-        }
-    };
-
     return (
         <div className="modal-pad">
             <h2 className="modal-title">Passkeys</h2>
-            {isPending && <p className="dim">Loading…</p>}
-            {!isPending && rows.length === 0 && (
-                <div className="us-empty">
-                    <i className="bi bi-fingerprint" />
-                    <div>No passkeys registered</div>
-                </div>
-            )}
-            {rows.map((p) => (
-                <div key={p.id} className="us-passkey-row">
-                    <div className="us-row-icon"><i className="bi bi-fingerprint" /></div>
-                    <div className="us-row-info">
-                        <div className="us-row-title">
-                            {p.friendly_name || 'Unnamed passkey'}
-                            {!p.is_enabled && <Badge tone="muted">Disabled</Badge>}
-                        </div>
-                        <div className="us-row-meta">
-                            Created {fmt.date(p.created)} · Last used {fmt.relative(p.last_used, 'never')} · {p.sign_count} uses
-                        </div>
-                    </div>
-                    <div className="us-row-actions" inert={!allowed || save.isPending || del.isPending}>
-                        <button className="btn-icon btn-icon-sm" title="Rename" aria-label={`Rename ${p.friendly_name ?? 'passkey'}`} onClick={() => void rename(p.id, p.friendly_name)}>
-                            <i className="bi bi-pencil" />
-                        </button>
-                        <button
-                            className="btn-icon btn-icon-sm"
-                            title={p.is_enabled ? 'Disable' : 'Enable'}
-                            aria-label={p.is_enabled ? 'Disable passkey' : 'Enable passkey'}
-                            onClick={() => void toggleEnabled(p.id, !p.is_enabled)}
-                        >
-                            <i className={`bi ${p.is_enabled ? 'bi-toggle-on' : 'bi-toggle-off'}`} />
-                        </button>
-                        <button className="btn-icon btn-icon-sm us-danger" title="Delete" aria-label="Delete passkey" onClick={() => void remove(p.id)}>
-                            <i className="bi bi-trash" />
-                        </button>
-                    </div>
-                </div>
-            ))}
+            <PasskeyList userId={userId} />
             <div className="modal-actions">
                 <button className="btn" onClick={onClose}>Close</button>
             </div>

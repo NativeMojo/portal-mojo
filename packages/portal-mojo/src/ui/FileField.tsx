@@ -7,6 +7,7 @@ import { useUploadQueue } from './UploadQueue';
 import { fileRelationId } from './field-wire';
 import { toast } from './toast';
 import { imageEditorModal, type ImageEditorModalOptions } from './image-editor';
+import { safePreviewUrl } from './safe-url';
 
 export type FileFieldState = 'keep' | 'clear' | 'replacement-in-progress' | 'replacement-failed'
     | 'completed-awaiting-attach' | 'attach-failed' | 'edit-pending' | 'edit-ready' | 'edit-failed';
@@ -53,16 +54,6 @@ export function reconcileFileOwnerResult(expected: number | null, result: FileFi
 
 interface PreviewRow { url?: unknown; thumbnail?: unknown; filename?: unknown }
 
-function safePreviewUrl(value: unknown): string | null {
-    if (typeof value !== 'string' || value.trim() !== value || !value || value.startsWith('//')) return null;
-    if (value.startsWith('/')) return /[\r\n\\]/.test(value) ? null : value;
-    try {
-        const url = new URL(value);
-        return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password
-            ? value : null;
-    } catch { return null; }
-}
-
 /**
  * Controlled django-mojo File relation editor. Browser File values, object
  * URLs, upload tasks, and stored preview capabilities stay component-local.
@@ -108,13 +99,18 @@ export function FileField(props: FileFieldProps) {
         }
     }, [queue]);
 
-    useEffect(() => () => {
-        mounted.current = false;
-        generation.current += 1;
-        editController.current?.abort();
-        revokeLocal();
-        if (desired.current !== undefined && candidate.current != null) reportOrphan(candidate.current);
-        queue.cancelAll();
+    useEffect(() => {
+        // Re-arm on (re)mount: StrictMode's probe unmount runs the cleanup
+        // below, and without this the remount stays "unmounted" forever.
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            generation.current += 1;
+            editController.current?.abort();
+            revokeLocal();
+            if (desired.current !== undefined && candidate.current != null) reportOrphan(candidate.current);
+            queue.cancelAll();
+        };
     }, [queue, reportOrphan, revokeLocal]);
 
     const active = queue.snapshot.activeCount > 0 || queue.snapshot.queuedCount > 0;

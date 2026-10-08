@@ -21,4 +21,11 @@ export const STORAGE_ADMIN_SECTION: AdminSection = {
         { path: 'files', label: 'Files', loadComponent: () => import('../storage/FilesPage').then(({ FilesPage }) => ({ default: FilesPage })), permissions: STORAGE_VIEW_PERMS },
     ],
 };
-export const INFRASTRUCTURE_ADMIN_SECTIONS = [DNS_ADMIN_SECTION, STORAGE_ADMIN_SECTION] as const;
+export const EDGE_ADMIN_SECTION: AdminSection = {
+    id: 'edge', basePath: 'edge', title: 'Edge', icon: 'bi-hdd-network', navigationGroup: 'infrastructure', permissions: DNS_VIEW_PERMISSIONS,
+    routes: [
+        { path: 'vhosts', label: 'Vhosts', loadComponent: () => import('../edge/VhostsPage').then(({ VhostsPage }) => ({ default: VhostsPage })), permissions: DNS_VIEW_PERMISSIONS },
+        { path: 'upstreams', label: 'Upstreams', loadComponent: () => import('../edge/UpstreamsPage').then(({ UpstreamsPage }) => ({ default: UpstreamsPage })), permissions: DNS_VIEW_PERMISSIONS },
+    ],
+};
+export const INFRASTRUCTURE_ADMIN_SECTIONS = [DNS_ADMIN_SECTION, STORAGE_ADMIN_SECTION, EDGE_ADMIN_SECTION] as const;
