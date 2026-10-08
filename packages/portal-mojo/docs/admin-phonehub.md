@@ -13,7 +13,10 @@ Import `PhoneHubPage`, the three individual pages, models, permission clauses, a
 - `PhoneConfigModel` reads sanitized scalar/default-graph rows. Saves and `test_connection` use imperative, cache-free calls. The editor follows web-mojo's provider-conditional layout: selecting Twilio, AWS SNS, or Mojo Remote shows and submits only that provider's connection fields. Mojo Remote uses `https://api.mojoverify.com` when the saved URL is unset or the editor is switched to Mojo; an explicitly configured custom URL is preserved. Secret inputs are DOM refs, not React or Query state: blank means untouched and is omitted; replacement must be non-empty; clear sends `null` only after a separate confirmation. Switching providers resets pending clears, and hidden provider credentials remain untouched. Responses are allowlisted before cache reconciliation. This surface edits existing provider credentials; it does not provision Django user/group API keys.
 
 Connection tests read the provider's `success` verdict, not the outer REST
-`status`. A failed or missing verdict is an error; `test_mode` is a warning
+`status`. The real wire answers the test flat (the action dict verbatim, as
+the mock now does too), so the call passes `refusal: 'return'`: a failed
+verdict is an answer for inline display, not a rejected request. A failed or
+missing verdict is an error; `test_mode` is a warning
 that the provider was not contacted. Results persist inside the detail modal
 on both sections, alongside a toast. Scope is labeled in the header and
 Connection section. Editing is disabled while a connection test is pending, so an old response

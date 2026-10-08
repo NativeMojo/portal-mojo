@@ -47,6 +47,9 @@ export type MockUser = User & { created: number; requires_mfa: boolean };
 
 const PRIVATE_USER_FIELDS = new Set(['created', 'requires_mfa']);
 
+/** Users whose password is unusable (OAuth/passkey-only) — `has_password: false`. */
+const passwordlessUsers = new Set<number>();
+
 function serializeUser(u: MockUser, graph: 'list' | 'default' = 'list'): User {
     const row: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(u)) {
@@ -56,6 +59,7 @@ function serializeUser(u: MockUser, graph: 'list' | 'default' = 'list'): User {
         delete row.is_online; // list-graph-only field
         row.requires_mfa = u.requires_mfa;
         row.has_passkey = db.passkeys.some((p) => p.user === u.id && p.is_enabled);
+        row.has_password = !passwordlessUsers.has(u.id);
     }
     return row as unknown as User;
 }
@@ -734,6 +738,109 @@ function buildAcmeDelegations(): MockAcmeDelegation[] {
         { id: 8501, created: iso(-30 * 86400), modified: iso(-29 * 86400), domain: 8204, domain_name: 'cert-only.example', source: '_acme-challenge.cert-only.example', target: 'mock-8501.acme-hub.example', state: 'verified', verified_at: iso(-29 * 86400), last_error_code: null, tenant_uuid: 'private-tenant-canary', cleanup_challenge_ref: null },
         { id: 8502, created: iso(-60 * 86400), modified: iso(-1800), domain: 8208, domain_name: 'broken-delegation.example', source: '_acme-challenge.broken-delegation.example', target: 'mock-8502.acme-hub.example', state: 'broken', verified_at: iso(-59 * 86400), last_error_code: 'dns_target_missing', tenant_uuid: 'private-broken-tenant', cleanup_challenge_ref: 'private-cleanup-canary' },
         { id: 8503, created: iso(-600), modified: iso(-600), domain: 8201, domain_name: 'acme.example', source: '_acme-challenge.acme.example', target: 'mock-8503.acme-hub.example', state: 'pending', verified_at: null, last_error_code: null, tenant_uuid: 'private-pending-tenant', cleanup_challenge_ref: null },
+    ];
+}
+
+// ── Edge — vhosts, routes, upstreams, fleet blocklist ────────────────
+// Sources: mojo/apps/edge/models/{vhost,route,upstream,blocklist}.py,
+// mojo/apps/edge/rest/, mojo/apps/edge/validators.py.
+interface MockEdgeUpstream {
+    id: number;
+    created: number;
+    modified: number;
+    group: number | null;
+    name: string;
+    kind: string;
+    host: string | null;
+    port: number | null;
+    socket_path: string | null;
+    is_enabled: boolean;
+    [field: string]: unknown;
+}
+
+interface MockEdgeVhost {
+    id: number;
+    created: number;
+    modified: number;
+    domain: number;
+    label: string;
+    kind: string;
+    upstream: number | null;
+    certificate: number | null;
+    pool: string;
+    spa: boolean;
+    body_size_mb: number;
+    quiet_paths: string[];
+    serve_static: boolean;
+    mojosec_policy: Record<string, unknown>;
+    redirect_to: string | null;
+    is_enabled: boolean;
+    [field: string]: unknown;
+}
+
+interface MockEdgeRoute {
+    id: number;
+    created: number;
+    modified: number;
+    vhost: number;
+    path_prefix: string;
+    upstream: number;
+    [field: string]: unknown;
+}
+
+interface MockEdgeBlocklistEntry {
+    id: number;
+    created: number;
+    modified: number;
+    kind: string;
+    value: string;
+    mode: string;
+    note: string;
+    [field: string]: unknown;
+}
+
+function buildEdgeUpstreams(): MockEdgeUpstream[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8601, created: now - 300 * 86400, modified: now - 30 * 86400, group: null, name: 'mojo-api', kind: 'http', host: '127.0.0.1', port: 8001, socket_path: null, is_enabled: true },
+        { id: 8602, created: now - 300 * 86400, modified: now - 30 * 86400, group: null, name: 'mojo-asgi', kind: 'unix', host: null, port: null, socket_path: '/run/mojo/asgi.sock', is_enabled: true },
+        { id: 8603, created: now - 90 * 86400, modified: now - 5 * 86400, group: 1, name: 'acme-backend', kind: 'http', host: '10.0.4.12', port: 8080, socket_path: null, is_enabled: true },
+        // Retired: rows that reach it stop being served; the select filters it out.
+        { id: 8604, created: now - 400 * 86400, modified: now - 60 * 86400, group: null, name: 'legacy-api', kind: 'http', host: '10.0.9.9', port: 9000, socket_path: null, is_enabled: false },
+        { id: 8605, created: now - 50 * 86400, modified: now - 50 * 86400, group: 2, name: 'globex-backend', kind: 'http', host: '10.0.7.20', port: 8080, socket_path: null, is_enabled: true },
+    ];
+}
+
+function buildEdgeVhosts(): MockEdgeVhost[] {
+    const now = Math.floor(Date.now() / 1000);
+    const base = { pool: 'default', spa: false, body_size_mb: 50, quiet_paths: [] as string[], serve_static: false, mojosec_policy: {}, redirect_to: null, upstream: null };
+    return [
+        { ...base, id: 8701, created: now - 80 * 86400, modified: now - 3 * 86400, domain: 8201, label: 'api', kind: 'api', upstream: 8603, certificate: 8401, quiet_paths: ['/health'], serve_static: true, is_enabled: true },
+        { ...base, id: 8702, created: now - 70 * 86400, modified: now - 9 * 86400, domain: 8201, label: 'www', kind: 'site', certificate: 8401, spa: true, is_enabled: true },
+        { ...base, id: 8703, created: now - 40 * 86400, modified: now - 2 * 86400, domain: 8201, label: 'app', kind: 'site_api', certificate: 8401, spa: true, quiet_paths: ['/api/health'], body_size_mb: 200, mojosec_policy: { version: 1, impossible_path_families: ['php_runtime', 'wordpress'], response_class: 'site_api' }, is_enabled: true },
+        { ...base, id: 8704, created: now - 70 * 86400, modified: now - 70 * 86400, domain: 8201, label: '', kind: 'redirect', certificate: 8401, redirect_to: 'www.acme.example', is_enabled: true },
+        // A disabled duplicate of 8702's name: a staged replacement.
+        { ...base, id: 8705, created: now - 86400, modified: now - 3600, domain: 8201, label: 'www', kind: 'site', certificate: 8401, is_enabled: false },
+        // House row: platform property, hidden from non-superuser lists.
+        { ...base, id: 8706, created: now - 200 * 86400, modified: now - 20 * 86400, domain: 8209, label: 'portal', kind: 'api', upstream: 8601, certificate: 8408, is_enabled: true },
+    ];
+}
+
+function buildEdgeRoutes(): MockEdgeRoute[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8801, created: now - 40 * 86400, modified: now - 40 * 86400, vhost: 8703, path_prefix: '/api', upstream: 8603 },
+        { id: 8802, created: now - 40 * 86400, modified: now - 2 * 86400, vhost: 8703, path_prefix: '/ws', upstream: 8602 },
+    ];
+}
+
+function buildEdgeBlocklist(): MockEdgeBlocklistEntry[] {
+    const now = Math.floor(Date.now() / 1000);
+    return [
+        { id: 8901, created: now - 30 * 86400, modified: now - 12 * 86400, kind: 'ip', value: '203.0.113.0/24', mode: 'enforce', note: 'Credential stuffing, March' },
+        { id: 8902, created: now - 2 * 86400, modified: now - 2 * 86400, kind: 'ua', value: 'sqlmap', mode: 'log', note: 'Watching before enforcing' },
+        { id: 8903, created: now - 20 * 86400, modified: now - 20 * 86400, kind: 'ip', value: '198.51.100.7/32', mode: 'allow', note: 'Partner monitor, exempt' },
+        { id: 8904, created: now - 60 * 86400, modified: now - 10 * 86400, kind: 'ua', value: 'curl/7\\.', mode: 'off', note: 'Parked: broke a customer integration' },
     ];
 }
 
@@ -4233,6 +4340,10 @@ const db = {
     dnsCertificates: buildDnsCertificates(),
     acmeDelegations: buildAcmeDelegations(),
     dnsRecords: buildDnsRecords(),
+    edgeUpstreams: buildEdgeUpstreams(),
+    edgeVhosts: buildEdgeVhosts(),
+    edgeRoutes: buildEdgeRoutes(),
+    edgeBlocklist: buildEdgeBlocklist(),
     metricPermissions: new Map<string, { view_permissions: string | string[] | null; write_permissions: string | string[] | null }>([
         ['global', { view_permissions: 'view_metrics', write_permissions: ['write_metrics', 'metrics'] }],
         ['group-1', { view_permissions: ['view_metrics', 'metrics'], write_permissions: null }],
@@ -4526,10 +4637,10 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
             if (!user.is_active) {
                 // The INSIDE-THE-200 refusal shape (flat): the handler's dict
                 // reaches the wire verbatim with `success:false` — no
-                // envelope-level `status:false`, so unwrap passes it through
-                // and client/action-result normalizes it into
-                // ActionRefusedError. This is the contract's executable
-                // refusal fixture; keep it flat.
+                // envelope-level `status:false`. unwrap rejects it with
+                // ActionRefusedError (#5922); mojoAction/useAction opt out
+                // and read it themselves to name the action. This is the
+                // contract's executable refusal fixture; keep it flat.
                 return { success: false, code: 'ALREADY_DISABLED', error: 'User is already disabled' };
             }
             if (!USER_DISABLE_REASONS.has(reason)) {
@@ -4591,10 +4702,13 @@ function runUserAction(user: MockUser, action: string, value: unknown, caller?: 
         case 'revoke_sessions':
             // Handler returns its own payload — the response is NOT the row.
             return { status: true, message: 'Sessions revoked. Re-authenticate to continue.' };
-        case 'disable_totp':
+        case 'disable_totp': {
             // on_action_disable_totp: clears enrollment (no-ops when nothing
             // is enrolled) and answers its own {status:true} payload.
+            const state = totpState.get(user.id);
+            if (state) state.enabled = false;
             return { status: true };
+        }
         default:
             return null;
     }
@@ -4972,9 +5086,75 @@ function signinFetch(method: string, body: Record<string, unknown>, headers: Rec
 // NO_SAVE_FIELDS parity (account/models/user.py RestMeta): silently dropped,
 // never an error — matching rest.py's strip. NOTE is_dob_verified IS in this
 // set live, which is why the portal ships no DOB force-verify affordance.
-const USER_NO_SAVE = new Set(['id', 'pk', 'auth_key', 'last_activity', 'is_dob_verified', 'created', 'has_passkey', 'is_online']);
+// Live NO_SAVE_FIELDS (user.py:188-192) plus the graph-only/derived keys the
+// mock row carries (id/pk/created/has_passkey/has_password/is_online) and
+// `current_password`, which set_new_password reads off the request, never
+// off the row.
+const USER_NO_SAVE = new Set([
+    'id', 'pk', 'auth_key', 'last_activity', 'is_dob_verified', 'requires_password_change',
+    'secrets', 'mojo_secrets', 'secret', 'permanent_password', 'protected_metadata', 'unusable_password', 'totp',
+    'created', 'has_passkey', 'has_password', 'is_online', 'current_password',
+]);
+
+/** user.py ADMIN_ONLY_FIELDS (:80-83) — `users`/`manage_users`/superuser only. */
+const USER_ADMIN_ONLY_FIELDS = ['is_email_verified', 'is_phone_verified', 'requires_mfa', 'is_active', 'org'];
+
+/**
+ * The live owner rules a save must pass (user.py on_rest_pre_save :1005-1100,
+ * _handle_existing_user_pre_save, set_is_superuser/set_is_staff :626-634,
+ * set_permissions :636-650, set_new_password :819-828, the rest.py `protected`
+ * metadata guard). Only CHANGED values trip the field guards — except
+ * is_superuser/is_staff, whose setters refuse a non-superuser even unchanged.
+ */
+function userSaveRefusal(user: MockUser, body: Record<string, unknown>, caller: MockUser | undefined): Record<string, unknown> | null {
+    if (!caller) return null;
+    const superuser = caller.is_superuser === true;
+    const admin = superuser || hasGlobalPermission(caller, ['users', 'manage_users']);
+    const deny = (error: string) => ({ status: false, error, error_code: 403 });
+    const target = user as unknown as Record<string, unknown>;
+    const current = (key: string): unknown => {
+        const value = target[key];
+        if (key === 'org') return value && typeof value === 'object' ? (value as { id?: unknown }).id ?? null : value ?? null;
+        return value ?? null;
+    };
+    const changed = (key: string): boolean => {
+        if (!(key in body)) return false;
+        const next = key === 'org' && body[key] != null && body[key] !== '' ? Number(body[key]) : body[key] ?? null;
+        return JSON.stringify(next) !== JSON.stringify(current(key));
+    };
+    if ('is_superuser' in body && !superuser) return deny('Only a superuser can grant superuser status');
+    if ('is_staff' in body && !superuser) return deny('Only a superuser can grant staff status');
+    if (isPlainObject(body.permissions) && Object.keys(body.permissions).length > 0 && !admin) return deny('permission denied');
+    for (const field of USER_ADMIN_ONLY_FIELDS) {
+        if (changed(field) && !admin) return deny(`You are not allowed to change ${field}`);
+    }
+    if (!admin) {
+        if (changed('email') || changed('username')) return deny('You are not allowed to change email or username');
+        if ('phone_number' in body) {
+            const next = body.phone_number;
+            const normalized = next == null || next === '' ? null : normalizePhone(String(next)) ?? String(next);
+            if (user.phone_number && normalized != null && normalized !== user.phone_number) {
+                return deny('Use the phone change flow to update an existing phone number');
+            }
+        }
+        if (changed('dob') && current('dob') != null) return deny('Date of birth cannot be changed after registration');
+    }
+    if ('password' in body) return deny('You are not allowed to change password');
+    if (isPlainObject(body.metadata) && 'protected' in body.metadata && !superuser) return deny('permission denied');
+    if ('new_password' in body) {
+        if (caller.id !== user.id && !admin) return deny('You are not allowed to change password');
+        const supplied = body.current_password;
+        if (!supplied && !admin) return { status: false, error: 'You must provide your current password', error_code: 400 };
+        if (supplied && (passwordlessUsers.has(user.id) || supplied !== MOCK_PASSWORD)) {
+            return { status: false, error: 'Incorrect current password', error_code: 400 };
+        }
+    }
+    return null;
+}
 
 function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUser, callerAuthTime?: number): unknown {
+    const refusal = userSaveRefusal(user, body, caller);
+    if (refusal) return refusal;
     let passwordChanged = false;
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
@@ -4991,6 +5171,7 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
             return { status: false, error: 'Password is too weak. Use a longer password or include a mix of uppercase, lowercase, numbers, and special characters', error_code: 400 };
         }
         passwordChanged = true;
+        passwordlessUsers.delete(user.id);
     }
     // set_org parity: the FK arrives as an id (or null to clear), serializes
     // back as the basic sub-graph.
@@ -5565,16 +5746,35 @@ function b64url(s: string): string {
     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+/**
+ * auth_key rotation parity (sessions/revoke, email change confirm): every
+ * token carries the user's current epoch as `ak` once one has been rotated,
+ * and a token minted under an older epoch is dead everywhere — exactly what
+ * rotating the server-side signing key does to every other session.
+ */
+const authEpochs = new Map<number, number>();
+
+function rotateAuthKey(userId: number): void {
+    authEpochs.set(userId, (authEpochs.get(userId) ?? 0) + 1);
+}
+
+function epochMatches(payload: Record<string, unknown>): boolean {
+    const current = authEpochs.get(Number(payload.uid)) ?? 0;
+    return (typeof payload.ak === 'number' ? payload.ak : 0) === current;
+}
+
 /** Real-shaped JWT (decodable header.payload) with a fake signature. */
 function mintJwt(user: User, ttlSec: number, extra: Record<string, unknown> = {}): string {
     const now = Math.floor(Date.now() / 1000);
     const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+    const epoch = authEpochs.get(user.id);
     const payload = b64url(JSON.stringify({
         uid: user.id,
         email: user.email,
         name: user.display_name,
         iat: now,
         exp: now + ttlSec,
+        ...(epoch ? { ak: epoch } : {}),
         ...extra,
     }));
     return `${header}.${payload}.mock-signature`;
@@ -5734,7 +5934,7 @@ function authFetch(path: string, body: Record<string, unknown>, params: Params =
             const payload = decodeMockJwt(String(body.refresh_token ?? ''));
             const user = payload && db.users.find((u) => u.id === Number(payload.uid));
             const now = Math.floor(Date.now() / 1000);
-            if (!payload || !user || typeof payload.exp !== 'number' || now >= payload.exp) {
+            if (!payload || !user || typeof payload.exp !== 'number' || now >= payload.exp || !epochMatches(payload)) {
                 return { status: false, error: 'token is invalid or expired', error_code: 401 };
             }
             // A refresh is NOT a fresh authentication: auth_time carries forward.
@@ -5846,6 +6046,7 @@ export interface MockRequestHistoryEntry {
 }
 
 const requestHistory: MockRequestHistoryEntry[] = [];
+const OWNER_SCOPED_LISTS = new Set(['/api/account/passkeys', '/api/account/api_keys', '/api/account/oauth_connection', '/api/user/device', '/api/account/logins']);
 
 export function getMockRequestHistory(): MockRequestHistoryEntry[] {
     return requestHistory.map((entry) => ({
@@ -5868,6 +6069,324 @@ let armedReauth: { method: string; path: string } | null = null;
 /** Mock-only one-shot fresh-auth challenge, matched by BOTH method and path. */
 export function armMockReauth(method: string, path: string): void {
     armedReauth = { method: method.toUpperCase(), path };
+}
+
+interface MockOnceArm {
+    method: string; path: string; extraDelayMs: number; stripGrantTokens: boolean;
+    mapData?: (data: Record<string, unknown>) => Record<string, unknown>;
+}
+let armedOnce: MockOnceArm | null = null;
+
+/**
+ * Mock-only one-shot response shaping, matched by BOTH method and path:
+ * `extraDelayMs` holds the answer back (to stage an in-flight race);
+ * `stripGrantTokens` drops access_token/refresh_token from a login grant —
+ * the shape of django-mojo's forced_password_response after auth_key rotated.
+ */
+export function armMockResponseOnce(method: string, path: string, opts: {
+    extraDelayMs?: number;
+    stripGrantTokens?: boolean;
+    /** Rewrite the envelope's `data` (e.g. pin a known WebAuthn challenge). */
+    mapData?: (data: Record<string, unknown>) => Record<string, unknown>;
+}): void {
+    armedOnce = { method: method.toUpperCase(), path, extraDelayMs: opts.extraDelayMs ?? 0, stripGrantTokens: opts.stripGrantTokens ?? false, mapData: opts.mapData };
+}
+
+// ── Self-service account (the AccountModal wire) ──────────────────────
+// Shape-level parity with django-mojo account/rest/passkeys.py (register),
+// rest/totp.py, rest/user.py (email/phone/username change, sessions/revoke)
+// and rest/verify.py. Every one-time value is fixed so flows are drivable:
+// TOTP and every emailed/SMS'd code is 123456. The fresh-auth gate on these
+// paths is the generic armMockReauth(method, path) one-shot above.
+
+interface MockTotpState {
+    secret: string | null;
+    enabled: boolean;
+    codes: string[];
+}
+
+const MOCK_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+const MOCK_ACCOUNT_CODE = '123456';
+const totpState = new Map<number, MockTotpState>();
+const pendingPasskeyRegistrations = new Map<string, { uid: number }>();
+const pendingEmailChanges = new Map<number, { email: string; code: string }>();
+const pendingPhoneChanges = new Map<string, { uid: number; phone: string; code: string }>();
+const pendingVerifyCodes = new Map<string, string>(); // `${uid}:email|phone` → code
+let accountSequence = 0;
+
+/** The registered-kinds catalogue the preferences GET carries (notification_kinds.py). */
+const MOCK_NOTIFICATION_KINDS: { kind: string; label: string; description: string; channels: string[] | null }[] = [
+    { kind: 'general', label: 'General', description: 'Messages from this service', channels: null },
+];
+
+/** Seeded users that already require MFA start with an enrolled authenticator. */
+function mockTotp(user: MockUser): MockTotpState {
+    let state = totpState.get(user.id);
+    if (!state) {
+        state = user.requires_mfa
+            ? { secret: MOCK_TOTP_SECRET, enabled: true, codes: mockRecoveryCodes() }
+            : { secret: null, enabled: false, codes: [] };
+        totpState.set(user.id, state);
+    }
+    return state;
+}
+
+function mockRecoveryCodes(): string[] {
+    const hex = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0');
+    return Array.from({ length: 8 }, () => `${hex()}-${hex()}-${hex()}`);
+}
+
+/** A deterministic stand-in QR (a data: SVG — the server sends data:image/png). */
+function mockQrDataUrl(seed: string): string {
+    const finder = (dx: number, dy: number) => dx === 0 || dx === 6 || dy === 0 || dy === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+    const cells: string[] = [];
+    for (let y = 0; y < 21; y++) {
+        for (let x = 0; x < 21; x++) {
+            let on: boolean;
+            if (x < 7 && y < 7) on = finder(x, y);
+            else if (x > 13 && y < 7) on = finder(x - 14, y);
+            else if (x < 7 && y > 13) on = finder(x, y - 14);
+            else if ((x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12)) on = false;
+            else on = ((seed.charCodeAt((x * 21 + y) % seed.length) * (x + 3) * (y + 7)) % 5) < 2;
+            if (on) cells.push(`<rect x="${x}" y="${y}" width="1" height="1"/>`);
+        }
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 25 25" shape-rendering="crispEdges"><rect x="-2" y="-2" width="25" height="25" fill="#fff"/><g fill="#000">${cells.join('')}</g></svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+function missingParam(name: string): Record<string, unknown> {
+    return { status: false, error: `Missing required parameter: ${name}`, error_code: 400 };
+}
+
+function serializePasskeyRow(p: MockPasskey): Record<string, unknown> {
+    const owner = db.users.find((u) => u.id === p.user);
+    const { user: _uid, ...rest } = p;
+    return { ...rest, user: owner ? userBasic(owner) : null };
+}
+
+/**
+ * The signed-in user's self-service routes. Returns undefined for any path
+ * it does not own so the main dispatcher continues.
+ */
+function accountSelfFetch(path: string, method: string, opts: MockFetchOpts): unknown {
+    const owned = path.startsWith('/api/account/passkeys/register/')
+        || path === '/api/account/totp' || path.startsWith('/api/account/totp/')
+        || path === '/api/auth/sessions/revoke'
+        || path.startsWith('/api/auth/email/change/') || path.startsWith('/api/auth/phone/change/')
+        || path.startsWith('/api/auth/verify/') || path === '/api/auth/username/change';
+    if (!owned) return undefined;
+    const user = userFromBearer(opts.headers);
+    // django-mojo's email change confirm also takes an unauthenticated ec:
+    // link token; the code flow (the only one the portal drives) needs auth.
+    if (!user) return permissionDenied(401);
+    const body = opts.body ?? {};
+
+    // ── Passkey registration (passkeys.py:59-150) ──
+    if (path === '/api/account/passkeys/register/begin' && method === 'POST') {
+        const challenge_id = `reg-${user.id}-${++accountSequence}`;
+        pendingPasskeyRegistrations.set(challenge_id, { uid: user.id });
+        const exclude = db.passkeys.filter((p) => p.user === user.id)
+            .map((p) => ({ type: 'public-key', id: b64url(p.credential_id) }));
+        return {
+            status: true,
+            data: {
+                challenge_id,
+                publicKey: {
+                    rp: { id: 'localhost', name: 'Mojo' },
+                    user: { id: b64url(`mock-user-${user.id}`), name: user.username, displayName: user.display_name },
+                    challenge: b64url(`mock-registration-${accountSequence}`),
+                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                    timeout: 60000,
+                    attestation: 'none',
+                    ...(exclude.length ? { excludeCredentials: exclude } : {}),
+                },
+                expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            },
+        };
+    }
+    if (path === '/api/account/passkeys/register/complete' && method === 'POST') {
+        if (!body.challenge_id) return missingParam('challenge_id');
+        if (!isPlainObject(body.credential)) return missingParam('credential');
+        const challengeId = String(body.challenge_id);
+        const pending = pendingPasskeyRegistrations.get(challengeId);
+        if (!pending) return { status: false, error: 'Challenge not found or expired', error_code: 403 };
+        if (pending.uid !== user.id) return { status: false, error: 'Challenge does not belong to this user', error_code: 403 };
+        const credential = body.credential;
+        const response = isPlainObject(credential.response) ? credential.response : {};
+        if (typeof credential.rawId !== 'string' || credential.id !== credential.rawId) {
+            return { status: false, error: 'Credential id does not match rawId', error_code: 403 };
+        }
+        if (typeof response.clientDataJSON !== 'string' || typeof response.attestationObject !== 'string') {
+            return { status: false, error: 'Invalid registration response', error_code: 403 };
+        }
+        const transports = Array.isArray(credential.transports) ? credential.transports.map(String) : [];
+        const friendly = typeof body.friendly_name === 'string' && body.friendly_name ? body.friendly_name : null;
+        const nowSec = Math.floor(Date.now() / 1000);
+        let row = db.passkeys.find((p) => p.credential_id === credential.rawId);
+        if (row && row.user !== user.id) return { status: false, error: 'Credential already registered to another user', error_code: 403 };
+        if (row) {
+            row.transports = transports.join(',') || null;
+            if (friendly) row.friendly_name = friendly;
+            row.is_enabled = true;
+            row.last_used = null;
+        } else {
+            row = {
+                id: Math.max(70, ...db.passkeys.map((p) => p.id)) + 1,
+                user: user.id,
+                friendly_name: friendly,
+                credential_id: String(credential.rawId),
+                rp_id: 'localhost',
+                is_enabled: true,
+                sign_count: 0,
+                transports: transports.join(',') || null,
+                aaguid: null,
+                last_used: null,
+                created: nowSec,
+            };
+            db.passkeys.unshift(row);
+        }
+        pendingPasskeyRegistrations.delete(challengeId);
+        return { status: true, data: serializePasskeyRow(row), graph: 'default' };
+    }
+
+    // ── TOTP (totp.py:41-139) ──
+    if (path === '/api/account/totp/setup' && method === 'POST') {
+        const state = mockTotp(user);
+        state.secret = MOCK_TOTP_SECRET;
+        state.enabled = false;
+        const uri = `otpauth://totp/Mojo:${encodeURIComponent(user.username)}?secret=${MOCK_TOTP_SECRET}&issuer=Mojo`;
+        return { status: true, data: { secret: MOCK_TOTP_SECRET, uri, qr_code: mockQrDataUrl(uri) } };
+    }
+    if (path === '/api/account/totp/confirm' && method === 'POST') {
+        if (!body.code) return missingParam('code');
+        const state = mockTotp(user);
+        if (!state.secret) return { status: false, error: 'TOTP setup not started. Call /api/account/totp/setup first.', error_code: 400 };
+        if (String(body.code).trim() !== MOCK_TOTP_CODE) return { status: false, error: 'Invalid code', error_code: 400 };
+        state.enabled = true;
+        state.codes = mockRecoveryCodes();
+        user.requires_mfa = true;
+        return { status: true, data: { is_enabled: true, recovery_codes: [...state.codes] } };
+    }
+    if (path === '/api/account/totp' && method === 'DELETE') {
+        // Deliberately leaves requires_mfa alone (totp.py:97-105).
+        mockTotp(user).enabled = false;
+        return { status: true };
+    }
+    if (path === '/api/account/totp/recovery-codes' && method === 'GET') {
+        const state = mockTotp(user);
+        if (!state.enabled) return { status: false, error: 'TOTP is not enabled for this account', error_code: 400 };
+        return { status: true, data: { remaining: state.codes.length, codes: state.codes.map((c) => `${c.slice(0, 4)}-xxxx-xxxx`) } };
+    }
+    if (path === '/api/account/totp/recovery-codes/regenerate' && method === 'POST') {
+        if (!body.code) return missingParam('code');
+        const state = mockTotp(user);
+        if (!state.enabled) return { status: false, error: 'TOTP is not enabled for this account', error_code: 400 };
+        if (String(body.code).trim() !== MOCK_TOTP_CODE) return { status: false, error: 'Invalid TOTP code', error_code: 403 };
+        state.codes = mockRecoveryCodes();
+        return { status: true, data: { is_enabled: true, recovery_codes: [...state.codes] } };
+    }
+
+    // ── Sessions (user.py:2331-2355) ──
+    if (path === '/api/auth/sessions/revoke' && method === 'POST') {
+        rotateAuthKey(user.id);
+        return { status: true, data: { ...tokenPair(user), user: serializeUser(user) } };
+    }
+
+    // ── Email change (user.py:1620-1717, 1953-1994) ──
+    if (path === '/api/auth/email/change/request' && method === 'POST') {
+        const email = String(body.email ?? '').toLowerCase().trim();
+        if (!email) return missingParam('email');
+        if (!/[^@]+@[^@]+\.[^@]+/.test(email)) return { status: false, error: 'Invalid email address', error_code: 400 };
+        if (email === user.email.toLowerCase()) return { status: false, error: 'New email must be different from current email', error_code: 400 };
+        if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === email)) return { status: false, error: 'Email already in use', error_code: 400 };
+        pendingEmailChanges.set(user.id, { email, code: MOCK_ACCOUNT_CODE });
+        return body.method === 'code'
+            ? { status: true, message: 'A verification code has been sent to your new email address.' }
+            : { status: true, message: 'A confirmation link has been sent to your new email address.' };
+    }
+    if (path === '/api/auth/email/change/confirm' && method === 'POST') {
+        if (!body.code && !body.token) return { status: false, error: 'token or code is required', error_code: 400 };
+        const pending = pendingEmailChanges.get(user.id);
+        if (!pending || String(body.code ?? '').trim() !== pending.code) return { status: false, error: 'Invalid or expired code', error_code: 400 };
+        pendingEmailChanges.delete(user.id);
+        if (db.users.some((u) => u.id !== user.id && u.email.toLowerCase() === pending.email)) return { status: false, error: 'Email already in use', error_code: 400 };
+        user.email = pending.email;
+        user.is_email_verified = true;
+        rotateAuthKey(user.id);
+        return { status: true, data: { ...tokenPair(user), user: serializeUser(user) } };
+    }
+    if (path === '/api/auth/email/change/cancel' && method === 'POST') {
+        pendingEmailChanges.delete(user.id);
+        return { status: true, message: 'Pending email change has been cancelled.' };
+    }
+
+    // ── Phone change (user.py:2124-2277) ──
+    if (path === '/api/auth/phone/change/request' && method === 'POST') {
+        const raw = String(body.phone_number ?? '').trim();
+        if (!raw) return missingParam('phone_number');
+        const normalized = normalizePhone(raw);
+        if (!normalized) return { status: false, error: 'Invalid phone number format', error_code: 400 };
+        if (normalized === user.phone_number) return { status: false, error: 'New phone number must be different from current phone number', error_code: 400 };
+        if (db.users.some((u) => u.id !== user.id && u.phone_number === normalized)) return { status: false, error: 'Phone number already in use', error_code: 400 };
+        for (const [token, entry] of pendingPhoneChanges) if (entry.uid === user.id) pendingPhoneChanges.delete(token);
+        const session_token = `pc:mock-${user.id}-${++accountSequence}`;
+        pendingPhoneChanges.set(session_token, { uid: user.id, phone: normalized, code: MOCK_ACCOUNT_CODE });
+        // Top-level, NOT under data — exactly the live JsonResponse.
+        return { status: true, session_token, message: 'A verification code has been sent to your new phone number.' };
+    }
+    if (path === '/api/auth/phone/change/confirm' && method === 'POST') {
+        if (!body.session_token) return missingParam('session_token');
+        if (!body.code) return missingParam('code');
+        const pending = pendingPhoneChanges.get(String(body.session_token));
+        if (!pending || String(body.code).trim() !== pending.code) return { status: false, error: 'Invalid or expired code', error_code: 400 };
+        if (pending.uid !== user.id) return { status: false, error: 'Session mismatch', error_code: 403 };
+        pendingPhoneChanges.delete(String(body.session_token));
+        if (db.users.some((u) => u.id !== user.id && u.phone_number === pending.phone)) return { status: false, error: 'Phone number is no longer available', error_code: 400 };
+        user.phone_number = pending.phone;
+        user.is_phone_verified = true;
+        return { status: true, message: 'Phone number updated successfully.' };
+    }
+    if (path === '/api/auth/phone/change/cancel' && method === 'POST') {
+        for (const [token, entry] of pendingPhoneChanges) if (entry.uid === user.id) pendingPhoneChanges.delete(token);
+        return { status: true, message: 'Pending phone number change has been cancelled.' };
+    }
+
+    // ── Verification (verify.py) ──
+    const verify = path.match(/^\/api\/auth\/verify\/(email|phone)\/(send|confirm)$/);
+    if (verify && method === 'POST') {
+        const channel = verify[1] as 'email' | 'phone';
+        const key = `${user.id}:${channel}`;
+        if (verify[2] === 'send') {
+            if (channel === 'email') {
+                if (user.is_email_verified) return { status: true, message: 'Email is already verified' };
+                if (!user.email) return { status: false, error: 'No email address on account', error_code: 400 };
+            } else {
+                if (user.is_phone_verified) return { status: true, message: 'Phone is already verified' };
+                if (!user.phone_number) return { status: false, error: 'No phone number on account', error_code: 400 };
+            }
+            pendingVerifyCodes.set(key, MOCK_ACCOUNT_CODE);
+            return { status: true, message: channel === 'email' && body.method !== 'code' ? 'Verification email sent' : 'Verification code sent' };
+        }
+        if (!body.code) return missingParam('code');
+        if (pendingVerifyCodes.get(key) !== String(body.code).trim()) return { status: false, error: 'Invalid or expired code', error_code: 400 };
+        pendingVerifyCodes.delete(key);
+        if (channel === 'email') user.is_email_verified = true;
+        else user.is_phone_verified = true;
+        return { status: true, message: channel === 'email' ? 'Email verified' : 'Phone verified' };
+    }
+
+    // ── Username change (user.py:2280-2324) ──
+    if (path === '/api/auth/username/change' && method === 'POST') {
+        const next = String(body.username ?? '').toLowerCase().trim();
+        if (!next) return missingParam('username');
+        if (next === user.username) return { status: false, error: 'New username must be different from current username', error_code: 400 };
+        if (!/^[a-z0-9._@+-]{3,}$/.test(next)) return { status: false, error: 'Invalid username', error_code: 400 };
+        if (db.users.some((u) => u.id !== user.id && u.username === next)) return { status: false, error: 'Username already taken', error_code: 400 };
+        user.username = next;
+        return { status: true, data: { username: user.username } };
+    }
+    return { status: false, error: `Method not allowed: ${method} ${path}`, error_code: 405 };
 }
 
 let dnsConfigMalformed = false;
@@ -6053,7 +6572,7 @@ function userFromBearer(headers: Record<string, string> | undefined): MockUser |
     if (!bearer) return undefined;
     const payload = decodeMockJwt(bearer);
     const now = Math.floor(Date.now() / 1000);
-    if (!payload || typeof payload.exp !== 'number' || now >= payload.exp) return undefined;
+    if (!payload || typeof payload.exp !== 'number' || now >= payload.exp || !epochMatches(payload)) return undefined;
     return db.users.find((u) => u.id === Number(payload.uid));
 }
 
@@ -6679,6 +7198,800 @@ function dnsCollectionCan(user: MockUser | undefined, opts: MockFetchOpts, manag
 function permissionDenied(code = 403): Record<string, unknown> {
     return { status: false, error: 'permission denied', error_code: code };
 }
+
+// ══ Edge — wire implementation (mojo/apps/edge) ═════════════════════
+
+/** `BlocklistEntry.RestMeta.VIEW_PERMS`; SAVE and DELETE share the manage clause. */
+const EDGE_BLOCKLIST_VIEW_GRANTS = ['view_security', 'manage_security', 'security'];
+const EDGE_BLOCKLIST_MANAGE_GRANTS = ['manage_security', 'security'];
+/** `settings.EDGE_POOLS` default. */
+const EDGE_DECLARED_POOLS = ['default'];
+const EDGE_SOCKET_BASE = '/run/mojo';
+const EDGE_LABEL_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const EDGE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const EDGE_UPSTREAM_HOST_RE = /^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/;
+const EDGE_PATH_RE = /^\/[A-Za-z0-9._/-]{0,127}$/;
+const EDGE_UA_RE = /^[A-Za-z0-9()[\]|?^.*+\\/_-]{1,256}$/;
+const EDGE_MOJOSEC_FAMILIES = ['admin_tools', 'php_runtime', 'secret_files', 'wordpress'];
+const EDGE_MOJOSEC_CLASSES = ['reverse_proxy', 'spa_fallback', 'static_site', 'site_api', 'redirect'];
+const EDGE_VHOST_KINDS = ['api', 'site', 'site_api', 'redirect'];
+
+function edgeRefuse(error: string, code = 400): Record<string, unknown> {
+    return { status: false, error, error_code: code };
+}
+
+function edgePlatformOnly(what: string): Record<string, unknown> {
+    return edgeRefuse(`${what} is restricted to platform administrators`, 403);
+}
+
+function edgeServerName(domainName: string, label: string): string {
+    return label === '' ? domainName : `${label}.${domainName}`;
+}
+
+function edgeServerNameError(name: string): string | null {
+    if (!name) return 'a vhost requires a server name';
+    if (name.length > 253) return 'server name is too long';
+    const parts = (name.startsWith('*.') ? name.slice(2) : name).split('.');
+    if (parts.length < 2) return `${name} is not a fully qualified domain name`;
+    return parts.every((part) => EDGE_LABEL_RE.test(part)) ? null : `${name} is not a valid server name`;
+}
+
+function edgeRequestPathError(path: unknown, what: string): string | null {
+    if (typeof path !== 'string' || !EDGE_PATH_RE.test(path)) return `${what} must start with '/' and use only letters, digits, '.', '_', '-' and '/' (max 128 characters)`;
+    if (path.includes('//')) return `${what} may not contain '//'`;
+    if (path.split('/').some((part) => part === '..')) return `${what} may not contain a '..' segment`;
+    return null;
+}
+
+function edgeCertificateCovers(certificate: MockDnsCertificate, serverName: string): boolean {
+    const target = serverName.toLowerCase();
+    for (const name of [certificate.common_name, ...certificate.sans]) {
+        if (typeof name !== 'string' || !name) continue;
+        const candidate = name.toLowerCase();
+        if (candidate === target) return true;
+        if (candidate.startsWith('*.')) {
+            const suffix = candidate.slice(1);
+            if (target.endsWith(suffix)) {
+                const remainder = target.slice(0, -suffix.length);
+                if (remainder && !remainder.includes('.')) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function edgeMojosecPolicy(value: unknown): { policy: Record<string, unknown> } | { error: string } {
+    if (value == null || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)) return { policy: {} };
+    if (typeof value !== 'object' || Array.isArray(value)) return { error: 'mojosec_policy must be an object' };
+    const raw = value as Record<string, unknown>;
+    const keys = Object.keys(raw).sort().join(',');
+    if (keys !== 'impossible_path_families,response_class,version') return { error: 'mojosec_policy requires version, impossible_path_families, and response_class only' };
+    if (typeof raw.version !== 'number' || !Number.isInteger(raw.version) || raw.version < 1 || raw.version > 65535) return { error: 'mojosec_policy version must be 1-65535' };
+    const families = raw.impossible_path_families;
+    if (!Array.isArray(families) || families.length > 4 || families.some((family) => !EDGE_MOJOSEC_FAMILIES.includes(family as string)) || new Set(families).size !== families.length) {
+        return { error: 'mojosec_policy impossible_path_families contains an unknown or duplicate family' };
+    }
+    if (!EDGE_MOJOSEC_CLASSES.includes(raw.response_class as string)) return { error: 'mojosec_policy response_class is not registered' };
+    return { policy: { version: raw.version, impossible_path_families: [...families].sort(), response_class: raw.response_class } };
+}
+
+/** `validators.validate_vhost`, in the server's order and with its messages. */
+function edgeValidateVhost(row: MockEdgeVhost, persisted: boolean): string | null {
+    const label = row.label ?? '';
+    if (label !== '' && label !== '*' && (typeof label !== 'string' || !EDGE_LABEL_RE.test(label))) {
+        return "label must be empty (apex), '*', or a single DNS label of letters, digits and hyphens";
+    }
+    if (!row.pool || !EDGE_NAME_RE.test(row.pool)) return "pool must be lowercase letters, digits, '-' or '_'";
+    if (!EDGE_DECLARED_POOLS.includes(row.pool)) return `${row.pool} is not a declared pool (${[...EDGE_DECLARED_POOLS].sort().join(', ')})`;
+    if (typeof row.body_size_mb !== 'number' || !Number.isInteger(row.body_size_mb)) return 'body_size_mb must be an integer';
+    if (row.body_size_mb < 1 || row.body_size_mb > 4096) return 'body_size_mb must be between 1 and 4096';
+    const policy = edgeMojosecPolicy(row.mojosec_policy);
+    if ('error' in policy) return policy.error;
+    row.mojosec_policy = policy.policy;
+    if (!EDGE_VHOST_KINDS.includes(row.kind)) return `unknown vhost kind '${row.kind}'`;
+    if (Object.keys(row.mojosec_policy).length) {
+        const expected = row.kind === 'api' ? 'reverse_proxy' : row.kind === 'site' ? (row.spa ? 'spa_fallback' : 'static_site') : row.kind;
+        if (row.mojosec_policy.response_class !== expected) return `mojosec_policy response_class for ${row.kind} must be ${expected}`;
+    }
+    if (row.kind === 'api') {
+        // An id that names no upstream cannot be stored; the wording for that case is this mock's own.
+        if (row.upstream == null || !db.edgeUpstreams.some((candidate) => candidate.id === row.upstream)) return 'an api vhost requires an upstream';
+    } else if (row.upstream != null) return `a ${row.kind} vhost has no whole-host upstream (site_api proxies per-route)`;
+    if (row.kind === 'redirect') {
+        if (typeof row.redirect_to !== 'string' || !row.redirect_to) return 'a redirect vhost requires redirect_to';
+        if (row.redirect_to.startsWith('*.')) return 'a redirect target cannot be a wildcard';
+        const refusal = edgeServerNameError(row.redirect_to);
+        if (refusal) return refusal;
+    } else if (row.redirect_to) return `a ${row.kind} vhost has no redirect target`;
+    if (row.spa && !['site', 'site_api'].includes(row.kind)) return `spa applies to site and site_api vhosts, not ${row.kind}`;
+    if (row.serve_static && !['api', 'site_api'].includes(row.kind)) return `serve_static applies to api and site_api vhosts, not ${row.kind}`;
+    const quietPaths = row.quiet_paths ?? [];
+    if (!Array.isArray(quietPaths)) return 'quiet_paths must be a list of paths';
+    if (quietPaths.length && !['api', 'site_api'].includes(row.kind)) return `quiet_paths applies to api and site_api vhosts, not ${row.kind}`;
+    for (const path of quietPaths) {
+        const refusal = edgeRequestPathError(path, 'a quiet path');
+        if (refusal) return refusal;
+    }
+    if (new Set(quietPaths).size !== quietPaths.length) return 'quiet_paths contains a duplicate';
+    const routes = persisted ? db.edgeRoutes.filter((route) => route.vhost === row.id) : [];
+    if (row.kind === 'site_api') {
+        // Prefixes load only for a stored row, so a CREATE carrying quiet
+        // paths always reports "none declared".
+        const prefixes = routes.map((route) => route.path_prefix);
+        for (const path of quietPaths) {
+            if (!prefixes.some((prefix) => path.startsWith(prefix))) {
+                return `quiet path ${path} is not under any route prefix (${[...prefixes].sort().join(', ') || 'none declared'})`;
+            }
+        }
+    } else if (routes.length) {
+        return `a ${row.kind} vhost cannot carry routes — delete them before changing kind`;
+    }
+    const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+    if (!domain) return 'a vhost requires a domain';
+    const serverName = edgeServerName(domain.name, label);
+    const nameRefusal = edgeServerNameError(serverName);
+    if (nameRefusal) return nameRefusal;
+    // The column is NOT NULL even for a disabled row, on create and on update.
+    if (row.certificate == null || !db.dnsCertificates.some((candidate) => candidate.id === row.certificate)) return 'a vhost requires a certificate';
+    if (row.is_enabled) {
+        const certificate = db.dnsCertificates.find((candidate) => candidate.id === row.certificate);
+        if (!certificate) return 'a vhost requires a certificate';
+        if (certificate.domain !== row.domain) return "the certificate must belong to this vhost's domain";
+        if (!edgeCertificateCovers(certificate, serverName)) return `certificate ${certificate.common_name} does not cover ${serverName}`;
+        // `edge_vhost_unique_enabled_server_name`.
+        if (db.edgeVhosts.some((other) => other.id !== row.id && other.is_enabled && other.domain === row.domain && other.label === label)) {
+            return `an enabled vhost already serves ${serverName}`;
+        }
+    }
+    return null;
+}
+
+function edgeNumberOrNull(value: unknown): number | null {
+    if (value == null || value === '') return null;
+    const id = typeof value === 'object' ? Number((value as Record<string, unknown>).id) : Number(value);
+    return Number.isFinite(id) ? id : null;
+}
+
+/** Copies the writable fields from a request body; `alias_of` and ids are pinned. */
+function edgeApplyVhostBody(row: MockEdgeVhost, body: Record<string, unknown>): void {
+    if ('label' in body) row.label = body.label == null ? '' : String(body.label);
+    if ('kind' in body) row.kind = String(body.kind);
+    if ('upstream' in body) row.upstream = edgeNumberOrNull(body.upstream);
+    if ('certificate' in body) row.certificate = edgeNumberOrNull(body.certificate);
+    if ('pool' in body) row.pool = String(body.pool ?? '');
+    if ('spa' in body) row.spa = body.spa === true;
+    if ('body_size_mb' in body) row.body_size_mb = body.body_size_mb as number;
+    if ('quiet_paths' in body) row.quiet_paths = (body.quiet_paths ?? []) as string[];
+    if ('serve_static' in body) row.serve_static = body.serve_static === true;
+    if ('mojosec_policy' in body) row.mojosec_policy = (body.mojosec_policy ?? {}) as Record<string, unknown>;
+    if ('redirect_to' in body) row.redirect_to = body.redirect_to == null || body.redirect_to === '' ? null : String(body.redirect_to);
+    if ('is_enabled' in body) row.is_enabled = body.is_enabled === true;
+}
+
+function serializeEdgeUpstream(row: MockEdgeUpstream, graph = 'default'): Record<string, unknown> {
+    if (graph === 'basic') return { id: row.id, name: row.name, kind: row.kind };
+    const group = row.group == null ? null : db.groups.find((candidate) => candidate.id === row.group);
+    return {
+        id: row.id, created: row.created, modified: row.modified, name: row.name, kind: row.kind,
+        host: row.host, port: row.port, socket_path: row.socket_path, is_enabled: row.is_enabled,
+        group: group ? groupBasic(group) : null,
+    };
+}
+
+function serializeEdgeVhost(row: MockEdgeVhost, graph = 'default'): Record<string, unknown> {
+    const domain = db.dnsDomains.find((candidate) => candidate.id === row.domain);
+    const serverName = domain ? edgeServerName(domain.name, row.label) : null;
+    if (graph === 'basic') return { id: row.id, kind: row.kind, is_enabled: row.is_enabled, server_name: serverName };
+    // `domain: basic` carries no group: house-ness is not readable off a vhost.
+    const domainBasic = domain ? { id: domain.id, name: domain.name, provider: domain.provider, status: domain.status, expires: domain.expires } : null;
+    if (graph === 'list') {
+        return { id: row.id, created: row.created, kind: row.kind, pool: row.pool, is_enabled: row.is_enabled, server_name: serverName, domain: domainBasic };
+    }
+    const upstream = row.upstream == null ? null : db.edgeUpstreams.find((candidate) => candidate.id === row.upstream);
+    const certificate = row.certificate == null ? null : db.dnsCertificates.find((candidate) => candidate.id === row.certificate);
+    return {
+        id: row.id, created: row.created, modified: row.modified, label: row.label, kind: row.kind,
+        pool: row.pool, spa: row.spa, body_size_mb: row.body_size_mb, quiet_paths: [...row.quiet_paths],
+        serve_static: row.serve_static, mojosec_policy: { ...row.mojosec_policy }, redirect_to: row.redirect_to,
+        is_enabled: row.is_enabled, server_name: serverName, domain: domainBasic,
+        upstream: upstream ? serializeEdgeUpstream(upstream, 'basic') : null,
+        certificate: certificate ? { id: certificate.id, common_name: certificate.common_name, status: certificate.status, not_after: certificate.not_after } : null,
+    };
+}
+
+function serializeEdgeRoute(row: MockEdgeRoute): Record<string, unknown> {
+    const vhost = db.edgeVhosts.find((candidate) => candidate.id === row.vhost);
+    const upstream = db.edgeUpstreams.find((candidate) => candidate.id === row.upstream);
+    return {
+        id: row.id, created: row.created, modified: row.modified, path_prefix: row.path_prefix,
+        vhost: vhost ? serializeEdgeVhost(vhost, 'basic') : null,
+        upstream: upstream ? serializeEdgeUpstream(upstream, 'basic') : null,
+    };
+}
+
+function serializeEdgeBlocklistEntry(row: MockEdgeBlocklistEntry): Record<string, unknown> {
+    return { id: row.id, created: row.created, modified: row.modified, kind: row.kind, value: row.value, mode: row.mode, note: row.note };
+}
+
+/** `ipaddress.IPv4Address`: four decimal octets, none written with a leading zero. */
+function edgeIpv4Strict(text: string): number | null {
+    const octets = text.split('.');
+    if (octets.length !== 4 || octets.some((octet) => !/^[0-9]{1,3}$/.test(octet) || (octet.length > 1 && octet.startsWith('0')) || Number(octet) > 255)) return null;
+    return octets.reduce((value, octet) => value * 256 + Number(octet), 0);
+}
+
+function edgeParseIpv6(text: string): number[] | null {
+    if (!/^[0-9A-Fa-f:.]+$/.test(text) || !text.includes(':')) return null;
+    let source = text;
+    const tail = source.slice(source.lastIndexOf(':') + 1);
+    if (tail.includes('.')) {
+        const v4 = edgeIpv4Strict(tail);
+        if (v4 == null) return null;
+        source = `${source.slice(0, source.lastIndexOf(':') + 1)}${Math.floor(v4 / 65536).toString(16)}:${(v4 % 65536).toString(16)}`;
+    }
+    const halves = source.split('::');
+    if (halves.length > 2) return null;
+    const parse = (part: string): number[] | null => {
+        if (part === '') return [];
+        const groups = part.split(':');
+        if (groups.some((group) => !/^[0-9A-Fa-f]{1,4}$/.test(group))) return null;
+        return groups.map((group) => parseInt(group, 16));
+    };
+    const head = parse(halves[0]!);
+    const rest = halves.length === 2 ? parse(halves[1]!) : [];
+    if (!head || !rest) return null;
+    if (halves.length === 1) return head.length === 8 ? head : null;
+    if (head.length + rest.length > 7) return null;
+    return [...head, ...new Array<number>(8 - head.length - rest.length).fill(0), ...rest];
+}
+
+function edgeFormatIpv6(groups: number[]): string {
+    let bestStart = -1;
+    let bestLength = 0;
+    for (let index = 0; index < 8;) {
+        if (groups[index] !== 0) { index += 1; continue; }
+        let end = index;
+        while (end < 8 && groups[end] === 0) end += 1;
+        if (end - index > bestLength) { bestStart = index; bestLength = end - index; }
+        index = end;
+    }
+    const hex = groups.map((group) => group.toString(16));
+    if (bestLength < 2) return hex.join(':');
+    return `${hex.slice(0, bestStart).join(':')}::${hex.slice(bestStart + bestLength).join(':')}`;
+}
+
+/** `str(ipaddress.ip_network(value, strict=False))`, or null when it cannot parse. */
+function edgeNormalizeIpNetwork(value: string): string | null {
+    const pieces = value.split('/');
+    if (pieces.length > 2) return null;
+    const [address = '', prefixRaw] = pieces;
+    const numeric = edgeIpv4Strict(address);
+    if (numeric != null) {
+        let prefix = 32;
+        if (prefixRaw !== undefined) {
+            if (/^[0-9]+$/.test(prefixRaw)) prefix = Number(prefixRaw);
+            else {
+                // A netmask (255.255.0.0) or, failing that, a hostmask (0.0.255.255).
+                const mask = edgeIpv4Strict(prefixRaw);
+                if (mask == null) return null;
+                const ones = (bits: number) => { const zeros = Math.log2(2 ** 32 - bits); return Number.isInteger(zeros) ? 32 - zeros : null; };
+                const asNetmask = ones(mask);
+                const asHostmask = ones(2 ** 32 - 1 - mask);
+                if (asNetmask != null) prefix = asNetmask;
+                else if (asHostmask != null) prefix = asHostmask;
+                else return null;
+            }
+        }
+        if (prefix > 32) return null;
+        const size = 2 ** (32 - prefix);
+        const network = Math.floor(numeric / size) * size;
+        return `${[24, 16, 8, 0].map((shift) => Math.floor(network / 2 ** shift) % 256).join('.')}/${prefix}`;
+    }
+    // An IPv6 zone (`fe80::1%eth0`) survives only when no host bits are masked off.
+    const zoneAt = address.indexOf('%');
+    const zone = zoneAt < 0 ? null : address.slice(zoneAt + 1);
+    if (zone != null && (!zone || zone.includes('%'))) return null;
+    const groups = edgeParseIpv6(zoneAt < 0 ? address : address.slice(0, zoneAt));
+    if (prefixRaw !== undefined && !/^[0-9]+$/.test(prefixRaw)) return null;
+    const prefix = prefixRaw === undefined ? 128 : Number(prefixRaw);
+    if (!groups || prefix > 128) return null;
+    const masked = groups.map((group, index) => {
+        const keep = Math.max(0, Math.min(16, prefix - index * 16));
+        return keep === 16 ? group : group - (group % 2 ** (16 - keep));
+    });
+    const kept = zone != null && masked.every((group, index) => group === groups[index]);
+    return `${edgeFormatIpv6(masked)}${kept ? `%${zone}` : ''}/${prefix}`;
+}
+
+/**
+ * Whether Python's `re.compile` accepts a pattern drawn from the user-agent
+ * alphabet, which is what the server runs. JavaScript's RegExp disagrees both
+ * ways (`\q`, `[]`, `a*+`, `(?i)a`), so this follows Python's parser instead.
+ * Returns null when it compiles; the reason wording is this mock's own.
+ */
+function edgePythonRegexError(pattern: string): string | null {
+    const OCT = '01234567';
+    const isHex = (text: string) => /^[0-9a-fA-F]+$/.test(text);
+    const isLetter = (char: string) => /^[A-Za-z]$/.test(char);
+    const isDigit = (char: string) => char >= '0' && char <= '9';
+    let at = 0;
+    let groups = 1;
+    const closed = new Set<number>();
+    const conditionRefs: number[] = [];
+    let flags = '';
+    class Refusal extends Error {}
+    const fail = (reason: string): never => { throw new Refusal(`${reason} at position ${at}`); };
+    const take = (count: number, allowed: (char: string) => boolean) => {
+        let taken = '';
+        while (taken.length < count && at < pattern.length && allowed(pattern[at]!)) taken += pattern[at++];
+        return taken;
+    };
+    /** After a backslash. Returns a code point, 'category', 'at' or 'atom'. */
+    const escape = (inClass: boolean): number | 'category' | 'at' | 'atom' => {
+        const char = pattern[at++];
+        if (char === undefined) return fail('bad escape (end of pattern)');
+        if ('dDsSwW'.includes(char)) return 'category';
+        if (char === 'x' || char === 'u' || char === 'U') {
+            const want = char === 'x' ? 2 : char === 'u' ? 4 : 8;
+            const digits = take(want, isHex);
+            if (digits.length !== want) return fail(`incomplete escape \\${char}${digits}`);
+            const value = parseInt(digits, 16);
+            if (value > 0x10ffff) return fail(`bad escape \\${char}${digits}`);
+            return value;
+        }
+        if (char === 'N') return fail('missing {');
+        if (inClass) {
+            if (char === 'b') return 8;
+            if (OCT.includes(char)) {
+                const value = parseInt(char + take(2, (next) => OCT.includes(next)), 8);
+                if (value > 0o377) return fail('octal escape value outside of range 0-0o377');
+                return value;
+            }
+            if (isDigit(char)) return fail(`bad escape \\${char}`);
+        } else {
+            if ('AbBZ'.includes(char)) return 'at';
+            if (char === '0') return parseInt(`0${take(2, (next) => OCT.includes(next))}`, 8);
+            if (isDigit(char)) {
+                let digits = char;
+                if (at < pattern.length && isDigit(pattern[at]!)) {
+                    digits += pattern[at++];
+                    if (OCT.includes(digits[0]!) && OCT.includes(digits[1]!) && at < pattern.length && OCT.includes(pattern[at]!)) {
+                        digits += pattern[at++];
+                        const value = parseInt(digits, 8);
+                        if (value > 0o377) return fail('octal escape value outside of range 0-0o377');
+                        return value;
+                    }
+                }
+                const group = Number(digits);
+                if (group >= groups) return fail(`invalid group reference ${group}`);
+                if (!closed.has(group)) return fail('cannot refer to an open group');
+                return 'atom';
+            }
+        }
+        const control = { a: 7, f: 12, n: 10, r: 13, t: 9, v: 11 }[char];
+        if (control !== undefined) return control;
+        if (isLetter(char)) return fail(`bad escape \\${char}`);
+        return char.charCodeAt(0);
+    };
+    const charClass = () => {
+        if (pattern[at] === '^') at += 1;
+        let members = 0;
+        for (;;) {
+            const char = pattern[at++];
+            if (char === undefined) return fail('unterminated character set');
+            if (char === ']' && members > 0) return;
+            const low = char === '\\' ? escape(true) : char.charCodeAt(0);
+            members += 1;
+            if (pattern[at] !== '-') continue;
+            at += 1;
+            const next = pattern[at++];
+            if (next === undefined) return fail('unterminated character set');
+            if (next === ']') return;
+            const high = next === '\\' ? escape(true) : next.charCodeAt(0);
+            if (typeof low !== 'number' || typeof high !== 'number' || high < low) return fail('bad character range');
+        }
+    };
+    const sequence = (first: boolean): void => {
+        // 'none' (nothing yet), 'at' (an anchor), 'repeat' or 'atom'.
+        let last: 'none' | 'at' | 'repeat' | 'atom' = 'none';
+        while (at < pattern.length) {
+            const char = pattern[at]!;
+            if (char === '|' || char === ')') return;
+            at += 1;
+            if (char === '\\') {
+                const kind = escape(false);
+                last = kind === 'at' ? 'at' : 'atom';
+            } else if (char === '[') {
+                charClass();
+                last = 'atom';
+            } else if (char === '*' || char === '+' || char === '?') {
+                if (last === 'none' || last === 'at') return fail('nothing to repeat');
+                if (last === 'repeat') return fail('multiple repeat');
+                if (pattern[at] === '?' || pattern[at] === '+') at += 1;
+                last = 'repeat';
+            } else if (char === '^') {
+                last = 'at';
+            } else if (char === '(') {
+                let group: number | null = null;
+                if (pattern[at] === '?') {
+                    at += 1;
+                    const next = pattern[at++];
+                    if (next === undefined) return fail('unexpected end of pattern');
+                    if (next === '(') {
+                        const end = pattern.indexOf(')', at);
+                        if (end < 0) return fail('missing ), unterminated name');
+                        const name = pattern.slice(at, end);
+                        at = end + 1;
+                        if (!name) return fail('missing group name');
+                        if (!/^[0-9]+$/.test(name)) return fail(/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? `unknown group name '${name}'` : `bad character in group name '${name}'`);
+                        const reference = Number(name);
+                        if (!reference) return fail('bad group number');
+                        conditionRefs.push(reference);
+                        sequence(false);
+                        if (pattern[at] === '|') {
+                            at += 1;
+                            sequence(false);
+                            if (pattern[at] === '|') return fail('conditional backref with more than two branches');
+                        }
+                        if (pattern[at] !== ')') return fail('missing ), unterminated subpattern');
+                        at += 1;
+                        last = 'atom';
+                        continue;
+                    }
+                    if (!'aiLmsux'.includes(next)) return fail(`unknown extension ?${next}`);
+                    let seen = next;
+                    while (at < pattern.length && 'aiLmsux'.includes(pattern[at]!)) seen += pattern[at++];
+                    if (pattern[at] !== ')') return fail(at < pattern.length && isLetter(pattern[at]!) ? 'unknown flag' : 'missing -, : or )');
+                    at += 1;
+                    if (seen.includes('L')) return fail("bad inline flags: cannot use 'L' flag with a str pattern");
+                    if ((flags + seen).includes('a') && (flags + seen).includes('u')) return fail("bad inline flags: flags 'a', 'u' and 'L' are incompatible");
+                    if (!first || last !== 'none') return fail('global flags not at the start of the expression');
+                    flags += seen;
+                    continue;
+                }
+                group = groups;
+                groups += 1;
+                alternation(false);
+                if (pattern[at] !== ')') return fail('missing ), unterminated subpattern');
+                at += 1;
+                closed.add(group);
+                last = 'atom';
+            } else {
+                last = 'atom';
+            }
+        }
+    };
+    const alternation = (top: boolean): void => {
+        let branch = 0;
+        for (;;) {
+            sequence(top && branch === 0);
+            if (pattern[at] !== '|') return;
+            at += 1;
+            branch += 1;
+        }
+    };
+    try {
+        alternation(true);
+        if (at < pattern.length) fail('unbalanced parenthesis');
+        for (const reference of conditionRefs) if (reference >= groups) fail(`invalid group reference ${reference}`);
+        return null;
+    } catch (error) {
+        if (error instanceof Refusal) return error.message;
+        throw error;
+    }
+}
+
+/** `validators.validate_blocklist_entry`; normalizes an `ip` value in place. */
+function edgeValidateBlocklistEntry(entry: MockEdgeBlocklistEntry): string | null {
+    if (!['ip', 'ua'].includes(entry.kind)) return `unknown blocklist kind '${entry.kind}'`;
+    if (!['allow', 'off', 'log', 'enforce'].includes(entry.mode)) return `unknown blocklist mode '${entry.mode}'`;
+    if (typeof entry.value !== 'string' || !entry.value) return 'a blocklist entry requires a value';
+    if (entry.kind === 'ip') {
+        const network = edgeNormalizeIpNetwork(entry.value);
+        if (network == null) return `'${entry.value}' is not an IP address or CIDR network`;
+        entry.value = network;
+    } else {
+        if (!EDGE_UA_RE.test(entry.value)) return 'a user-agent pattern may use letters, digits and the regex characters ()[]|?^.*+-/_\\ only (max 256 characters, no spaces, quotes or braces)';
+        if ((entry.value.length - entry.value.replace(/\\+$/, '').length) % 2 === 1) return 'a user-agent pattern cannot end with an unescaped backslash';
+        const reason = edgePythonRegexError(entry.value);
+        if (reason) return `user-agent pattern does not compile: ${reason}`;
+    }
+    // `edge_blocklist_kind_value_uniq`.
+    if (db.edgeBlocklist.some((other) => other.id !== entry.id && other.kind === entry.kind && other.value === entry.value)) {
+        return `a ${entry.kind} blocklist entry for ${entry.value} already exists`;
+    }
+    return null;
+}
+
+/** `validators.validate_upstream`. */
+function edgeValidateUpstream(row: MockEdgeUpstream): string | null {
+    if (!row.name || !EDGE_NAME_RE.test(row.name)) return "upstream name must be lowercase letters, digits, '-' or '_'";
+    if (row.kind === 'http') {
+        if (row.socket_path) return 'an http upstream has no socket path';
+        const host = row.host ?? '';
+        if (!EDGE_UPSTREAM_HOST_RE.test(host)) return 'upstream host must be a hostname or IPv4 address (letters, digits, dots and hyphens only)';
+        if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return 'link-local addresses cannot be an upstream';
+        if (typeof row.port !== 'number' || !Number.isInteger(row.port)) return 'upstream port must be an integer';
+        if (row.port < 1 || row.port > 65535) return 'upstream port must be between 1 and 65535';
+    } else if (row.kind === 'unix') {
+        if (row.host || row.port) return 'a unix upstream has no host or port';
+        const path = row.socket_path ?? '';
+        if (!path) return 'a unix upstream requires a socket path';
+        if (/[\n\r;\0]/.test(path)) return 'socket path contains an illegal character';
+        const resolved: string[] = [];
+        for (const part of path.split('/')) {
+            if (part === '' || part === '.') continue;
+            if (part === '..') resolved.pop(); else resolved.push(part);
+        }
+        const real = `/${resolved.join('/')}`;
+        if (!path.startsWith('/') || !(real === EDGE_SOCKET_BASE || real.startsWith(`${EDGE_SOCKET_BASE}/`))) return `socket path must resolve under ${EDGE_SOCKET_BASE}`;
+    } else return `unknown upstream kind '${row.kind}'`;
+    // `edge_upstream_group_name_uniq` / `edge_upstream_house_name_uniq`.
+    if (db.edgeUpstreams.some((other) => other.id !== row.id && other.group === row.group && other.name === row.name)) {
+        return `an upstream named ${row.name} already exists in this scope`;
+    }
+    return null;
+}
+
+function edgeNextId(rows: readonly { id: number }[], floor: number): number {
+    return Math.max(floor, ...rows.map((row) => row.id)) + 1;
+}
+
+function edgeFetch(path: string, opts: MockFetchOpts): Record<string, unknown> | undefined {
+    if (!path.startsWith('/api/edge/')) return undefined;
+    const method = (opts.method ?? 'GET').toUpperCase();
+    const caller = userFromBearer(opts.headers);
+    const now = Math.floor(Date.now() / 1000);
+    const body = opts.body ?? {};
+    const domainGroup = (domainId: number): number | null | undefined => {
+        const domain = db.dnsDomains.find((candidate) => candidate.id === domainId);
+        return domain ? domain.group : undefined;
+    };
+    /** The model permission for a row whose tenancy resolves to `group`. */
+    const scopedCan = (group: number | null | undefined, manage: boolean): boolean => (group == null
+        ? hasGlobalPermission(caller, manage ? DNS_MANAGE_GRANTS : DNS_VIEW_GRANTS)
+        : dnsMemberCan(caller, group, manage));
+
+    // ── Upstream declare / retire — platform administrators only ──
+    if (path === '/api/edge/upstream/declare' || path === '/api/edge/upstream/retire') {
+        if (!caller) return permissionDenied(401);
+        if (method !== 'POST') return edgeRefuse('Method not allowed', 405);
+        const declaring = path.endsWith('/declare');
+        // The gate runs first: a caller who may not act learns that before
+        // the payload is parsed.
+        if (!caller.is_superuser) return edgePlatformOnly(declaring ? 'Declaring an edge upstream' : 'Retiring an edge upstream');
+        if (!declaring) {
+            if (body.upstream == null || body.upstream === '') return edgeRefuse('missing required parameter: upstream');
+            const row = db.edgeUpstreams.find((candidate) => candidate.id === Number(body.upstream));
+            if (!row) return edgeRefuse('Upstream not found', 404);
+            row.is_enabled = false;
+            row.modified = now;
+            return { status: true, data: serializeEdgeUpstream(row), graph: 'default' };
+        }
+        for (const required of ['name', 'kind']) {
+            if (body[required] == null || body[required] === '') return edgeRefuse(`missing required parameter: ${required}`);
+        }
+        if (body.kind !== 'http' && body.kind !== 'unix') return edgeRefuse("kind must be 'http' or 'unix'");
+        let group: number | null = null;
+        if (body.group) {
+            if (!db.groups.some((candidate) => candidate.id === Number(body.group))) return edgeRefuse('Group not found', 404);
+            group = Number(body.group);
+        }
+        let port: number | null = null;
+        if (body.port != null) {
+            port = Number(body.port);
+            if (!Number.isInteger(port) || body.port === '' || typeof body.port === 'boolean') return edgeRefuse('port must be an integer');
+        }
+        const row: MockEdgeUpstream = {
+            id: edgeNextId(db.edgeUpstreams, 8600), created: now, modified: now, group,
+            name: String(body.name), kind: body.kind,
+            host: body.host == null ? null : String(body.host), port,
+            socket_path: body.socket_path == null ? null : String(body.socket_path), is_enabled: true,
+        };
+        const refusal = edgeValidateUpstream(row);
+        if (refusal) return edgeRefuse(refusal);
+        db.edgeUpstreams.push(row);
+        return { status: true, data: serializeEdgeUpstream(row), graph: 'default' };
+    }
+
+    // ── Upstreams — read, and `is_enabled` only on write ──
+    const upstreamMatch = path.match(/^\/api\/edge\/upstream(?:\/(\d+))?$/);
+    if (upstreamMatch) {
+        if (!caller) return permissionDenied(401);
+        if (upstreamMatch[1]) {
+            const row = db.edgeUpstreams.find((candidate) => candidate.id === Number(upstreamMatch[1]));
+            if (!row) return edgeRefuse('Upstream not found', 404);
+            if (method === 'DELETE') return edgeRefuse('Upstream deletion is not allowed', 403);
+            if (!scopedCan(row.group, method !== 'GET')) return permissionDenied();
+            if (method === 'POST') {
+                // NO_SAVE_FIELDS pins everything that decides where traffic goes.
+                if ('is_enabled' in body) { row.is_enabled = body.is_enabled === true; row.modified = now; }
+            }
+            return { status: true, data: serializeEdgeUpstream(row), graph: 'default' };
+        }
+        if (method !== 'GET') return edgeRefuse('Upstream creation is not allowed', 403);
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        // An active group sees its own rows plus the shared house rows.
+        const rows = groupId > 0 ? db.edgeUpstreams.filter((row) => row.group === groupId || row.group == null) : db.edgeUpstreams;
+        const { group: _group, ...params } = opts.params ?? {};
+        const result = listRows(rows as unknown as Record<string, unknown>[], params, (row) => `${row.name} ${row.kind}`, 'name');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockEdgeUpstream[]).map((row) => serializeEdgeUpstream(row)) };
+    }
+
+    // ── Vhosts ──
+    const vhostMatch = path.match(/^\/api\/edge\/vhost(?:\/(\d+))?$/);
+    if (vhostMatch) {
+        if (!caller) return permissionDenied(401);
+        const graph = String(opts.params?.graph ?? (vhostMatch[1] ? 'default' : 'list'));
+        if (vhostMatch[1]) {
+            const row = db.edgeVhosts.find((candidate) => candidate.id === Number(vhostMatch[1]));
+            if (!row) return edgeRefuse('Vhost not found', 404);
+            const group = domainGroup(row.domain);
+            // Model permission first, then the house guard: no status-code
+            // oracle over the platform's own serving inventory.
+            if (!scopedCan(group, false)) return permissionDenied();
+            if (group == null && !caller.is_superuser) return edgePlatformOnly('House vhosts');
+            if (method !== 'GET' && !scopedCan(group, true)) return permissionDenied();
+            if (method === 'DELETE') {
+                db.edgeVhosts = db.edgeVhosts.filter((candidate) => candidate.id !== row.id);
+                db.edgeRoutes = db.edgeRoutes.filter((route) => route.vhost !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST') {
+                if ('domain' in body && edgeNumberOrNull(body.domain) !== row.domain) return edgeRefuse('a vhost cannot be moved to another domain');
+                const draft: MockEdgeVhost = { ...row, quiet_paths: [...row.quiet_paths], mojosec_policy: { ...row.mojosec_policy } };
+                edgeApplyVhostBody(draft, body);
+                const refusal = edgeValidateVhost(draft, true);
+                if (refusal) return edgeRefuse(refusal);
+                Object.assign(row, draft, { modified: now });
+            }
+            return { status: true, data: serializeEdgeVhost(row, graph), graph };
+        }
+        if (method === 'DELETE') return edgeRefuse('DELETE not allowed on the collection', 403);
+        if (method === 'POST') {
+            const domainId = edgeNumberOrNull(body.domain);
+            const group = domainId == null ? undefined : domainGroup(domainId);
+            if (domainId != null && group === null && !caller.is_superuser) return edgePlatformOnly('Creating a vhost on a house domain');
+            if (!scopedCan(group, true)) return permissionDenied();
+            if (domainId == null || group === undefined) return edgeRefuse('a vhost requires a domain');
+            const draft: MockEdgeVhost = {
+                id: edgeNextId(db.edgeVhosts, 8700), created: now, modified: now, domain: domainId,
+                label: '', kind: 'site', upstream: null, certificate: null, pool: 'default', spa: false,
+                body_size_mb: 50, quiet_paths: [], serve_static: false, mojosec_policy: {}, redirect_to: null, is_enabled: true,
+            };
+            edgeApplyVhostBody(draft, body);
+            const refusal = edgeValidateVhost(draft, false);
+            if (refusal) return edgeRefuse(refusal);
+            db.edgeVhosts.push(draft);
+            return { status: true, data: serializeEdgeVhost(draft, 'default'), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        const { group: _group, domain__group: domainGroupFilter, ...params } = opts.params ?? {};
+        let rows = groupId > 0 ? db.edgeVhosts.filter((row) => domainGroup(row.domain) === groupId) : db.edgeVhosts;
+        // House rows never reach a non-superuser list, global grant or not.
+        if (!caller.is_superuser) rows = rows.filter((row) => domainGroup(row.domain) != null);
+        if (domainGroupFilter != null && domainGroupFilter !== '') rows = rows.filter((row) => domainGroup(row.domain) === Number(domainGroupFilter));
+        const result = listRows(rows as unknown as Record<string, unknown>[], params, (row) => `${row.label} ${row.kind} ${row.pool}`, 'label');
+        return { ...result, graph, data: (result.data as unknown as MockEdgeVhost[]).map((row) => serializeEdgeVhost(row, graph)) };
+    }
+
+    // ── Routes — site_api proxied prefixes ──
+    const routeMatch = path.match(/^\/api\/edge\/route(?:\/(\d+))?$/);
+    if (routeMatch) {
+        if (!caller) return permissionDenied(401);
+        const vhostGroup = (vhostId: number): number | null | undefined => {
+            const vhost = db.edgeVhosts.find((candidate) => candidate.id === vhostId);
+            return vhost ? domainGroup(vhost.domain) : undefined;
+        };
+        const validate = (route: MockEdgeRoute): string | null => {
+            const prefixRefusal = edgeRequestPathError(route.path_prefix, 'a route prefix');
+            if (prefixRefusal) return prefixRefusal;
+            if (route.path_prefix === '/') return "a route prefix cannot be '/' — use kind=api for a whole-host proxy";
+            const vhost = db.edgeVhosts.find((candidate) => candidate.id === route.vhost);
+            if (!vhost) return 'a route requires a vhost';
+            if (vhost.kind !== 'site_api') return `routes belong to site_api vhosts, not ${vhost.kind}`;
+            const upstream = db.edgeUpstreams.find((candidate) => candidate.id === route.upstream);
+            if (!upstream) return 'a route requires an upstream';
+            if (upstream.group != null && upstream.group !== domainGroup(vhost.domain)) return "the upstream must be a shared one or belong to this vhost's group";
+            // `edge_route_vhost_prefix_uniq`.
+            if (db.edgeRoutes.some((other) => other.id !== route.id && other.vhost === route.vhost && other.path_prefix === route.path_prefix)) {
+                return `this vhost already has a route for ${route.path_prefix}`;
+            }
+            return null;
+        };
+        if (routeMatch[1]) {
+            const row = db.edgeRoutes.find((candidate) => candidate.id === Number(routeMatch[1]));
+            if (!row) return edgeRefuse('VhostRoute not found', 404);
+            const group = vhostGroup(row.vhost);
+            if (!scopedCan(group, false)) return permissionDenied();
+            if (group == null && !caller.is_superuser) return edgePlatformOnly('House vhost routes');
+            if (method !== 'GET' && !scopedCan(group, true)) return permissionDenied();
+            if (method === 'DELETE') {
+                db.edgeRoutes = db.edgeRoutes.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST') {
+                const draft: MockEdgeRoute = { ...row };
+                if ('path_prefix' in body) draft.path_prefix = String(body.path_prefix ?? '');
+                if ('upstream' in body) draft.upstream = edgeNumberOrNull(body.upstream) ?? 0;
+                if ('vhost' in body) draft.vhost = edgeNumberOrNull(body.vhost) ?? 0;
+                const refusal = validate(draft);
+                if (refusal) return edgeRefuse(refusal);
+                Object.assign(row, draft, { modified: now });
+            }
+            return { status: true, data: serializeEdgeRoute(row), graph: 'default' };
+        }
+        if (method === 'DELETE') return edgeRefuse('DELETE not allowed on the collection', 403);
+        if (method === 'POST') {
+            const vhostId = edgeNumberOrNull(body.vhost);
+            const group = vhostId == null ? undefined : vhostGroup(vhostId);
+            if (vhostId != null && group === null && !caller.is_superuser) return edgePlatformOnly('Creating a route on a house vhost');
+            if (!scopedCan(group, true)) return permissionDenied();
+            const draft: MockEdgeRoute = {
+                id: edgeNextId(db.edgeRoutes, 8800), created: now, modified: now, vhost: vhostId ?? 0,
+                path_prefix: String(body.path_prefix ?? ''), upstream: edgeNumberOrNull(body.upstream) ?? 0,
+            };
+            const refusal = validate(draft);
+            if (refusal) return edgeRefuse(refusal);
+            db.edgeRoutes.push(draft);
+            return { status: true, data: serializeEdgeRoute(draft), graph: 'default' };
+        }
+        if (!dnsCollectionCan(caller, opts)) return permissionDenied();
+        const groupId = requestGroupId(opts);
+        const { group: _group, ...params } = opts.params ?? {};
+        let rows = groupId > 0 ? db.edgeRoutes.filter((row) => vhostGroup(row.vhost) === groupId) : db.edgeRoutes;
+        if (!caller.is_superuser) rows = rows.filter((row) => vhostGroup(row.vhost) != null);
+        const result = listRows(rows as unknown as Record<string, unknown>[], params, (row) => String(row.path_prefix), 'path_prefix');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockEdgeRoute[]).map(serializeEdgeRoute) };
+    }
+
+    // ── Fleet blocklist — GLOBAL security grants only; `?group=` opens nothing ──
+    const blocklistMatch = path.match(/^\/api\/edge\/blocklist(?:\/(\d+))?$/);
+    if (blocklistMatch) {
+        if (!caller) return permissionDenied(401);
+        if (!hasGlobalPermission(caller, EDGE_BLOCKLIST_VIEW_GRANTS)) return permissionDenied();
+        const canManage = hasGlobalPermission(caller, EDGE_BLOCKLIST_MANAGE_GRANTS);
+        const apply = (entry: MockEdgeBlocklistEntry): string | null => {
+            if ('kind' in body) entry.kind = String(body.kind);
+            if ('value' in body) entry.value = body.value == null ? '' : String(body.value);
+            if ('mode' in body) entry.mode = String(body.mode);
+            if ('note' in body) entry.note = body.note == null ? '' : String(body.note);
+            return edgeValidateBlocklistEntry(entry);
+        };
+        if (blocklistMatch[1]) {
+            const row = db.edgeBlocklist.find((candidate) => candidate.id === Number(blocklistMatch[1]));
+            if (!row) return edgeRefuse('BlocklistEntry not found', 404);
+            if (method !== 'GET' && !canManage) return permissionDenied();
+            if (method === 'DELETE') {
+                db.edgeBlocklist = db.edgeBlocklist.filter((candidate) => candidate.id !== row.id);
+                return { status: 'deleted' };
+            }
+            if (method === 'POST') {
+                const draft: MockEdgeBlocklistEntry = { ...row };
+                const refusal = apply(draft);
+                if (refusal) return edgeRefuse(refusal);
+                Object.assign(row, draft, { modified: now });
+            }
+            return { status: true, data: serializeEdgeBlocklistEntry(row), graph: 'default' };
+        }
+        if (method === 'DELETE') return edgeRefuse('DELETE not allowed on the collection', 403);
+        if (method === 'POST') {
+            if (!canManage) return permissionDenied();
+            const draft: MockEdgeBlocklistEntry = { id: edgeNextId(db.edgeBlocklist, 8900), created: now, modified: now, kind: 'ip', value: '', mode: 'log', note: '' };
+            const refusal = apply(draft);
+            if (refusal) return edgeRefuse(refusal);
+            db.edgeBlocklist.push(draft);
+            return { status: true, data: serializeEdgeBlocklistEntry(draft), graph: 'default' };
+        }
+        const { group: _group, ...params } = opts.params ?? {};
+        const result = listRows(db.edgeBlocklist as unknown as Record<string, unknown>[], params, (row) => `${row.value} ${row.note}`, 'kind');
+        return { ...result, graph: 'default', data: (result.data as unknown as MockEdgeBlocklistEntry[]).map(serializeEdgeBlocklistEntry) };
+    }
+    return undefined;
+}
+// ══ end Edge wire ══════════════════════════════════════════════════
 
 // ══ Jobs engine — wire implementation ════════════════════════════════
 
@@ -7916,7 +9229,7 @@ async function phoneHubFetch(path:string,opts:MockFetchOpts):Promise<unknown|und
     const smsMatch=path.match(/^\/api\/phonehub\/sms(?:\/(\d+))?$/);
     if(smsMatch){const id=smsMatch[1]?Number(smsMatch[1]):null;if(method==='DELETE'){if(!hasGlobalPermission(caller,SMS_DELETE_GRANTS))return permissionDenied();if(id==null)return {status:false,error:'Method not allowed',error_code:405};db.sms=db.sms.filter(row=>row.id!==id);return {status:'deleted'};}if(method==='POST'&&!hasGlobalPermission(caller,SMS_SAVE_GRANTS))return permissionDenied();if(method==='GET'&&!hasGlobalPermission(caller,SMS_VIEW_GRANTS))return permissionDenied();if(id!=null){const row=db.sms.find(item=>item.id===id);if(!row)return {status:false,error:'SMS not found',error_code:404};if(method==='POST'){for(const key of ['status','error_message','delivered_at'] as const)if(key in (opts.body??{}))(row as unknown as Record<string,unknown>)[key]=opts.body?.[key];row.modified=Math.floor(Date.now()/1000);}return {status:true,data:smsWire(row),graph:'default'};}if(method==='POST'){const body=opts.body??{};const now=Math.floor(Date.now()/1000);const row:MockSms={id:Math.max(0,...db.sms.map(item=>item.id))+1,created:now,modified:now,direction:String(body.direction??'outbound'),from_number:String(body.from_number??''),to_number:String(body.to_number??''),body:String(body.body??''),status:String(body.status??'queued'),provider:body.provider?String(body.provider):null,provider_message_id:null,error_code:null,error_message:null,metadata:{},is_test:Boolean(body.is_test),sent_at:null,delivered_at:null,user:body.user==null?null:Number(body.user),group:body.group==null?null:Number(body.group)};db.sms.unshift(row);return {status:true,data:smsWire(row),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['direction','status','provider','group','user'],['created','direction','status','provider','sent_at','delivered_at'],'default','-created',true);return messagingList(db.sms as unknown as Record<string,unknown>[],params,row=>`${row.from_number} ${row.to_number} ${row.body}`,'default',row=>smsWire(row as unknown as MockSms),'-created');}
     const configMatch=path.match(/^\/api\/phonehub\/config(?:\/(\d+))?$/);
-    if(configMatch){const id=configMatch[1]?Number(configMatch[1]):null;if(method==='DELETE'){if(!hasGlobalPermission(caller,PHONE_CONFIG_DELETE_GRANTS))return permissionDenied();if(id==null)return {status:false,error:'Method not allowed',error_code:405};db.phoneConfigs=db.phoneConfigs.filter(row=>row.id!==id);db.phoneConfigSecrets.delete(id);return {status:'deleted'};}if(!hasGlobalPermission(caller,PHONE_CONFIG_VIEW_GRANTS))return permissionDenied();if(id!=null){const row=db.phoneConfigs.find(item=>item.id===id);if(!row)return {status:false,error:'Phone config not found',error_code:404};if(method==='POST'&&opts.body?.test_connection){if(row.test_mode)return {status:true,data:{success:true,test_mode:true,message:'Config is in test mode - provider not tested'}};const secrets=db.phoneConfigSecrets.get(id)??{};const ready=row.provider==='twilio'?Boolean(secrets.twilio_account_sid&&secrets.twilio_auth_token):row.provider==='aws'?Boolean(secrets.aws_access_key_id&&secrets.aws_secret_access_key):Boolean(secrets.mojo_api_key&&row.mojo_remote_url);return {status:true,data:ready?{success:true,message:`${row.provider} connection succeeded`}:{success:false,message:`${row.provider} credentials are incomplete`,error:'missing_credentials'}};}if(method==='POST'){const nextGroup='group'in(opts.body??{})?(opts.body?.group==null?null:Number(opts.body.group)):row.group;if(nextGroup!=null&&db.phoneConfigs.some(item=>item.id!==id&&item.group===nextGroup))return {status:false,error:'A configuration already exists for this group',error_code:400};applyPhoneConfig(row,opts.body??{});saveMockPhoneSecrets(id,opts.body??{});}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};return {status:true,data:phoneConfigWire(row),graph:'default'};}if(method==='POST'){const body=opts.body??{};const group=body.group==null?null:Number(body.group);if(group!=null&&!db.groups.some(item=>item.id===group))return {status:false,error:'Group not found',error_code:404};if(group!=null&&db.phoneConfigs.some(item=>item.group===group))return {status:false,error:'A configuration already exists for this group',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockPhoneConfig={id:Math.max(0,...db.phoneConfigs.map(item=>item.id))+1,created:now,modified:now,group,name:String(body.name??''),is_active:body.is_active!==false,provider:['twilio','aws','mojo'].includes(String(body.provider))?String(body.provider) as MockPhoneConfig['provider']:'twilio',twilio_from_number:null,aws_region:null,aws_sender_id:null,mojo_remote_url:null,lookup_enabled:body.lookup_enabled!==false,lookup_cache_days:Number(body.lookup_cache_days??90),test_mode:Boolean(body.test_mode)};applyPhoneConfig(row,body);db.phoneConfigs.push(row);saveMockPhoneSecrets(row.id,body);return {status:true,data:phoneConfigWire(row),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['provider','is_active','group','test_mode'],['name','provider','is_active','created','modified'],'default','name');return messagingList(db.phoneConfigs as unknown as Record<string,unknown>[],params,row=>String(row.name),'default',row=>phoneConfigWire(row as unknown as MockPhoneConfig),'name');}
+    if(configMatch){const id=configMatch[1]?Number(configMatch[1]):null;if(method==='DELETE'){if(!hasGlobalPermission(caller,PHONE_CONFIG_DELETE_GRANTS))return permissionDenied();if(id==null)return {status:false,error:'Method not allowed',error_code:405};db.phoneConfigs=db.phoneConfigs.filter(row=>row.id!==id);db.phoneConfigSecrets.delete(id);return {status:'deleted'};}if(!hasGlobalPermission(caller,PHONE_CONFIG_VIEW_GRANTS))return permissionDenied();if(id!=null){const row=db.phoneConfigs.find(item=>item.id===id);if(!row)return {status:false,error:'Phone config not found',error_code:404};if(method==='POST'&&opts.body?.test_connection){/* Flat, as on the real wire: rest.py returns the action dict verbatim. */if(row.test_mode)return {success:true,test_mode:true,message:'Config is in test mode - provider not tested'};const secrets=db.phoneConfigSecrets.get(id)??{};const ready=row.provider==='twilio'?Boolean(secrets.twilio_account_sid&&secrets.twilio_auth_token):row.provider==='aws'?Boolean(secrets.aws_access_key_id&&secrets.aws_secret_access_key):Boolean(secrets.mojo_api_key&&row.mojo_remote_url);return ready?{success:true,message:`${row.provider} connection succeeded`}:{success:false,message:`${row.provider} credentials are incomplete`,error:'missing_credentials'};}if(method==='POST'){const nextGroup='group'in(opts.body??{})?(opts.body?.group==null?null:Number(opts.body.group)):row.group;if(nextGroup!=null&&db.phoneConfigs.some(item=>item.id!==id&&item.group===nextGroup))return {status:false,error:'A configuration already exists for this group',error_code:400};applyPhoneConfig(row,opts.body??{});saveMockPhoneSecrets(id,opts.body??{});}else if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};return {status:true,data:phoneConfigWire(row),graph:'default'};}if(method==='POST'){const body=opts.body??{};const group=body.group==null?null:Number(body.group);if(group!=null&&!db.groups.some(item=>item.id===group))return {status:false,error:'Group not found',error_code:404};if(group!=null&&db.phoneConfigs.some(item=>item.group===group))return {status:false,error:'A configuration already exists for this group',error_code:400};const now=Math.floor(Date.now()/1000);const row:MockPhoneConfig={id:Math.max(0,...db.phoneConfigs.map(item=>item.id))+1,created:now,modified:now,group,name:String(body.name??''),is_active:body.is_active!==false,provider:['twilio','aws','mojo'].includes(String(body.provider))?String(body.provider) as MockPhoneConfig['provider']:'twilio',twilio_from_number:null,aws_region:null,aws_sender_id:null,mojo_remote_url:null,lookup_enabled:body.lookup_enabled!==false,lookup_cache_days:Number(body.lookup_cache_days??90),test_mode:Boolean(body.test_mode)};applyPhoneConfig(row,body);db.phoneConfigs.push(row);saveMockPhoneSecrets(row.id,body);return {status:true,data:phoneConfigWire(row),graph:'default'};}if(method!=='GET')return {status:false,error:'Method not allowed',error_code:405};const params=messagingParams(opts.params??{},['provider','is_active','group','test_mode'],['name','provider','is_active','created','modified'],'default','name');return messagingList(db.phoneConfigs as unknown as Record<string,unknown>[],params,row=>String(row.name),'default',row=>phoneConfigWire(row as unknown as MockPhoneConfig),'name');}
     return undefined;
 }
 async function messagingFetch(path:string,opts:MockFetchOpts):Promise<unknown|undefined>{
@@ -7966,6 +9279,23 @@ async function messagingFetch(path:string,opts:MockFetchOpts):Promise<unknown|un
 /** Mock transport. Same signature the real fetch path resolves through. */
 export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {
     const method = (opts.method ?? 'GET').toUpperCase();
+    const arm = armedOnce?.method === method && armedOnce.path === path ? armedOnce : null;
+    if (arm) armedOnce = null;
+    const result = await mockFetchInner(path, opts);
+    if (!arm) return result;
+    if (arm.extraDelayMs > 0) await mockDelay(arm.extraDelayMs, opts.signal);
+    if (arm.mapData && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
+        return { ...(result as Record<string, unknown>), data: arm.mapData((result as { data: Record<string, unknown> }).data) };
+    }
+    if (arm.stripGrantTokens && result && typeof result === 'object' && (result as { data?: unknown }).data && typeof (result as { data?: unknown }).data === 'object') {
+        const { access_token: _a, refresh_token: _r, ...rest } = (result as { data: Record<string, unknown> }).data;
+        return { ...(result as Record<string, unknown>), data: { ...rest, requires_password_change: true } };
+    }
+    return result;
+}
+
+async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknown> {
+    const method = (opts.method ?? 'GET').toUpperCase();
     const key = `${method} ${path}`;
     callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
     const safeDnsParams = path === '/api/dnsman/credential/group-choice'
@@ -7975,7 +9305,11 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         || path.startsWith('/api/aws/cloudwatch/')
         || path.startsWith('/api/assistant/memory/')
         ? { ...(opts.params ?? {}) }
-        : undefined;
+        // Owner-scoped credential/device lists: only the owner filter (a
+        // users-grant caller is served EVERY row without it).
+        : method === 'GET' && OWNER_SCOPED_LISTS.has(path)
+            ? { user: opts.params?.user }
+            : undefined;
     const locationObservables = path.startsWith('/api/location/') ? {
         ...('input' in (opts.params ?? {}) ? { input_length: String(opts.params?.input ?? '').length } : {}),
         ...('session_token' in (opts.params ?? {}) ? { has_session_token: Boolean(opts.params?.session_token) } : {}),
@@ -8169,6 +9503,10 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
     if (storageResult !== undefined) return storageResult;
     const cloudWatchResult = cloudWatchFetch(path, opts);
     if (cloudWatchResult !== undefined) return cloudWatchResult;
+    const edgeResult = edgeFetch(path, opts);
+    if (edgeResult !== undefined) return edgeResult;
+    const accountResult = accountSelfFetch(path, method, opts);
+    if (accountResult !== undefined) return accountResult;
     if (path === '/api/auth/generate_api_key') {
         // account/rest/user_api_key.py generate_api_key: mints a long-lived
         // key for the CALLER (@requires_auth — needs the bearer, unlike the
@@ -9790,10 +11128,16 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { ...result, graph: 'default', data: (result.data as unknown as MockIncidentEvent[]).map(serializeIncidentEvent) };
     }
     // ── Passkeys — /api/account/passkeys (save: friendly_name/is_enabled) ──
+    // Passkey VIEW/SAVE_PERMS carry `owner` beside the users tier
+    // (models/rest.py:927-954): without a global grant a caller reaches only
+    // their own rows; with one, the list is unscoped unless ?user= filters it.
     const onePasskey = path.match(/^\/api\/account\/passkeys\/(\d+)$/);
     if (onePasskey) {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
         const pk = db.passkeys.find((p) => p.id === Number(onePasskey[1]));
         if (!pk) return { status: false, error: 'Passkey not found', error_code: 404 };
+        if (pk.user !== caller.id && !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
         if (opts.method === 'DELETE') {
             db.passkeys = db.passkeys.filter((p) => p.id !== pk.id);
             return { status: 'deleted' };
@@ -9808,8 +11152,13 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
         return { status: true, data: { ...rest, user: owner ? userBasic(owner) : null }, graph: 'default' };
     }
     if (path === '/api/account/passkeys') {
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const visible = hasGlobalPermission(caller, ['users', 'manage_users'])
+            ? db.passkeys
+            : db.passkeys.filter((p) => p.user === caller.id);
         const result = listRows(
-            db.passkeys as unknown as Record<string, unknown>[],
+            visible as unknown as Record<string, unknown>[],
             opts.params ?? {},
             (p) => `${p.friendly_name ?? ''} ${p.credential_id}`,
             '-created',
@@ -9867,13 +11216,32 @@ export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unkn
             db.notificationPrefs.set(targetId, current);
             return { status: true, data: { preferences: current } };
         }
-        return { status: true, data: { preferences: db.notificationPrefs.get(targetId) ?? {} } };
+        // `"*"` is the reserved per-channel master switch: stored and merged
+        // like any kind; the GET also carries the registered kinds catalogue
+        // and the valid channels (django-mojo notification kinds registry).
+        return {
+            status: true,
+            data: {
+                preferences: db.notificationPrefs.get(targetId) ?? {},
+                kinds: MOCK_NOTIFICATION_KINDS.map((k) => ({ ...k, channels: k.channels ? [...k.channels] : null })),
+                channels: ['email', 'in_app', 'push'],
+            },
+        };
     }
     if (path === '/api/user/me') {
         // The first authed mock endpoint — meaningless without a session,
         // exactly like the real backend's @requires_auth.
         const user = userFromBearer(opts.headers);
         if (!user) return { status: false, error: 'permission denied', error_code: 401 };
+        // on_user_me → User.on_rest_request(request, request.user.pk): a POST
+        // is the owner's own save through the SAME rules as /api/user/<id>.
+        if (method === 'DELETE') return permissionDenied();
+        if (method === 'POST') {
+            const body = opts.body ?? {};
+            if (Object.keys(body).some((key) => USER_ACTIONS.has(key))
+                && !hasGlobalPermission(user, ['users', 'manage_users'])) return permissionDenied();
+            return saveUser(user, body, user, authTimeFromBearer(opts.headers));
+        }
         return { status: true, data: meDict(user) };
     }
     const memberMatch = path.match(/^\/api\/group\/(\d+)\/member$/);

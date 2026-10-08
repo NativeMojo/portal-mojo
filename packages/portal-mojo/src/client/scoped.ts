@@ -50,7 +50,8 @@ export function mojoScopedCall(path: string, opts: ScopedCallOpts = {}): Promise
 /**
  * The scoped RPC verb: POST `body` under fresh auth with the scope injected.
  * Envelope failures reject in the transport (one boundary); action-shaped
- * `{key: payload}` saves belong to mojoAction, which injects the same scope.
+ * `{key: payload}` saves on a record belong to mojoAction, which sends no
+ * scope (the server binds the row's own group, #5923).
  */
 export async function mojoRpc<T>(path: string, body: Record<string, unknown>, opts: Omit<ScopedCallOpts, 'body' | 'method'> = {}): Promise<T> {
     const out = await withFreshAuth(() => mojoScopedCall(path, { ...opts, method: 'POST', body }));

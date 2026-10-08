@@ -28,11 +28,11 @@ export const UserModel = defineModel<User>({
 | Member | Behavior |
 |---|---|
 | `useList(params?, {enabled?})` | `useQuery` list under key `[endpoint, params]` with `keepPreviousData`; `enabled:false` suppresses permission-hidden background reads |
-| `useOne(id \| null)` | one record, key `[endpoint, 'one', id]`; disabled while `id` is null |
-| `useSave()` | mutation `{id, changes}`; `id: null` creates. Handles one fresh-auth 440/retry, then writes the returned row into the one-record cache and invalidates `[endpoint]`. REJECTS on failure |
-| `useDelete()` | mutation `{id}`; removes the one-record cache entry + invalidates |
-| `useAction(name)` | mutation for ONE declared POST_SAVE_ACTION (below), with one fresh-auth 440/retry. THROWS at render time for an undeclared name |
-| `fetchOne(queryClient, id)` | imperative fetch through the same cache key — dedupes with mounted `useOne`s (prefetch pattern) |
+| `useOne(id \| null)` | one record, key `[endpoint, 'one', id]`; disabled while `id` is null. Sends no group scope |
+| `useSave()` | mutation `{id, changes}`; `id: null` creates. Handles one fresh-auth 440/retry, then writes the returned row into the one-record cache and invalidates `[endpoint]`. REJECTS on failure. With an id it sends no group scope; a create sends only your `changes` |
+| `useDelete()` | mutation `{id}`; removes the one-record cache entry + invalidates. Sends no group scope |
+| `useAction(name)` | mutation for ONE declared POST_SAVE_ACTION (below), with one fresh-auth 440/retry. THROWS at render time for an undeclared name. The body is exactly `{[key]: payload}`; sends no group scope |
+| `fetchOne(queryClient, id)` | imperative fetch through the same cache key — dedupes with mounted `useOne`s (prefetch pattern). Sends no group scope |
 | `invalidate(queryClient)` | invalidate everything under `[endpoint]` |
 | `keys.root / keys.list(params) / keys.one(id)` | key builders for targeted cache surgery |
 
@@ -44,6 +44,35 @@ variables and declared response mode survive the retry, and cache updates run
 only on final success. Delete remains unwrapped, as do direct `mojoCall`
 mutations; callers opt those in only when the endpoint is both sensitive and
 safe to retry once.
+
+## Group scope
+
+In a group portal an app registers its scoped endpoint families
+(`registerEndpointScope`, [client.md](client.md)). The model layer treats
+its two kinds of call differently:
+
+- **Record calls send no group.** `useOne`, `fetchOne`, `useSave` with an
+  id, `useDelete` and `useAction` all hit `<endpoint>/<id>`. django-mojo
+  authorizes those against the row's own group, so a client group adds
+  nothing — and a `group` in a save or action body is written to the row as
+  its `group` field. The hooks declare these calls `unscoped: true`, so a
+  registered-REQUIRED family never blocks them in development.
+- **A create sends only your `changes`.** `useSave` with `id: null` posts to
+  the collection, where the request's group decides where the row lands.
+  Put the group in `changes` yourself; on a REQUIRED family the dev tripwire
+  stops a create that carries none.
+
+List reads (`useList`) are scoped only by the params you pass.
+
+**Upgrading.** Record calls used to be stopped by the dev tripwire on a
+REQUIRED family, and `mojoAction` used to inject the group. If your portal
+grew a local wrapper to get past that — one that adds the group to an
+action or save on a record, or refuses to send when the active group
+changed since the record was read — delete it and call `M.useAction(verb)`
+(or `mojoAction`) directly. Remove any hand-added `group` from record-path
+bodies and params: it is at best ignored and at worst rewrites the row's
+group. Custom views on a record path (`<id>/resend`) are not model calls and
+keep their scope through `mojoRpc`.
 
 ## POST_SAVE_ACTIONS
 
@@ -75,8 +104,12 @@ reaches the client in one of two wire shapes:
 ```
 
 This is NOT the envelope failure: envelope-level `status:false` already
-rejects at the unwrap boundary (`MojoError`). The action-refusal layer sits
-above it and is handled by `useAction` automatically:
+rejects at the unwrap boundary (`MojoError`). Since 0.3 unwrap also rejects
+the flat shape for raw calls; `useAction` opts out of that check
+(`refusal: 'return'` on its own request) so the error names the action and
+honours the model's declared mode. No behaviour change for models. The
+action-refusal layer sits above the boundary and is handled by `useAction`
+automatically:
 
 - **`refusal: 'reject'` (default)** — a `success:false` (or payload
   `status:false`) reply REJECTS with **`ActionRefusedError`**, so a refusal

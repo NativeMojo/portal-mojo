@@ -1,0 +1,130 @@
+{
+  "package": "portal-mojo",
+  "package_version": "0.2.5",
+  "source_repository": "https://github.com/NativeMojo/portal-mojo",
+  "source_tag": "v0.2.5",
+  "source_commit": "93c7fdfeb3096d33010e72bd4483cf9ca6e3d6f5",
+  "license": "Apache-2.0",
+  "license_file": "packages/portal-mojo/LICENSE",
+  "files": [
+    {
+      "source_path": "apps/portal/src/group-permissions.ts",
+      "source_sha256": "6237ad45328ecb9637a1a07d8954dd27cd019e22fa32942f5e7d05a76037fb5c",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-permissions.ts",
+      "package_sha256": "b909f5a5cf029b8b910a70e6817fea8abd9ded6797af14a16170b2695c0c1699",
+      "adaptation": "Moves system-pinned group permission clauses into the canonical package identity surface."
+    },
+    {
+      "source_path": "apps/portal/src/models.ts",
+      "source_sha256": "0b98a906a774e572f9109703fe22444c3a2e190ca5e02c3a93dfbd02cc3fcb84",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/models.ts",
+      "package_sha256": "6ac12a64d00e409874bc1b13d7941cf54c38a715af5ebcfddd2b2e9257356759",
+      "adaptation": "Extracts the Group model/type and group kind options; shared User, Member and Log models remain owned by their package domains."
+    },
+    {
+      "source_path": "apps/portal/src/pages/ApiKeysPage.tsx",
+      "source_sha256": "3d338cf77c3110b72a9361565c1cced10a7fccc52c486e3dafda119d66c676b2",
+      "package_path": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
+      "package_sha256": "f377d8a97b5c0ccbce745c333fdd7e4a5fd5f5a89b868b058677b31e3efe64ff",
+      "adaptation": "Expanded row facts and actions are presented in a native DetailView modal that observes the current API key record."
+    },
+    {
+      "source_path": "apps/portal/src/pages/GroupDetail.tsx",
+      "source_sha256": "01a8a6032a59a337636ec28e5e2aef90717e5bc00656807135e02820a92a394b",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/GroupDetail.tsx",
+      "package_sha256": "e26943218e3e8f5ac79ddc7f1b0bd40736bcab0bd6e9c694e01830086349a4e2",
+      "adaptation": "Raw metadata is visible in the explicit Metadata section without a collapsible control."
+    },
+    {
+      "source_path": "apps/portal/src/pages/GroupsPage.tsx",
+      "source_sha256": "82e4aa5e7ebf67832bbd3bcf7e15dcfdeea64383039cc426591fa15262e4d4c8",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/GroupsPage.tsx",
+      "package_sha256": "e16f3d0630fdb1937cf667cd2abe8cd1aabc9bb2b731113112930e66bde2f1df",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/AuditSection.tsx",
+      "source_sha256": "49848f57e5050c0008aa83f7092af9abb8f55d262791a2591e525eaa6d741df4",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuditSection.tsx",
+      "package_sha256": "07a40636549a0a1d8636a115ee330313b84c0c82500890c6464301fd39de1e06",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/AuthConfigDialog.tsx",
+      "source_sha256": "f42e18a802f206a2b3f30248c30ad12887598b170deb73b532232a6bf89699dd",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/AuthConfigDialog.tsx",
+      "package_sha256": "e2280185bde7eab3ca7108f7d6da9e0e66c4f4d8323ec97f3fd7d49376932b65",
+      "adaptation": "Raw auth overrides remain visible in the explicit configuration dialog without collapsible content."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/EventsSection.tsx",
+      "source_sha256": "b8cb12ae99d7c8d5931a090b7be8ea4e0373ff4657e786094e9ac862167d43ec",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/EventsSection.tsx",
+      "package_sha256": "f0004605fbf7ceb2704adb42c0a3dd14dc5a468c445f0f94f2548fbc5f1bfeb4",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/GeofenceSection.tsx",
+      "source_sha256": "d0ce22f5ef922371d7a78c353e1a29e5d9ca4932e45814499e9c3cdeda7dc137",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/GeofenceSection.tsx",
+      "package_sha256": "227850a8ef844867ea55d599997144b462ee058967224c361dd821713d1b677a",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/IdentitySection.tsx",
+      "source_sha256": "cda776a26f1e21b73820ed88ab7dcbafdaf2b146c4c3ee4bf6b24dcbaeecc9f4",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/IdentitySection.tsx",
+      "package_sha256": "888ff5f7a70c80d8a868f13675b39af9a2a7076d6ea5fbc323493c0265ce9880",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/MembersSection.tsx",
+      "source_sha256": "dc2e99924b8ba856ce2ed48dffae082e98cac9ef78df3ddb1f05fe8a71f9725d",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/MembersSection.tsx",
+      "package_sha256": "abccb58bcdb62d0d1de2611cad080ca7237e0dfa781b10c5fc1d7e251398f628",
+      "adaptation": "Passes the group navigation callback into UserDetail to keep cross-record navigation available."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/OverviewSection.tsx",
+      "source_sha256": "fb395569018b89e6efd45cea241ba665b73efd15549802a6f0d98d90116ce894",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/OverviewSection.tsx",
+      "package_sha256": "08b460272af71ba6209fe388b71f37f79d94a9fecc21c0c2ee3abaf11f01372f",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/SubGroupsSection.tsx",
+      "source_sha256": "81074a2d74d80fda93e40379b87620807c31db7979736f90559e359bdafc0672",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx",
+      "package_sha256": "61e412e709afb4384fdcbaa1d8fbb6df6ba414634ecc6aaa8201c66cf722af93",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/auth-config.ts",
+      "source_sha256": "37d75dff84bca2577bcd1804c77aa0ef1519e4d913dcfdf7914266045fdbabe6",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/auth-config.ts",
+      "package_sha256": "37d75dff84bca2577bcd1804c77aa0ef1519e4d913dcfdf7914266045fdbabe6",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/geofence-data.ts",
+      "source_sha256": "169d5feb72fbe16a0463d591328ce49963e95f1bc0f5f7e5fa9ed271a5ace8e6",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/geofence-data.ts",
+      "package_sha256": "169d5feb72fbe16a0463d591328ce49963e95f1bc0f5f7e5fa9ed271a5ace8e6",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/models.ts",
+      "source_sha256": "ec6a2fd700a0a91e8f1d9e49c364ffe5466db340b435004971e719da08b49371",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/models.ts",
+      "package_sha256": "ec6a2fd700a0a91e8f1d9e49c364ffe5466db340b435004971e719da08b49371",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    },
+    {
+      "source_path": "apps/portal/src/pages/group-sections/shared.ts",
+      "source_sha256": "68aa819b14edcbbd8ae399d5c5a74360cc50ffd281b6d0d3be1c4f8ebc4e4f6c",
+      "package_path": "packages/portal-mojo/src/admin/identity/groups/group-sections/shared.ts",
+      "package_sha256": "68aa819b14edcbbd8ae399d5c5a74360cc50ffd281b6d0d3be1c4f8ebc4e4f6c",
+      "adaptation": "Moved into the package identity domain and updated package-relative imports."
+    }
+  ]
+}

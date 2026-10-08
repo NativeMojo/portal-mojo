@@ -21,6 +21,13 @@
 // an action-specific payload (e.g. User.revoke_sessions → {status, message}).
 // Which one is DECLARED per action (`response: 'row' | 'payload'`), never
 // sniffed from the body — the resp.data heuristics class ends at this layer.
+//
+// Group scope (#5923) — record routes: the server binds the row's own group.
+// Every `<endpoint>/<id>` call here (get, update, delete, action) sends no
+// scope key and is declared `unscoped: true`, so a registered-required family
+// never trips the dev tripwire. A sent `group` would be saved as the row's
+// `group` field. Custom record-path views (`<id>/resend`) are not model calls:
+// they go through mojoRpc/mojoScopedCall and keep their scope.
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { mojoCall, mojoDelete, mojoGet, mojoSave, type Envelope } from './client';
 import { ActionRefusedError, readActionResult, type ActionResult } from './action-result';
@@ -169,7 +176,9 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
             const qc = useQueryClient();
             return useMutation({
                 mutationFn: async ({ id, changes }: SaveVars) => {
-                    const row = await withFreshAuth(() => mojoSave<T>(endpoint, id, changes));
+                    const row = await withFreshAuth(() => id == null
+                        ? mojoSave<T>(endpoint, id, changes)
+                        : mojoSave<T>(endpoint, id, changes, { unscoped: true }));
                     return sanitizeRow ? sanitizeRow(row) : row;
                 },
                 onSuccess: (row) => {
@@ -185,7 +194,7 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
         useDelete: () => {
             const qc = useQueryClient();
             return useMutation({
-                mutationFn: ({ id }: { id: number | string }) => mojoDelete(endpoint, id),
+                mutationFn: ({ id }: { id: number | string }) => mojoDelete(endpoint, id, { unscoped: true }),
                 onSuccess: (_res, { id }) => {
                     qc.removeQueries({ queryKey: keys.one(id) });
                     void qc.invalidateQueries({ queryKey: keys.root });
@@ -209,6 +218,9 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
                     const body = await withFreshAuth(() => mojoCall(`${endpoint}/${id}`, {
                         method: 'POST',
                         body: { [bodyKey]: payload },
+                        unscoped: true,
+                        // Read the refusal below, to name the action and honour def.refusal.
+                        refusal: 'return',
                     }));
                     // Handlers refuse INSIDE the 200 — normalize, and reject
                     // unless this action declared the flag a diagnostic.
@@ -241,7 +253,7 @@ export function defineModel<T extends { id: number | string }>(config: ModelConf
             qc.fetchQuery({
                 queryKey: keys.one(id),
                 queryFn: async () => {
-                    const row = await mojoGet<T>(endpoint, id);
+                    const row = await mojoGet<T>(endpoint, id, { unscoped: true });
                     return sanitizeRow ? sanitizeRow(row) : row;
                 },
             }),

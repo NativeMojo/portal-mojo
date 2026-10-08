@@ -28,7 +28,9 @@ function writeUrlGroupParam(id: number | null): void {
     if (id == null) params.delete('group');
     else params.set('group', String(id));
     const qs = params.toString();
-    window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : '') + (window.location.hash || ''));
+    // Keep the entry's state: react-router's {usr, key, idx} lives there and
+    // useBlocker needs it on Back (#5925).
+    window.history.replaceState(window.history.state, '', window.location.pathname + (qs ? `?${qs}` : '') + (window.location.hash || ''));
 }
 
 function loadStoredGroupId(): number | null {

@@ -84,6 +84,16 @@ try {
     await client.mojoSave('/api/user', me.uid, { display_name: 'Groups Manager' });
     assert.equal(received.length, 1, 'a save that changes no password must hand over no tokens');
 
+    // ── 3b. the "My account" route ────────────────────────────────────
+    // The account modal changes the password with POST /api/user/me, not
+    // /api/user/<id>; the pair must come back and be handed over there too.
+    await client.mojoCall('/api/user/me', {
+        method: 'POST', body: { current_password: 'mojo', new_password: 'A-fourth-strong-password-94!' },
+    });
+    assert.equal(received.length, 2, 'an own password change through /api/user/me must hand over a token pair');
+    assert.equal(claims(received[1].access_token).auth_time, me.auth_time,
+        'the /api/user/me route must carry auth_time over as well');
+
     // ── 4. a harness without the hook ─────────────────────────────────
     client.installAuthHooks({ async preRequest() {}, authHeader: () => `Bearer ${token}` });
     const bare = await client.mojoSave('/api/user', me.uid, { new_password: 'A-third-strong-password-93!' });

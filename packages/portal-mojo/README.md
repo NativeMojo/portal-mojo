@@ -9,6 +9,8 @@ npm install portal-mojo react react-dom react-router-dom @tanstack/react-query
 ```
 
 **Per-component reference docs (written for AI context): [`docs/`](docs/README.md).**
+**Upgrading from 0.2:** raw calls now reject a flat HTTP-200 refusal — see
+[Upgrading to 0.3](docs/client.md#upgrading-to-03).
 Live demos for everything: run `npm run dev:showcase` → **Develop → Components**.
 
 ## Subpath surfaces
@@ -23,8 +25,8 @@ additional exports are required.
 |---|---|
 | `portal-mojo/client` | Typed django-mojo protocol layer: envelope unwrap at exactly one boundary (a failed save **rejects**), `start`/`size` paging, `'-field'` sort, Django lookups, the URL-synced `useTableParams` store (single source of truth for table state), TanStack Query hooks. Auth client: password / magic-link / passkey login, forgot/reset, cross-origin handoff (`?auth_code=` scrub-before-network), single-flight refresh + pre-request gate (synthetic-401 reject, `/api/token/refresh` recursion guard), `X-Mojo-UID` device header, `getAuthSnapshot`/`subscribeAuth` for React. Auth-challenged realtime transport: `RealtimeProvider`/`RealtimeClient`, refcounted topics, typed event projection, and a deterministic mock. Boot auth with `initAuth()`. The in-memory HTTP mock transport lives here too — it is the wire contract's executable spec and evolves in lockstep with the client (any seeded active user logs in with email + `"mojo"`). |
 | `portal-mojo/client/runtime` | Stable, narrow client boundary for first-party application runtime code. It omits eager mock-test controls; the mock transport itself loads on the first mock request. |
-| `portal-mojo/ui` | Mission-control UI: `ModelTable`, `FilterBar`/`FilterPills`, `SchemaForm`/`formModal`, `DetailView`, `RecordFeed`, `AttachmentQueue`/`UploadQueue`, `ImageEditor`/`imageEditorModal`, awaitable native-`<dialog>` `modal`, `toast`, `ThemeProvider`, `Guarded` (permission slot), `GroupSwitcher` (searchable tree selector), `RequiresGroup`, the sidebar engine (`registerMenus`/`setDefaultMenu` registry + `SidebarNav` — static or searchable accordion with a compact icon rail; global and group scopes are explicit), `Badge`/`MetricCard`/`Spark`, `fmt` formatter namespace. |
-| `portal-mojo/ui/shell` | Stable, narrow boundary for application-shell primitives: theme, guards, menus/sidebar, right panel, modal/toast hosts, password helpers, and formatters. |
+| `portal-mojo/ui` | Mission-control UI: `ModelTable`, `FilterBar`/`FilterPills`, `SchemaForm`/`formModal`, `DetailView`, `RecordFeed`, `AttachmentQueue`/`UploadQueue`, `ImageEditor`/`imageEditorModal`, awaitable native-`<dialog>` `modal`, `toast`, `ThemeProvider`, `UserMenu` (top-nav account menu), `Guarded` (permission slot), `GroupSwitcher` (searchable tree selector), `RequiresGroup`, the sidebar engine (`registerMenus`/`setDefaultMenu` registry + `SidebarNav` — static or searchable accordion with a compact icon rail; global and group scopes are explicit), `Badge`/`MetricCard`/`Spark`, `fmt` formatter namespace. |
+| `portal-mojo/ui/shell` | Stable, narrow boundary for application-shell primitives: theme, guards, menus/sidebar, right panel, account menu (`UserMenu`), modal/toast hosts, password helpers, and formatters. |
 | `portal-mojo/charts` | Dependency-free SVG charts: `SeriesChart` (line/bar/area, stacked bars, legend toggle, crosshair tooltip) and `MetricsChart` (granularity/range/type control bar for `/api/metrics/fetch`). |
 | `portal-mojo/admin/core` | Side-effect-light Admin contracts and host: `AdminSection`, the discriminated `AdminRoute` XOR, `adminSectionRoutes`, `adminSectionsMenu`, and `AdminLazyPage`. |
 | `portal-mojo/admin/registry` | Stable, narrow built-in `ADMIN_SECTIONS` roster for first-party hosts, without broad page barrels. It installs the optional Email→DNS adapter synchronously so communications routes work before DNS navigation. |

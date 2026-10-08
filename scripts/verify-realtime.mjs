@@ -106,6 +106,29 @@ try {
     heartbeatClock.advance(10_000);
     assert.equal(heartbeat.getStatus().status, 'backoff', 'missing pong must close and reconnect');
 
+    const serverPingClock = new FakeClock();
+    const serverPingMock = createRealtimeMock({ autoOpen: false, autoPong: false });
+    const serverPing = new RealtimeClient({ socketFactory: serverPingMock.factory, clock: serverPingClock });
+    const dispatchedPings = [];
+    serverPing.on(defineRealtimeEvent('ping', (value) => value), (received) => dispatchedPings.push(received));
+    serverPing.connect('token'); serverPingMock.open(1);
+    const serverPingSocket = serverPingMock.sockets[0];
+    const sentFrames = [];
+    const realSend = serverPingSocket.send.bind(serverPingSocket);
+    serverPingSocket.send = (data) => { sentFrames.push(JSON.parse(data)); realSend(data); };
+    serverPingMock.direct({ type: 'ping', ts: 1_759_400_000 }, 1);
+    assert.equal(sentFrames.length, 0, 'a server ping before ready is not answered');
+    serverPingMock.authRequired(1);
+    assert.equal(serverPing.getStatus().status, 'ready');
+    serverPingClock.advance(20_000);
+    assert.deepEqual(sentFrames.at(-1), { type: 'ping' }, 'client heartbeat starts its own pong deadline');
+    sentFrames.length = 0;
+    serverPingMock.direct({ type: 'ping', ts: 1_759_400_020 }, 1);
+    assert.deepEqual(sentFrames, [{ type: 'pong' }], 'a server ping is answered with exactly one pong');
+    serverPingClock.advance(10_000);
+    assert.equal(serverPing.getStatus().status, 'ready', 'a server ping is proof of life: it clears the pending pong deadline');
+    assert.equal(dispatchedPings.length, 0, 'server pings are framework frames and are never dispatched to consumers');
+
     const source = await (await import('node:fs/promises')).readFile(new URL('../packages/portal-mojo/src/client/realtime.ts', import.meta.url), 'utf8');
     assert.match(source, /useEffect\(\(\) => \{ owned\.setToken\(token\); \}, \[owned, token\]\)/);
     assert.equal((source.match(/owned\.setToken\(token\)/g) ?? []).length, 1, 'refresh and cross-tab replacement share one token-value comparison path');

@@ -32,6 +32,11 @@ const targets = ['jobs/sections/JobOperationsSection.tsx','identity/users/sectio
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{ name: 'modal-boundary-fixtures', enforce: 'pre', resolveId: id => id in virtual ? id : null, load: id => virtual[id], transform(source,id) {
     if (id.endsWith('/ui/DetailView.tsx')) return source.replace("from '../client/me'", "from '/__4156_runtime.ts'");
     if (id.endsWith('/ui/Popover.tsx') && process.env.POPOVER_REGRESSION_REF) return execFileSync('git', ['show', `${process.env.POPOVER_REGRESSION_REF}:packages/portal-mojo/src/ui/Popover.tsx`], { encoding: 'utf8' });
+    if (id.endsWith('/account/PasskeyList.tsx')) {
+        // The shared passkey list (portal-mojo/account) backs the admin modal.
+        if (process.env.MODAL_REGRESSION_REF) source = execFileSync('git', ['show', `${process.env.MODAL_REGRESSION_REF}:${id.replace(process.cwd() + '/', '')}`], { encoding: 'utf8' });
+        return source.replace("from '../client/runtime'", "from '/__4156_runtime.ts'").replace("from './models'", "from '/__4156_models.ts'").replace("from './credential-models'", "from '/__4156_models.ts'");
+    }
     if (!targets.some(path => id.endsWith('/admin/' + path))) return;
     if (process.env.MODAL_REGRESSION_REF) source = execFileSync('git', ['show', `${process.env.MODAL_REGRESSION_REF}:${id.replace(process.cwd() + '/', '')}`], { encoding: 'utf8' });
     source = source.replace(/from ['"](?:\.\.\/)+client\/runtime['"]/g, `from '/__4156_runtime.ts'`);
@@ -39,7 +44,6 @@ const server = await createServer({ root: process.cwd(), appType: 'custom', logL
     if (id.includes('/identity/')) source = source.replace(/from '\.\.\/models'/g, `from '/__4156_models.ts'`);
     if (id.endsWith('/assistant/pages.tsx')) source = source.replace("from './api'", "from '/__4156_memory.ts'");
     if (id.endsWith('/rules/RuleSetDetailPage.tsx')) source = source.replace("from './models'", "from '/__4156_rules.ts'").replace("from '../../ui'", "from '/__4156_rule_ui.ts'");
-    if (id.endsWith('/actions.tsx')) source += '\nexport { PasskeysModal };';
     return source;
 } }] });
 const { QueryClient, QueryClientProvider, useQuery } = await import('@tanstack/react-query');
@@ -79,9 +83,10 @@ try {
     await mount(OAuthConnectionList, { userId: 7 }); await click('Unlink'); await act(async () => confirmation(true)); assert.equal(deleted.length, 1, 'Owner without admin retains unlink');
     await click('Unlink'); fixture.user = { id: 8 }; await act(async () => root.render(renderElement(OAuthConnectionList,{userId:7}))); await act(async () => confirmation(true)); assert.equal(deleted.length,1,'Permission loss refuses pending owner unlink'); await unmount();
     fixture.user = { id: 7 }; await mount(OAuthConnectionList,{userId:7}); await click('Unlink'); await unmount(); await act(async () => confirmation(true)); assert.equal(deleted.length,1,'Unmount invalidates pending confirmation');
-    const { PasskeysModal } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/users/sections/actions.tsx');
-    await mount(PasskeysModal,{userId:7,onClose(){}}); await click('Delete passkey'); await act(async () => confirmation(true)); assert.equal(deleted.length,2,'Owner without admin retains passkey removal');
-    await click('Delete passkey'); await unmount(); await act(async () => confirmation(true)); assert.equal(deleted.length,2);
+    const { PasskeyList } = await server.ssrLoadModule('/packages/portal-mojo/src/account/PasskeyList.tsx');
+    await mount(PasskeyList,{userId:7}); await click('Remove'); await act(async () => confirmation(true)); assert.equal(deleted.length,2,'Owner without admin retains passkey removal');
+    await click('Remove'); await unmount(); await act(async () => confirmation(true)); assert.equal(deleted.length,2);
+    fixture.user = { id: 8 }; await mount(PasskeyList,{userId:7}); assert(button('Remove').closest('[inert]'),'Without live ownership or admin the row actions are inert'); await unmount(); fixture.user = { id: 7 };
     console.log('Mounted credential exceptions: owner without admin, live owner loss, and unmount through nested OAuth/passkey confirmations.');
 
     fixture.can = true;

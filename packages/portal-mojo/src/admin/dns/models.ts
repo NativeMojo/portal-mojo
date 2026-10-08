@@ -355,7 +355,7 @@ export function normalizeCredentialListParams(params: Params): Params {
 export function normalizeDomainListParams(params: Params): Params {
     return normalizeListParams(
         params,
-        new Set(['group', 'provider', 'status']),
+        new Set(['group', 'group__isnull', 'provider', 'status']),
         new Set(['name', 'provider', 'status', 'expires', 'created']),
         'list',
     );

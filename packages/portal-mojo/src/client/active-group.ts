@@ -1,8 +1,8 @@
 // Active-group signal — GroupProvider OWNS the active group (context stays
 // the React-side source of truth); this cell mirrors it so plain functions
-// (mojoRpc, mojoScopedCall, mojoAction's scope injection) can resolve the
-// current scope without threading an id through every call site. Same
-// subscribable-module-state idiom as ui/active-persona.ts (#1609).
+// (mojoRpc, mojoScopedCall) can resolve the current scope without threading
+// an id through every call site. Same subscribable-module-state idiom as
+// ui/active-persona.ts (#1609).
 //
 // Do NOT read localStorage's `active_group_id` here instead — the URL
 // `?group=` param BEATS the stored id (group.tsx resolution order), and only

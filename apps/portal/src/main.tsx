@@ -37,7 +37,8 @@ const adminSearch = new URLSearchParams(window.location.search);
 if (adminSearch.has('group')) {
     adminSearch.delete('group');
     const query = adminSearch.toString();
-    window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    // Keep the entry's state, as the package's own URL rewrites do (#5925).
+    window.history.replaceState(window.history.state, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
 }
 
 // Hash routing so the built dist works from any static mount (including
@@ -79,6 +80,8 @@ if (import.meta.env.DEV) {
 // into fresh 401 error states instead of stale rows).
 mojo.onAuth('login', () => { void queryClient.invalidateQueries(); });
 mojo.onAuth('logout', () => { void queryClient.invalidateQueries(); });
+// A rotation (sessions revoke, email change) re-issues the same user's session.
+mojo.onAuth('rotated', () => { void queryClient.invalidateQueries(); });
 
 const root = createRoot(document.getElementById('root')!);
 let router: ReturnType<typeof createAdminRouter> | undefined;

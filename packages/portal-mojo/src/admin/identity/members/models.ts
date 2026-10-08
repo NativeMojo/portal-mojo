@@ -113,6 +113,9 @@ export interface MemberPermissionDef {
     tooltip?: string;
 }
 
+/** Optional product tabs installed by the consuming app through registerFormTabs. */
+export const MEMBER_APP_PERMS_TABSET = 'member-app-perms';
+
 const permissionRegistry = new Map<string, MemberPermissionDef>();
 let permissionVersion = 0;
 const permissionListeners = new Set<() => void>();

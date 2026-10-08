@@ -139,5 +139,7 @@ export function handleAuthTokenLanding(): void {
     const hashQuery = token ? `?${new URLSearchParams({ token }).toString()}` : '';
     // One replaceState carrying BOTH the scrub and the destination hash —
     // the token never gets its own history entry.
+    // The {} is deliberate (#5925): this moves to a DIFFERENT route before the
+    // router exists, so the old entry's route state must not follow it.
     window.history.replaceState({}, '', `${clean}#/auth/${dest}${hashQuery}`);
 }

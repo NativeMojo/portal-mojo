@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import {
     completeMfaRecovery, completeMfaSms, completeMfaTotp, loginWithPasskey,
-    isPasskeySupported, sendMfaSms,
+    isPasskeySupported, passkeyErrorMessage, sendMfaSms,
     type AuthUser, type MfaChallenge,
 } from 'portal-mojo/client/runtime';
 
@@ -22,14 +22,6 @@ type KnownMethod = 'totp' | 'sms' | 'passkey';
 const KNOWN: KnownMethod[] = ['totp', 'sms', 'passkey'];
 const METHOD_LABEL: Record<KnownMethod, string> = { totp: 'Authenticator', sms: 'Text message', passkey: 'Passkey' };
 const METHOD_ICON: Record<KnownMethod, string> = { totp: 'bi-shield-lock', sms: 'bi-chat-dots', passkey: 'bi-fingerprint' };
-
-function errorMessage(error: unknown): string {
-    if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') return 'Passkey prompt was dismissed';
-        return error.message;
-    }
-    return 'Something went wrong. Please try again.';
-}
 
 export interface MfaPanelProps {
     challenge: MfaChallenge;
@@ -74,7 +66,7 @@ export function MfaPanel({ challenge, username, remember, onSuccess, onCancel }:
         try {
             onSuccess(await fn());
         } catch (err) {
-            setError(errorMessage(err));
+            setError(passkeyErrorMessage(err));
             setBusy(false);
         }
     };
@@ -100,7 +92,7 @@ export function MfaPanel({ challenge, username, remember, onSuccess, onCancel }:
             setSmsSent(true);
             setCode('');
         } catch (err) {
-            setError(errorMessage(err));
+            setError(passkeyErrorMessage(err));
         } finally {
             setBusy(false);
         }

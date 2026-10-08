@@ -38,7 +38,7 @@ function SettingInput({ entry, disabled }: { entry: FleetEntry; disabled: boolea
     </div>;
 }
 
-function FleetEditor({ state, busy, publish }: { state: FleetState; busy: boolean; publish: (changes: FleetChanges) => Promise<void> }) {
+function FleetEditor({ state, busy, onPublish }: { state: FleetState; busy: boolean; onPublish: (changes: FleetChanges) => Promise<void> }) {
     const form = useRef<HTMLFormElement>(null);
     const [error, setError] = useState('');
     const sections = [...new Set(state.entries.map((entry) => entry.section))];
@@ -52,7 +52,7 @@ function FleetEditor({ state, busy, publish }: { state: FleetState; busy: boolea
                 if (change) changes[entry.key] = change;
             }
             if (!Object.keys(changes).length) { setError('Choose at least one change before publishing.'); return; }
-            await publish(changes);
+            await onPublish(changes);
         } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not publish configuration'); }
     };
     return <form ref={form} onSubmit={submit}>
@@ -147,7 +147,7 @@ function FleetContent({ userId }: { userId: number }) {
             <button className="btn" disabled={busy || !state.revision || (operation.data != null && !operationFinished(operation.data))} onClick={() => void apply()}>Apply now</button>
             {notice && <p role="status">{notice}</p>}{(error || stateQuery.error) && <p className="form-alert" role="alert">{error || stateQuery.error?.message}</p>}
         </div>
-        <FleetEditor key={`${state.revision ?? 'unpublished'}:${editorEpoch}`} state={state} busy={busy} publish={publish} />
+        <FleetEditor key={`${state.revision ?? 'unpublished'}:${editorEpoch}`} state={state} busy={busy} onPublish={publish} />
         {operation.error && <p className="form-alert" role="alert">Apply status could not be refreshed: {operation.error.message}. Refresh status to check nodes; prior results are not current confirmation.</p>}
         {tracked && <p role="status">Apply operation: {tracked.status}</p>}
         <FleetNodeStatus report={report} revision={state.revision} />

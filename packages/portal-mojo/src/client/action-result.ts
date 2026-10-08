@@ -4,63 +4,24 @@
 //
 // The wire (verified against django-mojo rest.py + consumer measurement,
 // wmx-admin-v2 annex): an action handler's return dict reaches the client in
-// one of two shapes —
+// one of two shapes, always inside an HTTP 200 —
 //   flat      {success: false, code, error, ...}            (JsonResponse verbatim)
 //   wrapped   {status: true, data: {success: false, ...}}   (save-and-respond)
-// — always inside an HTTP 200, so the transport's unwrap does NOT reject.
-// One oddball spells the flag `status` instead of `success` inside the
-// action payload (`revoke_sessions`); envelope-level `status: false` is a
-// different thing entirely and already rejects in unwrap. One-shot secrets
-// differ by direction: top-level on create, inside the action payload on
-// rotate — `payload` below merges both so callers read one place.
+// unwrap rejects the FLAT shape for every call (#5922); a wrapped
+// `success:false` can be ordinary data on a successful POST, so only this
+// layer, which knows it posted an action, reads it as a refusal. One oddball
+// spells the flag `status` instead of `success` inside the action payload
+// (`revoke_sessions`); envelope-level `status: false` is a different thing
+// entirely and already rejects in unwrap. One-shot secrets differ by
+// direction: top-level on create, inside the action payload on rotate —
+// `payload` merges both so callers read one place. The reader and the error
+// live in errors.ts (cycle-free, so unwrap can use them) and are re-exported
+// here unchanged.
 import { mojoCall } from './client';
 import { withFreshAuth } from './auth';
-import { MojoError } from './errors';
-import { getActiveGroupId } from './active-group';
-import { endpointScopeFor, endpointScopeValue } from './endpoint-scope';
+import { ActionRefusedError, readActionResult, type ActionResult } from './errors';
 
-export interface ActionResult {
-    /** False when the handler refused inside the 200. */
-    ok: boolean;
-    /** Semantic refusal code (`WRONG_STATUS`, `MISSING_DETAILS`, …). */
-    code?: string;
-    /** Server-provided human error text. */
-    error?: string;
-    /** Envelope ⊕ action dict (action fields win) — one-shot secrets,
-     *  counts etc. read from here regardless of wire shape. */
-    payload: Record<string, unknown>;
-}
-
-export function readActionResult(out: unknown): ActionResult {
-    const env = (typeof out === 'object' && out !== null ? out : {}) as Record<string, unknown>;
-    const data = (typeof env.data === 'object' && env.data !== null ? env.data : {}) as Record<string, unknown>;
-    const payload = { ...env, ...data };
-    const refused = env.success === false
-        || data.success === false
-        || data.status === false; // the `status`-spelling oddball (revoke_sessions)
-    const code = typeof payload.code === 'string' && payload.code ? payload.code : undefined;
-    const error = typeof payload.error === 'string' && payload.error ? payload.error : undefined;
-    return { ok: !refused, code, error, payload };
-}
-
-/**
- * A refused action. `status` is 200 on purpose — the HTTP layer succeeded;
- * the HANDLER said no. `errorCode` carries the refusal code, `data` the
- * merged payload (may hold evidence like the current row status).
- */
-export class ActionRefusedError extends MojoError {
-    result: ActionResult;
-    constructor(action: string, result: ActionResult) {
-        super(
-            result.error ?? (result.code ? `${action} refused (${result.code})` : `${action} was refused by the server`),
-            200,
-            result.code,
-            result.payload,
-        );
-        this.name = 'ActionRefusedError';
-        this.result = result;
-    }
-}
+export { readActionResult, ActionRefusedError, type ActionResult } from './errors';
 
 /**
  * The raw-path action primitive: POST `{[action]: payload}` to
@@ -68,6 +29,11 @@ export class ActionRefusedError extends MojoError {
  * ActionRefusedError on an inside-the-200 refusal. Argument-less actions
  * send `true` (django-mojo dispatches on the key's presence; handlers
  * treat a non-dict value as flag-only).
+ *
+ * Sends NO scope key, on any family (#5923): this is a REST record route, so
+ * the server binds the row's own group, and a `group` in the body would be
+ * saved as the row's `group` field. The call is declared `unscoped: true`, so
+ * a registered-required family does not trip the dev tripwire.
  *
  * For model-bound calls prefer `defineModel(...).useAction` — it rides the
  * same normalizer and additionally maintains the record caches.
@@ -78,16 +44,12 @@ export async function mojoAction(
     action: string,
     payload?: unknown,
 ): Promise<ActionResult> {
-    // Scope-registered families (endpoint-scope.ts, #1936) get the group
-    // injected into the action body — the wallet-verbs class: actions the
-    // backend refuses for brand-scoped operators without it.
-    const path = `${endpoint}/${id}`;
-    const reg = endpointScopeFor(path);
-    const gid = reg ? getActiveGroupId() : null;
-    const scope = reg && gid != null ? { [reg.key]: endpointScopeValue(reg, gid) } : {};
-    const body = await withFreshAuth(() => mojoCall(path, {
+    const body = await withFreshAuth(() => mojoCall(`${endpoint}/${id}`, {
         method: 'POST',
-        body: { ...scope, [action]: payload ?? true },
+        body: { [action]: payload ?? true },
+        unscoped: true,
+        // Read the refusal here, so the error names the action, not the path.
+        refusal: 'return',
     }));
     const result = readActionResult(body);
     if (!result.ok) throw new ActionRefusedError(action, result);

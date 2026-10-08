@@ -54,6 +54,8 @@ const DisplayDemo = lazyDemo(() => import('./demos-display'), 'DisplayDemo');
 const SkeletonDemo = lazyDemo(() => import('./demos-display'), 'SkeletonDemo');
 const AccessDemo = lazyDemo(() => import('./demos-display'), 'AccessDemo');
 const PopoverDemo = lazyDemo(() => import('./demos-popover'), 'PopoverDemo');
+const UserMenuDemo = lazyDemo(() => import('./demos-user-menu'), 'UserMenuDemo');
+const AccountDemo = lazyDemo(() => import('./demos-account'), 'AccountDemo');
 const TagInputDemo = lazyDemo(() => import('./demos-taginput'), 'TagInputDemo');
 const DrawerDemo = lazyDemo(() => import('./demos-drawer'), 'DrawerDemo');
 const RightPanelDemo = lazyDemo(() => import('./demos-right-panel'), 'RightPanelDemo');
@@ -96,6 +98,7 @@ const AdminJobsDemo = lazyDemo(() => import('./demos-admin-jobs'), 'AdminJobsDem
 const AdminMembersDemo = lazyDemo(() => import('./demos-admin-members'), 'AdminMembersDemo');
 const AdminIdentityUsersDemo = lazyDemo(() => import('./demos-admin-identity-users'), 'AdminIdentityUsersDemo');
 const AdminStorageDemo = lazyDemo(() => import('./demos-admin-storage'), 'AdminStorageDemo');
+const AdminEdgeDemo = lazyDemo(() => import('./demos-admin-edge'), 'AdminEdgeDemo');
 const AdminShortlinksDemo = lazyDemo(() => import('./demos-admin-shortlinks'), 'AdminShortlinksDemo');
 const AdminMessagingDemo = lazyDemo(() => import('./demos-admin-messaging'), 'AdminMessagingDemo');
 const AdminPhoneHubDemo = lazyDemo(() => import('./demos-admin-phonehub'), 'AdminPhoneHubDemo');
@@ -282,6 +285,11 @@ const GROUPS: DemoGroup[] = [
                 render: () => <PopoverDemo />,
             },
             {
+                key: 'user-menu', title: 'UserMenu', icon: 'bi-person-circle',
+                blurb: 'The top-nav account menu: avatar trigger, identity header, Light/Dark/System theme control, app items, pending-aware Sign out — full menu keyboard model.',
+                render: () => <UserMenuDemo />,
+            },
+            {
                 key: 'modals', title: 'Modals', icon: 'bi-window-stack',
                 blurb: 'Awaitable native-<dialog> manager: confirm, form, detail — stacking for free.',
                 render: () => <ModalsDemo />,
@@ -404,6 +412,16 @@ const GROUPS: DemoGroup[] = [
         ],
     },
     {
+        title: 'Account',
+        sections: [
+            {
+                key: 'account', title: 'AccountModal', icon: 'bi-person-vcard',
+                blurb: 'The self-service My account modal (portal-mojo/account): Profile, Passkeys, Security, Sessions, Notifications, API keys on one rail — with CamActive notification kinds and an armed 440 step-up.',
+                render: () => <AccountDemo />,
+            },
+        ],
+    },
+    {
         title: 'Admin',
         sections: [
             {
@@ -441,6 +459,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
                 blurb: 'Global S3 buckets, masked storage backends, explicit policy-backed file uploads, capability-safe sharing, and finite rendition convergence.',
                 render: () => <AdminStorageDemo />,
+            },
+            {
+                key: 'admin-edge', title: 'Edge', icon: 'bi-hdd-network',
+                blurb: 'Vhosts by shape with a guided wizard, proxied path routes, declared upstreams, and the fleet blocklist with its log-first modes.',
+                render: () => <AdminEdgeDemo />,
             },
             {
                 key: 'admin-shortlinks', title: 'Shortlinks', icon: 'bi-link-45deg',

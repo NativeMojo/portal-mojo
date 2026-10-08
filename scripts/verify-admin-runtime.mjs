@@ -283,7 +283,8 @@ assert(main.indexOf('initializeAdminSourceSession();') < main.indexOf('mojo.init
 assert(main.indexOf('handleAuthTokenLanding();') < main.indexOf('function createAdminRouter'));
 assert.match(main, /await authExchange;\s*await ensureAdminSourceSession\(\);\s*router\?\.dispose\(\);\s*router = createAdminRouter\(\)/);
 assert.match(await source('apps/portal/src/admin-sections.ts'), /withAdminSourceSession\(route.loadComponent\)/);
-assert.equal(((await source('apps/portal/src/pages/admin-routes.tsx')).match(/withAdminSourceSession\(\(\) => import/g) ?? []).length, 2);
+assert.equal(((await source('apps/portal/src/pages/admin-routes.tsx')).match(/withAdminSourceSession\(\(\) => import/g) ?? []).length, 0,
+    'built-in routes come from the package registry instead of duplicate consumer-side loaders');
 assert.equal(((await source('apps/portal/src/pages/auth/routes.tsx')).match(/withAdminSourceSession\(\(\) => import/g) ?? []).length, 4);
 assert.match(await source('apps/portal/src/components/Sidebar.tsx'), /usingMockTransport\(\)/);
 assert.match(await source('apps/portal/src/components/Sidebar.tsx'), /v\{version\}/);
