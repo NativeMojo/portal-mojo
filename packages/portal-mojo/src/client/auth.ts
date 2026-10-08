@@ -847,7 +847,9 @@ export function handleAuthCodeFromURL(): Promise<AuthUser | null> {
 function scrubUrl(params: URLSearchParams, hash: string): void {
     const remaining = params.toString();
     const clean = window.location.pathname + (remaining ? `?${remaining}` : '') + hash;
-    window.history.replaceState({}, '', clean);
+    // Keep the entry's state: react-router's {usr, key, idx} lives there and
+    // useBlocker needs it on Back (#5925).
+    window.history.replaceState(window.history.state, '', clean);
 }
 
 // ── Hosted auth pages (the django-mojo /auth "bouncer" pages) ─────────
