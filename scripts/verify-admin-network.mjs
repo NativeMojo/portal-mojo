@@ -85,7 +85,7 @@ try {
     const rulesTab = await server.ssrLoadModule('/packages/portal-mojo/src/admin/network/geofence/RulesTab.tsx');
     const geoip = await server.ssrLoadModule('/packages/portal-mojo/src/admin/security/geoip/models.ts');
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
-    const shim = await server.ssrLoadModule('/apps/portal/src/pages/group-sections/geofence-data.ts');
+    const shim = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/groups/group-sections/geofence-data.ts');
 
     // ── 1. Permissions: sys.-pinned, fail-closed, member grants rejected ──
     const CLAUSES = {
@@ -132,11 +132,12 @@ try {
     assert.equal(section.basePath, 'security/network');
     assert.equal(section.navigationGroup, 'security');
     assert.deepEqual(section.routes.map((r) => r.path),
-        ['blocked-ips', 'firewall-log', 'ip-sets', 'geofencing']);
-    // The section gate is the ANY-of UNION of the four route gates.
+        ['blocked-ips', 'firewall-log', 'ip-sets', 'geofencing', 'edge-blocklist']);
+    // The section gate is the ANY-of UNION of the five route gates.
     const union = new Set([
         ...geoip.GEOIP_VIEW_PERMS, ...firewall.FIREWALL_LOG_PERMS,
         ...models.IPSET_VIEW_PERMS, ...gf.GEOFENCE_VIEW_PERMS,
+        ...admin.EDGE_BLOCKLIST_VIEW_PERMS,
     ]);
     assert.deepEqual([...section.permissions].sort(), [...union].sort(), 'section gate is the union of its routes');
     assert(section.permissions.every((p) => p.startsWith('sys.')), 'the section gate is system-pinned too');
@@ -147,7 +148,7 @@ try {
     const standalone = admin.adminSectionRoutes([section]).map((r) => r.path);
     const embedded = admin.adminSectionRoutes([section], { mount: '/system' }).map((r) => r.path);
     for (const path of ['security/network/blocked-ips', 'security/network/firewall-log',
-        'security/network/ip-sets', 'security/network/geofencing']) {
+        'security/network/ip-sets', 'security/network/geofencing', 'security/network/edge-blocklist']) {
         assert(standalone.includes(path), `standalone route ${path}`);
         assert(embedded.includes(`system/${path}`), `embedded route system/${path}`);
     }
@@ -319,10 +320,10 @@ try {
         assert(shim[name] !== undefined, `the shim re-exports ${name}`);
         assert.equal(shim[name], gf[name], `${name} is the SAME identity — one projection, not a copy`);
     }
-    const shimSource = await read('apps/portal/src/pages/group-sections/geofence-data.ts');
+    const shimSource = await read('packages/portal-mojo/src/admin/identity/groups/group-sections/geofence-data.ts');
     assert.doesNotMatch(stripComments(shimSource), /\bfunction\b|COUNTRY_NAMES\s*[:=]/,
         'the app file is a pure re-export shim — no second implementation, no second country table');
-    const sectionSource = await read('apps/portal/src/pages/group-sections/GeofenceSection.tsx');
+    const sectionSource = await read('packages/portal-mojo/src/admin/identity/groups/group-sections/GeofenceSection.tsx');
     assert.doesNotMatch(stripComments(sectionSource), /FriendlyEditor/, 'the private editor is gone');
     assert.match(sectionSource, /<GeofenceRuleEditor/, 'the group panel renders the SHARED editor');
     // The group surface can only tighten: it never writes platform rules.

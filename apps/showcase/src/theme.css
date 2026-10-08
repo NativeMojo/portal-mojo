@@ -26,6 +26,7 @@
 @import "./theme/admin-dns-certificates.css";
 @import "./theme/admin-dns-registrar.css";
 @import "./theme/admin-storage.css";
+@import "./theme/admin-edge.css";
 @import "./theme/admin-shortlinks.css";
 @import "./theme/admin-messaging.css";
 @import "./theme/admin-phonehub.css";
@@ -52,6 +53,8 @@
 @import "./theme/loading.css";
 @import "./theme/demos-filters.css";
 @import "./theme/worldmap.css";
+@import "./theme/user-menu.css";
+@import "./theme/account.css";
 /* The toolkit's components live outside this app — point Tailwind's scanner
    at the package source so utility classes used there are generated too. */
 @source "../../../packages/portal-mojo/src";
@@ -266,14 +269,6 @@ button { font: inherit; color: inherit; }
 }
 .topnav-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink-strong); letter-spacing: -0.01em; }
 .topnav-right { display: flex; align-items: center; gap: 14px; }
-.user-chip { display: flex; align-items: center; gap: 8px; }
-.user-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--accent-soft); color: var(--accent);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 750;
-}
-.user-name { font-size: 13.5px; font-weight: 600; color: var(--ink-strong); }
 
 /* ============================================================ Panels & toolbar */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }

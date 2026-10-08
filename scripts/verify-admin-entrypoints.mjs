@@ -17,7 +17,7 @@ for (const mode of ['core', 'legacy', 'email-first']) {
     execFileSync(process.execPath, [resolve(root, 'scripts/verify-admin-side-effects.mjs'), mode], { cwd: root, stdio: 'inherit' });
 }
 const manifest = JSON.parse(await readFile(resolve(root, 'packages/portal-mojo/package.json'), 'utf8'));
-const expectedEntrypoints = ['./admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './ui', './ui/shell'];
+const expectedEntrypoints = ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './ui', './ui/shell'];
 assert.deepEqual(Object.keys(manifest.exports).sort(), expectedEntrypoints);
 const [coreSource, showcaseSource] = await Promise.all([
     readFile(resolve(root, 'packages/portal-mojo/src/admin/core/index.ts'), 'utf8'),
@@ -49,7 +49,7 @@ const server = await createServer({ root, appType: 'custom', logLevel: 'silent',
 try {
     const core = await server.ssrLoadModule('/packages/portal-mojo/src/admin/core/index.ts');
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
-    assert.deepEqual(admin.ADMIN_SECTIONS.map((section) => section.id), ['dashboard', 'users', 'members', 'credentials', 'signin', 'monitoring', 'cloudwatch', 'settings', 'fleet-configuration', 'security-operations', 'bouncer', 'device-intel', 'geoip', 'jobs', 'network-security', 'dns', 'storage', 'shortlinks', 'email', 'public-messages', 'push', 'phonehub', 'assistant']);
+    assert.deepEqual(admin.ADMIN_SECTIONS.map((section) => section.id), ['dashboard', 'groups', 'personal-api-keys', 'users', 'members', 'credentials', 'signin', 'monitoring', 'cloudwatch', 'settings', 'fleet-configuration', 'security-operations', 'bouncer', 'device-intel', 'geoip', 'jobs', 'network-security', 'dns', 'storage', 'edge', 'shortlinks', 'email', 'public-messages', 'push', 'phonehub', 'assistant']);
     assert(admin.ADMIN_SECTIONS.flatMap((section) => section.routes).every((route) => 'loadComponent' in route && !('component' in route)), 'all built-in routes must use the explicit lazy arm');
 
     const domainPaths = ['identity', 'security', 'observability', 'operations', 'infrastructure', 'communications', 'assistant'];

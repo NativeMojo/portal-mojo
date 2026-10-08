@@ -5,7 +5,7 @@
 // under each, tones mapped from the log level (LOG_LEVEL_TONE).
 import { Eyebrow, Timeline, fmt, type TimelineItem } from 'portal-mojo/ui';
 import { LogModel, type LogRow } from 'portal-mojo/admin/observability';
-import { type GroupRow } from '../../models';
+import { type GroupRow } from '../models';
 import { LOG_TONE, groupAuditParams } from './shared';
 
 /** Bucket rows by local calendar day, newest day first (rows arrive -created). */

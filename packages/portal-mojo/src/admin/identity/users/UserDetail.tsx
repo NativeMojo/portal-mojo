@@ -237,12 +237,12 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
                 { divider: 'Access' },
                 ...(canMembers ? [{ key: 'Groups', label: 'Groups', icon: 'bi-people', render: () => <GroupsSection user={user} onOpenGroup={onOpenGroup} /> }] : []),
                 {
-                    key: 'SysPerms', label: 'Sys Perms', icon: 'bi-shield-check',
+                    key: 'SysPerms', label: 'System permissions', icon: 'bi-shield-check',
                     permissions: ADMIN,
                     render: () => <SysPermsSection user={user} />,
                 },
                 ...(hasAppPerms ? [{
-                    key: 'AppPerms', label: 'App Perms', icon: 'bi-puzzle',
+                    key: 'AppPerms', label: 'Product permissions', icon: 'bi-puzzle',
                     permissions: ADMIN,
                     render: () => <AppPermsSection user={user} />,
                 }] : []),

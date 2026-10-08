@@ -7,7 +7,6 @@ import {
     adminSectionsMenu,
 } from 'portal-mojo/admin/core';
 import { ADMIN_SECTIONS } from './admin-sections';
-import { GROUP_VIEW_PERMS } from './group-permissions';
 
 const contributions = adminSectionsMenu(ADMIN_SECTIONS, {
     name: 'admin-contributions',
@@ -28,8 +27,6 @@ const identity: MenuItem = {
     label: identityMeta.label,
     icon: identityMeta.icon,
     children: [
-        { id: 'admin:groups', label: 'Groups', route: '/groups', permissions: GROUP_VIEW_PERMS },
-        { id: 'admin:personal-api-keys', label: 'Personal API Keys', route: '/apikeys' },
         ...(identityContribution?.children ?? []),
     ],
 };

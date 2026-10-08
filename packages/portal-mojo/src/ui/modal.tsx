@@ -3,6 +3,7 @@
 // event handler; no JSX modal state to hoist. The z-index/backdrop stack
 // manager web-mojo needed does not exist here: <dialog> stacks natively.
 import { useLayoutEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { getAuthSnapshot, onAuth, subscribeAuth } from '../client/auth';
 
 export type ModalSize = 'sm' | 'md' | 'lg';
 
@@ -63,6 +64,50 @@ function emit() {
     listeners.forEach((fn) => fn());
 }
 
+/**
+ * Close EVERY open modal/drawer, resolving each await with null. Bypasses
+ * canDismiss — this is the session ending, not the user dismissing.
+ */
+function closeAll(): void {
+    if (stack.length === 0) return;
+    const open = stack;
+    stack = [];
+    emit();
+    // resolve() is each item's settled-guarded close; the item is already
+    // gone, so a drawer's exit animation has nothing left to play.
+    for (const item of open) item.resolve(null);
+}
+
+// The stack is module state, so it outlives the host that renders it: an
+// app that mounts <ModalHost> under its auth guard unmounts it on sign-out
+// and REMOUNTS it on the next sign-in — every dialog body would come back,
+// re-run its mount effects, for whoever signed in. A session ending (this
+// tab's logout / unauthorized) or a change of identity seen through storage
+// (another tab signing out or in as someone else) therefore empties it.
+// Wired on the first open (never at import: no storage reads in non-DOM
+// consumers of the package).
+let authWired = false;
+function wireAuth(): void {
+    if (authWired || typeof window === 'undefined') return;
+    authWired = true;
+    // Best-effort: a harness or host that stubs the auth module (or has no
+    // storage) must never stop a modal from opening.
+    try {
+        onAuth('logout', closeAll);
+        onAuth('unauthorized', closeAll);
+        let seenUid: string | null = null;
+        const observe = () => {
+            try {
+                const snap = getAuthSnapshot();
+                if (seenUid != null && (!snap.authenticated || snap.uid !== seenUid)) closeAll();
+                seenUid = snap.authenticated ? snap.uid : null;
+            } catch { /* auth unavailable: nothing to observe */ }
+        };
+        observe();
+        subscribeAuth(observe);
+    } catch { /* auth module stubbed or unavailable: modals still open */ }
+}
+
 export interface ModalOptions {
     size?: ModalSize;
     flush?: boolean;
@@ -71,6 +116,7 @@ export interface ModalOptions {
 }
 
 function open<T>(render: (close: (value: T) => void) => ReactNode, opts: ModalOptions = {}): Promise<T | null> {
+    wireAuth();
     return new Promise<T | null>((resolve) => {
         const id = nextId++;
         let settled = false;
@@ -120,6 +166,7 @@ function drawerWidthPx(width: DrawerWidth | undefined): number {
 }
 
 function drawer<T = unknown>(opts: DrawerOptions<T>): Promise<T | null> {
+    wireAuth();
     const body = opts.render ?? (() => opts.content ?? null);
     let dismissable = opts.dismissable ?? true;
     if (!dismissable && !opts.render) {
@@ -169,6 +216,9 @@ function drawer<T = unknown>(opts: DrawerOptions<T>): Promise<T | null> {
 export const modal = {
     open,
 
+    /** Close every open modal and drawer; each await resolves null. */
+    closeAll,
+
     /** Detail modal: large, flush body — the Modal.detail() envelope. */
     detail(render: (close: (value: unknown) => void) => ReactNode): Promise<unknown> {
         return open(render, { size: 'lg', flush: true });
@@ -212,11 +262,29 @@ function ModalDialog({ item }: { item: ModalItem }) {
         item.resolve(null);
     };
 
+    // The native dialog can close WITHOUT a cancelable cancel: Chromium's
+    // second Escape with no click in between (close-watcher anti-abuse) and
+    // Android back fire a non-cancelable cancel, then close. A locked item
+    // reopens; an unlocked one settles like any other dismiss.
+    const onNativeClose = () => {
+        const dialog = ref.current;
+        if (!dialog || dialog.open || !stack.some((m) => m.id === item.id)) return; // unmount / already settled
+        if (item.canDismiss?.() === false) {
+            dialog.showModal();
+            if (!dialog.contains(document.activeElement)) {
+                (dialog.querySelector<HTMLElement>('[autofocus], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? dialog).focus();
+            }
+            return;
+        }
+        item.resolve(null);
+    };
+
     return (
         <dialog
             ref={ref}
             className={`mojo-modal mojo-modal-${item.size}${item.flush ? ' mojo-modal-flush' : ''}`}
             onCancel={(e) => { e.preventDefault(); dismiss(); }}
+            onClose={onNativeClose}
             onMouseDown={(e) => { if (e.target === ref.current) dismiss(); }}
         >
             {item.flush && <button type="button" className="btn-icon modal-fallback-close" aria-label="Close" onClick={dismiss}><i className="bi bi-x-lg" /></button>}
@@ -238,6 +306,13 @@ function DrawerDialog({ item }: { item: DrawerItem }) {
     }, []);
 
     const dismiss = () => { if (item.dismissable) item.resolve(null); };
+    // Same non-cancelable close path as ModalDialog: a non-dismissable drawer reopens.
+    const onNativeClose = () => {
+        const el = ref.current;
+        if (!el || el.open || !stack.some((m) => m.id === item.id && m.variant === 'drawer' && !m.closing)) return;
+        if (!item.dismissable) { el.showModal(); return; }
+        item.resolve(null);
+    };
     const hasHead = item.dismissable || item.eyebrow != null || item.title != null || (item.meta?.length ?? 0) > 0;
 
     return (
@@ -247,6 +322,7 @@ function DrawerDialog({ item }: { item: DrawerItem }) {
             // React's CSSProperties has no index signature for custom props.
             style={{ '--drawer-w': `${item.width}px` } as CSSProperties}
             onCancel={(e) => { e.preventDefault(); dismiss(); }}
+            onClose={onNativeClose}
             onMouseDown={(e) => { if (e.target === ref.current) dismiss(); }}
         >
             {/* The panel fills the dialog, so the dialog element is only ever

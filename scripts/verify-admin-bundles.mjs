@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temp = await mkdtemp(join(tmpdir(), 'portal-mojo-bundles-'));
+/** Per-chunk cap for every eager/default-route JS chunk (history below). */
+const EAGER_CHUNK_CAP = 525_000;
 const budgets = {
     portal: {
         entry: 1_334_285,
@@ -73,18 +75,28 @@ try {
         const closureBytes = await bytes(outDir, manifest, defaultClosure);
         assert(entryBytes <= budget.entry, `${app} entry closure ${entryBytes} exceeds ${budget.entry}`);
         assert(closureBytes <= budget.closure, `${app} entry + default route closure ${closureBytes} exceeds ${budget.closure}`);
+        let largestEager = 0;
         for (const key of defaultClosure) {
             const file = manifest[key]?.file;
             // 520_000: bumped from 500_000 on 2026-08-13 (#1604) — the route-level
             // RouteError card is deliberately EAGER (a lazy error card cannot
             // display chunk-load failures) and put the portal entry chunk at
             // 502,515 (was 499,007, already 99.8% of the old cap).
-            if (file?.endsWith('.js')) assert((await stat(resolve(outDir, file))).size <= 520_000, `${app} eager/default chunk ${file} exceeds 520000 bytes`);
+            // 525_000: bumped from 520_000 on 2026-10-07 (portal-mojo #7184) —
+            // the self-service account wire (passkey registration, rotations,
+            // step-up) lives in the eager client/auth and the admin User models
+            // re-export the credential models eagerly. After splitting
+            // account/credential-models out (account/api left the eager graph)
+            // the portal chunk measured 523,016 bytes.
+            if (!file?.endsWith('.js')) continue;
+            const size = (await stat(resolve(outDir, file))).size;
+            largestEager = Math.max(largestEager, size);
+            assert(size <= EAGER_CHUNK_CAP, `${app} eager/default chunk ${file} is ${size} bytes, exceeds ${EAGER_CHUNK_CAP}`);
         }
         for (const sourcePath of budget.representatives) {
             const key = moduleKey(manifest, app, sourcePath);
             assert(!entryClosure.has(key), `${app} representative ${sourcePath} must remain async`);
         }
-        console.log(`${app}: entry ${entryBytes} bytes; entry + default ${closureBytes} bytes`);
+        console.log(`${app}: entry ${entryBytes} bytes; entry + default ${closureBytes} bytes; largest eager chunk ${largestEager} bytes (cap ${EAGER_CHUNK_CAP})`);
     }
 } finally { await rm(temp, { recursive: true, force: true }); }

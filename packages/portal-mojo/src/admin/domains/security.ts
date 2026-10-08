@@ -1,5 +1,6 @@
 import type { AdminRoute, AdminSection } from '../core';
 import { BOUNCER_VIEW_PERMS } from '../bouncer/models';
+import { EDGE_BLOCKLIST_VIEW_PERMS } from '../edge/permissions';
 import { LOGS_ADMIN_PERMISSIONS } from '../monitoring/models';
 import { GEOIP_VIEW_PERMS } from '../security/geoip/models';
 import { LOGIN_EVENT_VIEW_PERMS, USER_DEVICE_VIEW_PERMS } from '../security/devices/models';
@@ -43,12 +44,13 @@ export const GEOIP_ADMIN_SECTION: AdminSection = {
 };
 export const NETWORK_SECURITY_ADMIN_SECTION: AdminSection = {
     id: 'network-security', basePath: 'security/network', title: 'Network Security', icon: 'bi-hdd-network', navigationGroup: 'security',
-    permissions: [...new Set([...GEOIP_VIEW_PERMS, ...LOGS_ADMIN_PERMISSIONS, ...IPSET_VIEW_PERMS, ...GEOFENCE_VIEW_PERMS])],
+    permissions: [...new Set([...GEOIP_VIEW_PERMS, ...LOGS_ADMIN_PERMISSIONS, ...IPSET_VIEW_PERMS, ...GEOFENCE_VIEW_PERMS, ...EDGE_BLOCKLIST_VIEW_PERMS])],
     routes: [
         { path: 'blocked-ips', label: 'Blocked IPs', loadComponent: () => import('../network/BlockedIPsPage').then(({ BlockedIPsPage }) => ({ default: BlockedIPsPage })), permissions: GEOIP_VIEW_PERMS },
         { path: 'firewall-log', label: 'Firewall Log', loadComponent: () => import('../network/FirewallLogPage').then(({ FirewallLogPage }) => ({ default: FirewallLogPage })), permissions: LOGS_ADMIN_PERMISSIONS },
         { path: 'ip-sets', label: 'IP Sets', loadComponent: () => import('../network/IPSetsPage').then(({ IPSetsPage }) => ({ default: IPSetsPage })), permissions: IPSET_VIEW_PERMS },
         { path: 'geofencing', label: 'Geofencing', loadComponent: () => import('../network/geofence/GeofencingPage').then(({ GeofencingPage }) => ({ default: GeofencingPage })), permissions: GEOFENCE_VIEW_PERMS },
+        { path: 'edge-blocklist', label: 'Edge Blocklist', loadComponent: () => import('../edge/BlocklistPage').then(({ BlocklistPage }) => ({ default: BlocklistPage })), permissions: EDGE_BLOCKLIST_VIEW_PERMS },
     ],
 };
 

@@ -26,6 +26,7 @@ const queryClient = new QueryClient({
     defaultOptions: { queries: { ...mojoQueryDefaults().queries, staleTime: 30_000 } },
 });
 onAuth('login', () => { void queryClient.invalidateQueries(); });
+onAuth('rotated', () => { void queryClient.invalidateQueries(); });
 const root = createRoot(document.getElementById('root')!);
 
 async function bootstrap() {
