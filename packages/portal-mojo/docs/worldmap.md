@@ -298,5 +298,5 @@ round-trip, clamping, fitting, antimeridian splitting), the centroid table
 (244 unique keys, coordinate ranges, `ES` = Spain), the binding helpers
 (slug parsing, sizing, sorting/top-N/drops), tone fallbacks and their warns,
 the land normalizer, and the source invariants above (no network, no map
-library, no HTML-string tooltips, tokens-only CSS, and the two theme copies
-staying byte-identical).
+library, no HTML-string tooltips, tokens-only CSS, and the package
+stylesheet importing `worldmap.css`).

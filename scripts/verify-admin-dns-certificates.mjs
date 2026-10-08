@@ -130,8 +130,7 @@ try {
     assert(!apiSource.includes('useMutation'));
     assert.match(detailSource, /modal\.confirm/);
     assert.match(await read('packages/portal-mojo/src/admin/dns/CertificatesPage.tsx'), /modal\.detail/);
-    assert.match(await read('apps/portal/src/theme.css'), /admin-dns-certificates\.css/);
-    assert.match(await read('apps/showcase/src/theme.css'), /admin-dns-certificates\.css/);
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-dns-certificates\.css" layer\(portal-mojo\);/);
     assert.match(await read('apps/showcase/src/pages/components/demos-admin-dns-certificates.tsx'), /<CertificatesPage \/>/);
     assert.match(await read('packages/portal-mojo/docs/admin-dns-certificates.md'), /renew_after.*authoritative/is);
 

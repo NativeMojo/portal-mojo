@@ -12,7 +12,7 @@ import {
 The "we're fetching / working" family. It **complements the skeleton
 silhouette**, which stays the default for anything whose shape is already
 known (see the decision table below). Live demo: portal → Develop →
-Components → **Loaders**. Styling: `apps/portal/src/theme/loading.css` —
+Components → **Loaders**. Styling: `packages/portal-mojo/src/styles/components/loading.css` —
 tokens only, both themes.
 
 Ported from web-mojo `src/core/views/feedback/BusyIndicator.js` (its only
@@ -210,7 +210,7 @@ clicked away mid-save, they keep where they went.
   restores focus to the element the inert switch blurred (see above). Its
   veil is `pointer-events: none`: `inert` already stopped the clicks, and a
   veil that swallowed them would break text selection after release.
-- **Reduced motion:** the spinner does not spin. `theme.css` kills every
+- **Reduced motion:** the spinner does not spin. `core.css` kills every
   animation with a universal `!important` rule — right for a skeleton
   (shimmer stops), wrong for a spinner (the ring would freeze mid-rotation
   with one colored quarter and read as a stuck control). `loading.css`

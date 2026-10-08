@@ -6,6 +6,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
+import { verifyStyleContract } from './style-contract.mjs';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tempRoot = await mkdtemp(join(tmpdir(), 'portal-mojo-package-'));
 const packDir = join(tempRoot, 'pack');
@@ -40,9 +42,14 @@ try {
     const artifact = packed[0];
     assert.equal(artifact.name, 'portal-mojo', 'packed package name must be portal-mojo');
     assert.match(artifact.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'package version must be SemVer');
-    assert.ok(artifact.unpackedSize <= 5_000_000, `unpacked package exceeds 5 MB budget (${artifact.unpackedSize})`);
+    // 5.5 MB since #5921: the component stylesheets ship in the package.
+    assert.ok(artifact.unpackedSize <= 5_500_000, `unpacked package exceeds 5.5 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
+    // Every stylesheet the source entry imports must be in the tarball (#5921).
+    const stylesIndex = await readFile(resolve(root, 'packages/portal-mojo/src/styles/index.css'), 'utf8');
+    const styleFiles = [...stylesIndex.matchAll(/@import "\.\/([\w/-]+\.css)"/g)].map((match) => `src/styles/${match[1]}`);
+    assert.ok(styleFiles.length > 1 && styleFiles.includes('src/styles/core.css'), 'styles entry must import core.css and the component files');
     for (const required of [
         'package.json', 'README.md', 'LICENSE',
         'src/client/index.ts', 'src/client/runtime.ts',
@@ -50,6 +57,7 @@ try {
         'src/charts/index.ts', 'src/admin/index.ts',
         'src/admin/core/index.ts', 'src/admin/registry.ts',
         'src/admin/public/identity.ts', 'src/admin/public/assistant-launcher.ts',
+        'src/styles/index.css', 'src/styles/required-tokens.json', ...styleFiles,
     ]) {
         assert.ok(files.has(required), `packed package must include ${required}`);
     }
@@ -78,10 +86,21 @@ try {
         devDependencies: {
             '@types/react': '^19.2.7',
             '@types/react-dom': '^19.2.3',
+            '@tailwindcss/vite': '^4.1.8',
+            tailwindcss: '^4.1.8',
             typescript: '~5.9.3',
             vite: '^7.1.0',
         },
     }, null, 2));
+    await writeFile(join(consumerDir, 'vite.config.js'), [
+        "import { defineConfig } from 'vite';",
+        "import tailwindcss from '@tailwindcss/vite';",
+        'export default defineConfig({ plugins: [tailwindcss()] });',
+        '',
+    ].join('\n'));
+    // The documented CSS entry: Tailwind, then the package, with no layer()
+    // and no @source of the consumer's own.
+    await writeFile(join(consumerDir, 'src/app.css'), '@import "tailwindcss";\n@import "portal-mojo/styles.css";\n');
     await writeFile(join(consumerDir, 'tsconfig.json'), JSON.stringify({
         compilerOptions: {
             target: 'ES2022',
@@ -97,6 +116,7 @@ try {
     }, null, 2));
     await writeFile(join(consumerDir, 'index.html'), '<div id="app"></div><script type="module" src="/src/main.ts"></script>\n');
     await writeFile(join(consumerDir, 'src/main.ts'), [
+        "import './app.css';",
         "import { initAuth } from 'portal-mojo/client';",
         "import { usingMockTransport } from 'portal-mojo/client/runtime';",
         "import { Badge } from 'portal-mojo/ui';",
@@ -126,7 +146,34 @@ try {
     const installed = JSON.parse(await readFile(join(consumerDir, 'node_modules/portal-mojo/package.json'), 'utf8'));
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
-    assert.deepEqual(Object.keys(installed.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './ui', './ui/shell']);
+    assert.deepEqual(Object.keys(installed.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './styles.css', './ui', './ui/shell']);
+    // The installed stylesheets meet the same contract as the source: every
+    // file imported in layer(portal-mojo), no orphan, and the token list exact.
+    assert.equal(installed.exports['./styles.css'], './src/styles/index.css', 'installed portal-mojo/styles.css must resolve to src/styles/index.css');
+    const installedStyles = join(consumerDir, 'node_modules/portal-mojo/src/styles');
+    const { imported: installedImports } = await verifyStyleContract(installedStyles);
+    const packedStyles = [...files].filter((path) => path.startsWith('src/styles/') && path.endsWith('.css')).sort();
+    assert.deepEqual(packedStyles, ['src/styles/index.css', ...installedImports.map((file) => `src/styles/${file}`)].sort(), 'the tarball must hold exactly the stylesheets index.css imports');
+
+    // The CSS subpath, the layer and the package's own @source all work from
+    // node_modules. The consumer's source holds no class name, so a Tailwind
+    // utility in its CSS can only come from the package scanning itself:
+    // `xl:grid-cols-4` is used by the Users overview and by no package style.
+    const assets = join(consumerDir, 'dist/assets');
+    const cssAssets = (await readdir(assets)).filter((name) => name.endsWith('.css'));
+    assert.equal(cssAssets.length, 1, 'consumer build must emit exactly one CSS asset');
+    const css = await readFile(join(assets, cssAssets[0]), 'utf8');
+    // Layers take their order from first appearance; the minifier may fold
+    // the order statement into the blocks, so read the order, not the text.
+    const layerOrder = [];
+    for (const match of css.matchAll(/@layer\s+([\w-]+(?:\s*,\s*[\w-]+)*)\s*[;{]/g)) {
+        for (const name of match[1].split(',').map((part) => part.trim())) if (!layerOrder.includes(name)) layerOrder.push(name);
+    }
+    assert.equal(layerOrder.at(-1), 'portal-mojo', `consumer CSS must order the portal-mojo layer last, after utilities (got ${layerOrder.join(', ')})`);
+    assert.ok(layerOrder.includes('utilities'), 'consumer CSS must hold the Tailwind utilities layer');
+    assert.ok(/@layer portal-mojo\s*\{/.test(css), 'consumer CSS must hold the portal-mojo layer');
+    for (const selector of ['.guardrail-effect', '.signin-card', '.side-nav']) assert.ok(css.includes(selector), `consumer CSS must hold the package rule ${selector}`);
+    assert.ok(css.includes('.xl\\:grid-cols-4'), 'consumer CSS must hold a utility used only in package markup: the package @source must scan from node_modules');
     const installedRoot = join(consumerDir, 'node_modules/portal-mojo');
     const program = ts.createProgram(await typeScriptFiles(join(installedRoot, 'src')), {
         target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,

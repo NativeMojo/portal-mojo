@@ -140,8 +140,9 @@ be rendering a plain `<select>` fallback in that slot; swapping it for
   reachable on engines without `Intl.supportedValuesOf`.
 - An empty `timezones={[]}` means "no override" (source parity), not "no
   zones".
-- No stylesheet ships: the wrapper `.tz-select` is an unstyled hook and every
-  pixel comes from `apps/portal/src/theme/combobox.css`, which consuming apps
-  must include.
+- No stylesheet of its own: the wrapper `.tz-select` is an unstyled hook and
+  every pixel comes from
+  `packages/portal-mojo/src/styles/components/combobox.css`, which ships in
+  `portal-mojo/styles.css`.
 - The dropdown is ComboBox's locally-positioned list — inside
   `overflow:hidden` containers it clips (MERGE-WIRE: Popover primitive #1271).

@@ -52,7 +52,7 @@ stuck work, purge history — plus the cron-style scheduled tasks whose backend
 django-mojo has always shipped and whose admin page web-mojo never wired up.
 
 Demo: showcase → Admin → **Jobs engine**. Styles:
-`apps/{portal,showcase}/src/theme/admin-jobs.css` (byte-identical).
+`packages/portal-mojo/src/styles/components/admin-jobs.css`.
 Verifier: `npm run verify:admin-jobs`.
 
 Wire facts below come from django-mojo `mojo/apps/jobs/` (`models/job.py`,
@@ -424,6 +424,6 @@ from hand-built `JobsStats` objects (and, for `JobRunnersStrip`, a demo-only
 branched for the demo.
 
 Styles are semantic `jobs-*` classes, tokens only, both themes:
-`apps/{portal,showcase}/src/theme/admin-jobs.css`, imported from each app's
-`theme.css`. The verifier asserts the two copies stay byte-identical and that
-neither contains a raw hex colour.
+`packages/portal-mojo/src/styles/components/admin-jobs.css`, imported by the
+package's `src/styles/index.css`. The verifier asserts that import and that
+the file contains no raw hex colour.

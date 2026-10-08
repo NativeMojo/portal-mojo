@@ -1,7 +1,7 @@
 # Admin Users
 
-Reusable global User administration for django-mojo. Consumers must include
-the semantic `user-admin.css` stylesheet used by the portal and showcase.
+Reusable global User administration for django-mojo. Its semantic
+`user-admin.css` stylesheet ships in `portal-mojo/styles.css`.
 
 ```tsx
 import {

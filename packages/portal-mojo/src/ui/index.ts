@@ -1,7 +1,8 @@
 // portal-mojo/ui — mission-control UI: server tables, filters, schema forms,
 // detail views, native-<dialog> modals, toasts, theming. Components render
-// semantic classes (panel, chip, tbl, …) styled by the consuming app's
-// theme.css tokens — light AND dark (reference set: apps/portal/src/theme.css).
+// semantic classes (panel, chip, tbl, …) styled by portal-mojo/styles.css
+// from the consuming app's tokens — light AND dark (reference set:
+// apps/portal/src/theme.css).
 export * from './ThemeProvider';
 export * from './Guarded';
 export * from './GroupSwitcher';

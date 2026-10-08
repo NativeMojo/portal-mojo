@@ -7,8 +7,8 @@
    PasskeyList / NotificationPreferences that the admin User detail reuses.
    Tokens only — both themes come from the token swap. Reuses .btn, .chip,
    .switch, .input/.field, .form-grid, .skel, .spin, .eyebrow, .modal-*.
-   Copy this file (plus user-admin.css + group-admin.css) into every app
-   that mounts the modal. */
+   Ships in portal-mojo/styles.css with user-admin.css + group-admin.css;
+   an app that mounts the modal imports that and copies nothing. */
 
 /* ── Shell ───────────────────────────────────────────────────────────── */
 .mojo-modal:has(> .acct) { width: min(760px, 94vw); max-width: 94vw; overflow: hidden; }

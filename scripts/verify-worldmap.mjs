@@ -212,11 +212,11 @@ try {
     assert.match(badGeometry.warnings[0], /skipped 1 land feature/);
 
     // ── Source invariants that must not regress ───────────────────────
-    const [component, geoSource, themePortal, themeShowcase] = await Promise.all([
+    const [component, geoSource, packageCss, packageStyles] = await Promise.all([
         readFile(new URL('../packages/portal-mojo/src/charts/worldmap/WorldMap.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/charts/worldmap/geo.ts', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/portal/src/theme/worldmap.css', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/showcase/src/theme/worldmap.css', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/styles/components/worldmap.css', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/styles/index.css', import.meta.url), 'utf8'),
     ]);
     // Comments are stripped first: the header comments name the CDN and tile
     // server precisely to record why this is a rebuild, and that provenance
@@ -229,8 +229,8 @@ try {
     assert.doesNotMatch(code, /fetch\(|useQuery|mojoCall/, 'consumers own the queries — the map fetches nothing');
     assert.doesNotMatch(component, /#[0-9a-fA-F]{6}\b/, 'colors are tokens, so a theme flip needs no re-render');
     assert.match(component, /prefers-reduced-motion|animateRoutes/, 'route animation is opt-out');
-    assert.equal(themePortal, themeShowcase, 'the two theme dirs keep worldmap.css byte-identical');
-    assert.doesNotMatch(stripComments(themePortal), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
+    assert.match(packageStyles, /@import "\.\/components\/worldmap\.css" layer\(portal-mojo\);/, 'the package stylesheet imports worldmap.css');
+    assert.doesNotMatch(stripComments(packageCss), /#[0-9a-fA-F]{3,6}\b/, 'the stylesheet is tokens-only');
     const dashboard = await readFile(new URL('../packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx', import.meta.url), 'utf8');
     assert.match(dashboard, /<LoginLocationMap/, 'the Admin dashboard reuses the package WorldMap-backed login surface');
 

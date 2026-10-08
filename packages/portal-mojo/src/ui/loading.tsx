@@ -22,7 +22,7 @@
 //          the same reasoning Popover.tsx uses, and the native inertness of a
 //          modal dialog is what makes this actually block input
 //   FIXED  hardcoded #fff/#0d6efd/#e9ecef (light-theme only, unreadable in
-//          dark) → tokens in apps/portal/src/theme/loading.css, both themes
+//          dark) → tokens in src/styles/components/loading.css, both themes
 //   NEW    the anti-flash `delay` + `minVisible` hold. web-mojo showed the
 //          overlay on the same tick as the call, so every sub-100ms action
 //          strobed. A spinner that appears for 80ms is worse than none.

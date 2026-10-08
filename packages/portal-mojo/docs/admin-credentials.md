@@ -178,9 +178,10 @@ and confirmed rotation are explicit button actions.
 ## Styling contract
 
 Credential components render the existing semantic `ga-*` classes and never
-import an application stylesheet. A consuming portal or showcase must include
-the `group-admin.css` semantic rules in its theme entry, as the repository's
-`apps/portal/src/theme.css` and `apps/showcase/src/theme.css` do today.
+import an application stylesheet. The `ga-*` rules ship in
+`portal-mojo/styles.css`
+(`packages/portal-mojo/src/styles/components/group-admin.css`); a consuming
+app imports that one stylesheet from its Tailwind entry.
 
 ## Personal keys are separate
 

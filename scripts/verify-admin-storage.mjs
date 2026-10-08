@@ -251,7 +251,7 @@ try {
     assert.match(clientSource, /errorCode = body\.error_code/);
     assert.match(clientSource, /body\.code \?\? legacyStatus/);
     assert.match(await read('apps/showcase/src/pages/components/ComponentsPage.tsx'), /admin-storage/);
-    assert.equal(await read('apps/portal/src/theme/admin-storage.css'), await read('apps/showcase/src/theme/admin-storage.css'));
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-storage\.css" layer\(portal-mojo\);/);
     assert.match(await read('packages/portal-mojo/docs/admin-storage.md'), /idempotency|whole-page drop/i);
 
     console.log('verify-admin-storage: all assertions passed');

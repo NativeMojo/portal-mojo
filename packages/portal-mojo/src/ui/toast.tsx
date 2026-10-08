@@ -16,7 +16,7 @@
 // in-flight operation's only indicator.
 //
 // Visual spec from web-mojo's toast.css (left accent bar, compact card,
-// bottom-right); idiom styles live in the app's theme/idioms.css — tokens
+// bottom-right); idiom styles live in src/styles/components/idioms.css — tokens
 // only, both themes.
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';

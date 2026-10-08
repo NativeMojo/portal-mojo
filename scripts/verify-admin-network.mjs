@@ -660,17 +660,13 @@ try {
     });
     assert.equal(Object.keys(fetched.data.data).length, family.length, 'one fetch covers the whole family');
 
-    // ── 12. Theme byte-identity + tokens only ──
-    const portalCss = await read('apps/portal/src/theme/admin-network.css');
-    const showcaseCss = await read('apps/showcase/src/theme/admin-network.css');
-    assert.equal(portalCss, showcaseCss, 'the two theme files are byte-identical');
-    const declarations = portalCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    // ── 12. Package stylesheet: tokens only ──
+    const packageCss = await read('packages/portal-mojo/src/styles/components/admin-network.css');
+    const declarations = packageCss.replace(/\/\*[\s\S]*?\*\//g, '');
     const literals = declarations.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|\bhsla?\([^)]*\)/g) ?? [];
     assert.deepEqual(literals, [], `admin-network.css must use tokens only — found ${literals.join(', ')}`);
-    for (const app of ['portal', 'showcase']) {
-        assert.match(await read(`apps/${app}/src/theme.css`), /@import "\.\/theme\/admin-network\.css";/,
-            `apps/${app} imports the stylesheet`);
-    }
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-network\.css" layer\(portal-mojo\);/,
+        'the package stylesheet imports it');
 
     // NOTE: two console.warn lines above are EXPECTED and are themselves part
     // of the contract — the unknown-reason-code fallback and the unknown-graph

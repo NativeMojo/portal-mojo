@@ -24,7 +24,7 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
 - `packages/portal-mojo` — the toolkit: TS-source subpath exports
   `portal-mojo/client`, `/ui`, `/charts`, `/admin`; no build step. The app
   imports the package, never the reverse. Its README lists what consuming
-  apps must provide (tokens, `@source` scan, icons, providers).
+  apps provide (tokens, the `portal-mojo/styles.css` import, icons, providers).
   **Component reference docs: `packages/portal-mojo/docs/` — read the page
   before using/altering a component; new components ship with a docs page
   AND a playground demo (app → Develop → Components).**

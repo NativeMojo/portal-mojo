@@ -107,7 +107,7 @@ element the user just clicked.
    construction.
 3. `null`/`undefined` are the only "nothing selected" — `0` and `''` are
    selections.
-4. Both themes, tokens only: `apps/portal/src/theme/multiselect-dropdown.css`
+4. Both themes, tokens only: `packages/portal-mojo/src/styles/components/multiselect-dropdown.css`
    (reuses `.tbl-check`, `.btn`, `.field-*`; the popover shell supplies the
    surface/border/shadow).
 

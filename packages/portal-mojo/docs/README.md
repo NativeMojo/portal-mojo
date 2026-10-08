@@ -89,8 +89,10 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 4. **Controlled inputs, one value pipeline.** A control can never display a
    value its state doesn't hold. Unknown option values fall back to a
    default WITH a `console.warn` — never to rendering nothing.
-5. **Both themes, day one.** Style with tokens from `apps/portal/src/theme.css`
-   (`--surface`, `--ink`, `--mute`, `--accent`, …) and verify under
+5. **Both themes, day one.** Component CSS lives in
+   `packages/portal-mojo/src/styles/`. Style with the app's tokens
+   (`--surface`, `--ink`, `--mute`, `--accent`, …; reference values in
+   `apps/portal/src/theme.css`) and verify under
    `data-theme="light"` AND `"dark"`.
 6. **django-mojo datetimes are epoch SECONDS** on the wire. `fmt.*` accepts
    them directly; do not `new Date(epochSeconds)` without ×1000.

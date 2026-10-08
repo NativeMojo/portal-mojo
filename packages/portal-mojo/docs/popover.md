@@ -101,7 +101,7 @@ it (source parity).
 
 ## Styling
 
-`.mojo-popover` lives in `apps/portal/src/theme/popover.css` — tokens
+`.mojo-popover` lives in `packages/portal-mojo/src/styles/components/popover.css` — tokens
 only, both themes. It neutralizes the UA `[popover]` stylesheet
 (`inset: 0` centering, `margin: auto`, border, padding, Canvas colors)
 and restores the mission-control look (`.filter-menu` family: `--surface`

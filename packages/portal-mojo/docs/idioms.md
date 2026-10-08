@@ -47,7 +47,7 @@ Behavior contract (dom.js `armedButton` parity):
   live trigger). Fail-safe cost is one extra click, never an unintended fire.
 - Clicks `stopPropagation()` — safe inside clickable rows / expand rows.
 
-Styling: `apps/portal/src/theme/idioms.css` — `.armed-btn` (rest) /
+Styling: `packages/portal-mojo/src/styles/components/idioms.css` — `.armed-btn` (rest) /
 `.armed-btn.is-armed` (armed, pulsing; static under
 `prefers-reduced-motion`). Tokens only, both themes; the dark theme swaps
 the armed text color for contrast against the light --bad.

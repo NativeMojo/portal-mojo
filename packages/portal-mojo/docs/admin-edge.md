@@ -199,8 +199,10 @@ The editor shows the saved value from the response.
 
 ## Themes and showcase
 
-Styles are `theme/admin-edge.css`, identical in the portal and showcase apps
-and built from tokens only, so both themes render from one sheet. The showcase
+Styles live in `src/styles/components/admin-edge.css` and ship in
+`portal-mojo/styles.css`; the app declares the tokens. They are built from
+tokens only, so both themes render from one sheet. The showcase still carries
+its own identical copy until it adopts the package stylesheet. The showcase
 demo (Develop → Components → Admin → Edge) runs the shipped pages against the
 mock under five identities: platform administrator, DNS manager, DNS viewer,
 security manager and security viewer.

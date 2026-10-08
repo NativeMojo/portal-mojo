@@ -1,0 +1,32 @@
+{
+    "description": "Tokens a consuming app must declare for portal-mojo/styles.css: every custom property the package styles read with var() and no fallback, and do not declare themselves. Declare each one for light and for dark. Checked by scripts/style-contract.mjs, on the source and on the installed tarball.",
+    "required": [
+        "--accent",
+        "--accent-soft",
+        "--bad",
+        "--bad-soft",
+        "--bg",
+        "--field-bg",
+        "--field-line",
+        "--field-line-hover",
+        "--info",
+        "--info-soft",
+        "--ink",
+        "--ink-strong",
+        "--line",
+        "--line-soft",
+        "--mute",
+        "--ok",
+        "--ok-soft",
+        "--shadow",
+        "--shadow-pop",
+        "--sidebar-bg",
+        "--surface",
+        "--surface2",
+        "--warn",
+        "--warn-soft"
+    ],
+    "knownUndeclared": {
+        "--good": "Read by components/admin-push.css and declared by no app, so that rule's left border is dropped. Tracked as board item 6518; remove this entry with the fix."
+    }
+}

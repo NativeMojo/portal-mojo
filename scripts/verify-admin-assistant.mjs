@@ -183,9 +183,8 @@ try {
     const foreignContinuation = await mock.mockFetch('/api/assistant', { method: 'POST', headers: manager, body: { message: 'continue', conversation_id: created.data.conversation_id } });
     assert.equal(foreignContinuation.error_code, 404);
 
-    const portalCss = await readFile(new URL('../apps/portal/src/theme/admin-assistant.css', import.meta.url), 'utf8');
-    const showcaseCss = await readFile(new URL('../apps/showcase/src/theme/admin-assistant.css', import.meta.url), 'utf8');
-    assert.equal(showcaseCss, portalCss, 'Assistant theme copies must remain byte-identical');
+    const packageStyles = await readFile(new URL('../packages/portal-mojo/src/styles/index.css', import.meta.url), 'utf8');
+    assert.match(packageStyles, /@import "\.\/components\/admin-assistant\.css" layer\(portal-mojo\);/, 'the package stylesheet imports the Assistant styles');
     console.log('admin assistant behavioral contract verified');
 } finally {
     await server.close();

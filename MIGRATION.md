@@ -23,8 +23,9 @@ then express the same behavior in this codebase's idiom.
 4. `packages/portal-mojo/docs/README.md` (the 7 non-negotiables) and ONE
    existing component for idiom — `packages/portal-mojo/src/ui/FilterBar.tsx`
    or `ModelTable.tsx` (naming, tokens, comment density).
-5. `apps/portal/src/theme.css` — the design tokens and class patterns your
-   CSS must use.
+5. `apps/portal/src/theme.css` (the design tokens) and
+   `packages/portal-mojo/src/styles/core.css` (the class patterns) your CSS
+   must use.
 
 ## Hard rules (the ones agents break most)
 
@@ -49,7 +50,8 @@ prompt explicitly grants. Everything else is READ-ONLY — especially these
 shared files, which the orchestrator wires at merge time:
 
 - `packages/portal-mojo/src/ui/index.ts` (exports)
-- `apps/portal/src/theme.css` (your CSS goes in your OWN new file instead)
+- `packages/portal-mojo/src/styles/index.css` and `apps/portal/src/theme.css`
+  (your CSS goes in your OWN new file instead)
 - `apps/portal/src/pages/components/ComponentsPage.tsx` (rail registry)
 - `packages/portal-mojo/docs/README.md` (docs index)
 - `PLAN.md`, `CLAUDE.md`, `.claude/*`
@@ -59,7 +61,7 @@ Standard file set for a component `<slug>`:
 | File | Rule |
 |---|---|
 | `packages/portal-mojo/src/ui/.../<Component>.tsx` | the component (path per prompt) |
-| `apps/portal/src/theme/<slug>.css` | its styles — tokens only, both themes; NOT imported anywhere yet (orchestrator adds the `@import` to theme.css at merge) |
+| `packages/portal-mojo/src/styles/components/<slug>.css` | its styles — tokens only, both themes; NOT imported anywhere yet (orchestrator adds the `@import "./components/<slug>.css" layer(portal-mojo);` line to `src/styles/index.css` at merge; `npm run verify:package` fails until it is there) |
 | `apps/portal/src/pages/components/demos-<slug>.tsx` | a self-contained demo: export a named `<X>Demo` component (+ more if the prompt says). Import your component by RELATIVE path into `packages/portal-mojo/src/...` and leave a `// MERGE-WIRE: portal-mojo/ui` comment on that import |
 | `packages/portal-mojo/docs/<slug>.md` | reference page in the established style (import path, API, wire contract, invariants, pitfalls) — written for an AI reader |
 

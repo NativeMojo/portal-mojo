@@ -140,7 +140,7 @@ npm run verify:record-attachments
 
 It covers pure validation, lazy concurrency, capacity, stable/safe snapshots,
 consumer/destination dedupe, real progress updates, callback-only retry,
-truthful cancellation, known-id recovery, and byte-identical Portal/Showcase
-token CSS. The form contract adds strict relation normalization, explicit
+truthful cancellation, known-id recovery, and the package stylesheet importing
+the upload CSS. The form contract adds strict relation normalization, explicit
 attach states, owner-response reconciliation, orphan retention, safe previews,
 avatar #1488 semantics, and cache-boundary sanitization.

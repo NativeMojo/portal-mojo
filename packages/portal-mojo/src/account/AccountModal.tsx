@@ -11,8 +11,9 @@
 //
 // Every focused flow (add passkey, authenticator, recovery codes, password,
 // email/phone change, verify, photo) stacks its own dialog over this one;
-// fresh-auth step-ups come from the app's FreshAuthHost. Styles: the app's
-// theme/account.css (tokens only, both themes).
+// fresh-auth step-ups come from the app's FreshAuthHost. Styles:
+// styles/components/account.css, shipped in portal-mojo/styles.css (tokens
+// only, both themes).
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { hostedAuthUrl, logout, onAuth, redirectToHostedAuth, useAuthSnapshot, useMe, type Me } from '../client/runtime';
 import { fmt, modal, toast, useAvatarUrl, type UserMenuAuthMode } from '../ui';

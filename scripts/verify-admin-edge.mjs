@@ -347,9 +347,10 @@ try {
     assert.match(edgeSources, /is_enabled: false \}, \{ create: true \}/, 'a site_api create is disabled first');
     assert.match(edgeSources, /group__isnull: false/, 'non-superusers never see house domains in the wizard');
     assert.match(edgeSources, /me\?\.is_superuser === true/, 'declare and retire follow the server\'s platform gate');
-    const portalCss = await read('apps/portal/src/theme/admin-edge.css');
-    assert.equal(portalCss, await read('apps/showcase/src/theme/admin-edge.css'), 'both apps ship the same Edge styles');
-    for (const app of ['portal', 'showcase']) assert.match(await read(`apps/${app}/src/theme.css`), /admin-edge\.css/);
+    const packageCss = await read('packages/portal-mojo/src/styles/components/admin-edge.css');
+    assert.equal(packageCss, await read('apps/showcase/src/theme/admin-edge.css'), 'the package and the showcase ship the same Edge styles');
+    assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-edge\.css" layer\(portal-mojo\);/);
+    assert.match(await read('apps/showcase/src/theme.css'), /admin-edge\.css/);
     assert.match(await read('apps/showcase/src/pages/components/ComponentsPage.tsx'), /admin-edge/);
     const docs = await read('packages/portal-mojo/docs/admin-edge.md');
     for (const topic of [/site_api/, /quiet/i, /Both themes|Themes and showcase/i, /claim/i]) assert.match(docs, topic);

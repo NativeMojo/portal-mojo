@@ -73,4 +73,5 @@ field in that batch back to its shared server snapshot.
 
 The suggestion list uses the shared `Popover`, which is the sole owner of
 outside-mousedown and Escape dismissal. Styles live in
-`theme/location-address.css` and use design tokens in both themes.
+`src/styles/components/location-address.css` (shipped in
+`portal-mojo/styles.css`) and use design tokens in both themes.

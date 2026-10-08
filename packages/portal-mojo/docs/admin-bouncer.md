@@ -110,9 +110,9 @@ accepted it. No batch or action endpoints are invented, so partial failures use
 ## Styling and showcase
 
 The package emits semantic `bouncer-*` classes and imports no application CSS.
-Consumers must include `theme/admin-bouncer.css` after the shared token
-definitions. The repository keeps matching leaf files in `apps/portal` and
-`apps/showcase`, consistent with the current intentional theme duplication.
+Its styles live in `src/styles/components/admin-bouncer.css` and ship in
+`portal-mojo/styles.css`; the app declares the tokens. The showcase still
+carries its own copy until it adopts the package stylesheet.
 
 The showcase's `AdminBouncerDemo` switches among the three real package pages
 so only one URL-backed top-level table is mounted at a time. Open signal/device

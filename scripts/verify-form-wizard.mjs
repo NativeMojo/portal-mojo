@@ -94,7 +94,7 @@ try {
         readFile(new URL('../packages/portal-mojo/src/ui/FormView.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/ui/FormFields.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/ui/modal.tsx', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/portal/src/theme/formview.css', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/styles/components/formview.css', import.meta.url), 'utf8'),
     ]);
     for (const token of ['role="tablist"', 'role="tab"', 'role="tabpanel"', 'aria-controls', 'aria-labelledby', 'tabIndex', 'hidden={!selected}', 'selected ? item.panel : null']) assert(tabsSource.includes(token), `Tabs ARIA/panel invariant: ${token}`);
     assert.match(tabsSource, /controlledTabHealTransition\(lastNotice\.current/, 'controlled invalid-key notification uses the resettable de-loop transition');

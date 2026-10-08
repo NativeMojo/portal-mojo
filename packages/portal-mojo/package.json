@@ -42,7 +42,8 @@
         "./admin/infrastructure": "./src/admin/public/infrastructure.ts",
         "./admin/communications": "./src/admin/public/communications.ts",
         "./admin/assistant": "./src/admin/public/assistant.ts",
-        "./admin/assistant/launcher": "./src/admin/public/assistant-launcher.ts"
+        "./admin/assistant/launcher": "./src/admin/public/assistant-launcher.ts",
+        "./styles.css": "./src/styles/index.css"
     },
     "scripts": {
         "typecheck": "tsc --noEmit"

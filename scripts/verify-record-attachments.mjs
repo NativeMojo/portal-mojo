@@ -33,12 +33,10 @@ try {
     assert.match(recordUi, /key=\{JSON\.stringify\(props\.adapter\.queryKey\)\}/, 'record changes must remount local state');
     assert.doesNotMatch(queueUi, /mojoDelete|URL\.createObjectURL|upload_token|upload_url/, 'attachment queue must neither delete Files nor retain capabilities');
     assert.doesNotMatch(assistantApi, /WebSocket|EventSource/);
-    const portalRecordCss = await readFile(new URL('../apps/portal/src/theme/record-feed.css', import.meta.url), 'utf8');
-    const showcaseRecordCss = await readFile(new URL('../apps/showcase/src/theme/record-feed.css', import.meta.url), 'utf8');
-    assert.equal(portalRecordCss, showcaseRecordCss, 'RecordFeed attachment CSS must remain byte-identical across themes');
-    for (const cssPath of ['../apps/portal/src/theme/admin-assistant.css', '../apps/showcase/src/theme/admin-assistant.css']) {
-        assert.match(await readFile(new URL(cssPath, import.meta.url), 'utf8'), /assistant-attachment-chip/);
-    }
+    const packageStyles = await readFile(new URL('../packages/portal-mojo/src/styles/index.css', import.meta.url), 'utf8');
+    assert.match(packageStyles, /@import "\.\/components\/record-feed\.css" layer\(portal-mojo\);/, 'the package stylesheet imports the RecordFeed styles');
+    assert.match(packageStyles, /@import "\.\/components\/admin-assistant\.css" layer\(portal-mojo\);/, 'the package stylesheet imports the Assistant styles');
+    assert.match(await readFile(new URL('../packages/portal-mojo/src/styles/components/admin-assistant.css', import.meta.url), 'utf8'), /assistant-attachment-chip/);
 
     toastModule.toast.progress = () => ({ update() {}, finalizing() {}, done() {}, fail() {}, remove() {} });
     toastModule.toast.success = () => {};

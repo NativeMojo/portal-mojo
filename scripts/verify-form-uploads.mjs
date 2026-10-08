@@ -69,7 +69,7 @@ try {
     await assert.rejects(() => client.mojoSave('/api/user', 2, { avatar: true }), /positive File id or null/);
     await assert.rejects(() => client.mojoSave('/api/user', 2, { avatar: 5109 }), /File unavailable/, 'admin cannot attach another uploader’s candidate');
 
-    const [fieldSource, queueSource, coreSource, formSource, wizardSource, formViewSource, avatarSource, portalCss, showcaseCss] = await Promise.all([
+    const [fieldSource, queueSource, coreSource, formSource, wizardSource, formViewSource, avatarSource, packageStyles] = await Promise.all([
         readFile(new URL('../packages/portal-mojo/src/ui/FileField.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/ui/UploadQueue.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/ui/schema-form-core.tsx', import.meta.url), 'utf8'),
@@ -77,8 +77,7 @@ try {
         readFile(new URL('../packages/portal-mojo/src/ui/FormWizard.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/ui/FormView.tsx', import.meta.url), 'utf8'),
         readFile(new URL('../packages/portal-mojo/src/admin/identity/users/sections/actions.tsx', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/portal/src/theme/file-upload.css', import.meta.url), 'utf8'),
-        readFile(new URL('../apps/showcase/src/theme/file-upload.css', import.meta.url), 'utf8'),
+        readFile(new URL('../packages/portal-mojo/src/styles/index.css', import.meta.url), 'utf8'),
     ]);
     for (const state of ['keep', 'clear', 'replacement-in-progress', 'replacement-failed', 'completed-awaiting-attach', 'attach-failed', 'edit-pending', 'edit-ready', 'edit-failed']) assert(fieldSource.includes(`'${state}'`), `explicit field state: ${state}`);
     assert.match(fieldSource, /<FileDropZone/, 'field itself is keyboard-accessible and accepts drop');
@@ -102,7 +101,7 @@ try {
     assert.match(avatarSource, /cropAndScale: \{ width: 200, height: 200 \}/, 'avatar opts into exact 200x200 pre-upload output');
     assert.match(avatarSource, /requireEdit/, 'avatar cannot bypass its exact edit contract with Use original');
     assert.match(avatarSource, /disabled=\{busy \|\| uploadPending\}/, 'explicit Close shares the transfer/edit/save dismissal gate');
-    assert.equal(portalCss, showcaseCss, 'both themes carry byte-identical upload field styles');
+    assert.match(packageStyles, /@import "\.\/components\/file-upload\.css" layer\(portal-mojo\);/, 'the package stylesheet imports the upload field styles');
     await stat(new URL('../packages/portal-mojo/docs/forms.md', import.meta.url));
     await stat(new URL('../packages/portal-mojo/docs/admin-identity-users.md', import.meta.url));
     console.log('verify-form-uploads: all contracts passed');

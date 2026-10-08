@@ -221,9 +221,10 @@ caller's preferences ▸ one "General" row.
    `onSignOut` both places). Lazy-load it if the shell entry is budgeted:
    `import('portal-mojo/account').then((m) => m.openAccountModal(props))`
    (apps/portal does this).
-2. Copy the CSS (the package ships none): `theme/account.css`, plus
-   `theme/user-admin.css` (API-key rows) and `theme/group-admin.css`
-   (`.ga-secret-*` token reveal) if the app doesn't already ship them.
+2. Import `portal-mojo/styles.css` from the app's Tailwind CSS entry and
+   declare the colour tokens. `account.css`, `user-admin.css` (API-key rows)
+   and `group-admin.css` (`.ga-secret-*` token reveal) ship in it; there is
+   nothing to copy. The showcase still carries its own copies.
 3. Mount `ModalHost` + `ToastHost`, and a fresh-auth handler (apps/portal's
    `FreshAuthHost`, registered through `setFreshAuthHandler`) inside the
    authenticated tree. Without a handler a 440 just fails with the

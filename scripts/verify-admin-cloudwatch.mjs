@@ -19,17 +19,15 @@ try {
         server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts'),
         server.ssrLoadModule('/packages/portal-mojo/src/client/client.ts'),
     ]);
-    const [page, cloudwatchChart, resourceDetail, dataSource, metricsChart, adminIndex, portalTheme, showcaseTheme, portalCss, showcaseCss, demo, components, docs] = await Promise.all([
+    const [page, cloudwatchChart, resourceDetail, dataSource, metricsChart, adminIndex, packageStyles, packageCss, demo, components, docs] = await Promise.all([
         read('packages/portal-mojo/src/admin/cloudwatch/CloudWatchDashboardPage.tsx'),
         read('packages/portal-mojo/src/admin/cloudwatch/CloudWatchChart.tsx'),
         read('packages/portal-mojo/src/admin/cloudwatch/CloudWatchResourceDetail.tsx'),
         read('packages/portal-mojo/src/admin/cloudwatch/data.ts'),
         read('packages/portal-mojo/src/charts/MetricsChart.tsx'),
         read('packages/portal-mojo/src/admin/index.ts'),
-        read('apps/portal/src/theme.css'),
-        read('apps/showcase/src/theme.css'),
-        read('apps/portal/src/theme/admin-cloudwatch.css'),
-        read('apps/showcase/src/theme/admin-cloudwatch.css'),
+        read('packages/portal-mojo/src/styles/index.css'),
+        read('packages/portal-mojo/src/styles/components/admin-cloudwatch.css'),
         read('apps/showcase/src/pages/components/demos-admin-cloudwatch.tsx'),
         read('apps/showcase/src/pages/components/ComponentsPage.tsx'),
         read('packages/portal-mojo/docs/admin-cloudwatch.md'),
@@ -106,12 +104,9 @@ try {
     assert.match(dataSource, /if \(typeof params\.slugs === 'string' && params\.slugs\.trim\(\)\) wire\.slugs/);
     assert.match(dataSource, /catch \(error\)[\s\S]*sanitizeCloudWatchError/);
 
-    assert.equal(portalCss, showcaseCss);
-    assert.doesNotMatch(portalCss, /#[0-9a-fA-F]{3,8}\b/);
-    assert.match(portalTheme, /admin-dashboard\.css/);
-    assert.match(portalTheme, /admin-cloudwatch\.css/);
-    assert.match(showcaseTheme, /admin-dashboard\.css/);
-    assert.match(showcaseTheme, /admin-cloudwatch\.css/);
+    assert.doesNotMatch(packageCss, /#[0-9a-fA-F]{3,8}\b/);
+    assert.match(packageStyles, /@import "\.\/components\/admin-dashboard\.css" layer\(portal-mojo\);/);
+    assert.match(packageStyles, /@import "\.\/components\/admin-cloudwatch\.css" layer\(portal-mojo\);/);
     assert.match(demo, /CloudWatchDashboardPage/);
     assert.match(components, /admin-cloudwatch/);
     assert.match(docs, /Name tags|Name tag/i);

@@ -73,7 +73,8 @@ receives a viewport-height limit; page/embedded bodies have no modal minimum
 or maximum. At narrow container widths an in-flow section button expands the
 same filtered rail entries, including rich, zero and dot badges. No native
 select stringification or second top-layer overlay is involved. The chrome
-lives in `theme/detailview.css` in both consuming apps.
+lives in `packages/portal-mojo/src/styles/components/detailview.css` and ships in
+`portal-mojo/styles.css`.
 
 ## Permission-gated sections (fail-closed)
 
@@ -191,7 +192,7 @@ get rows. See [Admin modal policy](admin-modals.md) for lifecycle exceptions.
   cache.
 - **Badges are state, not commands** — to "setBadge", change the value
   your `badges` prop is built from.
-- The styles for the C1 chrome live in `apps/portal/src/theme/detailview.css`
+- The styles for the C1 chrome live in `packages/portal-mojo/src/styles/components/detailview.css`
   (`.rail-badge`, `.rail-dot`, `.dv-menu*`, `.dv-keep`) — tokens only,
   both themes.
 

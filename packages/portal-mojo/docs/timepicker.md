@@ -150,7 +150,7 @@ zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`, `'UTC'` on failure)
 
 ## Styling
 
-`apps/portal/src/theme/timepicker.css` — `mojo-time-*` anatomy only
+`packages/portal-mojo/src/styles/components/timepicker.css` — `mojo-time-*` anatomy only
 (`trigger` / `trigger-text` / `trigger-clear` / `popover-inner` /
 `picker-inline` / `stepper*` / `ampm*` / `tz-host` / `foot`), tokens only,
 both themes. The trigger wears the house `.input` look so it lines up in a

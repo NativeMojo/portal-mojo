@@ -171,9 +171,8 @@ try {
     await tick();
     assert.equal(cancelQueue.getSnapshot().items[0].status, 'uncertain');
 
-    const portalCss = await readFile(new URL('../apps/portal/src/theme/file-upload.css', import.meta.url), 'utf8');
-    const showcaseCss = await readFile(new URL('../apps/showcase/src/theme/file-upload.css', import.meta.url), 'utf8');
-    assert.equal(portalCss, showcaseCss, 'Portal and Showcase upload CSS must remain byte-identical');
+    const packageStyles = await readFile(new URL('../packages/portal-mojo/src/styles/index.css', import.meta.url), 'utf8');
+    assert.match(packageStyles, /@import "\.\/components\/file-upload\.css" layer\(portal-mojo\);/, 'the package stylesheet imports the upload styles');
     const source = await readFile(new URL('../packages/portal-mojo/src/ui/UploadQueue.tsx', import.meta.url), 'utf8');
     assert(!/localStorage|sessionStorage|useQuery|QueryClient/.test(source), 'queue is component-local and has no persistence/query ownership');
     assert.match(source, /startTask\(fileValue!, entry\.destination\)/, 'task creation remains inside the scheduler');
