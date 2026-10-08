@@ -172,8 +172,10 @@ request carries:
    writes the signal in the **layout phase** of the commit, before any child
    query starts its fetch, so the first request after a group switch already
    carries the new group.
-3. **An explicit `group` option wins everywhere**, on hooks and plain
-   functions alike. `group: null` means "unscoped by choice".
+3. **An explicit `group` id wins everywhere**, on hooks and plain functions
+   alike. `group: null` differs: on `useScopedQuery` it means "unscoped by
+   choice"; on `mojoScopedCall` and `mojoRpc` a null `group` is treated as
+   not passed and the signal is used.
 
 Do not read `localStorage.active_group_id` yourself: the URL `?group=` param
 BEATS the stored id (group.tsx resolution order), and only the provider
