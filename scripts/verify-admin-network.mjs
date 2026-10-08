@@ -132,11 +132,12 @@ try {
     assert.equal(section.basePath, 'security/network');
     assert.equal(section.navigationGroup, 'security');
     assert.deepEqual(section.routes.map((r) => r.path),
-        ['blocked-ips', 'firewall-log', 'ip-sets', 'geofencing']);
-    // The section gate is the ANY-of UNION of the four route gates.
+        ['blocked-ips', 'firewall-log', 'ip-sets', 'geofencing', 'edge-blocklist']);
+    // The section gate is the ANY-of UNION of the five route gates.
     const union = new Set([
         ...geoip.GEOIP_VIEW_PERMS, ...firewall.FIREWALL_LOG_PERMS,
         ...models.IPSET_VIEW_PERMS, ...gf.GEOFENCE_VIEW_PERMS,
+        ...admin.EDGE_BLOCKLIST_VIEW_PERMS,
     ]);
     assert.deepEqual([...section.permissions].sort(), [...union].sort(), 'section gate is the union of its routes');
     assert(section.permissions.every((p) => p.startsWith('sys.')), 'the section gate is system-pinned too');
@@ -147,7 +148,7 @@ try {
     const standalone = admin.adminSectionRoutes([section]).map((r) => r.path);
     const embedded = admin.adminSectionRoutes([section], { mount: '/system' }).map((r) => r.path);
     for (const path of ['security/network/blocked-ips', 'security/network/firewall-log',
-        'security/network/ip-sets', 'security/network/geofencing']) {
+        'security/network/ip-sets', 'security/network/geofencing', 'security/network/edge-blocklist']) {
         assert(standalone.includes(path), `standalone route ${path}`);
         assert(embedded.includes(`system/${path}`), `embedded route system/${path}`);
     }

@@ -36,6 +36,7 @@
 @import "./components/admin-dns-certificates.css" layer(portal-mojo);
 @import "./components/admin-dns-registrar.css" layer(portal-mojo);
 @import "./components/admin-storage.css" layer(portal-mojo);
+@import "./components/admin-edge.css" layer(portal-mojo);
 @import "./components/admin-shortlinks.css" layer(portal-mojo);
 @import "./components/admin-messaging.css" layer(portal-mojo);
 @import "./components/admin-phonehub.css" layer(portal-mojo);

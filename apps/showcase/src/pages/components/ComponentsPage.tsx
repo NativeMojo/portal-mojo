@@ -98,6 +98,7 @@ const AdminJobsDemo = lazyDemo(() => import('./demos-admin-jobs'), 'AdminJobsDem
 const AdminMembersDemo = lazyDemo(() => import('./demos-admin-members'), 'AdminMembersDemo');
 const AdminIdentityUsersDemo = lazyDemo(() => import('./demos-admin-identity-users'), 'AdminIdentityUsersDemo');
 const AdminStorageDemo = lazyDemo(() => import('./demos-admin-storage'), 'AdminStorageDemo');
+const AdminEdgeDemo = lazyDemo(() => import('./demos-admin-edge'), 'AdminEdgeDemo');
 const AdminShortlinksDemo = lazyDemo(() => import('./demos-admin-shortlinks'), 'AdminShortlinksDemo');
 const AdminMessagingDemo = lazyDemo(() => import('./demos-admin-messaging'), 'AdminMessagingDemo');
 const AdminPhoneHubDemo = lazyDemo(() => import('./demos-admin-phonehub'), 'AdminPhoneHubDemo');
@@ -458,6 +459,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
                 blurb: 'Global S3 buckets, masked storage backends, explicit policy-backed file uploads, capability-safe sharing, and finite rendition convergence.',
                 render: () => <AdminStorageDemo />,
+            },
+            {
+                key: 'admin-edge', title: 'Edge', icon: 'bi-hdd-network',
+                blurb: 'Vhosts by shape with a guided wizard, proxied path routes, declared upstreams, and the fleet blocklist with its log-first modes.',
+                render: () => <AdminEdgeDemo />,
             },
             {
                 key: 'admin-shortlinks', title: 'Shortlinks', icon: 'bi-link-45deg',

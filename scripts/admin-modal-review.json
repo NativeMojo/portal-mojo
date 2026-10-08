@@ -355,6 +355,24 @@
       "purpose": "Push editor with grouped fields and a live pending dismissal lock"
     },
     {
+      "id": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard:modal.open:0",
+      "fingerprint": "835efa4d14dc52953b88",
+      "category": "editor",
+      "purpose": "VhostWizard: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:openDeclareUpstream:modal.open:0",
+      "fingerprint": "75a8577e0a2e334ccdc7",
+      "category": "editor",
+      "purpose": "DeclareUpstreamDialog: collect and save fields"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:openBlocklistEditor:modal.open:0",
+      "fingerprint": "b9499c5fc6734798003d",
+      "category": "editor",
+      "purpose": "BlocklistEditor: collect and save fields"
+    },
+    {
       "id": "packages/portal-mojo/src/account/dialogs.tsx:openAddPasskeyDialog:modal.open:0",
       "fingerprint": "b4d37e253dcce7651fc8",
       "category": "action",

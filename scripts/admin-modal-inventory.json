@@ -2018,6 +2018,50 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:openBlocklistEditor:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx",
+      "owner": "openBlocklistEditor",
+      "launcher": "modal.open",
+      "body": [
+        "BlocklistEditor"
+      ],
+      "category": "editor",
+      "parent": "openBlocklistEditor",
+      "target": null,
+      "fingerprint": "b9499c5fc6734798003d",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:BlocklistPage:openBlocklistEditor:0",
+      "file": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx",
+      "owner": "BlocklistPage",
+      "launcher": "openBlocklistEditor",
+      "body": [],
+      "category": "editor",
+      "parent": "BlocklistPage",
+      "target": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:openBlocklistEditor",
+      "fingerprint": "58b68b2e6b9b3f944dae",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:BlocklistPage:openBlocklistEditor:1",
+      "file": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx",
+      "owner": "BlocklistPage",
+      "launcher": "openBlocklistEditor",
+      "body": [],
+      "category": "editor",
+      "parent": "BlocklistPage",
+      "target": "packages/portal-mojo/src/admin/edge/BlocklistPage.tsx:openBlocklistEditor",
+      "fingerprint": "3dce4d3659f4f0a7f2a2",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/domains/security.ts:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/domains/security.ts",
       "owner": "<module>",
@@ -2209,6 +2253,20 @@
       "parent": "<module>",
       "target": null,
       "fingerprint": "5d615373aec973a6407d",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/security.ts:<module>:import:14",
+      "file": "packages/portal-mojo/src/admin/domains/security.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "341b9f9141e17627de51",
       "categories": [
         "dependency"
       ]
@@ -6751,6 +6809,232 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx",
+      "owner": "openVhostWizard",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "VhostWizard"
+      ],
+      "category": "editor",
+      "parent": "openVhostWizard",
+      "target": null,
+      "fingerprint": "835efa4d14dc52953b88",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:edit:openVhostWizard:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "edit",
+      "launcher": "openVhostWizard",
+      "body": [],
+      "category": "editor",
+      "parent": "edit",
+      "target": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard",
+      "fingerprint": "c7100e8c5d470d1708dc",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:remove:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "remove",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "remove",
+      "target": null,
+      "fingerprint": "678b4b9f8ac48910a3c7",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:DetailView:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "DetailView",
+      "body": [
+        "DetailView",
+        "div",
+        "Eyebrow",
+        "FlatRow",
+        "code",
+        "span",
+        "VhostRoutes"
+      ],
+      "category": "record",
+      "parent": "VhostDetail",
+      "target": null,
+      "fingerprint": "c0183047cc60af15712a",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:edit:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "edit",
+      "body": [],
+      "category": "editor",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:edit",
+      "fingerprint": "a36069ec87e809e2acbb",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:remove:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "remove",
+      "body": [],
+      "category": "confirmation",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:remove",
+      "fingerprint": "f6ee4b30dbb23a76b905",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx",
+      "owner": "open",
+      "launcher": "modal.detail",
+      "body": [
+        "VhostDetail"
+      ],
+      "category": "record",
+      "parent": "open",
+      "target": null,
+      "fingerprint": "c6f18acdb1196a128f8a",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:create:openVhostWizard:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx",
+      "owner": "create",
+      "launcher": "openVhostWizard",
+      "body": [],
+      "category": "editor",
+      "parent": "create",
+      "target": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard",
+      "fingerprint": "bcf7835a242b77cdf7ef",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:VhostsPage:open:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx",
+      "owner": "VhostsPage",
+      "launcher": "open",
+      "body": [],
+      "category": "record",
+      "parent": "VhostsPage",
+      "target": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open",
+      "fingerprint": "0f9850f48a3ec66c0ed0",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:VhostsPage:create:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx",
+      "owner": "VhostsPage",
+      "launcher": "create",
+      "body": [],
+      "category": "editor",
+      "parent": "VhostsPage",
+      "target": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:create",
+      "fingerprint": "da73b28054b799b0a6d6",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:openDeclareUpstream:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx",
+      "owner": "openDeclareUpstream",
+      "launcher": "modal.open",
+      "body": [
+        "DeclareUpstreamDialog"
+      ],
+      "category": "editor",
+      "parent": "openDeclareUpstream",
+      "target": null,
+      "fingerprint": "75a8577e0a2e334ccdc7",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:retire:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx",
+      "owner": "retire",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "retire",
+      "target": null,
+      "fingerprint": "091f325833c71b8f43ca",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:declare:openDeclareUpstream:0",
+      "file": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx",
+      "owner": "declare",
+      "launcher": "openDeclareUpstream",
+      "body": [],
+      "category": "editor",
+      "parent": "declare",
+      "target": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:openDeclareUpstream",
+      "fingerprint": "fcb8b64b272ed482e9e6",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:UpstreamsPage:retire:0",
+      "file": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx",
+      "owner": "UpstreamsPage",
+      "launcher": "retire",
+      "body": [],
+      "category": "confirmation",
+      "parent": "UpstreamsPage",
+      "target": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:retire",
+      "fingerprint": "f149e1bede9eae5266a4",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:UpstreamsPage:declare:0",
+      "file": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx",
+      "owner": "UpstreamsPage",
+      "launcher": "declare",
+      "body": [],
+      "category": "editor",
+      "parent": "UpstreamsPage",
+      "target": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:declare",
+      "fingerprint": "0bfcf4acc0422c1c897a",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
       "owner": "<module>",
@@ -6872,6 +7156,34 @@
       "parent": "<module>",
       "target": null,
       "fingerprint": "06302a65a4f7b54c74fe",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:9",
+      "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "b6d289528dd071c2fe91",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:10",
+      "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "15683da8a430ec05f1ba",
       "categories": [
         "dependency"
       ]
@@ -9704,6 +10016,20 @@
       "key": "'files'",
       "label": "Files",
       "fingerprint": "94976f11921ef583e1b7"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "key": "'overview'",
+      "label": "Overview",
+      "fingerprint": "f17be929f4c2eab8e414"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "key": "'routes'",
+      "label": "Routes",
+      "fingerprint": "2e3597be801ae98686a2"
     },
     {
       "file": "packages/portal-mojo/src/admin/shortlinks/ShortlinkDetail.tsx",
