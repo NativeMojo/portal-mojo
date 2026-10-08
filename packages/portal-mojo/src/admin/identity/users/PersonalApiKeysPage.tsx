@@ -10,6 +10,9 @@
 //   · disable/enable is a plain is_active save — reversible, hence
 //     act-immediately + grace-window UNDO TOAST (no confirm)
 //   · no DELETE (CAN_DELETE false server-side)
+//   · the list is NOT owner-scoped for a users/manage_users caller: without
+//     ?user= they are served every user's keys, so this page pins
+//     user=<me> on every list and export (#7190)
 // NOTE: the group-scoped /api/group/apikey surface 500s on the live dev
 // backend — this user-key surface is the one that works today.
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +21,7 @@ import {
     ArmedButton,
     type Column, type FilterDef,
 } from 'portal-mojo/ui';
+import { useMe } from '../../../client/runtime';
 import { showSecretDialog } from '../../credentials';
 import { ApiKeyModel, useGenerateUserApiKey, type ApiKeyRow } from './models';
 
@@ -126,6 +130,7 @@ export function PersonalApiKeysPage() {
     const save = ApiKeyModel.useSave();
     const revoke = ApiKeyModel.useAction('revoke');
     const generateKey = useGenerateUserApiKey();
+    const { data: me } = useMe();
 
     const generate = async () => {
         const data = await formModal(ApiKeyModel.forms.generate!);
@@ -195,9 +200,14 @@ export function PersonalApiKeysPage() {
         ));
     };
 
+    // No table before the signed-in user is known: holding only the list
+    // would leave Export live, and that would go out unscoped.
+    if (!me) return <div className="detail-loading"><span className="skel skel-block" /></div>;
+
     return (
         <ModelTable<ApiKeyRow>
             model={ApiKeyModel}
+            fixedParams={{ user: me.id }}
             eyebrow="Account"
             title="API Keys"
             searchPlaceholder="Search key labels…"

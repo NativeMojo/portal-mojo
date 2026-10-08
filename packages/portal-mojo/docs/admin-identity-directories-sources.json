@@ -25,8 +25,8 @@
       "source_path": "apps/portal/src/pages/ApiKeysPage.tsx",
       "source_sha256": "3d338cf77c3110b72a9361565c1cced10a7fccc52c486e3dafda119d66c676b2",
       "package_path": "packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx",
-      "package_sha256": "f377d8a97b5c0ccbce745c333fdd7e4a5fd5f5a89b868b058677b31e3efe64ff",
-      "adaptation": "Expanded row facts and actions are presented in a native DetailView modal that observes the current API key record."
+      "package_sha256": "0c1e1efd34f515e4b5dc994ce34be1446eb13d1486deea3e9641565215edb6ad",
+      "adaptation": "Expanded row facts and actions are presented in a native DetailView modal that observes the current API key record. Every list and export is pinned to the signed-in user with fixedParams, and the table is not mounted before that user is known."
     },
     {
       "source_path": "apps/portal/src/pages/GroupDetail.tsx",

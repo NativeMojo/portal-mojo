@@ -690,6 +690,50 @@ try {
     assert.notEqual(client.getAccessToken(), rotatedFrom, 'and keeps this session on the rotated login');
     assert(!button('Sign out everywhere else'), 'the action toast dismisses on click');
 
+    // Admin "Personal API Keys" (#7190): the REAL ModelTable, under a router.
+    // A users-grant caller is served every user's keys without ?user=, so
+    // every list and export the page sends must carry the signed-in user's
+    // id, and nothing may go out before that id is known (a fresh Query
+    // cache, so `me` is not yet loaded when the page mounts).
+    {
+        const { MemoryRouter } = await import('react-router-dom');
+        const { PersonalApiKeysPage } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx');
+        const signedIn = (await client.mojoCall('/api/user/me')).data;
+        const pageQc = new QueryClient({ defaultOptions: { queries: { retry: false, ...client.mojoQueryDefaults().queries } } });
+        const host = document.body.appendChild(document.createElement('div'));
+        const pageRoot = createRoot(host);
+        const keyLists = () => mock.getMockRequestHistory().filter((entry) => entry.method === 'GET' && entry.path === '/api/account/api_keys');
+        // The export ends in a download-link click, which JSDOM reports as an
+        // unimplemented navigation. The request is what this checks.
+        const anchorClick = dom.window.HTMLAnchorElement.prototype.click;
+        dom.window.HTMLAnchorElement.prototype.click = () => {};
+        mock.clearMockRequestHistory();
+        await act(async () => {
+            pageRoot.render(React.createElement(QueryClientProvider, { client: pageQc },
+                React.createElement(MemoryRouter, null, React.createElement(PersonalApiKeysPage))));
+        });
+        assert.equal(pageQc.getQueryData(['me', client.getAuthSnapshot().uid]), undefined, 'the page mounted before the signed-in user was loaded');
+        // Never hand a DOM node to assert as `actual`: a failure is printed by
+        // inspecting it, and a mounted node drags the whole React tree along.
+        assert.equal(host.querySelector('table') === null, true, 'no table (and no Export) before the signed-in user is known');
+        await wait(800);
+        assert(host.querySelector('table'), 'the keys table renders once the signed-in user is known');
+        const listsSent = keyLists().length;
+        assert(listsSent > 0, 'the Personal API Keys page lists /api/account/api_keys');
+        const exportButton = host.querySelector('button[title="Export"]');
+        assert(exportButton, 'the page offers Export');
+        await act(async () => { exportButton.click(); });
+        const csv = [...host.querySelectorAll('.filter-menu-item')].find((node) => node.textContent.trim() === 'Export as CSV');
+        assert(csv, 'the export menu offers CSV');
+        await act(async () => { csv.click(); });
+        await wait(800);
+        assert(keyLists().length > listsSent, 'the export request reached the mock');
+        for (const entry of keyLists()) assert.equal(String(entry.params?.user), String(signedIn.id), 'Personal API Keys list/export carries ?user=<me>');
+        await act(async () => pageRoot.unmount());
+        host.remove();
+        dom.window.HTMLAnchorElement.prototype.click = anchorClick;
+    }
+
     await act(async () => root.unmount());
     console.error = originalError;
     assert.deepEqual(consoleErrors.filter((line) => !/inert/.test(line)), [], 'no console errors while mounted');
