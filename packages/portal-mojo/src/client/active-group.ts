@@ -8,6 +8,12 @@
 // `?group=` param BEATS the stored id (group.tsx resolution order), and only
 // the provider computes that. The signal is written from the provider's
 // activation path, so it always reflects the resolved truth.
+//
+// The provider writes it in the LAYOUT phase (#5918), so anything that reads
+// it from a passive effect — every TanStack Query fetch — sees the committed
+// group. A child's own layout effect, or a fetch started during render
+// (suspense queries), runs earlier and still sees the previous one: pass
+// `group` explicitly there.
 
 let activeGroupId: number | null = null;
 const listeners = new Set<() => void>();

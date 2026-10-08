@@ -170,13 +170,62 @@ query, below); `required: false` families only inject when a group is active.
 
 ### Where the group id comes from
 
-`GroupProvider` **owns** the active group — context stays the React-side
-source of truth — and mirrors its *resolved* group into a module-level
-signal (`setActiveGroupSignal` / `getActiveGroupId`) so plain functions can
-read it. Do not read `localStorage.active_group_id` yourself instead: the
-URL `?group=` param BEATS the stored id (group.tsx resolution order), and
-only the provider computes that resolution — the signal always reflects it.
-An explicit `group` option on any helper beats the signal.
+`GroupProvider` **owns** the active group. Three rules decide which group a
+request carries:
+
+1. **Hooks read the group context.** `useScopedQuery`, `useCan` and
+   `CollectionSelect` take the group from `GroupContext` at render time.
+   Under a mounted `GroupProvider`, `useScopedQuery` uses the context and
+   nothing else: a null context group means *no group*, never "whatever the
+   signal still holds". Only with no provider mounted at all does it fall
+   back to the signal.
+2. **Plain functions read the signal.** `mojoScopedCall` and `mojoRpc` have
+   no React context, so the provider mirrors its *resolved* group into a
+   module-level signal (`setActiveGroupSignal` / `getActiveGroupId`). It
+   writes the signal in the **layout phase** of the commit, before any child
+   query starts its fetch, so the first request after a group switch already
+   carries the new group.
+3. **An explicit `group` id wins everywhere**, on hooks and plain functions
+   alike. `group: null` differs: on `useScopedQuery` it means "unscoped by
+   choice"; on `mojoScopedCall` and `mojoRpc` a null `group` is treated as
+   not passed and the signal is used.
+
+Do not read `localStorage.active_group_id` yourself: the URL `?group=` param
+BEATS the stored id (group.tsx resolution order), and only the provider
+computes that resolution.
+
+**Recommended default**
+
+- Reads: `useScopedQuery`.
+- Writes and other calls from event handlers: `mojoRpc` / `mojoScopedCall`.
+- A query you write by hand with `useQuery`: put the group id in its key
+  (`['things', group?.id]`). The package cannot key a hand-rolled query for
+  you, and a key without the group serves one group's rows to the next.
+
+**While the group is resolving.** At boot, or on a switch the cache was not
+seeded for (`?group=`, or the fallback after a failed load), the provider
+reports `loading` with a null group. `useScopedQuery` holds a registered
+query, required or optional, **disabled** for that window, so nothing goes
+out under the previous group or unscoped. A query given an explicit `group`
+option is not held: it has nothing to wait for. A plain `mojoScopedCall` in the
+same window sees an empty signal: a required family throws in dev and an
+optional one goes out unscoped, exactly as at boot. Gate on `loading` or
+render under `RequiresGroup`.
+
+**Upgrading.** A blanket "invalidate everything when the group changes" is
+no longer needed for `useScopedQuery`, nor for hand-rolled queries whose key
+carries the group id.
+
+**Caveats**
+
+- A child's own `useLayoutEffect` runs before the provider's and still sees
+  the previous group in the signal. Use a hook, or pass `group` explicitly.
+- A fetch started during render (`useSuspenseQuery`, `fetchOptimistic`) runs
+  before the commit, so the signal is not yet current. Pass `group`
+  explicitly.
+- Signed out with a stored group, the provider is not `loading`, so an
+  optional family can fire once unscoped and again after sign-in. Scoped
+  product routes sit behind `RequireAuth`; nothing is held for this case.
 
 ### `useScopedQuery<T>(path, params?, {read?, group?, ...queryOpts})`
 
@@ -186,7 +235,8 @@ request params, and the group id rides the query key —
 cached rows, while invalidation by `[path]` prefix keeps working. Keep that
 key discipline if you write a raw scoped query by hand.
 
-When a REQUIRED scope has no active group, the query renders **disabled** —
+While the provider is still resolving its group, a registered query with no
+explicit `group` is held disabled (see above). When a REQUIRED scope has no active group, the query renders **disabled** —
 and a disabled query has *neither data nor error*. Do not draw an empty box
 or a spinner that never resolves: state the wait honestly at the call site
 ("select a brand to load …").

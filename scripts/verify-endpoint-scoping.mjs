@@ -234,6 +234,19 @@ try {
     assert.match(scopedSource, /params: \{ \[reg\.key\]: value, \.\.\.\(rest\.params \?\? \{\}\) \}/,
         'mojoScopedCall must inject into PARAMS for parameter-only requests');
 
+    // #5918: under a provider the hook takes the group from context only,
+    // and the provider writes (and clears) the signal in the layout phase.
+    // verify-group-scope proves the behaviour mounted; these pin the lines.
+    assert.match(scopedSource, /group !== undefined \? group : groupCtx \? groupCtx\.group\?\.id \?\? null : getActiveGroupId\(\)/,
+        'useScopedQuery must not read the signal when a group context is present');
+    const groupSource = await readFile(new URL('../packages/portal-mojo/src/client/group.tsx', import.meta.url), 'utf8');
+    assert.match(groupSource, /useLayoutEffect\(\(\) => \{\s+setActiveGroupSignal\(group\?\.id \?\? null\);\s+\}, \[group\?\.id\]\);/,
+        'GroupProvider must write the signal from useLayoutEffect');
+    assert.match(groupSource, /useLayoutEffect\(\(\) => \(\) => setActiveGroupSignal\(null\), \[\]\);/,
+        "GroupProvider's unmount cleanup of the signal must be a useLayoutEffect too");
+    assert.doesNotMatch(groupSource, /\buseEffect\(\(\) => (\{\s+|\(\) => )setActiveGroupSignal/,
+        'no passive effect may write the signal');
+
     const actionSource = await readFile(new URL('../packages/portal-mojo/src/client/action-result.ts', import.meta.url), 'utf8');
     assert.doesNotMatch(actionSource, /endpoint-scope/, 'mojoAction must not consult the scope registry (#5923)');
     assert.match(actionSource, /unscoped: true/, 'mojoAction must declare its record call unscoped');

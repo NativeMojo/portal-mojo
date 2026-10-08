@@ -8,7 +8,7 @@
 //   · on activation the user's member record for that group is fetched
 //     (`/api/group/<id>/member`) — group-context permissions flow from it
 //   · URL-group failure falls back to the stored group, then to none
-import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { mojoCall, mojoGet } from './client';
 import { useAuthSnapshot } from './me';
@@ -94,10 +94,16 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     // Mirror the RESOLVED group into the module signal (scoped.ts's plain-fn
     // consumers). The loaded id, not the candidate — a failing/loading group
     // must not scope requests. Cleared on unmount.
-    useEffect(() => {
+    //
+    // LAYOUT timing is load-bearing (#5918). A child's query starts its fetch
+    // from a passive effect, and React runs child passive effects before this
+    // provider's, so a passive write here left the first request after a
+    // switch carrying the previous group. A layout effect runs for committed
+    // trees only and before every passive effect.
+    useLayoutEffect(() => {
         setActiveGroupSignal(group?.id ?? null);
     }, [group?.id]);
-    useEffect(() => () => setActiveGroupSignal(null), []);
+    useLayoutEffect(() => () => setActiveGroupSignal(null), []);
 
     const memberQuery = useQuery({
         queryKey: ['group-member', group?.id, auth.uid],
