@@ -7,8 +7,11 @@
 // body on mutations), the group id rides the query key, and a REQUIRED
 // scope with no group resolves loudly, never silently.
 //
-// The group id comes from the active-group signal (GroupProvider mirrors
-// its RESOLVED group there); an explicit `group` option always wins.
+// Where the group id comes from: an explicit `group` option always wins.
+// Without one, a HOOK under a mounted GroupProvider reads the group context
+// and nothing else — context first under a provider; the signal only without
+// one. PLAIN functions have no context and read the active-group signal,
+// which GroupProvider writes in the layout phase (#5918).
 import { useContext } from 'react';
 import { useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 import { mojoCall, type Envelope, type FetchOpts } from './client';
@@ -72,20 +75,30 @@ export interface ScopedQueryOpts<T> extends Omit<UseQueryOptions<T>, 'queryKey' 
  * and a REQUIRED scope with no active group renders the query DISABLED.
  * A disabled query has neither data nor error: state the wait honestly at
  * the call site rather than drawing an empty box.
+ *
+ * The group: an explicit `group` option, else the group context when a
+ * GroupProvider is mounted, else (no provider at all) the active-group
+ * signal. Under a provider the signal is never borrowed — a null context
+ * group means no group (#5918). While the provider is still resolving its
+ * group, a registered query, required or optional, is held DISABLED so
+ * nothing goes out under the previous group or unscoped.
  */
 export function useScopedQuery<T>(path: string, params: Params = {}, opts: ScopedQueryOpts<T> = {}): UseQueryResult<T> {
     const { read, group, enabled, ...rest } = opts;
     const groupCtx = useContext(GroupContext);
     const reg = endpointScopeFor(path);
-    const gid = group !== undefined ? group : groupCtx?.group?.id ?? getActiveGroupId();
+    const gid = group !== undefined ? group : groupCtx ? groupCtx.group?.id ?? null : getActiveGroupId();
     const scopedParams: Params = reg && gid != null
         ? { [reg.key]: endpointScopeValue(reg, gid) as Params[string], ...params }
         : params;
     const scopeSatisfied = !reg || !reg.required || gid != null;
+    // The provider is still resolving its group (boot, or a switch nothing
+    // seeded): wait for it. An explicit `group` has nothing to wait for.
+    const groupResolving = group === undefined && !!reg && !!groupCtx?.loading && groupCtx.group == null;
     return useQuery<T>({
         ...rest,
         queryKey: [path, params, gid ?? null],
-        enabled: scopeSatisfied && (enabled ?? true),
+        enabled: scopeSatisfied && !groupResolving && (enabled ?? true),
         queryFn: async () => {
             const env = await mojoCall(path, { params: scopedParams });
             return read ? read(env) : (env.data as T);
