@@ -26,8 +26,10 @@ setDefaultMenu('admin');
 Resolution: route containment in registration order (group menus eligible
 only under a kind-matched active group) → defaultMenu → first non-group
 visible. Items support `permissions` (any-of) ∧ `requiresGroupKind`;
-dividers with no visible children drop; a parent lights when a child route
-is active. `scope: 'admin' | 'group' | 'account' | 'global'` makes ownership
+dividers with no visible children drop. Only the destination row is selected;
+an accordion parent is a neutral disclosure control and opens for its active
+child. `exact: true` end-matches both the visual selection and `aria-current`.
+`scope: 'admin' | 'group' | 'account' | 'global'` makes ownership
 explicit; legacy `groupKind` menus still infer group scope. Static rendering
 remains the default for compatibility. `presentation: 'accordion'` enables
 searchable, single-open-section navigation. Give accordion parents stable
@@ -57,6 +59,8 @@ Admin section bundles contribute through `adminSectionsMenu`. Use
 `{grouped: true, presentation: 'accordion'}` for the domain-grouped Admin
 experience. Routes remain mount-relative; multiple embedded root sections
 share one `/system` landing instead of emitting duplicate index routes.
+Generated Admin destinations are exact matched, so an embedded mount’s root
+Dashboard cannot remain selected on every nested page.
 
 Import the route/menu machinery from `portal-mojo/admin/core`, then import only
 the registry domains the shell installs. The stable domains are `identity`,

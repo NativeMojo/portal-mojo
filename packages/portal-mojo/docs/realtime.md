@@ -19,6 +19,11 @@ disable this shared provider.
   `auth_success`. An auth error closes and suspends the connection until the
   token value changes.
 - Heartbeat is a `ping` every 20 seconds with a 10-second `pong` deadline.
+  A server-initiated `{type:'ping'}` (django-mojo 1.32+ sends one every 20
+  seconds and culls a socket silent for 90) is answered at once with
+  `{type:'pong'}` while ready, clears the pending `pong` deadline, and is never
+  dispatched to consumers. Answering from the message handler keeps the socket
+  alive while a background tab throttles the client's own ping timer.
   Reconnect uses capped jittered backoff. Pre-accept close code 4429 enforces at
   least 60 seconds, and focus/visibility cannot bypass that deadline.
 - Desired topics are refcounted and replay after authentication. Operations are

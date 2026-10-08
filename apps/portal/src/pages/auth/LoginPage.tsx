@@ -10,19 +10,11 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
     getAuthSnapshot, isPasskeySupported, login, loginWithPasskey,
-    usingMockTransport,
+    passkeyErrorMessage, usingMockTransport,
     type AuthUser, type MfaChallenge,
 } from 'portal-mojo/client/runtime';
 import { MfaPanel } from './MfaPanel';
 import { consumeReturnRoute } from './config';
-
-function errorMessage(error: unknown): string {
-    if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') return 'Passkey prompt was dismissed';
-        return error.message;
-    }
-    return 'Something went wrong. Please try again.';
-}
 
 export function LoginPage() {
     const navigate = useNavigate();
@@ -60,7 +52,7 @@ export function LoginPage() {
                 done(result.user);
             }
         } catch (err) {
-            setError(errorMessage(err));
+            setError(passkeyErrorMessage(err));
             setBusy(false);
         }
     };
@@ -71,7 +63,7 @@ export function LoginPage() {
         try {
             done(await loginWithPasskey(username.trim() || undefined));
         } catch (err) {
-            setError(errorMessage(err));
+            setError(passkeyErrorMessage(err));
             setBusy(false);
         }
     };

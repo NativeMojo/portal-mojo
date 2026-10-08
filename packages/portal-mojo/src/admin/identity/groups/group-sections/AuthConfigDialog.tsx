@@ -22,9 +22,9 @@
 // multi-tab form is too heavy for the side-nav").
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { JsonBlock, MultiSelectDropdown, TagInput, modal, toast } from 'portal-mojo/ui';
+import { MultiSelectDropdown, TagInput, modal, toast } from 'portal-mojo/ui';
 import { mojoCall } from 'portal-mojo/client/runtime';
-import { GroupModel, type GroupRow } from '../../models';
+import { GroupModel, type GroupRow } from '../models';
 import { buildAuthConfigDiff, resolveAuthConfigChain } from './auth-config';
 
 // ── Allowed tokens (must match django-mojo auth_config schema) ────────
@@ -387,7 +387,8 @@ function AuthConfigBody({ group, close }: { group: GroupRow; close: () => void }
                     Inherited policy is unavailable because the complete parent chain could not be loaded.
                     Overrides are shown read-only; Save and Reset remain disabled to avoid deriving a mutation from partial policy.
                 </p>
-                <JsonBlock value={own} label="This group's auth overrides" defaultOpen />
+                <div className="field-label">This group's auth overrides</div>
+                <pre className="dim" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}><code>{JSON.stringify(own, null, 2)}</code></pre>
                 <div className="ga-geo-save-row" style={{ marginTop: 14 }}>
                     <button className="btn" onClick={close}>Close</button>
                 </div>
