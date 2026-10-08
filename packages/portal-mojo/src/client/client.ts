@@ -113,6 +113,18 @@ export interface Envelope {
     count?: number;
     size?: number;
     start?: number;
+    /**
+     * A replacement session pair, beside `data`. django-mojo sends it when the
+     * request ended every other session of the caller's own account — today a
+     * save that changed the caller's own password (User.on_rest_save_and_respond).
+     * The tokens the request was sent with are already dead.
+     */
+    tokens?: SessionTokens;
+}
+
+export interface SessionTokens {
+    access_token: string;
+    refresh_token?: string;
 }
 
 /** Installed by auth (initAuth). The transport stays auth-agnostic. */
@@ -121,6 +133,9 @@ export interface AuthHooks {
     preRequest(path: string): Promise<void>;
     /** Authorization header value, or null when no session exists. */
     authHeader(): string | null;
+    /** The server replaced this session's tokens (Envelope.tokens): store them.
+     *  Optional: a harness that installs its own hooks holds no stored session. */
+    tokensReplaced?(tokens: SessionTokens): void;
 }
 
 let authHooks: AuthHooks | null = null;
@@ -187,6 +202,12 @@ async function unwrap(path: string, opts: FetchOpts): Promise<Envelope> {
             body.error_code,
             body.data,
         );
+    }
+    // Stored here, at the one boundary, so every caller is covered: a save
+    // that changed the caller's own password comes back with the only tokens
+    // that still work. Dropping them would sign the user out on the next call.
+    if (body.tokens && typeof body.tokens.access_token === 'string' && body.tokens.access_token) {
+        authHooks?.tokensReplaced?.(body.tokens);
     }
     // Flat only: a top-level success:false is always the handler's own reply
     // (model actions answer flat). A wrapped data.success:false can be

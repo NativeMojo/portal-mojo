@@ -27,6 +27,7 @@
         "verify:admin-navigation": "node scripts/verify-admin-navigation.mjs && node scripts/verify-sidebar-selection.mjs",
         "verify:personas": "node scripts/verify-personas.mjs",
         "verify:action-results": "node scripts/verify-action-results.mjs",
+        "verify:token-replacement": "node scripts/verify-token-replacement.mjs && node scripts/verify-token-replacement-race.mjs",
         "verify:endpoint-scoping": "node scripts/verify-endpoint-scoping.mjs",
         "verify:model-scope": "node scripts/verify-model-scope.mjs",
         "verify:history-state": "node scripts/verify-history-state.mjs",

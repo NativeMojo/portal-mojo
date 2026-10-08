@@ -198,16 +198,23 @@ async function doRefresh(): Promise<boolean> {
         return false;
     }
     const persistent = sessionIsPersistent();
+    // The answer is for the session whose refresh token was sent. When the
+    // stored one is no longer that token, the session was replaced while this
+    // was in flight: a save that changed the password (tokensReplaced), a new
+    // sign-in, a sign-out. A late pair is signed with a key the server has
+    // dropped, and a late 401 is about a token nobody holds any more; either
+    // one, acted on, would undo the session that replaced it.
+    const superseded = (): boolean => getRefreshToken() !== refresh;
+    const sessionUsable = (): boolean => checkTokenStatus().action !== 'logout';
     try {
         const body = await mojoCall(REFRESH_PATH, { method: 'POST', body: { refresh_token: refresh } });
-        // The session changed while this POST was in flight (a new login was
-        // adopted, or logout): never write the old session's pair over it.
-        if (getRefreshToken() !== refresh) return getRefreshToken() != null;
+        if (superseded()) return sessionUsable();
         const pkg = body.data as { access_token: string; refresh_token?: string };
         setTokens(pkg.access_token, pkg.refresh_token, persistent);
         emitAuth('refreshed');
         return true;
     } catch (error) {
+        if (superseded()) return sessionUsable();
         const status = error instanceof Error && 'status' in error ? (error as { status: number }).status : 0;
         if (status === 401 || status === 403) {
             emitAuth('unauthorized');
@@ -929,6 +936,11 @@ export function initAuth(): void {
         authHeader() {
             const token = getAccessToken();
             return token ? `Bearer ${token}` : null;
+        },
+        tokensReplaced(tokens) {
+            // Same storage the session already lives in (remember-me), read
+            // before setTokens clears both.
+            setTokens(tokens.access_token, tokens.refresh_token, sessionIsPersistent());
         },
     });
     if (getRefreshToken()) startAutoRefresh();
