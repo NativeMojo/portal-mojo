@@ -193,7 +193,8 @@ computes that resolution.
 seeded for (`?group=`, or the fallback after a failed load), the provider
 reports `loading` with a null group. `useScopedQuery` holds a registered
 query, required or optional, **disabled** for that window, so nothing goes
-out under the previous group or unscoped. A plain `mojoScopedCall` in the
+out under the previous group or unscoped. A query given an explicit `group`
+option is not held: it has nothing to wait for. A plain `mojoScopedCall` in the
 same window sees an empty signal: a required family throws in dev and an
 optional one goes out unscoped, exactly as at boot. Gate on `loading` or
 render under `RequiresGroup`.
@@ -221,8 +222,8 @@ request params, and the group id rides the query key —
 cached rows, while invalidation by `[path]` prefix keeps working. Keep that
 key discipline if you write a raw scoped query by hand.
 
-While the provider is still resolving its group, a registered query is held
-disabled (see above). When a REQUIRED scope has no active group, the query renders **disabled** —
+While the provider is still resolving its group, a registered query with no
+explicit `group` is held disabled (see above). When a REQUIRED scope has no active group, the query renders **disabled** —
 and a disabled query has *neither data nor error*. Do not draw an empty box
 or a spinner that never resolves: state the wait honestly at the call site
 ("select a brand to load …").

@@ -218,6 +218,9 @@ try {
         assert.deepEqual(callsTo('/api/probe/plain').map(groupOf), [12], 'mojoScopedCall must send the explicit group');
         await mojoScopedCall('/api/probe/plain-active');
         assert.deepEqual(callsTo('/api/probe/plain-active').map(groupOf), [4], 'without an explicit group a plain call reads the signal');
+        // unchanged on purpose: a plain call treats a null group as not passed
+        await mojoScopedCall('/api/probe-opt/plain-null', { group: null });
+        assert.deepEqual(callsTo('/api/probe-opt/plain-null').map(groupOf), [4], 'a null group on mojoScopedCall still falls back to the signal');
     });
 
     // ── E. No provider mounted: the signal is still the fallback ──────
