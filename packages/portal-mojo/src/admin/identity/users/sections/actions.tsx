@@ -364,9 +364,9 @@ export function useUserAdminActions(
         // One POST carries the action + the optional field, exactly like the
         // source (fields save before action handlers run server-side). Raw
         // mojoCall on purpose: mojoAction/useAction post `{action: payload}`
-        // ONLY — they cannot carry the sibling plain field. An inside-the-200
-        // refusal here would need readActionResult; today this route refuses
-        // at the envelope level (status:false), which already rejects.
+        // ONLY — they cannot carry the sibling plain field. A raw mojoCall
+        // rejects a flat inside-the-200 refusal too (ActionRefusedError,
+        // #5922), and this route's envelope-level status:false already did.
         const body: Record<string, unknown> = { disable_totp: true };
         if (data.clear_requirement === true) body.requires_mfa = false;
         try {

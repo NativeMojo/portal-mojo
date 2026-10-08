@@ -45,6 +45,19 @@ shape. Modern envelopes use numeric top-level `code` plus a string semantic
 envelopes always reject. Structured `data` can contain deliberately safe
 recovery evidence, but callers must still avoid logging it indiscriminately.
 
+A handler's **flat refusal inside an HTTP 200** — a top-level
+`success:false`, as a model action answers — rejects too, on every call
+through the boundary (`mojoCall`, `mojoList`, `mojoGet`, `mojoSave`,
+`mojoDelete`, `mojoMetrics`, `mojoScopedCall`). It throws
+**`ActionRefusedError`**, a `MojoError` with `status: 200`, `message` = the
+server's `error` (or `message`) text, `errorCode` = the string refusal
+`code`, and `data`/`result.payload` = the full reply; a raw call's label is
+its request path. A wrapped `{status:true, data:{success:false}}` is **data**
+here — a successful POST can legitimately carry it. A call whose flat
+`success:false` is a real answer (a connection test) passes
+**`refusal: 'return'`** and reads the reply itself with `readActionResult`.
+See [Upgrading to 0.3](#upgrading-to-03).
+
 ## Functions
 
 | Fn | Wire | Returns |
@@ -82,15 +95,21 @@ answer 440. Ordinary requests and real transports are unaffected.
 
 django-mojo POST_SAVE_ACTION handlers can refuse **inside an HTTP 200**, in
 two wire shapes — flat `{success:false, code, error}` or wrapped
-`{status:true, data:{success:false, …}}` — which the unwrap boundary
-deliberately passes through (envelope `status:false` is a different failure
-and already rejects). Never hand-sniff these shapes; there is one reader:
+`{status:true, data:{success:false, …}}`. The unwrap boundary rejects the
+flat shape for every call (see the envelope section above); the wrapped shape
+can be ordinary data on a successful POST, so only the action layer, which
+knows it posted an action, reads it as a refusal. `mojoAction` and
+`useAction` pass `refusal: 'return'` to unwrap and read the reply
+themselves, so their error names the action rather than the path (envelope
+`status:false` is a different failure and already rejects). Never
+hand-sniff these shapes; there is one reader:
 
 - `readActionResult(body)` → `{ok, code, error, payload}`. `payload` merges
   the envelope with the action dict (action fields win), so one-shot
   secrets/counters read from one place whichever direction they rode.
   Payload `status:false` (the `revoke_sessions` spelling) also refuses;
-  bodies with no flag resolve `ok: true`.
+  bodies with no flag resolve `ok: true`. A refusal with no string `error`
+  takes its text from a string `message`; numeric codes are ignored.
 - `mojoAction(endpoint, id, action, payload?)` — the raw-path primitive:
   POSTs `{[action]: payload ?? true}` to `endpoint/<id>` under
   `withFreshAuth`, normalizes the reply, and **REJECTS with
@@ -103,8 +122,8 @@ normalizer + cache maintenance; see defineModel.md "Action refusals" for
 `refusal: 'reject' | 'return'`); **raw one-off action POST →
 `mojoAction`**; **never** parse `success`/`status` off an action body at a
 call site. Diagnostics whose flag is a result datum (connection testers)
-either declare `refusal:'return'` on the model or stay as bespoke raw
-readers with a comment.
+either declare `refusal:'return'` on the model or, posted raw, pass
+`refusal: 'return'` to `mojoCall` and read the verdict with a comment.
 
 ## Endpoint scoping — the middle tier
 
@@ -347,7 +366,7 @@ confirm `completed` before the task returns success. Completed scalar
 ## `mojoQueryDefaults()`
 
 Spread into the app's `QueryClient` defaults. Provides: no retry on 4xx
-`MojoError`s (deterministic failures), `networkMode: 'always'` under the
+`MojoError`s or `ActionRefusedError` (deterministic failures), `networkMode: 'always'` under the
 mock ('online' live), and `refetchOnWindowFocus: false` (freshness comes
 from explicit refresh + opt-in autoRefresh — focus storms read as phantom
 fetches).
@@ -359,3 +378,20 @@ fetches).
   the semantic wire code, and `data` preserves safe structured evidence.
 - `AuthRequiredError` — thrown by the pre-request gate when a request needs
   a session that doesn't exist (synthetic 401; no network was touched).
+
+## Upgrading to 0.3
+
+0.3.0 is a breaking minor release: a raw call through the unwrap boundary
+now **rejects** a flat HTTP-200 refusal (top-level `success:false`) with
+`ActionRefusedError` instead of resolving it.
+
+- Find raw `mojoCall` / `mojoScopedCall` sites that read a top-level
+  `.success`. Those refusal checks are now dead code: delete them. Their
+  `catch` receives `ActionRefusedError`, which is a `MojoError`, so existing
+  `instanceof MojoError` handling keeps working.
+- A call whose flat `success:false` is a real answer, such as a connection
+  test, adds `refusal: 'return'` and keeps reading the reply.
+- Reads of a wrapped `data.success` are unaffected.
+- `err.errorCode` carries the refusal code and `err.data` the full reply, so
+  the server's reason is no longer lost.
+- `defineModel` actions and `mojoAction` behave as before.

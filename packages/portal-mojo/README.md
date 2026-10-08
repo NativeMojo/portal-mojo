@@ -9,6 +9,8 @@ npm install portal-mojo react react-dom react-router-dom @tanstack/react-query
 ```
 
 **Per-component reference docs (written for AI context): [`docs/`](docs/README.md).**
+**Upgrading from 0.2:** raw calls now reject a flat HTTP-200 refusal — see
+[Upgrading to 0.3](docs/client.md#upgrading-to-03).
 Live demos for everything: run `npm run dev:showcase` → **Develop → Components**.
 
 ## Subpath surfaces

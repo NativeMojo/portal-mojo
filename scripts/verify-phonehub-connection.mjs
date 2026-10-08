@@ -8,7 +8,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 const fixture = globalThis.__phoneConnection = { reply: {}, writes: [] };
-const runtime = `export * from '/packages/portal-mojo/src/client/runtime.ts'; export const useCan=()=>({can:true,me:{id:1}}); export const mojoList=async()=>({rows:[]}); export const mojoCall=async(path,opts)=>{globalThis.__phoneConnection.writes.push({path,body:{...opts.body}});return globalThis.__phoneConnection.reply;};`;
+const runtime = `export * from '/packages/portal-mojo/src/client/runtime.ts'; export const useCan=()=>({can:true,me:{id:1}}); export const mojoList=async()=>({rows:[]}); export const mojoCall=async(path,opts)=>{globalThis.__phoneConnection.writes.push({path,body:{...opts.body},opts});return globalThis.__phoneConnection.reply;};`;
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{
     name: 'phone-connection-fixture', enforce: 'pre',
     resolveId: id => id === '/__phone_runtime.ts' ? id : null,
@@ -33,6 +33,9 @@ try {
         fixture.reply = wrapped ? { status: true, data } : { status: true, ...data };
         assert.equal((await api.testPhoneConfigImperative(7)).status, false, 'A provider failure is not a successful connection, even with a successful REST envelope');
     }
+    const test = fixture.writes.at(-1);
+    assert.deepEqual(test.body, { test_connection: 1 });
+    assert.equal(test.opts.refusal, 'return', "The flat provider verdict is an answer: the test must pass refusal:'return' so unwrap does not reject it");
     fixture.reply = { status: true, data: { success: true, message: 'Key verified' } };
     assert.equal((await api.testPhoneConfigImperative(7)).status, true);
     fixture.reply = { status: true, data: { id: 7 } };
