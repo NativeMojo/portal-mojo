@@ -698,7 +698,27 @@ try {
     {
         const { MemoryRouter } = await import('react-router-dom');
         const { PersonalApiKeysPage } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/users/PersonalApiKeysPage.tsx');
+        // The persona the fault needed: a users administrator. The session
+        // left by the blocks above is the support viewer, who is served only
+        // their own keys with or without ?user=, so nothing asserted on the
+        // table could fail for them (#7476).
+        await act(async () => { await client.login('groups.manager@nativemojo.com', 'mojo'); });
         const signedIn = (await client.mojoCall('/api/user/me')).data;
+        assert.equal(signedIn.email, 'groups.manager@nativemojo.com', 'the Personal API Keys block runs as groups.manager');
+        assert.equal(Boolean(signedIn.permissions?.users || signedIn.permissions?.manage_users), true, 'groups.manager holds users or manage_users');
+        const asAdmin = { Authorization: `Bearer ${client.getAccessToken()}` };
+        // One key of their own, made here: no seeded key belongs to this user.
+        const ownLabel = 'verify-account own key (#7476)';
+        const minted = await mock.mockFetch('/api/auth/generate_api_key', { method: 'POST', headers: asAdmin, body: { label: ownLabel } });
+        assert.equal(minted.status, true, 'the mock mints a personal key for the administrator');
+        const ownKeys = (await mock.mockFetch('/api/account/api_keys', { headers: asAdmin, params: { user: signedIn.id, size: 100 } })).data;
+        assert.deepEqual(ownKeys.map((k) => [k.id, k.label]), [[minted.data.id, ownLabel]], 'the administrator owns exactly the key made here');
+        // Without ?user= the mock, like the server, hands this caller every
+        // owner's keys. That is the list the page showed before #7190.
+        const everyKey = (await mock.mockFetch('/api/account/api_keys', { headers: asAdmin, params: { size: 100 } })).data;
+        const otherLabels = everyKey.filter((k) => k.id !== minted.data.id).map((k) => k.label).filter(Boolean);
+        assert.equal(everyKey.some((k) => k.id === minted.data.id), true, 'the unscoped list includes the own key');
+        assert.equal(otherLabels.length > 0, true, 'unscoped, the mock serves the administrator other owners\' keys');
         const pageQc = new QueryClient({ defaultOptions: { queries: { retry: false, ...client.mojoQueryDefaults().queries } } });
         const host = document.body.appendChild(document.createElement('div'));
         const pageRoot = createRoot(host);
@@ -718,6 +738,13 @@ try {
         assert.equal(host.querySelector('table') === null, true, 'no table (and no Export) before the signed-in user is known');
         await wait(800);
         assert(host.querySelector('table'), 'the keys table renders once the signed-in user is known');
+        // The header renders before the rows do; wait for a key cell.
+        for (let i = 0; i < 40 && !host.querySelector('tbody .cell-name'); i += 1) await wait(100);
+        // Strings and booleans only, never a node (see above).
+        const tableText = host.querySelector('table').textContent;
+        assert.equal(tableText.includes(ownLabel), true, 'the table lists the administrator\'s own key');
+        assert.deepEqual(otherLabels.filter((label) => tableText.includes(label)), [], 'the table lists no other owner\'s key');
+        assert.equal(host.querySelectorAll('table tbody tr').length, 1, 'the table has one row: the own key');
         const listsSent = keyLists().length;
         assert(listsSent > 0, 'the Personal API Keys page lists /api/account/api_keys');
         const exportButton = host.querySelector('button[title="Export"]');
