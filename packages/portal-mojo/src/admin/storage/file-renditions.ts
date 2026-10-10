@@ -97,3 +97,15 @@ export async function pollRenditionConvergence(args: {
     }
     return 'timeout';
 }
+
+const ROLE_ACRONYMS = new Set(['hevc', 'mp4', 'webm', 'pdf']);
+
+/** `video_hevc` → "Video HEVC", `thumbnail_sm` → "Thumbnail sm". Display only; the role key is the identity. */
+export function renditionRoleLabel(role: string): string {
+    const words = role.split('_').filter(Boolean);
+    if (!words.length) return role;
+    return words.map((word, index) => {
+        if (ROLE_ACRONYMS.has(word)) return word.toUpperCase();
+        return index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+    }).join(' ');
+}

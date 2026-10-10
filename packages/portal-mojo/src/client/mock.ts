@@ -1,4 +1,5 @@
 import { fleetMock } from './fleet-mock';
+import { describeRenditions, validateRenditionSetting } from './renditions-mock';
 // In-memory django-mojo mock. Speaks the EXACT wire contract the real client
 // uses — envelope {status, data|rows..., message}, start/size paging, sort
 // with '-' prefix, search, and Django-style lookups (field, field__in,
@@ -679,6 +680,8 @@ function buildSettings(): MockSetting[] {
         // PostgreSQL unique_together permits repeated NULL group values. Keep
         // that live quirk executable instead of enforcing a stricter mock.
         { id: 404, created: now - 5 * 86400, modified: now - 5 * 86400, key: 'SITE_NAME', value: 'NativeMojo fallback', is_secret: false, group: null, secretValue: null },
+        // #7729: one rendition override so Media rendering shows a changed field beside greyed defaults on first load.
+        { id: 405, created: now - 3 * 86400, modified: now - 3 * 86400, key: 'FILEMAN_RENDITIONS_VIDEO', value: JSON.stringify({ video_hevc: { crf: 24 } }), is_secret: false, group: null, secretValue: null },
     ];
 }
 
@@ -6766,11 +6769,21 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         && !path.startsWith('/api/fileman/manager')
         && !path.startsWith('/api/fileman/file')
         && path !== '/api/fileman/upload/initiate'
+        && path !== '/api/fileman/renditions/options'
         && !path.startsWith('/api/shortlink/link')
         && !path.startsWith('/api/shortlink/history')) return undefined;
     const caller = userFromBearer(opts.headers);
     if (!caller) return permissionDenied(401);
     const method = (opts.method ?? 'GET').toUpperCase();
+
+    // #7729 — the rendition descriptor (django-mojo fileman #7728). Read-only;
+    // writes go through /api/settings like any other Setting row.
+    if (path === '/api/fileman/renditions/options') {
+        if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+        if (!hasGlobalPermission(caller, ['manage_settings', 'manage_files', 'files', 'groups'])) return permissionDenied();
+        const globalRows = db.settings.filter((row) => row.group == null && !row.is_secret).map((row) => ({ key: row.key, value: row.value }));
+        return { status: true, data: describeRenditions(globalRows) };
+    }
 
     if (path === '/api/fileman/upload/initiate') {
         if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
@@ -10390,6 +10403,11 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             if (!row) return { status: false, error: 'Setting not found', error_code: 404 };
             if (opts.method === 'DELETE') return { status: false, error: 'DELETE not allowed: Setting', error_code: 403 };
             if (opts.method === 'POST' && opts.body) {
+                if ('value' in opts.body && !row.is_secret) {
+                    // Registered validators run before the row mutates (Setting.on_rest_pre_save → config.validate).
+                    const refusal = validateRenditionSetting(typeof opts.body.key === 'string' ? opts.body.key : row.key, opts.body.value);
+                    if (refusal) return { status: false, error: refusal, error_code: 400 };
+                }
                 for (const [field, value] of Object.entries(opts.body)) {
                     if (field === 'is_secret') row.is_secret = Boolean(value);
                     else if (field === 'value') {
@@ -10414,6 +10432,10 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
                 else if (field === 'group') row.group = value == null || value === '' ? null : Number(value);
             }
             if (!row.key) return { status: false, error: 'key is required', error_code: 400 };
+            if (!row.is_secret) {
+                const refusal = validateRenditionSetting(row.key, row.value);
+                if (refusal) return { status: false, error: refusal, error_code: 400 };
+            }
             if (row.group != null && db.settings.some((candidate) => candidate.group === row.group && candidate.key === row.key)) return { status: false, error: 'Setting with this Key and Group already exists.', error_code: 400 };
             db.settings.push(row);
             return { status: true, data: serializeSetting(row), graph: 'default' };
