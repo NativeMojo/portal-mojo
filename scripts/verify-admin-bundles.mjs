@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temp = await mkdtemp(join(tmpdir(), 'portal-mojo-bundles-'));
-/** Per-chunk cap for every eager/default-route JS chunk (history below). */
-const EAGER_CHUNK_CAP = 525_000;
+/** Per-chunk cap for every eager/default-route JS chunk (history below).
+ *  2026-10-10 (#7729): 525000 -> 530000. main's portal entry sat at 524834 (166 bytes of
+ *  headroom); one more lazy route entry in the storage section (+374 bytes) tipped it. */
+const EAGER_CHUNK_CAP = 530_000;
 const budgets = {
     portal: {
         entry: 1_334_285,

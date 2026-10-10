@@ -21,6 +21,13 @@ const FIELD_LABELS: Record<string, string> = {
     bitrate: 'Bitrate', codec: 'Codec', crf: 'CRF', preset: 'Preset', duration: 'Seconds', audio: 'Audio', page: 'Page', max_pages: 'Max pages',
 };
 const PLACEHOLDERS: Record<string, string> = { bitrate: '2000k', time_offset: 'HH:MM:SS' };
+// Display order only — membership always comes from the descriptor's `fields[kind]` (served sorted).
+const FIELD_ORDER = ['width', 'height', 'mode', 'format', 'quality', 'time_offset', 'page', 'max_pages', 'bitrate', 'codec', 'crf', 'preset', 'duration', 'audio'];
+
+function orderFields(names: readonly string[]): string[] {
+    const rank = (name: string) => { const at = FIELD_ORDER.indexOf(name); return at === -1 ? FIELD_ORDER.length : at; };
+    return [...names].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
 
 function fieldLabel(name: string): string {
     return FIELD_LABELS[name] ?? name.replace(/_/g, ' ');
@@ -97,7 +104,8 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
     const roles = Object.keys(category.defaults);
     const value = useMemo(() => draftToValue(category, draft), [category, draft]);
     const dirty = !sameOverride(value, category.override);
-    const hints = useMemo(() => Object.fromEntries(validateDraft(category, draft).map((entry) => [`${entry.role}.${entry.field}`, entry.message])), [category, draft]);
+    // Hints wear the same slot and wording as a routed 400: the reason only, the role.field prefix is the label.
+    const hints = useMemo(() => Object.fromEntries(validateDraft(category, draft).map((entry) => [`${entry.role}.${entry.field}`, routeRenditionError(entry.message).message])), [category, draft]);
     const hasH265 = roles.some((role) => category.defaults[role]?.codec === 'h265');
 
     const change = (role: string, name: string, raw: unknown) => {
@@ -171,7 +179,7 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
             {roles.map((role) => {
                 const kind = category.role_kinds[role] ?? '';
                 const hideMp4 = hidesMp4Options(category, draft, role);
-                const names = (category.fields[kind] ?? Object.keys(category.defaults[role] ?? {})).filter((name) => !(hideMp4 && (MP4_ONLY_OPTIONS as readonly string[]).includes(name)));
+                const names = orderFields(category.fields[kind] ?? Object.keys(category.defaults[role] ?? {})).filter((name) => !(hideMp4 && (MP4_ONLY_OPTIONS as readonly string[]).includes(name)));
                 const roleError = errors[role];
                 const automatic = draft.automatic.includes(role);
                 const automaticDefault = category.automatic_default.includes(role);
