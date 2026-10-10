@@ -10,5 +10,7 @@ export * from './FileUploadSurface';
 export * from './FileView';
 export * from './FilePreview';
 export * from './storage-dialogs';
+export * from './rendition-settings';
+export * from './MediaRenderingPage';
 
 export { STORAGE_ADMIN_SECTION } from '../domains/infrastructure';

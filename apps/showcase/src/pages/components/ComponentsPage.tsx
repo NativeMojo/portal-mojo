@@ -98,6 +98,7 @@ const AdminJobsDemo = lazyDemo(() => import('./demos-admin-jobs'), 'AdminJobsDem
 const AdminMembersDemo = lazyDemo(() => import('./demos-admin-members'), 'AdminMembersDemo');
 const AdminIdentityUsersDemo = lazyDemo(() => import('./demos-admin-identity-users'), 'AdminIdentityUsersDemo');
 const AdminStorageDemo = lazyDemo(() => import('./demos-admin-storage'), 'AdminStorageDemo');
+const AdminMediaRenderingDemo = lazyDemo(() => import('./demos-admin-media-rendering'), 'AdminMediaRenderingDemo');
 const AdminEdgeDemo = lazyDemo(() => import('./demos-admin-edge'), 'AdminEdgeDemo');
 const AdminShortlinksDemo = lazyDemo(() => import('./demos-admin-shortlinks'), 'AdminShortlinksDemo');
 const AdminMessagingDemo = lazyDemo(() => import('./demos-admin-messaging'), 'AdminMessagingDemo');
@@ -459,6 +460,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-storage', title: 'Storage', icon: 'bi-hdd-stack',
                 blurb: 'Global S3 buckets, masked storage backends, explicit policy-backed file uploads, capability-safe sharing, and finite rendition convergence.',
                 render: () => <AdminStorageDemo />,
+            },
+            {
+                key: 'admin-media-rendering', title: 'Media rendering', icon: 'bi-sliders',
+                blurb: 'Descriptor-driven editor for the three rendition settings: typed per-role fields, runs-on-upload switches, greyed defaults, inline server refusals, and a reset that writes {} because Setting rows cannot be deleted.',
+                render: () => <AdminMediaRenderingDemo />,
             },
             {
                 key: 'admin-edge', title: 'Edge', icon: 'bi-hdd-network',

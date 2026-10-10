@@ -31,8 +31,10 @@ try {
     const section = admin.STORAGE_ADMIN_SECTION;
     assert.equal(section.id, 'storage');
     assert.equal(section.navigationGroup, 'infrastructure');
-    assert.deepEqual(section.routes.map((route) => route.path), ['buckets', 'backends', 'files']);
-    assert.deepEqual(section.routes.map((route) => route.permissions), [models.BUCKET_MANAGE_PERMS, models.STORAGE_VIEW_PERMS, models.STORAGE_VIEW_PERMS]);
+    assert.deepEqual(section.routes.map((route) => route.path), ['buckets', 'backends', 'files', 'rendering']);
+    // #7729: Media rendering edits Setting rows, so it carries the Settings page's gate and widens the section audience.
+    assert.deepEqual(section.routes.map((route) => route.permissions), [models.BUCKET_MANAGE_PERMS, models.STORAGE_VIEW_PERMS, models.STORAGE_VIEW_PERMS, ['sys.manage_settings', 'sys.groups']]);
+    assert.deepEqual(section.permissions, ['sys.view_fileman', 'sys.manage_files', 'sys.manage_aws', 'sys.files', 'sys.manage_settings', 'sys.groups']);
     assert(admin.ADMIN_SECTIONS.includes(section));
     assert(!section.routes.some((route) => route.path.includes(':id')));
     assert(admin.adminSectionRoutes([section]).some((route) => route.path === 'storage/files'));
@@ -42,6 +44,8 @@ try {
     assert.deepEqual(visible({ manage_aws: true }), ['buckets']);
     assert.deepEqual(visible({ manage_files: true }), ['backends', 'files']);
     assert.deepEqual(visible({ files: true }), ['buckets', 'backends', 'files']);
+    assert.deepEqual(visible({ manage_settings: true }), ['rendering']);
+    assert.deepEqual(visible({ groups: true }), ['rendering']);
     assert.equal(me.hasPermission({ id: 1, permissions: {} }, section.permissions, { permissions: { files: true, manage_aws: true } }), false);
 
     // Shared error boundary preserves numeric status + semantic code + safe evidence.

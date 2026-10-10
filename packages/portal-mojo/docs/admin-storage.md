@@ -8,8 +8,11 @@ import {
 ```
 
 `STORAGE_ADMIN_SECTION` contributes global/no-group Infrastructure routes at
-`storage/buckets`, `storage/backends`, and `storage/files` (or the same paths
-under an embedded `/system` mount). There are no record routes: buckets,
+`storage/buckets`, `storage/backends`, `storage/files` and `storage/rendering`
+(or the same paths under an embedded `/system` mount). `storage/rendering` is
+the Media rendering editor — see [admin-media-rendering.md](admin-media-rendering.md);
+it carries the Settings gate (`sys.manage_settings | sys.groups`), which the
+section audience therefore includes. There are no record routes: buckets,
 backends, nested files, and files use `modal.detail`.
 
 ## Permissions
