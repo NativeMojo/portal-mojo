@@ -6809,6 +6809,34 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/storage/MediaRenderingPage.tsx:reset:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/storage/MediaRenderingPage.tsx",
+      "owner": "reset",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "reset",
+      "target": null,
+      "fingerprint": "d922927e3f69947a2e34",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/MediaRenderingPage.tsx:CategoryPanel:reset:0",
+      "file": "packages/portal-mojo/src/admin/storage/MediaRenderingPage.tsx",
+      "owner": "CategoryPanel",
+      "launcher": "reset",
+      "body": [],
+      "category": "confirmation",
+      "parent": "CategoryPanel",
+      "target": "packages/portal-mojo/src/admin/storage/MediaRenderingPage.tsx:reset",
+      "fingerprint": "d493d79b4208be265073",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard:modal.open:0",
       "file": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx",
       "owner": "openVhostWizard",
@@ -7169,13 +7197,27 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "b6d289528dd071c2fe91",
+      "fingerprint": "18176e3da37f795622fb",
       "categories": [
         "dependency"
       ]
     },
     {
       "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:10",
+      "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "b6d289528dd071c2fe91",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:11",
       "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
       "owner": "<module>",
       "launcher": "import",
