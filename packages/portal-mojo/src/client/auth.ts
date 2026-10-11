@@ -10,8 +10,8 @@
 //     10 min, or older than 60 min, with a valid refresh token → refresh)
 //   · pre-request gate: bypass /api/token/refresh exactly (recursion guard)
 //     and requests made with no stored token (pre-login / public); otherwise
-//     ensureValidToken() — throws AuthRequiredError, which the transport
-//     turns into a synthetic 401 REJECT without calling fetch
+//     ensureValidToken() — blocks fetch on any refresh failure; only a
+//     confirmed denial becomes AuthRequiredError (synthetic 401)
 //   · auth-code / magic-token URL handoff: the param is scrubbed from the URL
 //     *synchronously, before any network call*, so a slow exchange cannot
 //     leak the one-time code to third-party scripts reading location.search
@@ -174,13 +174,18 @@ export function checkTokenStatus(): { action: TokenAction; reason: string } {
     return { action: 'none', reason: 'All tokens valid and not expiring soon' };
 }
 
-let refreshPromise: Promise<boolean> | null = null;
+type RefreshOutcome = { ok: true } | { ok: false; error?: unknown };
+let refreshPromise: Promise<RefreshOutcome> | null = null;
 
 /**
  * Refresh the access token. Single-flight: concurrent callers share one
  * in-flight POST. Always resolves to a boolean; never throws.
  */
 export function refreshTokens(): Promise<boolean> {
+    return refreshOutcome().then(result => result.ok);
+}
+
+function refreshOutcome(): Promise<RefreshOutcome> {
     if (!refreshPromise) {
         refreshPromise = doRefresh().finally(() => {
             refreshPromise = null;
@@ -189,13 +194,13 @@ export function refreshTokens(): Promise<boolean> {
     return refreshPromise;
 }
 
-async function doRefresh(): Promise<boolean> {
+async function doRefresh(): Promise<RefreshOutcome> {
     const refresh = getRefreshToken();
     const info = tokenInfo(refresh);
     if (!refresh || !info?.isValid || info.isExpired) {
         emitAuth('unauthorized');
         stopAutoRefresh();
-        return false;
+        return { ok: false };
     }
     const persistent = sessionIsPersistent();
     // The answer is for the session whose refresh token was sent. When the
@@ -208,30 +213,31 @@ async function doRefresh(): Promise<boolean> {
     const sessionUsable = (): boolean => checkTokenStatus().action !== 'logout';
     try {
         const body = await mojoCall(REFRESH_PATH, { method: 'POST', body: { refresh_token: refresh } });
-        if (superseded()) return sessionUsable();
+        if (superseded()) return { ok: sessionUsable() };
         const pkg = body.data as { access_token: string; refresh_token?: string };
         setTokens(pkg.access_token, pkg.refresh_token, persistent);
         emitAuth('refreshed');
-        return true;
+        return { ok: true };
     } catch (error) {
-        if (superseded()) return sessionUsable();
+        if (superseded()) return { ok: sessionUsable() };
         const status = error instanceof Error && 'status' in error ? (error as { status: number }).status : 0;
         if (status === 401 || status === 403) {
             emitAuth('unauthorized');
             stopAutoRefresh();
+            return { ok: false };
         } else {
             // Transient (network/5xx): keep the session, report, let the
             // watcher or the next gated request retry.
             emitAuth('refresh-failed', error);
+            return { ok: false, error };
         }
-        return false;
     }
 }
 
 /**
  * Pre-request gate (TokenManager.ensureValidToken). Throws AuthRequiredError
- * when the request must not be sent; the transport short-circuits it to a
- * synthetic-401 reject without touching the network.
+ * on confirmed denial. A temporary refresh failure preserves its original
+ * error; both failures block the protected request without touching fetch.
  */
 export async function ensureValidToken(): Promise<void> {
     const status = checkTokenStatus();
@@ -241,8 +247,11 @@ export async function ensureValidToken(): Promise<void> {
         throw new AuthRequiredError('Both access and refresh tokens are invalid');
     }
     if (status.action === 'refresh') {
-        const ok = await refreshTokens();
-        if (!ok) throw new AuthRequiredError('Token refresh failed');
+        const result = await refreshOutcome();
+        if (!result.ok) {
+            if ('error' in result) throw result.error;
+            throw new AuthRequiredError('Token refresh failed');
+        }
     }
 }
 

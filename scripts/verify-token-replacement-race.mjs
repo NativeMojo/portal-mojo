@@ -38,9 +38,9 @@ globalThis.window = {
     matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
 };
 
-function token(generation, kind) {
+function token(generation, kind, lifetime = 86400) {
     const now = Math.floor(Date.now() / 1000);
-    const claims = { uid: 42, iat: now, exp: now + 86400, auth_time: now - 4000, generation, token_type: kind };
+    const claims = { uid: 42, iat: now, exp: now + lifetime, auth_time: now - 4000, generation, token_type: kind };
     return `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.synthetic`;
 }
 const pair = (generation) => ({
@@ -61,12 +61,16 @@ const ok = (body) => ({ ok: true, status: 200, json: async () => body });
 const refused = () => ({ ok: false, status: 401, json: async () => ({ status: false, error: 'Invalid token signature' }) });
 
 let saveAnswer = null;
+let protectedCalls = 0;
+let refreshCalls = 0;
 globalThis.fetch = async (url) => {
     if (String(url).endsWith('/api/token/refresh')) {
+        refreshCalls++;
         const gate = refreshGate;
         gate.markStarted();
         return gate.answer;
     }
+    if (String(url).endsWith('/api/protected')) protectedCalls++;
     return ok(saveAnswer);
 };
 
@@ -172,6 +176,60 @@ try {
         assert.equal(await refresh, false, 'a refused refresh of the current session must fail');
         assert.deepEqual(events, ['unauthorized'], 'a refused refresh of the current session must report unauthorized');
         assert.equal(auth.getRefreshToken(), before.refresh_token, 'a refused refresh must not touch the stored tokens');
+    }
+
+    // A temporary refresh outage is an unavailable read, never a synthetic
+    // denial. All gated callers share one refresh and none send the protected
+    // request. The public boolean refresh API still resolves false.
+    for (const failure of [
+        { response: { ok: false, status: 503, json: async () => ({ error: 'Unavailable' }) }, status: 503 },
+        { response: null, status: 0 },
+    ]) {
+        begin(false);
+        const access = token('expiring', 'access', 30), refresh = token('expiring', 'refresh');
+        auth.setTokens(access, refresh, false);
+        const gate = holdRefresh();
+        const beforeRefresh = refreshCalls;
+        const calls = Array.from({ length: 8 }, () => client.mojoCall('/api/protected'));
+        const background = auth.refreshTokens();
+        const settled = Promise.allSettled(calls);
+        await gate.started;
+        if (failure.response) gate.release(failure.response);
+        else gate.release(Promise.reject(new TypeError('Network unavailable')));
+        assert.equal(await background, false);
+        assert.equal(refreshCalls, beforeRefresh + 1, 'gated callers and background upkeep must share one refresh');
+        for (const result of await settled) {
+            assert.equal(result.status, 'rejected');
+            assert.notEqual(result.reason.name, 'AuthRequiredError', 'a refresh outage must not become unauthorized');
+            assert.equal(result.reason.status ?? 0, failure.status);
+        }
+        assert.equal(protectedCalls, 0, 'failed refresh must block every protected request');
+        assert.deepEqual(events, ['refresh-failed'], 'temporary refresh failure must not emit unauthorized');
+        assert.equal(auth.getAccessToken(), access);
+        assert.equal(auth.getRefreshToken(), refresh);
+        assert.equal(auth.getAuthSnapshot().authenticated, true);
+        // Recovery happens on the next explicit gated call, with no replay of
+        // the failed requests and no new token storage policy.
+        const recovery = holdRefresh();
+        saveAnswer = { status: true, data: { recovered: true } };
+        const next = client.mojoCall('/api/protected');
+        await recovery.started;
+        recovery.release(ok({ status: true, data: pair('recovered') }));
+        assert.equal((await next).data.recovered, true);
+        assert.equal(protectedCalls, 1);
+        protectedCalls = 0;
+    }
+    for (const status of [401, 403]) {
+        begin(false);
+        auth.setTokens(token('expiring', 'access', 30), token('expiring', 'refresh'), false);
+        const gate = holdRefresh();
+        const call = client.mojoCall('/api/protected');
+        const rejection = assert.rejects(call, error => error.name === 'AuthRequiredError' && error.status === 401);
+        await gate.started;
+        gate.release({ ok: false, status, json: async () => ({ error: 'Permission denied' }) });
+        await rejection;
+        assert.deepEqual(events, ['unauthorized']);
+        assert.equal(protectedCalls, 0);
     }
 
     auth.logout();
