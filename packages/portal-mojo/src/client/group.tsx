@@ -73,6 +73,7 @@ export function GroupProvider({ children }: { children: ReactNode }) {
         return loadStoredGroupId();
     });
     const current = useRef({ groupId, uid: auth.uid, authenticated: auth.authenticated, generation: 0 });
+    const mounted = useRef(true);
     if (current.current.groupId !== groupId || current.current.uid !== auth.uid || current.current.authenticated !== auth.authenticated)
         current.current = { groupId, uid: auth.uid, authenticated: auth.authenticated, generation: current.current.generation + 1 };
     const deniedGroups = denials.get(queryClient) ?? new Map<string, { group: boolean; member: boolean }>();
@@ -92,7 +93,7 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     const assert = (id: number, uid: typeof auth.uid, generation: number, signal: AbortSignal) => {
         signal.throwIfAborted();
         const actor = getAuthSnapshot();
-        if (!actor.authenticated || actor.uid !== uid || current.current.uid !== uid || current.current.groupId !== id || current.current.generation !== generation)
+        if (!mounted.current || !actor.authenticated || actor.uid !== uid || current.current.uid !== uid || current.current.groupId !== id || current.current.generation !== generation)
             throw new DOMException('Group or account changed', 'AbortError');
     };
 
@@ -150,7 +151,14 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     useLayoutEffect(() => {
         setActiveGroupSignal(group?.id ?? null);
     }, [group?.id]);
-    useLayoutEffect(() => () => setActiveGroupSignal(null), []);
+    useLayoutEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            current.current.generation++;
+            setActiveGroupSignal(null);
+        };
+    }, []);
 
     const memberQuery = useQuery({
         queryKey: ['group-member', group?.id, auth.uid],

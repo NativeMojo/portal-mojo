@@ -166,3 +166,5 @@ still satisfy `useCan`. This flag is not a loading state. Global Admin clears
 it along with the group/member context. The server checks every request.
 Provider requests check their candidate group, selection generation and authenticated actor both
 before dispatch and after resolving, and consume TanStack's cancellation signal.
+Provider teardown invalidates pending request closures even if another query
+observer keeps their cache key alive.

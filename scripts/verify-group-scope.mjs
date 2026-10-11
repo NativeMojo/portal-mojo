@@ -155,7 +155,10 @@ try {
         try {
             await React.act(async () => root.render(h(QueryClientProvider, { client: qc }, tree)));
             await flush();
-            await body({ qc });
+            await body({ qc,
+                unmountProvider: () => React.act(async () => root.render(h(QueryClientProvider, {client:qc}))),
+                remountProvider: () => React.act(async () => root.render(h(QueryClientProvider, {client:qc}, h(GroupProvider,null,h(Capture))))),
+            });
             passed += 1;
             console.log(`ok    ${name}`);
         } catch (error) {
@@ -416,6 +419,23 @@ try {
         await flush();
         assert.equal(ctx.accessDenied,false);
         assert.equal(ctx.member?.id,24);
+    });
+    await run('S  provider teardown rejects a late result retained by another observer', {url:'/?group=4',children:[]},async ({qc,unmountProvider,remountProvider}) => {
+        const key=['group-member',4,'1'];
+        const observer=new QueryObserver(qc,{queryKey:key,enabled:false,gcTime:0});
+        const unsubscribe=observer.subscribe(() => {});
+        let release;
+        fixture.getMember=() => new Promise(resolve => {release=resolve;});
+        const pending=qc.refetchQueries({queryKey:key});
+        await flush();
+        await unmountProvider();
+        await React.act(async () => {release({id:999,permissions:{view_probe:true}});await pending;});
+        assert.notEqual(qc.getQueryData(key)?.id,999,'an unmounted provider cannot accept or re-authorize a late response');
+        fixture.getMember=async () => ({id:25,permissions:{view_probe:true}});
+        await remountProvider();
+        await flush();
+        assert.notEqual(ctx.member?.id,999);
+        unsubscribe();
     });
     // ── E. No provider mounted: the signal is still the fallback ──────
     await run('E  with no provider and no signal, an optional query goes unscoped', { provider: false, children: [h(ScopedProbe, { key: 's', path: '/api/probe-opt/x', name: 'opt' })] }, async () => {
