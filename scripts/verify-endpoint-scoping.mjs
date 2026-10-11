@@ -242,8 +242,8 @@ try {
     const groupSource = await readFile(new URL('../packages/portal-mojo/src/client/group.tsx', import.meta.url), 'utf8');
     assert.match(groupSource, /useLayoutEffect\(\(\) => \{\s+setActiveGroupSignal\(group\?\.id \?\? null\);\s+\}, \[group\?\.id\]\);/,
         'GroupProvider must write the signal from useLayoutEffect');
-    assert.match(groupSource, /useLayoutEffect\(\(\) => \(\) => setActiveGroupSignal\(null\), \[\]\);/,
-        "GroupProvider's unmount cleanup of the signal must be a useLayoutEffect too");
+    // Cleanup timing and retained-observer requests are exercised by the
+    // mounted verify-group-scope teardown case, not by its function spelling.
     assert.doesNotMatch(groupSource, /\buseEffect\(\(\) => (\{\s+|\(\) => )setActiveGroupSignal/,
         'no passive effect may write the signal');
 

@@ -113,6 +113,10 @@ try {
         // A host workspace must use the explicit denial flag as well as identity.
         return ctx.group && !ctx.accessDenied ? h('div', {'data-private-probe':true}, 'private data') : null;
     }
+    function CleanupProbe() {
+        React.useEffect(() => () => {rendered.signalAtUnmount=getActiveGroupId();}, []);
+        return null;
+    }
 
     // A hand-rolled query: the group reaches the request through the SIGNAL.
     function PlainProbe() {
@@ -420,7 +424,7 @@ try {
         assert.equal(ctx.accessDenied,false);
         assert.equal(ctx.member?.id,24);
     });
-    await run('S  provider teardown rejects a late result retained by another observer', {url:'/?group=4',children:[]},async ({qc,unmountProvider,remountProvider}) => {
+    await run('S  provider teardown rejects a late result retained by another observer', {url:'/?group=4',children:[h(CleanupProbe,{key:'cleanup'})]},async ({qc,unmountProvider,remountProvider}) => {
         const key=['group-member',4,'1'];
         const observer=new QueryObserver(qc,{queryKey:key,enabled:false,gcTime:0});
         const unsubscribe=observer.subscribe(() => {});
@@ -429,6 +433,7 @@ try {
         const pending=qc.refetchQueries({queryKey:key});
         await flush();
         await unmountProvider();
+        assert.equal(rendered.signalAtUnmount,null,'layout cleanup must clear the signal before child passive cleanup');
         await React.act(async () => {release({id:999,permissions:{view_probe:true}});await pending;});
         assert.notEqual(qc.getQueryData(key)?.id,999,'an unmounted provider cannot accept or re-authorize a late response');
         fixture.getMember=async () => ({id:25,permissions:{view_probe:true}});
