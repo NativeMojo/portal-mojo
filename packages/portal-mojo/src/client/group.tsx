@@ -8,8 +8,8 @@
 //   · on activation the user's member record for that group is fetched
 //     (`/api/group/<id>/member`) — group-context permissions flow from it
 //   · URL-group failure falls back to the stored group, then to none
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { mojoCall, mojoQueryDefaults, MojoError } from './client';
 import { getAuthSnapshot } from './auth';
 import { useAuthSnapshot } from './me';
@@ -20,6 +20,11 @@ import { setActiveGroupSignal } from './active-group';
 const STORAGE_KEY = 'active_group_id';
 const denied = (error: unknown) => error instanceof MojoError && [401, 403, 404].includes(error.status);
 const temporary = (error: unknown) => !(error instanceof MojoError) || error.status === 0 || error.status >= 500 || [408, 429].includes(error.status);
+const retry = (count: number, error: unknown) => !(error instanceof Error && error.name === 'AbortError') && mojoQueryDefaults().queries.retry(count, error);
+// Query keeps old data when a refetch fails, and its latest error can change
+// from 403 to 503. A known denial outlives either that error or a switcher row.
+// Share its lifetime with the cache, including provider remounts.
+const denials = new WeakMap<QueryClient, Map<string, { group: boolean; member: boolean }>>();
 
 function readUrlGroupParam(): string | null {
     if (typeof window === 'undefined') return null;
@@ -67,28 +72,50 @@ export function GroupProvider({ children }: { children: ReactNode }) {
         if (Number.isFinite(urlId) && urlId > 0) return urlId;
         return loadStoredGroupId();
     });
-    const current = useRef({ groupId, uid: auth.uid });
-    current.current = { groupId, uid: auth.uid };
-    const assert = (id: number, uid: typeof auth.uid, signal: AbortSignal) => {
+    const current = useRef({ groupId, uid: auth.uid, authenticated: auth.authenticated, generation: 0 });
+    if (current.current.groupId !== groupId || current.current.uid !== auth.uid || current.current.authenticated !== auth.authenticated)
+        current.current = { groupId, uid: auth.uid, authenticated: auth.authenticated, generation: current.current.generation + 1 };
+    const deniedGroups = denials.get(queryClient) ?? new Map<string, { group: boolean; member: boolean }>();
+    denials.set(queryClient, deniedGroups);
+    const [, rerender] = useReducer((value: number) => value + 1, 0);
+    const denialFor = (id: number, uid: typeof auth.uid) => {
+        const key = JSON.stringify([uid, id]);
+        let denial = deniedGroups.get(key);
+        if (!denial) deniedGroups.set(key, denial = { group: false, member: false });
+        return denial;
+    };
+    const select = (id: number | null) => {
+        current.current = { ...current.current, groupId: id, generation: current.current.generation + 1 };
+        setGroupId(id);
+        rerender();
+    };
+    const assert = (id: number, uid: typeof auth.uid, generation: number, signal: AbortSignal) => {
         signal.throwIfAborted();
         const actor = getAuthSnapshot();
-        if (!actor.authenticated || actor.uid !== uid || current.current.uid !== uid || current.current.groupId !== id)
+        if (!actor.authenticated || actor.uid !== uid || current.current.uid !== uid || current.current.groupId !== id || current.current.generation !== generation)
             throw new DOMException('Group or account changed', 'AbortError');
     };
 
     const groupQuery = useQuery({
         queryKey: ['group', groupId, auth.uid],
         queryFn: async ({ signal }) => {
-            const id = groupId!, uid = auth.uid;
-            const check = () => assert(id, uid, signal);
+            const id = groupId!, uid = auth.uid, generation = current.current.generation;
+            const check = () => assert(id, uid, generation, signal);
             check();
-            const result = await mojoCall(`/api/group/${id}`, { signal, beforeSend: check });
-            check();
-            return result.data as Group;
+            try {
+                const result = await mojoCall(`/api/group/${id}`, { signal, beforeSend: check });
+                check();
+                denialFor(id, uid).group = false;
+                return result.data as Group;
+            } catch (error) {
+                check();
+                if (denied(error)) Object.assign(denialFor(id, uid), { group: true, member: true });
+                throw error;
+            }
         },
         enabled: auth.authenticated && groupId != null,
         staleTime: 5 * 60_000,
-        retry: mojoQueryDefaults().queries.retry,
+        retry,
     });
 
     // web-mojo's fallback chain: a failing URL/stored group falls back to the
@@ -99,16 +126,17 @@ export function GroupProvider({ children }: { children: ReactNode }) {
         if (stored != null && stored !== groupId) {
             console.warn(`[portal-mojo] active group ${groupId} failed to load; falling back to stored group ${stored}`);
             writeUrlGroupParam(stored);
-            setGroupId(stored);
+            select(stored);
         } else {
             console.warn(`[portal-mojo] active group ${groupId} failed to load; clearing group context`);
             clearStoredGroupId();
             writeUrlGroupParam(null);
-            setGroupId(null);
+            select(null);
         }
     }, [groupQuery.isError, groupQuery.data, groupQuery.error, groupId]);
 
-    const group = auth.authenticated && groupId != null && !denied(groupQuery.error) ? (groupQuery.data ?? null) : null;
+    const groupDenied = groupId != null && (denialFor(groupId, auth.uid).group || denied(groupQuery.error));
+    const group = auth.authenticated && groupId != null && !groupDenied ? (groupQuery.data ?? null) : null;
 
     // Mirror the RESOLVED group into the module signal (scoped.ts's plain-fn
     // consumers). The loaded id, not the candidate — a failing/loading group
@@ -127,38 +155,58 @@ export function GroupProvider({ children }: { children: ReactNode }) {
     const memberQuery = useQuery({
         queryKey: ['group-member', group?.id, auth.uid],
         queryFn: async ({ signal }) => {
-            const id = group!.id, uid = auth.uid;
-            const check = () => assert(id, uid, signal);
+            const id = group!.id, uid = auth.uid, generation = current.current.generation;
+            const check = () => assert(id, uid, generation, signal);
             check();
-            const result = await mojoCall(`/api/group/${id}/member`, { signal, beforeSend: check });
-            check();
-            return result.data as MemberLike;
+            try {
+                const result = await mojoCall(`/api/group/${id}/member`, { signal, beforeSend: check });
+                check();
+                denialFor(id, uid).member = false;
+                return result.data as MemberLike;
+            } catch (error) {
+                check();
+                if (denied(error)) denialFor(id, uid).member = true;
+                throw error;
+            }
         },
         enabled: auth.authenticated && group != null,
         staleTime: 5 * 60_000,
-        retry: mojoQueryDefaults().queries.retry,
+        retry,
     });
 
+    const memberDenied = groupId != null && (denialFor(groupId, auth.uid).member || denied(memberQuery.error));
     const value = useMemo<GroupContextValue>(() => ({
         group,
-        member: (group != null && !denied(memberQuery.error) ? memberQuery.data : null) ?? null,
-        accessDenied: denied(groupQuery.error) || (group != null && denied(memberQuery.error)),
+        member: (group != null && !memberDenied ? memberQuery.data : null) ?? null,
+        accessDenied: groupDenied || memberDenied,
         loading: auth.authenticated && groupId != null
             && (groupQuery.isLoading || (group != null && memberQuery.isLoading)),
         setActiveGroup(next: Group) {
-            // Seed the cache with the row the switcher already holds — no
-            // refetch flash on switch.
-            queryClient.setQueryData(['group', next.id, auth.uid], next);
+            const groupKey = ['group', next.id, auth.uid];
+            const memberKey = ['group-member', next.id, auth.uid];
+            const denial = denialFor(next.id, auth.uid);
+            if (denial.group || denial.member || denied(queryClient.getQueryState(groupKey)?.error) || denied(queryClient.getQueryState(memberKey)?.error)) {
+                // Selecting an old row cannot re-authorize a denied context.
+                // Forget both cached reads; keep the latch until each actual
+                // guarded request succeeds.
+                void queryClient.cancelQueries({ queryKey: groupKey, exact: true });
+                void queryClient.cancelQueries({ queryKey: memberKey, exact: true });
+                queryClient.removeQueries({ queryKey: groupKey, exact: true });
+                queryClient.removeQueries({ queryKey: memberKey, exact: true });
+            } else {
+                // An authorized switcher row avoids an ordinary refetch flash.
+                queryClient.setQueryData(groupKey, next);
+            }
             saveStoredGroupId(next.id);
             writeUrlGroupParam(next.id);
-            setGroupId(next.id);
+            select(next.id);
         },
         clearActiveGroup() {
             clearStoredGroupId();
             writeUrlGroupParam(null);
-            setGroupId(null);
+            select(null);
         },
-    }), [group, memberQuery.data, memberQuery.error, memberQuery.isLoading, groupQuery.error, groupQuery.isLoading, groupId, auth.authenticated, auth.uid, queryClient]);
+    }), [group, memberQuery.data, memberDenied, memberQuery.isLoading, groupDenied, groupQuery.isLoading, groupId, auth.authenticated, auth.uid, queryClient]);
 
     return <GroupContext.Provider value={value}>{children}</GroupContext.Provider>;
 }

@@ -155,11 +155,14 @@ An unresolved initial group still follows the URL/stored fallback chain.
 Group 401/403/404 suppress the cached group immediately and run that fallback;
 membership 401/403/404 keep the group identity but expose `member: null` and
 `accessDenied: true`. These definitive denials do not retry.
+Once denied, a later network failure or selecting an old switcher row cannot
+restore cached grants. Recovery requires successful guarded group and member
+reads; membership-only denial requires a successful member read.
 
 A private workspace must treat `accessDenied === true` as a boundary: cancel
 pending work, hide cached private results and remove temporary preview URLs.
 Removing `member` only removes member-derived grants; user/system grants may
 still satisfy `useCan`. This flag is not a loading state. Global Admin clears
 it along with the group/member context. The server checks every request.
-Provider requests check their candidate group and authenticated actor both
+Provider requests check their candidate group, selection generation and authenticated actor both
 before dispatch and after resolving, and consume TanStack's cancellation signal.
