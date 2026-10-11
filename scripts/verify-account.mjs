@@ -690,6 +690,11 @@ try {
     assert.notEqual(client.getAccessToken(), rotatedFrom, 'and keeps this session on the rotated login');
     assert(!button('Sign out everywhere else'), 'the action toast dismisses on click');
 
+    // The account flow is finished. Tear down its host before loading the
+    // independent Admin page: that module load can outlast a success toast's
+    // timer, whose mounted React update would otherwise run outside act().
+    await act(async () => root.unmount());
+
     // Admin "Personal API Keys" (#7190): the REAL ModelTable, under a router.
     // A users-grant caller is served every user's keys without ?user=, so
     // every list and export the page sends must carry the signed-in user's
@@ -761,7 +766,6 @@ try {
         dom.window.HTMLAnchorElement.prototype.click = anchorClick;
     }
 
-    await act(async () => root.unmount());
     console.error = originalError;
     assert.deepEqual(consoleErrors.filter((line) => !/inert/.test(line)), [], 'no console errors while mounted');
     console.log('account module verified (no admin barrel, MeSaveModel me write, status-only cache, TOTP shown-once lock + no secret in any cache, six sections render)');
