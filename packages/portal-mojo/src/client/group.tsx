@@ -8,15 +8,18 @@
 //   · on activation the user's member record for that group is fetched
 //     (`/api/group/<id>/member`) — group-context permissions flow from it
 //   · URL-group failure falls back to the stored group, then to none
-import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { mojoCall, mojoGet } from './client';
+import { mojoCall, mojoQueryDefaults, MojoError } from './client';
+import { getAuthSnapshot } from './auth';
 import { useAuthSnapshot } from './me';
 import type { MemberLike } from './me';
 import { GroupContext, type Group, type GroupContextValue } from './group-context';
 import { setActiveGroupSignal } from './active-group';
 
 const STORAGE_KEY = 'active_group_id';
+const denied = (error: unknown) => error instanceof MojoError && [401, 403, 404].includes(error.status);
+const temporary = (error: unknown) => !(error instanceof MojoError) || error.status === 0 || error.status >= 500 || [408, 429].includes(error.status);
 
 function readUrlGroupParam(): string | null {
     if (typeof window === 'undefined') return null;
@@ -64,18 +67,34 @@ export function GroupProvider({ children }: { children: ReactNode }) {
         if (Number.isFinite(urlId) && urlId > 0) return urlId;
         return loadStoredGroupId();
     });
+    const current = useRef({ groupId, uid: auth.uid });
+    current.current = { groupId, uid: auth.uid };
+    const assert = (id: number, uid: typeof auth.uid, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        const actor = getAuthSnapshot();
+        if (!actor.authenticated || actor.uid !== uid || current.current.uid !== uid || current.current.groupId !== id)
+            throw new DOMException('Group or account changed', 'AbortError');
+    };
 
     const groupQuery = useQuery({
         queryKey: ['group', groupId, auth.uid],
-        queryFn: () => mojoGet<Group>('/api/group', groupId!),
+        queryFn: async ({ signal }) => {
+            const id = groupId!, uid = auth.uid;
+            const check = () => assert(id, uid, signal);
+            check();
+            const result = await mojoCall(`/api/group/${id}`, { signal, beforeSend: check });
+            check();
+            return result.data as Group;
+        },
         enabled: auth.authenticated && groupId != null,
         staleTime: 5 * 60_000,
+        retry: mojoQueryDefaults().queries.retry,
     });
 
     // web-mojo's fallback chain: a failing URL/stored group falls back to the
     // stored one (when different), else the context clears entirely.
     useEffect(() => {
-        if (!groupQuery.isError || groupId == null) return;
+        if (!groupQuery.isError || groupId == null || (groupQuery.data && temporary(groupQuery.error))) return;
         const stored = loadStoredGroupId();
         if (stored != null && stored !== groupId) {
             console.warn(`[portal-mojo] active group ${groupId} failed to load; falling back to stored group ${stored}`);
@@ -87,9 +106,9 @@ export function GroupProvider({ children }: { children: ReactNode }) {
             writeUrlGroupParam(null);
             setGroupId(null);
         }
-    }, [groupQuery.isError, groupId]);
+    }, [groupQuery.isError, groupQuery.data, groupQuery.error, groupId]);
 
-    const group = groupId != null ? (groupQuery.data ?? null) : null;
+    const group = auth.authenticated && groupId != null && !denied(groupQuery.error) ? (groupQuery.data ?? null) : null;
 
     // Mirror the RESOLVED group into the module signal (scoped.ts's plain-fn
     // consumers). The loaded id, not the candidate — a failing/loading group
@@ -107,14 +126,23 @@ export function GroupProvider({ children }: { children: ReactNode }) {
 
     const memberQuery = useQuery({
         queryKey: ['group-member', group?.id, auth.uid],
-        queryFn: async () => (await mojoCall(`/api/group/${group!.id}/member`)).data as MemberLike,
+        queryFn: async ({ signal }) => {
+            const id = group!.id, uid = auth.uid;
+            const check = () => assert(id, uid, signal);
+            check();
+            const result = await mojoCall(`/api/group/${id}/member`, { signal, beforeSend: check });
+            check();
+            return result.data as MemberLike;
+        },
         enabled: auth.authenticated && group != null,
         staleTime: 5 * 60_000,
+        retry: mojoQueryDefaults().queries.retry,
     });
 
     const value = useMemo<GroupContextValue>(() => ({
         group,
-        member: (group != null ? memberQuery.data : null) ?? null,
+        member: (group != null && !denied(memberQuery.error) ? memberQuery.data : null) ?? null,
+        accessDenied: denied(groupQuery.error) || (group != null && denied(memberQuery.error)),
         loading: auth.authenticated && groupId != null
             && (groupQuery.isLoading || (group != null && memberQuery.isLoading)),
         setActiveGroup(next: Group) {
@@ -130,7 +158,7 @@ export function GroupProvider({ children }: { children: ReactNode }) {
             writeUrlGroupParam(null);
             setGroupId(null);
         },
-    }), [group, memberQuery.data, memberQuery.isLoading, groupQuery.isLoading, groupId, auth.authenticated, auth.uid, queryClient]);
+    }), [group, memberQuery.data, memberQuery.error, memberQuery.isLoading, groupQuery.error, groupQuery.isLoading, groupId, auth.authenticated, auth.uid, queryClient]);
 
     return <GroupContext.Provider value={value}>{children}</GroupContext.Provider>;
 }

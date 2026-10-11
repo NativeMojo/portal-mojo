@@ -20,6 +20,8 @@ export interface GroupContextValue {
     member: MemberLike | null;
     /** True while boot resolution or a switch is in flight. */
     loading: boolean;
+    /** Definitive group/member read denial. Consumers must fence cached private workspaces. */
+    accessDenied?: boolean;
     setActiveGroup(group: Group): void;
     clearActiveGroup(): void;
 }

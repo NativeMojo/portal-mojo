@@ -146,7 +146,7 @@ function guardedElement(section: AdminSection, route: AdminRoute, sections: read
 export function AdminGlobalScope({ children }: { children: ReactNode }) {
     const outer = useContext(GroupContext);
     if (!outer) return children;
-    return createElement(GroupContext.Provider, { value: { ...outer, group: null, member: null, loading: false }, children });
+    return createElement(GroupContext.Provider, { value: { ...outer, group: null, member: null, loading: false, accessDenied: false }, children });
 }
 
 function routeVisible(section: AdminSection, route: AdminRoute, me: ReturnType<typeof useMe>['data']): boolean {

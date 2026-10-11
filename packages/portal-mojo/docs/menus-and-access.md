@@ -140,7 +140,7 @@ converging it onto flat sections is a named follow-up.
 ## Group context (A3)
 
 Product portals place `<GroupProvider>` at the app root. `useActiveGroup() → {group, member,
-loading, setActiveGroup, clearActiveGroup}`. The active group id rides the
+loading, accessDenied, setActiveGroup, clearActiveGroup}`. The active group id rides the
 REAL `?group=` search param (hash-safe, deep-linkable) with localStorage
 fallback; activating a group fetches the caller's member record
 (`/api/group/<id>/member`) whose permissions feed `useCan`.
@@ -148,3 +148,18 @@ fallback; activating a group fetches the caller's member record
 embedded-parent rows, kind chips); `RequiresGroup` wraps pages that need a
 group and shows the pick-a-group state otherwise. Do not install these in the
 standalone Admin shell; they belong to group-scoped product navigation.
+
+A cached group and membership remain resolved during network errors and server
+5xx responses. The URL, stored selection and active-group signal stay in place.
+An unresolved initial group still follows the URL/stored fallback chain.
+Group 401/403/404 suppress the cached group immediately and run that fallback;
+membership 401/403/404 keep the group identity but expose `member: null` and
+`accessDenied: true`. These definitive denials do not retry.
+
+A private workspace must treat `accessDenied === true` as a boundary: cancel
+pending work, hide cached private results and remove temporary preview URLs.
+Removing `member` only removes member-derived grants; user/system grants may
+still satisfy `useCan`. This flag is not a loading state. Global Admin clears
+it along with the group/member context. The server checks every request.
+Provider requests check their candidate group and authenticated actor both
+before dispatch and after resolving, and consume TanStack's cancellation signal.

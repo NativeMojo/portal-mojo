@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { createServer } from 'vite';
-import { createElement } from 'react';
+import { createElement, useContext } from 'react';
 import { renderToString } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -48,6 +48,20 @@ assert.deepEqual(sourceExports, exportContract, 'portal-mojo/admin TypeScript ex
 const server = await createServer({ root, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
 try {
     const core = await server.ssrLoadModule('/packages/portal-mojo/src/admin/core/index.ts');
+    const { GroupContext } = await server.ssrLoadModule('/packages/portal-mojo/src/client/group-context.ts');
+    function ScopeProbe() {
+        const value = useContext(GroupContext);
+        assert.equal(value.group, null);
+        assert.equal(value.member, null);
+        assert.equal(value.loading, false);
+        assert.equal(value.accessDenied, false, 'a group denial must not leak into global Admin');
+        return null;
+    }
+    renderToString(createElement(GroupContext.Provider, { value: {
+        group: { id: 4, name: 'Denied group', kind: 'organization' },
+        member: { permissions: { admin: true } }, loading: false,
+        accessDenied: true, setActiveGroup() {}, clearActiveGroup() {},
+    } }, createElement(core.AdminGlobalScope, { children: createElement(ScopeProbe) })));
     const admin = await server.ssrLoadModule('/packages/portal-mojo/src/admin/index.ts');
     assert.deepEqual(admin.ADMIN_SECTIONS.map((section) => section.id), ['dashboard', 'groups', 'personal-api-keys', 'users', 'members', 'credentials', 'signin', 'monitoring', 'cloudwatch', 'settings', 'fleet-configuration', 'security-operations', 'bouncer', 'device-intel', 'geoip', 'jobs', 'network-security', 'dns', 'storage', 'edge', 'shortlinks', 'email', 'public-messages', 'push', 'phonehub', 'assistant']);
     assert(admin.ADMIN_SECTIONS.flatMap((section) => section.routes).every((route) => 'loadComponent' in route && !('component' in route)), 'all built-in routes must use the explicit lazy arm');

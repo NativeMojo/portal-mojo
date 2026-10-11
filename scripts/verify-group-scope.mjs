@@ -34,6 +34,9 @@ const fixture = globalThis.__groupScope = {
     calls: [],
     // The provider's group fetch; a case replaces it to hold the load open.
     getGroup: async (_endpoint, id) => ({ id, name: `group ${id}`, kind: 'organization' }),
+    getMember: async () => ({ id: 1, permissions: { view_probe: true } }),
+    dispatchGate: null,
+    groupDispatches: [],
 };
 const REAL_CLIENT = '/packages/portal-mojo/src/client/client.ts';
 const recorder = `export * from '${REAL_CLIENT}';
@@ -43,7 +46,16 @@ export const mojoCall = async (path, opts = {}) => {
 };`;
 const groupClient = `export * from '${REAL_CLIENT}';
 export const mojoGet = (endpoint, id) => globalThis.__groupScope.getGroup(endpoint, id);
-export const mojoCall = async () => ({ status: true, data: { id: 1, permissions: {} } });`;
+export const mojoCall = async (path, opts = {}) => {
+    const f = globalThis.__groupScope;
+    if (f.dispatchGate) await f.dispatchGate;
+    opts.beforeSend?.();
+    opts.signal?.throwIfAborted();
+    f.groupDispatches.push(path);
+    const member = path.endsWith('/member');
+    const id = Number(path.split('/')[3]);
+    return { status: true, data: await (member ? f.getMember(id) : f.getGroup('/api/group', id)) };
+};`;
 const VIRTUAL = { '/__group_scope_recorder.ts': recorder, '/__group_scope_group_client.ts': groupClient };
 const REWRITES = { '/client/scoped.ts': '/__group_scope_recorder.ts', '/client/group.tsx': '/__group_scope_group_client.ts' };
 const rewritten = new Set();
@@ -65,13 +77,15 @@ const server = await createServer({ root: process.cwd(), appType: 'custom', logL
 
 const React = await import('react');
 const { createRoot } = await import('react-dom/client');
-const { QueryClient, QueryClientProvider, useQuery } = await import('@tanstack/react-query');
+const { QueryClient, QueryClientProvider, useQuery, QueryObserver } = await import('@tanstack/react-query');
 const h = React.createElement;
 
 const failures = [];
 let passed = 0;
 
 try {
+    const { MojoError } = await server.ssrLoadModule('/packages/portal-mojo/src/client/errors.ts');
+    const { hasPermission } = await server.ssrLoadModule('/packages/portal-mojo/src/client/me.ts');
     const { GroupProvider, useActiveGroup } = await server.ssrLoadModule('/packages/portal-mojo/src/client/group.tsx');
     const { useScopedQuery, mojoScopedCall } = await server.ssrLoadModule('/packages/portal-mojo/src/client/scoped.ts');
     const { registerEndpointScope, resetEndpointScopes } = await server.ssrLoadModule('/packages/portal-mojo/src/client/endpoint-scope.ts');
@@ -116,6 +130,9 @@ try {
 
     async function run(name, { url = '/', provider = true, getGroup, signal = null, children }, body) {
         fixture.calls.length = 0;
+        fixture.groupDispatches.length = 0;
+        fixture.dispatchGate = null;
+        fixture.getMember = async () => ({ id: 1, permissions: { view_probe: true } });
         fixture.getGroup = getGroup ?? (async (_endpoint, id) => group(id));
         for (const key of Object.keys(rendered)) delete rendered[key];
         ctx = null;
@@ -127,7 +144,7 @@ try {
         registerEndpointScope('/api/probe/');
         registerEndpointScope('/api/probe-opt/', { required: false });
         setActiveGroupSignal(signal);
-        const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const qc = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } });
         const root = createRoot(document.getElementById('root'));
         const tree = provider ? h(GroupProvider, null, h(Capture), ...children) : h(React.Fragment, null, ...children);
         try {
@@ -223,6 +240,83 @@ try {
         assert.deepEqual(callsTo('/api/probe-opt/plain-null').map(groupOf), [4], 'a null group on mojoScopedCall still falls back to the signal');
     });
 
+    await run('G  cached group 503 retains group, URL, storage and member', { url:'/?group=4', children:[] }, async ({qc}) => {
+        await React.act(async () => ctx.setActiveGroup(group(4)));
+        await flush();
+        fixture.getGroup = async () => { throw new MojoError('Temporary outage',503); };
+        await React.act(async () => { await qc.refetchQueries({queryKey:['group',4,'1']}); });
+        await flush();
+        assert.equal(ctx.group?.id,4,'a cached 503 must retain the group');
+        assert.equal(ctx.member?.permissions.view_probe,true);
+        assert.equal(getActiveGroupId(),4);
+        assert.equal(localStorage.getItem('active_group_id'),'4');
+        assert.equal(new URLSearchParams(window.location.search).get('group'),'4');
+        assert.notEqual(ctx.accessDenied,true);
+    });
+    await run('H  cached member 503 retains member permissions', { url:'/?group=4',children:[] },async ({qc}) => {
+        fixture.getMember = async () => { throw new MojoError('Temporary outage',503); };
+        await React.act(async () => { await qc.refetchQueries({queryKey:['group-member',4,'1']}); });
+        await flush();
+        assert.equal(ctx.group?.id,4);
+        assert.equal(ctx.member?.permissions.view_probe,true);
+        assert.notEqual(ctx.accessDenied,true);
+    });
+    await run('I  cached member 403 exposes explicit workspace denial', { url:'/?group=4',children:[] },async ({qc}) => {
+        let calls=0;
+        fixture.getMember=async () => { calls++; throw new MojoError('Forbidden',403); };
+        // Even a consumer that configures retries may not postpone denial.
+        qc.setDefaultOptions({queries:{retry:3,retryDelay:0}});
+        await React.act(async () => { await qc.refetchQueries({queryKey:['group-member',4,'1']}); });
+        await flush();
+        assert.equal(calls,1,'definitive membership denial must not retry');
+        assert.equal(ctx.group?.id,4,'identity may remain for a denied shell');
+        assert.equal(ctx.member,null,'cached grants must disappear');
+        assert.equal(ctx.accessDenied,true,'a workspace must have an explicit fence');
+        assert.equal(ctx.loading,false,'denial is not loading');
+        assert.equal(hasPermission({id:1,permissions:{view_probe:true}},'view_probe',ctx.member),true,'user grants remain separate; the workspace must use accessDenied');
+    });
+    await run('J  cached group 403 never remains resolved', { url:'/?group=4',children:[] },async ({qc}) => {
+        fixture.getGroup=async () => { throw new MojoError('Forbidden',403); };
+        await React.act(async () => { await qc.refetchQueries({queryKey:['group',4,'1']}); });
+        await flush();
+        assert.equal(ctx.group,null);
+        assert.equal(ctx.member,null);
+        assert.equal(getActiveGroupId(),null);
+    });
+    await run('K  initial unresolved group failure still clears context', { url:'/?group=4',getGroup:async () => { throw new MojoError('Forbidden',403); },children:[] },async () => {
+        await flush();
+        assert.equal(ctx.group,null);
+        assert.equal(new URLSearchParams(window.location.search).get('group'),null);
+    });
+    await run('L  a held dispatch cannot send after the group changes', { url:'/?group=4',children:[] },async ({qc}) => {
+        let release;
+        fixture.dispatchGate=new Promise(resolve => { release=resolve; });
+        fixture.groupDispatches.length=0;
+        const pending=qc.refetchQueries({queryKey:['group-member',4,'1']});
+        await flush();
+        await React.act(async () => ctx.setActiveGroup(group(7)));
+        await React.act(async () => { release(); await pending; });
+        fixture.dispatchGate=null;
+        await flush();
+        assert.ok(!fixture.groupDispatches.includes('/api/group/4/member'),'beforeSend must reject the old candidate after auth waiting');
+        assert.equal(ctx.group?.id,7);
+    });
+    await run('M  a late result cannot restore a cleared group while another observer holds its key', { url:'/?group=4',children:[] },async ({qc}) => {
+        const key=['group-member',4,'1'];
+        const observer=new QueryObserver(qc,{queryKey:key,enabled:false});
+        const unsubscribe=observer.subscribe(() => {});
+        let release;
+        fixture.getMember=() => new Promise(resolve => { release=resolve; });
+        const pending=qc.refetchQueries({queryKey:key});
+        await flush();
+        await React.act(async () => ctx.clearActiveGroup());
+        await React.act(async () => { release({id:999,permissions:{view_probe:true}}); await pending; });
+        await flush();
+        assert.notEqual(qc.getQueryData(key)?.id,999,'post-await guard must reject a late response even with another observer');
+        assert.equal(ctx.group,null);
+        assert.equal(ctx.member,null);
+        unsubscribe();
+    });
     // ── E. No provider mounted: the signal is still the fallback ──────
     await run('E  with no provider and no signal, an optional query goes unscoped', { provider: false, children: [h(ScopedProbe, { key: 's', path: '/api/probe-opt/x', name: 'opt' })] }, async () => {
         assert.deepEqual(callsTo('/api/probe-opt/x').map(groupOf), [null], 'no provider and no signal means unscoped');
