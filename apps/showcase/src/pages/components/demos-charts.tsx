@@ -1,6 +1,7 @@
 // Chart demos: SeriesChart with static data (deterministic — renders the
 // same on mock and live) and MetricsChart driving the real metrics endpoint.
-import { MetricsChart, SeriesChart } from 'portal-mojo/charts';
+import { useEffect, useRef, useState } from 'react';
+import { MetricsChart, MetricsChartView, SeriesChart, QUICK_RANGES, metricsQuickWindow } from 'portal-mojo/charts';
 
 const LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DATASETS = [
@@ -12,6 +13,7 @@ const DATASETS = [
 export function ChartsDemo() {
     return (
         <>
+            <ScopedMetricsDemo />
             <div className="panel panel-pad">
                 <div className="eyebrow">SeriesChart · static data</div>
                 <h3 className="panel-subtitle">Line (crosshair tooltip, legend toggles)</h3>
@@ -48,4 +50,42 @@ export function ChartsDemo() {
             />
         </>
     );
+}
+
+function ScopedMetricsDemo() {
+    const [window, setWindow] = useState(() => metricsQuickWindow('1h', 'minutes'));
+    const [owner, setOwner] = useState(() => new AbortController());
+    const expiryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    useEffect(() => () => clearTimeout(expiryTimer.current), [owner]);
+    const [revision, setRevision] = useState(0);
+    const [mode, setMode] = useState<'ready' | 'loading' | 'error'>('ready');
+    const [narrow, setNarrow] = useState(false);
+    const refresh = () => { setRevision((n) => n + 1); setMode('ready'); if (window.range) setWindow(metricsQuickWindow(window.range, window.granularity)); };
+    const times = [60, 120, 180, 240, 720, 780, 840].map((n) => window.dt_end - 900 + n);
+    return <div>
+        <div className="panel panel-pad">
+            <div className="eyebrow">MetricsChartView · caller-owned snapshot</div>
+            <p>Try the shared controls, missing readings, statistics and CSV. Schedule expiry, then open a dialog to see its private data clear.</p>
+            <div className="demo-row">
+                <button className="btn" onClick={() => { clearTimeout(expiryTimer.current); expiryTimer.current = setTimeout(() => owner.abort(), 3000); }}>Expire in 3 seconds</button>
+                <button className="btn" onClick={() => { owner.abort(); setOwner(new AbortController()); }}>New snapshot</button>
+                <button className="btn" onClick={() => setMode('loading')}>Show loading</button>
+                <button className="btn" onClick={() => setMode('error')}>Show error</button>
+                <button className="btn" onClick={() => setNarrow(!narrow)}>{narrow ? 'Wide chart' : 'Narrow chart'}</button>
+                <span>Refreshes: {revision}</span>
+            </div>
+        </div>
+        <div style={{ maxWidth: narrow ? 360 : undefined }}>
+            <MetricsChartView title="Resource history" window={window} onWindowChange={setWindow}
+                onRefresh={refresh} loading={mode === 'loading'} error={mode === 'error' ? 'Snapshot request failed' : undefined}
+                labels={times.map((t) => new Date(t * 1000).toLocaleTimeString())}
+                datasets={[{ label: 'CPU', data: [12, 24, null, 30, 40, 32, null] }, { label: 'Memory', data: [42, 44, 46, 45, 53, 52, 55] }]}
+                xValues={times} xDomain={[window.dt_start, window.dt_end]} maxGap={180}
+                minValue={0} maxValue={100} smoothing={0} height={240} showXLabels={false}
+                valueFormatter={(n) => `${Number(n.toFixed(1))}%`} ariaLabel="Scoped resource history"
+                allowedRanges={QUICK_RANGES.filter((r) => r.value !== '30d')} allowedGranularities={['minutes', 'hours', 'days']}
+                minDate={Math.floor(Date.now() / 1000) - 7 * 86400} maxDate={Math.floor(Date.now() / 1000)}
+                signal={owner.signal} />
+        </div>
+    </div>;
 }

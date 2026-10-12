@@ -113,9 +113,12 @@ export interface ModalOptions {
     flush?: boolean;
     /** Guards Escape/backdrop dismissal. Programmatic close still succeeds. */
     canDismiss?: () => boolean;
+    /** Abort removes this entry immediately, even without a mounted ModalHost. */
+    signal?: AbortSignal;
 }
 
 function open<T>(render: (close: (value: T) => void) => ReactNode, opts: ModalOptions = {}): Promise<T | null> {
+    if (opts.signal?.aborted) return Promise.resolve(null);
     wireAuth();
     return new Promise<T | null>((resolve) => {
         const id = nextId++;
@@ -123,10 +126,13 @@ function open<T>(render: (close: (value: T) => void) => ReactNode, opts: ModalOp
         const close = (value: unknown) => {
             if (settled) return;
             settled = true;
+            opts.signal?.removeEventListener('abort', abort);
             stack = stack.filter((m) => m.id !== id);
             emit();
             resolve(value as T | null);
         };
+        const abort = () => close(null);
+        opts.signal?.addEventListener('abort', abort, { once: true });
         stack = [...stack, {
             id,
             variant: 'modal',

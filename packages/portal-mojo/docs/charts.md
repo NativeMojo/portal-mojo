@@ -2,7 +2,7 @@
 
 ```ts
 import {
-    SeriesChart, MetricsChart, MiniChart, MetricsMiniWidget,
+    SeriesChart, MetricsChart, MetricsChartView, MiniChart, MetricsMiniWidget,
     KPITile, KPIStrip, CircularProgress, PieChart,
     showSeriesStats, showSeriesData, exportChartPng,
     computeSeriesStats, computeTrend, deltaBadge,   // pure math
@@ -174,6 +174,78 @@ contracts alongside categorical stacked/grouped bars and container resize.
   `exportChartPng`), `withDelta` endpoint switching (KPIStrip covers the
   KPI use-case).
 
+## MetricsChartView (caller-owned data)
+
+`MetricsChart` renders this exact header, toolbar, legend, chart and dialogs.
+Use the view when a caller already owns a private snapshot or a different report
+endpoint. It has no query, cache, transport, timer or polling lifecycle.
+
+```tsx
+import { MetricsChartView, metricsQuickWindow, QUICK_RANGES } from 'portal-mojo/charts';
+import type { MetricsChartWindow } from 'portal-mojo/charts';
+
+const [window, setWindow] = useState<MetricsChartWindow>(() => metricsQuickWindow('1h', 'minutes'));
+<MetricsChartView
+    title="Resource history" window={window} onWindowChange={setWindow}
+    labels={snapshot.labels} datasets={snapshot.datasets}
+    xValues={snapshot.timestamps} xDomain={[window.dt_start, window.dt_end]}
+    maxGap={180} minValue={0} maxValue={100} smoothing={0}
+    valueFormatter={(n) => `${n.toFixed(1)}%`}
+    loading={loading} isFetching={refreshing} error={error}
+    onRefresh={refreshSnapshot} onRetry={refreshSnapshot}
+    allowedRanges={QUICK_RANGES.filter((r) => r.value !== '30d')}
+    allowedGranularities={['minutes', 'hours', 'days']}
+    minDate={retentionStart} maxDate={latestSupportedTime}
+    signal={scope.signal} height={240} className="resource-chart"
+/>
+```
+
+- `window` is controlled: `{dt_start, dt_end, granularity, range?}`. Bounds are
+  **epoch seconds**. `range` is the active quick-range identity; absent means
+  custom. `onWindowChange` emits one complete window for a quick range,
+  custom calendar Apply, or granularity change. The caller writes it back,
+  clears stale data and performs its request. The view does not request on mount.
+- `onRefresh` and `onRetry` are independent callbacks (Retry defaults to
+  Refresh). Refresh calls the owner once and never changes the window itself.
+  For rolling windows the owner may call `metricsQuickWindow(window.range,
+  window.granularity)` to re-anchor, then load exactly once. The fetch-owning
+  `MetricsChart` adapter retains its automatic re-anchoring and `refreshSignal`.
+- `allowedRanges` takes `{value, label, durationMs}[]` (default `QUICK_RANGES`).
+  The quick-range helper also accepts one such object. `allowedGranularities`
+  narrows the standard vocabulary, then range gating disables unsuitable
+  buckets. An explicit empty list exposes no available granularities.
+  `minDate` and `maxDate` remove unsupported quick/day presets and restrict
+  the calendar; partial first/last days are clamped at Apply to exact epochs.
+  The caller still validates its source contract before loading.
+- All `SeriesChartProps` pass through, including sparse values, numeric X,
+  domains, gap thresholds, exact Y bounds, stacking, accessible inspection,
+  labels and legend toggles. Stats/table/CSV exclude nonfinite or out-of-domain
+  X positions when numeric X is provided. They never synthesize samples.
+- `defaultType` defaults to line. To control type externally, supply
+  `chartType` and `onTypeChange`; otherwise the view owns this display choice.
+  Existing `showGranularity`, `showDateRange`, `showTypeSwitch`, `showRefresh`,
+  `showStats`, `showDataTable` flags default true. `disabled` disables controls;
+  loading and error states disable captured-data dialogs. `height` is the SVG
+  plot's pixel height, without scaling its text; `className` supports a host's
+  fixed-height/flex layout. Narrow containers use the granularity select.
+  `content` optionally replaces only the plot with an owner-rendered report
+  table; the same toolbar, status overlays and abort boundary remain. Hide
+  `showTypeSwitch`/`showDataTable` when an inline report already serves those
+  actions. `showGranularity={false}` also omits bucket nouns from dialogs.
+- `signal` must belong to the immutable data scope. Abort blanks the entire
+  view and removes its dialogs from the modal stack; unmount, replacement
+  signal, changed payload/window/bounds or loading/error/disabled transition
+  also dispose open dialogs. Equivalent arrays preserve them. The caller
+  remains responsible for clearing its data and cancelling its transport/cache.
+  A keyed snapshot generation is appropriate when replacement data is equal.
+- Render the usual `ModalHost`. Abort before the host mounts still disposes
+  pending entries. Already-aborted signals cannot reopen private data.
+
+Showcase → Charts includes owned-window, loading, error, narrow-container and
+snapshot-expiry examples. `npm run verify:metrics-chart` mounts the real view
+and legacy wrapper, covering callbacks, request counts, retention, sparse
+stats/CSV, replacement/unmount/abort and pre-host modal disposal.
+
 ## MiniChart (sparkline primitive)
 
 ```tsx
@@ -316,15 +388,22 @@ Pure helpers (`parsePieInput`, `buildPieGeometry`, `goldenAngleColor`,
 ## Stats + view-data dialogs (shared)
 
 ```ts
-showSeriesStats({ title, labels, datasets, granularity, formatter });
-showSeriesData({ title, labels, datasets, granularity, formatter });  // + Download CSV
+showSeriesStats({ title, labels, datasets, granularity, formatter, signal });
+showSeriesData({ title, labels, datasets, granularity, formatter, signal });  // + Download CSV
 ```
 
 Awaitable native-`<dialog>`s (modal manager). Stats: per-series
 Latest/Min/Max/Avg/Median/Sum with the "Hourly · N points" header. Data:
 one row per label, one column per series; CSV downloads as
 `<title-slug>-<date>.csv` (RFC-safe quoting via `buildCsv`). Empty data
-renders "No data to display." — never a blank dialog.
+renders "No data to display." — never a blank dialog. `signal` is optional;
+abort removes the dialog even if its host is not mounted. Numeric zero remains
+zero. Null, undefined and nonfinite observations show **Unavailable** and export
+as empty CSV cells. Aggregates use finite observations only; each series lists
+its observed Samples count. Latest means the final slot, so a missing final
+observation stays unavailable instead of substituting an earlier reading.
+`computeSeriesStats` keeps numeric result field types: unavailable results are
+`NaN`; always guard custom formatters with `Number.isFinite` (the dialogs do).
 
 ## exportChartPng
 

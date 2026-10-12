@@ -27,6 +27,12 @@ height; embedded/page hosts have no modal minimum or maximum and may omit
 `onClose`. A flush modal has a fallback close control while its body loads or
 fails; successful DetailView bodies supply the normal header close.
 
+`modal.open(render, { signal })` optionally binds a dialog to an AbortSignal.
+Already-aborted signals resolve null without adding an entry. Later abort removes
+only that entry immediately and resolves null, even before `ModalHost` mounts;
+normal close removes the listener. Owner disposal bypasses `canDismiss` because
+it ends the data scope. An owner must also abort its controller on unmount.
+
 ## Executable inventory
 
 `scripts/admin-modal-inventory.json` records file, owner, launcher/helper, body,

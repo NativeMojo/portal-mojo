@@ -10,7 +10,6 @@ import {
     computeSeriesStats,
     csvFilename,
     defaultStatFormat,
-    toNumber,
     type SeriesLike,
 } from './stats';
 
@@ -23,6 +22,8 @@ export interface ChartDialogOptions {
     granularity?: string;
     /** Value formatter; default = int/2dp locale formatting. */
     formatter?: (n: number) => string;
+    /** Owner disposal removes this dialog and its captured data. */
+    signal?: AbortSignal;
 }
 
 function pointsLine(granularity: string | undefined, points: number): string {
@@ -44,6 +45,7 @@ function EmptyBody({ onClose }: { onClose: () => void }) {
 
 /** Per-series Latest / Min / Max / Avg / Median / Sum summary dialog. */
 export function showSeriesStats(opts: ChartDialogOptions): Promise<unknown> {
+    if (opts.signal?.aborted) return Promise.resolve(null);
     const stats = computeSeriesStats(opts.datasets);
     const fmt = opts.formatter ?? defaultStatFormat;
     const cols = ['Latest', 'Min', 'Max', 'Avg', 'Median', 'Sum'] as const;
@@ -58,12 +60,13 @@ export function showSeriesStats(opts: ChartDialogOptions): Promise<unknown> {
                 <EmptyBody onClose={() => close(null)} />
             ) : (
                 <>
-                    <div className="chart-dialog-sub">{pointsLine(opts.granularity, stats[0]!.count)}</div>
+                    <div className="chart-dialog-sub">{pointsLine(opts.granularity, opts.labels.length)}</div>
                     <div className="chart-dialog-scroll">
                         <table className="chart-stats-table">
                             <thead>
                                 <tr>
                                     <th>Series</th>
+                                    <th className="num">Samples</th>
                                     {cols.map((c) => <th key={c} className="num">{c}</th>)}
                                 </tr>
                             </thead>
@@ -71,7 +74,8 @@ export function showSeriesStats(opts: ChartDialogOptions): Promise<unknown> {
                                 {stats.map((s) => (
                                     <tr key={s.label}>
                                         <td>{s.label}</td>
-                                        {cols.map((c) => <td key={c} className="num">{fmt(pick(s, c))}</td>)}
+                                        <td className="num">{s.count}</td>
+                                        {cols.map((c) => <td key={c} className="num">{Number.isFinite(pick(s, c)) ? fmt(pick(s, c)) : 'Unavailable'}</td>)}
                                     </tr>
                                 ))}
                             </tbody>
@@ -83,7 +87,7 @@ export function showSeriesStats(opts: ChartDialogOptions): Promise<unknown> {
                 </>
             )}
         </div>
-    ), { size: 'md' });
+    ), { size: 'lg', signal: opts.signal });
 }
 
 /** Trigger a text-file download (the CSV button). */
@@ -101,13 +105,15 @@ function downloadText(text: string, filename: string, mime: string): void {
 
 /** The raw series as a table: one row per label, one column per series, + CSV. */
 export function showSeriesData(opts: ChartDialogOptions): Promise<unknown> {
+    if (opts.signal?.aborted) return Promise.resolve(null);
     const { labels, datasets } = opts;
     const hasData = labels.length > 0 && datasets.length > 0;
     const fmt = opts.formatter ?? defaultStatFormat;
     const headers = ['Label', ...datasets.map((d) => d.label ?? '')];
-    const rows = labels.map((label, i) => [label, ...datasets.map((d) => toNumber(d.data?.[i]))] as const);
+    const rows = labels.map((label, i) => [label, ...datasets.map((d) => typeof d.data?.[i] === 'number' && Number.isFinite(d.data[i]) ? d.data[i] : null)] as const);
 
     const downloadCsv = () => {
+        if (opts.signal?.aborted) return;
         downloadText(buildCsv(headers, rows), csvFilename(opts.title), 'text/csv;charset=utf-8');
     };
 
@@ -130,7 +136,7 @@ export function showSeriesData(opts: ChartDialogOptions): Promise<unknown> {
                                 {rows.map((row, ri) => (
                                     <tr key={ri}>
                                         <td>{row[0]}</td>
-                                        {row.slice(1).map((v, ci) => <td key={ci} className="num">{fmt(v as number)}</td>)}
+                                        {row.slice(1).map((v, ci) => <td key={ci} className="num">{typeof v === 'number' && Number.isFinite(v) ? fmt(v) : 'Unavailable'}</td>)}
                                     </tr>
                                 ))}
                             </tbody>
@@ -145,5 +151,5 @@ export function showSeriesData(opts: ChartDialogOptions): Promise<unknown> {
                 </>
             )}
         </div>
-    ), { size: 'lg' });
+    ), { size: 'lg', signal: opts.signal });
 }

@@ -7,6 +7,8 @@
 // and the exportChartPng SVG→PNG serializer.
 export * from './SeriesChart';
 export * from './MetricsChart';
+export * from './MetricsChartView';
+export * from './metrics-window';
 export * from './MiniChart';
 export * from './MetricsMiniWidget';
 export * from './KPITile';

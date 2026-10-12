@@ -1,29 +1,12 @@
-// MetricsChart — the django-mojo metrics surface: fetches /api/metrics/fetch
-// and owns the control bar. Ported from web-mojo's MetricsChart:
-//   · inline granularity toggle  MIN HR DAY WK MO   (collapses to a <select>)
-//   · quick ranges               1H 24H 7D 30D      + Custom range… dialog
-//   · chart type switch          line / bar / area  (bars stack by default)
-//   · stats summary + view-data dialogs (native <dialog>, CSV download)
-//   · refresh + loading/error overlays with retry
-//
-// Wire note (C2): /api/metrics/fetch takes `dt_start`/`dt_end` (epoch
-// SECONDS — objict.parse_date reads digit strings as epochs). web-mojo sent
-// `dr_start`/`dr_end` here, which the metrics endpoint silently IGNORES
-// (`dr_*` is the model-LIST daterange triple) — its custom ranges never
-// reached the backend. This port sends dt_*. The `range` param rides along
-// for quick ranges because the shipped mock windows off it; each side
-// ignores the other's param.
+// Query-owning django-mojo adapter over the shared MetricsChartView.
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { mojoMetrics, type MetricsResponse } from '../client/client';
 import type { Params } from '../client/types';
-import { DateRangePicker } from '../ui/date/DateRangePicker';
-import { modal } from '../ui/modal';
-import { showSeriesData, showSeriesStats } from './chart-dialogs';
-import { SeriesChart, type ChartType } from './SeriesChart';
-import { granularitiesForSpanMs, quickRangeWindow, ymdRangeToEpochSeconds } from './stats';
-
-export interface Granularity { value: string; label: string; short: string }
+import type { ChartType } from './SeriesChart';
+import { MetricsChartView } from './MetricsChartView';
+import { metricsGranularities, metricsQuickWindow, type MetricsChartWindow } from './metrics-window';
+export { GRANULARITIES, QUICK_RANGES, type Granularity } from './metrics-window';
 
 export interface MetricsFetchParams extends Params {
     slugs: string;
@@ -36,35 +19,6 @@ export interface MetricsFetchParams extends Params {
 }
 
 export type MetricsSeriesLoader = (params: MetricsFetchParams) => Promise<MetricsResponse>;
-
-export const GRANULARITIES: Granularity[] = [
-    { value: 'minutes', label: 'Minutes', short: 'MIN' },
-    { value: 'hours', label: 'Hours', short: 'HR' },
-    { value: 'days', label: 'Days', short: 'DAY' },
-    { value: 'weeks', label: 'Weeks', short: 'WK' },
-    { value: 'months', label: 'Months', short: 'MO' },
-];
-
-export const QUICK_RANGES = [
-    { value: '1h', label: '1H' },
-    { value: '24h', label: '24H' },
-    { value: '7d', label: '7D' },
-    { value: '30d', label: '30D' },
-];
-
-/** Granularities that make sense for a range — mirrors the backend's buckets. */
-const RANGE_GRANULARITY: Record<string, string[]> = {
-    '1h': ['minutes'],
-    '24h': ['minutes', 'hours'],
-    '7d': ['hours', 'days'],
-    '30d': ['days', 'weeks', 'months'],
-};
-
-const TYPES: { value: ChartType; icon: string; title: string }[] = [
-    { value: 'line', icon: 'bi-graph-up', title: 'Line' },
-    { value: 'bar', icon: 'bi-bar-chart-fill', title: 'Bar (stacked)' },
-    { value: 'area', icon: 'bi-graph-up-arrow', title: 'Area' },
-];
 
 /** 'api_calls' → 'Api Calls' — the default legend name for an unmapped slug. */
 function humanizeSlug(slug: string): string {
@@ -100,38 +54,6 @@ export function remapMetricSeriesIdentity(response: MetricsResponse, requestedSl
             return candidates.length === 1 ? { ...dataset, label: candidates[0]! } : dataset;
         }),
     };
-}
-
-/** The active window: a quick range anchored at pick time, or custom days. */
-type RangeState =
-    | { kind: 'quick'; value: string; anchor: number }
-    | { kind: 'custom'; start: string; end: string };
-
-// ── Custom-range dialog (DateRangePicker inline + explicit Apply) ─────
-function RangeDialog({ initial, onDone }: {
-    initial: { start: string; end: string };
-    onDone: (range: { start: string; end: string } | null) => void;
-}) {
-    const [range, setRange] = useState(initial);
-    const complete = !!range.start && !!range.end;
-    return (
-        <div className="modal-pad chart-range-dialog">
-            <h2 className="modal-title">Custom date range</h2>
-            <DateRangePicker
-                inline
-                presets="default"
-                start={range.start}
-                end={range.end}
-                onChange={(e) => setRange({ start: e.start, end: e.end })}
-            />
-            <div className="modal-actions">
-                <button className="btn" onClick={() => onDone(null)}>Cancel</button>
-                <button className="btn btn-primary" disabled={!complete} onClick={() => onDone(range)}>
-                    Apply
-                </button>
-            </div>
-        </div>
-    );
 }
 
 export interface MetricsChartProps {
@@ -178,92 +100,29 @@ export interface MetricsChartProps {
     refreshSignal?: unknown;
 }
 
-function constrainGranularities(values: readonly string[], configured?: readonly string[]): string[] {
-    if (!configured) return [...values];
-    const supported = new Set(GRANULARITIES.map((item) => item.value));
-    return values.filter((value) => configured.includes(value) && supported.has(value));
-}
-
 export function MetricsChart({
-    title,
-    slugs,
-    seriesLabels = {},
-    preserveSeriesLabels = false,
-    account = 'global',
-    defaultRange = '24h',
-    defaultGranularity = 'hours',
-    defaultType = 'line',
-    height = 280,
-    valueFormatter,
-    apiParams,
-    loadSeries = mojoMetrics,
-    seriesCacheKey = 'metrics/fetch',
-    childKind,
-    breakdown,
-    showGranularity = true,
-    showDateRange = true,
-    showTypeSwitch = true,
-    showRefresh = true,
-    showStats = true,
-    showDataTable = true,
-    allowedGranularities,
-    refreshSignal,
+    title, slugs, seriesLabels = {}, preserveSeriesLabels = false, account = 'global',
+    defaultRange = '24h', defaultGranularity = 'hours', defaultType = 'line',
+    height = 280, valueFormatter, apiParams, loadSeries = mojoMetrics,
+    seriesCacheKey = 'metrics/fetch', childKind, breakdown, allowedGranularities,
+    refreshSignal, ...controls
 }: MetricsChartProps) {
-    const [range, setRange] = useState<RangeState>(() => ({ kind: 'quick', value: defaultRange, anchor: Date.now() }));
-    const [granularity, setGranularity] = useState(defaultGranularity);
-    const [chartType, setChartType] = useState<ChartType>(defaultType);
-
-    // ── Window → wire params + granularity gating ─────────────────────
-    let allowed: string[];
-    let dtStart: number;
-    let dtEnd: number;
-    if (range.kind === 'quick') {
-        allowed = RANGE_GRANULARITY[range.value] ?? ['days'];
-        const w = quickRangeWindow(range.value, range.anchor);
-        dtStart = Math.floor(w.startMs / 1000);
-        dtEnd = Math.floor(w.endMs / 1000);
-    } else {
-        const epochs = ymdRangeToEpochSeconds(range.start, range.end);
-        // The dialog can only apply a complete pair; a bad pair degrades to
-        // the default quick window rather than crashing the fetch.
-        if (!epochs) {
-            console.warn('MetricsChart: invalid custom range — falling back to 24h', range);
-            const w = quickRangeWindow('24h');
-            dtStart = Math.floor(w.startMs / 1000);
-            dtEnd = Math.floor(w.endMs / 1000);
-            allowed = RANGE_GRANULARITY['24h']!;
-        } else {
-            dtStart = epochs.dtStart;
-            dtEnd = epochs.dtEnd;
-            allowed = granularitiesForSpanMs((dtEnd - dtStart) * 1000);
-        }
-    }
-    const configured = constrainGranularities(GRANULARITIES.map((item) => item.value), allowedGranularities);
-    const constrained = constrainGranularities(allowed, allowedGranularities);
-    const available = constrained.length > 0 ? constrained : configured.length > 0 ? configured : constrainGranularities(allowed);
-    const effective = available.includes(granularity) ? granularity : available[available.length - 1]!;
-
+    const [window, setWindow] = useState<MetricsChartWindow>(() => metricsQuickWindow(defaultRange, defaultGranularity));
+    const available = metricsGranularities(window, allowedGranularities);
+    const effective = available.includes(window.granularity) ? window.granularity : available.at(-1) ?? window.granularity;
     const wire: MetricsFetchParams = {
         ...apiParams,
         ...(childKind ? { child_kind: childKind } : {}),
         ...(breakdown !== undefined ? { breakdown } : {}),
-        slugs: slugs.join(','),
-        granularity: effective,
-        account,
-        // `range` windows the shipped mock; dt_start/dt_end (epoch seconds)
-        // window the real backend. Each ignores the other's param.
-        ...(range.kind === 'quick' ? { range: range.value } : {}),
-        dt_start: dtStart,
-        dt_end: dtEnd,
+        slugs: slugs.join(','), granularity: effective, account,
+        ...(window.range ? { range: window.range } : {}),
+        dt_start: window.dt_start, dt_end: window.dt_end,
     };
-
     const query = useQuery({
         queryKey: ['metrics', seriesCacheKey, wire],
         queryFn: () => loadSeries(wire),
         select: (res) => {
-            const identitySafe = loadSeries === mojoMetrics
-                ? remapMetricSeriesIdentity(res, slugs)
-                : res;
+            const identitySafe = loadSeries === mojoMetrics ? remapMetricSeriesIdentity(res, slugs) : res;
             return {
                 ...identitySafe,
                 datasets: identitySafe.datasets.map((d) => ({
@@ -273,40 +132,13 @@ export function MetricsChart({
             };
         },
     });
-
-    // Switching range re-points granularity at the nearest sensible bucket
-    // rather than firing a request the backend would bucket differently.
-    const pickRange = (next: string) => {
-        setRange({ kind: 'quick', value: next, anchor: Date.now() });
-        const rangeGranularities = RANGE_GRANULARITY[next] ?? ['days'];
-        const constrainedNext = constrainGranularities(rangeGranularities, allowedGranularities);
-        const ok = constrainedNext.length > 0 ? constrainedNext : configured.length > 0 ? configured : rangeGranularities;
-        if (!ok.includes(granularity)) setGranularity(ok[ok.length - 1]!);
-    };
-
-    const openCustomRange = async () => {
-        const initial = range.kind === 'custom' ? { start: range.start, end: range.end } : { start: '', end: '' };
-        const picked = await modal.open<{ start: string; end: string } | null>((close) => (
-            <RangeDialog initial={initial} onDone={close} />
-        ), { size: 'md' });
-        if (!picked) return;
-        setRange({ kind: 'custom', start: picked.start, end: picked.end });
-        const epochs = ymdRangeToEpochSeconds(picked.start, picked.end);
-        if (epochs) {
-            const rangeGranularities = granularitiesForSpanMs((epochs.dtEnd - epochs.dtStart) * 1000);
-            const constrainedNext = constrainGranularities(rangeGranularities, allowedGranularities);
-            const ok = constrainedNext.length > 0 ? constrainedNext : configured.length > 0 ? configured : rangeGranularities;
-            if (!ok.includes(granularity)) setGranularity(ok[ok.length - 1]!);
-        }
-    };
-
-    // Refresh re-anchors a quick window at NOW (web-mojo kept the stale
-    // window — deliberate fix, documented in charts.md).
     const refresh = () => {
-        if (range.kind === 'quick') setRange({ ...range, anchor: Math.max(Date.now(), range.anchor + 1) });
+        const next = window.range ? metricsQuickWindow(window.range, effective) : window;
+        // A pick and refresh in the same second have the same query key: refetch
+        // once. Otherwise the re-anchored key itself owns the one request.
+        if (next.dt_start !== window.dt_start || next.dt_end !== window.dt_end) setWindow(next);
         else void query.refetch();
     };
-
     const priorRefreshSignal = useRef(refreshSignal);
     useEffect(() => {
         if (Object.is(priorRefreshSignal.current, refreshSignal)) return;
@@ -314,146 +146,12 @@ export function MetricsChart({
         refresh();
     }, [refreshSignal]);
 
-    const openStats = () => {
-        void showSeriesStats({
-            title: `${title} — Stats`,
-            labels: query.data?.labels ?? [],
-            datasets: query.data?.datasets ?? [],
-            granularity: effective,
-            formatter: valueFormatter,
-        });
-    };
-    const openData = () => {
-        void showSeriesData({
-            title,
-            labels: query.data?.labels ?? [],
-            datasets: query.data?.datasets ?? [],
-            granularity: effective,
-            formatter: valueFormatter,
-        });
-    };
-
-    const customActive = range.kind === 'custom';
-    const customTitle = customActive ? `Custom range: ${range.start} – ${range.end}` : 'Custom range…';
-
-    return (
-        <div className="panel panel-pad chart-panel">
-            <div className="chart-head">
-                <div>
-                    <div className="eyebrow">Metrics</div>
-                    <h3 className="panel-subtitle">
-                        {title}
-                        {customActive && <span className="chart-range-chip">{range.start} – {range.end}</span>}
-                    </h3>
-                </div>
-                <div className="chart-controls">
-                    {showGranularity && (
-                        <>
-                            <div className="seg seg-xs gran-toggle" role="group" aria-label="Granularity">
-                                {GRANULARITIES.filter((g) => !allowedGranularities || configured.length === 0 || configured.includes(g.value)).map((g) => {
-                                    const enabled = available.includes(g.value);
-                                    return (
-                                        <button
-                                            key={g.value}
-                                            className={`seg-btn${effective === g.value ? ' seg-active' : ''}`}
-                                            disabled={!enabled}
-                                            title={enabled ? g.label : `${g.label} — not available for this range`}
-                                            onClick={() => setGranularity(g.value)}
-                                        >
-                                            {g.short}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <select
-                                className="input input-compact gran-select"
-                                value={effective}
-                                onChange={(e) => setGranularity(e.target.value)}
-                                aria-label="Granularity"
-                            >
-                                {GRANULARITIES.filter((g) => available.includes(g.value)).map((g) => (
-                                    <option key={g.value} value={g.value}>{g.label}</option>
-                                ))}
-                            </select>
-                        </>
-                    )}
-
-                    {showDateRange && (
-                        <div className="seg seg-xs" role="group" aria-label="Date range">
-                            {QUICK_RANGES.map((r) => (
-                                <button
-                                    key={r.value}
-                                    className={`seg-btn${range.kind === 'quick' && range.value === r.value ? ' seg-active' : ''}`}
-                                    onClick={() => pickRange(r.value)}
-                                >
-                                    {r.label}
-                                </button>
-                            ))}
-                            <button
-                                className={`seg-btn${customActive ? ' seg-active' : ''}`}
-                                title={customTitle}
-                                aria-label="Custom date range"
-                                onClick={() => void openCustomRange()}
-                            >
-                                <i className="bi bi-calendar-range" />
-                            </button>
-                        </div>
-                    )}
-
-                    {showTypeSwitch && (
-                        <div className="seg seg-xs" role="group" aria-label="Chart type">
-                            {TYPES.map((t) => (
-                                <button
-                                    key={t.value}
-                                    className={`seg-btn${chartType === t.value ? ' seg-active' : ''}`}
-                                    title={t.title}
-                                    onClick={() => setChartType(t.value)}
-                                >
-                                    <i className={`bi ${t.icon}`} />
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {showStats && (
-                        <button className="btn-icon" title="Stats" aria-label="Stats" onClick={openStats}>
-                            <i className="bi bi-info-circle" />
-                        </button>
-                    )}
-                    {showDataTable && (
-                        <button className="btn-icon" title="View data" aria-label="View data" onClick={openData}>
-                            <i className="bi bi-table" />
-                        </button>
-                    )}
-                    {showRefresh && (
-                        <button className="btn-icon" title="Refresh" aria-label="Refresh" onClick={refresh}>
-                            <i className={`bi bi-arrow-repeat${query.isFetching ? ' spin' : ''}`} />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            <div className="chart-body" style={{ minHeight: height }}>
-                {query.isPending ? (
-                    <div className="chart-overlay"><span className="skel skel-block" /></div>
-                ) : query.isError ? (
-                    <div className="chart-overlay">
-                        <div className="chart-error">
-                            <i className="bi bi-exclamation-triangle" />
-                            <span>{query.error instanceof Error ? query.error.message : 'Failed to load metrics'}</span>
-                            <button className="btn btn-compact" onClick={() => void query.refetch()}>Retry</button>
-                        </div>
-                    </div>
-                ) : (
-                    <SeriesChart
-                        labels={query.data!.labels}
-                        datasets={query.data!.datasets}
-                        chartType={chartType}
-                        height={height}
-                        valueFormatter={valueFormatter}
-                    />
-                )}
-            </div>
-        </div>
-    );
+    return <MetricsChartView {...controls}
+        title={title} window={{ ...window, granularity: effective }} onWindowChange={setWindow}
+        labels={query.data?.labels ?? []} datasets={query.data?.datasets ?? []}
+        defaultType={defaultType} height={height} valueFormatter={valueFormatter}
+        allowedGranularities={allowedGranularities} onRefresh={refresh}
+        onRetry={() => { void query.refetch(); }} loading={query.isPending}
+        isFetching={query.isFetching} error={query.isError ? query.error : undefined}
+    />;
 }

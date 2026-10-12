@@ -70,6 +70,7 @@
         "verify:admin-signin": "node scripts/verify-admin-signin.mjs",
         "verify:admin-push": "node scripts/verify-admin-push.mjs && node scripts/verify-push-tests.mjs",
         "verify:admin-metrics-explorer": "node scripts/verify-admin-metrics-explorer.mjs",
+        "verify:metrics-chart": "node scripts/verify-metrics-chart.mjs",
         "verify:series-chart": "node scripts/verify-series-chart.mjs",
         "verify:worldmap": "node scripts/verify-worldmap.mjs",
         "verify:form-wizard": "node scripts/verify-form-wizard.mjs && node scripts/verify-form-wizard-mounted.mjs",

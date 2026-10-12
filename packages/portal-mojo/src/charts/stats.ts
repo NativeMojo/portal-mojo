@@ -6,7 +6,7 @@
 
 export interface SeriesLike {
     label: string;
-    data: number[];
+    data: (number | null | undefined)[];
 }
 
 export interface SeriesStat {
@@ -31,15 +31,17 @@ export function toNumber(v: unknown): number {
 /**
  * Per-series summary stats. Empty datasets produce no entry (the caller
  * renders its "No data" state); an empty series inside a non-empty set
- * yields a zeroed row so the table stays aligned with the legend.
+ * yields unavailable (NaN) values so the table stays aligned with the legend.
+ * Aggregates use finite observations only; Latest refers to the final sample.
  */
 export function computeSeriesStats(datasets: readonly SeriesLike[] | null | undefined): SeriesStat[] {
     // (Array.isArray would widen the readonly array to any[] — a TS quirk.)
     const list: readonly SeriesLike[] = datasets ?? [];
     return list.map((d) => {
-        const values = (Array.isArray(d.data) ? d.data : []).map(toNumber);
+        const data = Array.isArray(d.data) ? d.data : [];
+        const values = data.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
         if (values.length === 0) {
-            return { label: d.label ?? '', count: 0, sum: 0, avg: 0, median: 0, min: 0, max: 0, latest: 0 };
+            return { label: d.label ?? '', count: 0, sum: NaN, avg: NaN, median: NaN, min: NaN, max: NaN, latest: NaN };
         }
         const sorted = [...values].sort((a, b) => a - b);
         const sum = values.reduce((a, b) => a + b, 0);
@@ -53,14 +55,14 @@ export function computeSeriesStats(datasets: readonly SeriesLike[] | null | unde
             median,
             min: sorted[0]!,
             max: sorted[sorted.length - 1]!,
-            latest: values[values.length - 1]!,
+            latest: Number.isFinite(data.at(-1)) ? data.at(-1)! : NaN,
         };
     });
 }
 
 /** '–' for nothing; integers plain; decimals to 2 places (source parity). */
 export function defaultStatFormat(n: number | null | undefined): string {
-    if (n == null || Number.isNaN(n)) return '–';
+    if (n == null || !Number.isFinite(n)) return '–';
     if (Number.isInteger(n)) return n.toLocaleString();
     return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }

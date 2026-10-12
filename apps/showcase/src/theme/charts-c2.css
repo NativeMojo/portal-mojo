@@ -247,3 +247,18 @@ button.cprog { cursor: pointer; font: inherit; }
 
 /* Settings dialog fields */
 .mmw-settings { display: flex; flex-direction: column; gap: 12px; }
+
+/* Shared MetricsChartView also lives in narrow cards inside wide pages. */
+.chart-panel { container-type: inline-size; min-width: 0; }
+.chart-panel .chart-error { flex-wrap: wrap; overflow-wrap: anywhere; }
+.chart-range-dialog { container-type: inline-size; }
+@container (max-width: 560px) {
+    .chart-panel .gran-toggle { display: none; }
+    .chart-panel .gran-select { display: inline-block; }
+}
+@container (max-width: 500px) {
+    .chart-range-dialog .mojo-daterange-with-presets { grid-template-columns: minmax(0, 1fr); }
+    .chart-range-dialog .mojo-calendar-presets { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+    .chart-range-dialog .mojo-calendar-presets-eyebrow { width: 100%; }
+    .chart-range-dialog .mojo-calendar-presets-divider { display: none; }
+}

@@ -91,8 +91,7 @@ try {
 
     assert.match(metricsChart, /allowedGranularities\?: string\[\]/);
     assert.match(metricsChart, /refreshSignal\?: unknown/);
-    assert.match(metricsChart, /if \(range\.kind === 'quick'\) setRange[\s\S]*else void query\.refetch\(\)/, 'quick refresh does not also refetch');
-    assert.doesNotMatch(metricsChart, /if \(range\.kind === 'quick'\) setRange[^;]+;\s*void query\.refetch\(\)/);
+    assert.match(metricsChart, /<MetricsChartView/, 'CloudWatch shares the canonical toolbar');
     assert.match(page, /EAGER_CHART_COUNT = 4/);
     assert.match(cloudwatchChart, /IntersectionObserver/);
     assert.match(cloudwatchChart, /showRefresh=\{false\}/);
