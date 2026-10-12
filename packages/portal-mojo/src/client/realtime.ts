@@ -241,6 +241,12 @@ export class RealtimeClient {
     private open(): void {
         if (!this.enabled || !this.token || this.suspended || this.socket) return;
         const run = this.generation;
+        // Token refresh and provider remount use this same entry point; neither
+        // may bypass a server admission deadline.
+        if (this.clock.now() < this.extendedBackoffUntil) {
+            this.scheduleReconnect(run, 0);
+            return;
+        }
         this.setLifecycle('connecting');
         let socket: RealtimeSocket;
         try {
@@ -310,6 +316,21 @@ export class RealtimeClient {
         }
         if (frame.type === 'subscribed' || frame.type === 'unsubscribed') {
             if (typeof frame.topic === 'string') this.completeTopic(frame.type, frame.topic);
+            return;
+        }
+        if (frame.type === 'error' && frame.message === 'Too many connections'
+            && (this.lifecycle === 'authenticating' || this.lifecycle === 'ready')) {
+            // django-mojo's admission refusal also arrives after the challenge
+            // (or a ready-state capacity check), followed by a normal close.
+            // Fence queued frames before closing: late auth_success must not
+            // clear the deadline or make this refused socket ready.
+            this.extendedBackoffUntil = this.clock.now() + 60_000;
+            this.socket = null;
+            this.clearHeartbeat();
+            this.resetTopicConnectionState();
+            this.automaticUserTopic = null;
+            this.scheduleReconnect(run, 4429);
+            socket.close(4429, 'Connection limit');
             return;
         }
         if (frame.type === 'error') {

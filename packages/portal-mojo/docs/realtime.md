@@ -17,7 +17,8 @@ disable this shared provider.
 - An open socket is not ready. The client waits for `auth_required`, then sends
   `{type:'authenticate',token,prefix:'bearer'}` and becomes ready only after
   `auth_success`. An auth error closes and suspends the connection until the
-  token value changes.
+  token value changes. The exact direct admission-capacity error described
+  below is a transport refusal, not an authentication failure.
 - Heartbeat is a `ping` every 20 seconds with a 10-second `pong` deadline.
   A server-initiated `{type:'ping'}` (django-mojo 1.32+ sends one every 20
   seconds and culls a socket silent for 90) is answered at once with
@@ -25,7 +26,11 @@ disable this shared provider.
   dispatched to consumers. Answering from the message handler keeps the socket
   alive while a background tab throttles the client's own ping timer.
   Reconnect uses capped jittered backoff. Pre-accept close code 4429 enforces at
-  least 60 seconds, and focus/visibility cannot bypass that deadline.
+  least 60 seconds. The direct `{type:'error',message:'Too many connections'}`
+  admission refusal while authenticating or ready uses the same delay, even
+  when followed by a normal server close. Focus/visibility, token replacement,
+  and provider remount cannot bypass the deadline on that client. Queued frames
+  from the refused socket are ignored; recovery still requires authentication.
 - Desired topics are refcounted and replay after authentication. Operations are
   serialized because acknowledgements carry only the topic and denial is a
   generic uncorrelated `error`. Denial yields topic status `denied`; it does not
@@ -41,6 +46,12 @@ disable this shared provider.
 ## Error frames
 
 A top-level `{type:'error'}` frame is attributed in order:
+
+0. **Exact admission capacity refusal** — `message === 'Too many connections'`
+   while authenticating or ready: close and enter bounded `backoff`, without
+   dispatching an application error or declaring account access revoked.
+   Substrings, the `error` field, and wrapped application events do not match.
+   Consumers retain their independent HTTP authorization checks.
 
 1. **During authentication** — auth failure: the client closes and suspends
    until the token value changes. Surfaces through the lifecycle status only;

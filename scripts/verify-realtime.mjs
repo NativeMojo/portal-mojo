@@ -97,6 +97,59 @@ try {
     limited.nudge();
     assert.equal(limitedMock.sockets.length, 1, 'focus nudge cannot bypass 4429');
 
+    // django-mojo also refuses authenticated admission with an error frame
+    // followed by a normal close, rather than a pre-accept 4429 close.
+    for (const ready of [false, true]) {
+        const capacityClock = new FakeClock();
+        const capacityMock = createRealtimeMock({ autoOpen: false });
+        const capacity = new RealtimeClient({ socketFactory: capacityMock.factory, clock: capacityClock });
+        capacity.connect('capacity-token'); capacityMock.open(1);
+        if (ready) capacityMock.authRequired(1);
+        capacity.retainTopic('orders');
+        const rejectedSocket = capacityMock.sockets[0];
+        // Model asynchronous browser close: queued frames may still arrive.
+        const close = rejectedSocket.close.bind(rejectedSocket);
+        rejectedSocket.close = () => {};
+        capacityMock.direct({ type: 'error', message: 'Too many connections' }, 1);
+        assert.equal(capacity.getStatus().status, 'backoff', 'capacity is transport loss, never auth failure');
+        const deadline = capacity.getStatus().retryAt;
+        assert(deadline - capacityClock.now() >= 60_000);
+        capacityMock.authSuccess(1);
+        capacityMock.direct({ type: 'error', message: 'Too many connections' }, 1);
+        close(1000, 'server capacity close');
+        assert.equal(capacity.getStatus().status, 'backoff', 'late frames cannot revive a refused socket');
+        assert.equal(capacity.getStatus().retryAt, deadline, 'duplicate frames cannot change the deadline');
+        capacity.nudge();
+        capacity.setToken('refreshed-capacity-token');
+        assert.equal(capacityMock.sockets.length, 1, 'token replacement cannot bypass capacity backoff');
+        capacityClock.advance(59_999); capacity.nudge();
+        assert.equal(capacityMock.sockets.length, 1, 'focus cannot bypass capacity backoff');
+        capacityClock.advance(1);
+        assert.equal(capacityMock.sockets.length, 2, 'one shared retry opens at the deadline');
+        capacityMock.open(2); capacityMock.authRequired(2);
+        assert.equal(capacity.getStatus().status, 'ready');
+        assert.equal(capacity.topicStatus('orders'), 'subscribed', 'desired topics replay only after authentication');
+        capacity.destroy();
+    }
+
+    const unknownMock = createRealtimeMock({ autoOpen: false });
+    const unknown = new RealtimeClient({ socketFactory: unknownMock.factory, clock: new FakeClock() });
+    unknown.connect('token'); unknownMock.open(1);
+    unknownMock.direct({ type: 'error', message: 'Too many connections for an unknown reason' }, 1);
+    assert.equal(unknown.getStatus().status, 'auth-failed', 'unknown auth errors still fail closed');
+    unknown.nudge();
+    assert.equal(unknownMock.sockets.length, 1);
+
+    const forcedMock = createRealtimeMock({ autoOpen: false });
+    const forced = new RealtimeClient({ socketFactory: forcedMock.factory, clock: new FakeClock() });
+    forced.connect('token'); forcedMock.open(1); forcedMock.authRequired(1);
+    forcedMock.wrapped({ type: 'error', message: 'Too many connections' }, 'orders', 1);
+    assert.equal(forced.getStatus().status, 'ready', 'wrapped app events cannot change transport admission');
+    forcedMock.forceDisconnect(1);
+    assert.equal(forced.getStatus().status, 'forced-disconnect', 'trusted revocation still suspends');
+    forced.nudge();
+    assert.equal(forcedMock.sockets.length, 1);
+
     const heartbeatClock = new FakeClock();
     const heartbeatMock = createRealtimeMock({ autoOpen: false, autoPong: false });
     const heartbeat = new RealtimeClient({ socketFactory: heartbeatMock.factory, clock: heartbeatClock });
