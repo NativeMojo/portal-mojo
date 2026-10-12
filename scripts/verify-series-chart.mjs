@@ -24,7 +24,7 @@ const close = (actual, expected, message) => assert.ok(Math.abs(actual - expecte
 const key = async (value) => React.act(async () => svg().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value })));
 const pointer = async (type, x, pointerType = 'mouse') => React.act(async () => {
     const hit = svg().querySelector('[fill="transparent"]');
-    hit.getBoundingClientRect = () => ({ left: 48, top: 10, width: Number(hit.getAttribute('width')), height: 224 });
+    hit.getBoundingClientRect = () => ({ left: Number(hit.getAttribute('x')), top: 10, width: Number(hit.getAttribute('width')), height: 224 });
     const event = new MouseEvent(type, { bubbles: true, clientX: x });
     Object.defineProperty(event, 'pointerType', { value: pointerType });
     hit.dispatchEvent(event);
@@ -38,6 +38,7 @@ const finiteGeometry = () => {
 };
 try {
     const { SeriesChart } = await server.ssrLoadModule('/packages/portal-mojo/src/charts/SeriesChart.tsx');
+    const { filesize } = await server.ssrLoadModule('/packages/portal-mojo/src/ui/format.ts');
     const mount = async (props) => React.act(async () => root.render(React.createElement(SeriesChart, props)));
     const labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
     const sparse = { labels, datasets: [{ label: 'CPU', data: [10, 20, null, 30, 40, NaN, Infinity, undefined, 50] }], smoothing: 0 };
@@ -90,6 +91,24 @@ try {
     await mount({ ...timed, xDomain: [0, 60] });
     assert.equal(document.querySelector('.chart-tip'), null, 'changed domain clears old inspection');
     assert.equal(inspections.at(-1), null);
+
+    // Bytes must retain leading digits inside an overflow-clipped chart host.
+    const byteHistory = { ...timed, datasets: [{ label: 'Downloaded', data: [100_000_000, 20_000_000, null, 4_000_000] }], maxValue: 100_000_000, valueFormatter: filesize };
+    await mount(byteHistory);
+    const byteTicks = [...svg().querySelectorAll('text[text-anchor="end"]:not(.series-x-label)')];
+    const hundredMb = byteTicks.find((tick) => tick.textContent === '100.0 MB');
+    assert(hundredMb, 'the real filesize formatter supplies the byte-axis label');
+    assert(Number(hundredMb.getAttribute('x')) >= 56, 'all eight byte-label characters fit inside the SVG');
+    const byteLeft = Number(svg().querySelector('[fill="transparent"]').getAttribute('x'));
+    const bytePlot = Number(svg().querySelector('[fill="transparent"]').getAttribute('width'));
+    close(Number(dots()[0].getAttribute('cx')), byteLeft + bytePlot / 12, 'numeric geometry follows the expanded plot origin');
+    await key('Home'); assert.match(document.querySelector('.chart-tip').textContent, /100.0 MB/);
+    await pointer('pointermove', byteLeft + bytePlot * 100 / 120);
+    assert.equal(inspections.at(-1), 3, 'pointer inspection uses the expanded origin');
+    await mount(timed);
+    assert.equal(Number(svg().querySelector('[fill="transparent"]').getAttribute('x')), 48, 'percentage labels restore the compact original margin');
+    await mount({ ...byteHistory, showYLabels: false });
+    assert.equal(Number(svg().querySelector('[fill="transparent"]').getAttribute('x')), 48, 'hidden Y labels need no expanded margin');
 
     // Numeric axes span the domain even when every sample is clumped at one end.
     const clustered = {

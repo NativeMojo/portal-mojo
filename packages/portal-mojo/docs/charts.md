@@ -67,7 +67,11 @@ daterange triple — `/api/metrics/fetch` ignores it silently. web-mojo sent
 
 Legend entries toggle series; hover shows the crosshair index tooltip;
 ticks are "nice"-rounded; container width is measured (no viewBox
-smearing).
+smearing). The left margin measures formatted Y-axis labels before paint and
+expands for values such as `100.0 MB`, preserving their leading digits inside
+clipped containers. Short percentage labels retain the compact 48px margin;
+switching formatters or hiding Y labels restores it. Plot geometry, numeric X
+ticks and pointer inspection share the adjusted origin.
 
 Sparse histories can opt into numeric X positions without changing categorical
 callers:

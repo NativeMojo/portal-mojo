@@ -2,6 +2,7 @@
 // same on mock and live) and MetricsChart driving the real metrics endpoint.
 import { useEffect, useRef, useState } from 'react';
 import { MetricsChart, MetricsChartView, SeriesChart, QUICK_RANGES, metricsQuickWindow } from 'portal-mojo/charts';
+import { fmt } from 'portal-mojo/ui';
 
 const LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DATASETS = [
@@ -61,6 +62,7 @@ function ScopedMetricsDemo() {
     const [mode, setMode] = useState<'ready' | 'loading' | 'error'>('ready');
     const [chartWidth, setChartWidth] = useState<number | undefined>();
     const [longAxis, setLongAxis] = useState(false);
+    const [bytes, setBytes] = useState(false);
     const refresh = () => { setRevision((n) => n + 1); setMode('ready'); if (window.range) setWindow(metricsQuickWindow(window.range, window.granularity)); };
     const times = [60, 120, 180, 240, 720, 780, 840].map((n) => window.dt_end - 900 + n);
     return <div>
@@ -76,6 +78,7 @@ function ScopedMetricsDemo() {
                     <option value="">Wide chart</option><option value="320">320 px chart</option><option value="390">390 px chart</option>
                 </select>
                 <button className="btn" onClick={() => setLongAxis(!longAxis)}>{longAxis ? 'Short axis labels' : 'Long axis labels'}</button>
+                <button className="btn" onClick={() => setBytes(!bytes)}>{bytes ? 'Percentage values' : 'Byte values'}</button>
                 <span>Refreshes: {revision}</span>
             </div>
         </div>
@@ -83,11 +86,13 @@ function ScopedMetricsDemo() {
             <MetricsChartView title="Resource history" window={window} onWindowChange={setWindow}
                 onRefresh={refresh} loading={mode === 'loading'} error={mode === 'error' ? 'Snapshot request failed' : undefined}
                 labels={times.map((t) => new Date(t * 1000).toLocaleTimeString())}
-                datasets={[{ label: 'CPU', data: [12, 24, null, 30, 40, 32, null] }, { label: 'Memory', data: [42, 44, 46, 45, 53, 52, 55] }]}
+                datasets={bytes
+                    ? [{ label: 'Downloaded', data: [100e6, 24e6, null, 30e6, 40e6, 32e6, null] }, { label: 'Uploaded', data: [12e6, 14e6, 16e6, 15e6, 13e6, 12e6, 15e6] }]
+                    : [{ label: 'CPU', data: [12, 24, null, 30, 40, 32, null] }, { label: 'Memory', data: [42, 44, 46, 45, 53, 52, 55] }]}
                 xValues={times} xDomain={[window.dt_start, window.dt_end]} maxGap={180}
-                minValue={0} maxValue={100} smoothing={0} height={240}
+                minValue={0} maxValue={bytes ? 100e6 : 100} smoothing={0} height={240}
                 xValueFormatter={(n) => new Date(n * 1000).toLocaleString(undefined, longAxis ? { dateStyle: 'full', timeStyle: 'long' } : window.range === '1h' || window.range === '24h' ? { hour: '2-digit', minute: '2-digit', hour12: false } : { month: 'short', day: 'numeric' })}
-                valueFormatter={(n) => `${Number(n.toFixed(1))}%`} ariaLabel="Scoped resource history"
+                valueFormatter={bytes ? fmt.filesize : (n) => `${Number(n.toFixed(1))}%`} ariaLabel="Scoped resource history"
                 allowedRanges={QUICK_RANGES.filter((r) => r.value !== '30d')} allowedGranularities={['minutes', 'hours', 'days']}
                 minDate={Math.floor(Date.now() / 1000) - 7 * 86400} maxDate={Math.floor(Date.now() / 1000)}
                 signal={owner.signal} />

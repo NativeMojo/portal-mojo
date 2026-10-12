@@ -98,16 +98,16 @@ function fitAxisLabel(text: string, width: number): string {
     return `${shortened}…`;
 }
 
-function numericAxisTicks(domain: [number, number], plotW: number, format: (value: number) => string) {
+function numericAxisTicks(domain: [number, number], plotW: number, left: number, format: (value: number) => string) {
     const [min, max] = domain;
     const make = (count: number) => Array.from({ length: count }, (_, index) => {
         const fraction = count === 1 ? 0.5 : index / (count - 1);
         // Weighted interpolation avoids overflowing max - min on extreme feeds.
         const value = index === 0 ? min : index === count - 1 ? max : min * (1 - fraction) + max * fraction;
-        const x = PAD.left + fraction * plotW;
+        const x = left + fraction * plotW;
         const step = count === 1 ? plotW : plotW / (count - 1);
-        const start = index === 0 ? PAD.left : x - step / 2 + 6;
-        const end = index === count - 1 ? PAD.left + plotW : x + step / 2 - 6;
+        const start = index === 0 ? left : x - step / 2 + 6;
+        const end = index === count - 1 ? left + plotW : x + step / 2 - 6;
         const full = format(value);
         return { value, x, start, width: Math.max(1, end - start), full,
             anchor: count === 1 ? 'middle' as const : index === 0 ? 'start' as const : index === count - 1 ? 'end' as const : 'middle' as const };
@@ -179,6 +179,8 @@ export function SeriesChart({
     const id = useId();
     const tipRef = useRef<HTMLDivElement>(null);
     const [tipWidth, setTipWidth] = useState(180);
+    const yLabelsRef = useRef<SVGGElement>(null);
+    const [yLabelWidth, setYLabelWidth] = useState(0);
 
     // Measure the container — real pixel geometry keeps text unscaled
     // (a viewBox + preserveAspectRatio="none" would smear the labels).
@@ -201,7 +203,8 @@ export function SeriesChart({
     const shown = datasets.filter((d) => !visible.has(d.label));
     const isStacked = stacked === 'auto' ? chartType === 'bar' : !!stacked;
 
-    const plotW = Math.max(40, width - PAD.left - PAD.right);
+    const left = Math.max(PAD.left, showYLabels ? Math.ceil(yLabelWidth) + 16 : 0);
+    const plotW = Math.max(40, width - left - PAD.right);
     const plotH = Math.max(40, height - PAD.top - PAD.bottom);
     const n = labels.length;
     const colW = n > 0 ? plotW / n : plotW;
@@ -216,7 +219,7 @@ export function SeriesChart({
         return isFiniteNumber(min) && isFiniteNumber(max) ? [min, max] : null;
     }, [xValues, xDomain, n]);
     const xPositions = useMemo(() => {
-        if (!xValues) return labels.map((_, i) => PAD.left + colW * (i + 0.5));
+        if (!xValues) return labels.map((_, i) => left + colW * (i + 0.5));
         if (!numericDomain) return labels.map(() => null);
         const [min, max] = numericDomain;
         return labels.map((_, i) => {
@@ -225,10 +228,11 @@ export function SeriesChart({
             // Half-scaled differences also work for finite domains spanning
             // more than Number.MAX_VALUE, without overflowing the subtraction.
             const fraction = max === min ? 0.5 : (x / 2 - min / 2) / (max / 2 - min / 2);
-            return Number.isFinite(fraction) ? PAD.left + fraction * plotW : null;
+            return Number.isFinite(fraction) ? left + fraction * plotW : null;
         });
-    }, [labels, xValues, numericDomain, colW, plotW]);
+    }, [labels, xValues, numericDomain, colW, plotW, left]);
     const inspectable = xPositions.flatMap((x, i) => x == null ? [] : [i]);
+    const hasData = n > 0 && datasets.length > 0 && inspectable.length > 0;
     const active = hover != null && xPositions[hover] != null ? hover : null;
     const lastInspection = useRef<number | null | undefined>(undefined);
     // Compare content, not array identity: callers often construct props during
@@ -304,7 +308,9 @@ export function SeriesChart({
     }, [scale]);
 
     // Numeric ticks describe the whole scale, independent of sample clusters.
-    const xTicks = numericDomain ? numericAxisTicks(numericDomain, plotW, xValueFormatter ?? String) : null;
+    const xTicks = numericDomain ? numericAxisTicks(numericDomain, plotW, left, xValueFormatter ?? String) : null;
+    const yLabels = showYLabels && hasData ? ticks.map((tick) => fmt(tick)) : [];
+    const yLabelsKey = JSON.stringify(yLabels);
     // Categorical callers keep their existing label thinning.
     const labelStride = Math.max(1, Math.ceil((n * 54) / Math.max(plotW, 1)));
 
@@ -312,7 +318,7 @@ export function SeriesChart({
 
     const onMove = (e: React.PointerEvent<SVGRectElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = PAD.left + (e.clientX - rect.left) * (plotW / (rect.width || plotW));
+        const x = left + (e.clientX - rect.left) * (plotW / (rect.width || plotW));
         let nearest: number | null = null;
         for (const i of inspectable) {
             if (nearest == null || Math.abs(xCenter(i) - x) < Math.abs(xCenter(nearest) - x)) nearest = i;
@@ -340,7 +346,15 @@ export function SeriesChart({
         if (measured && Number.isFinite(measured)) setTipWidth(measured);
     }, [readout, width]);
 
-    const hasData = n > 0 && datasets.length > 0 && inspectable.length > 0;
+    // Measure before paint: byte/currency/custom labels can exceed the compact
+    // percentage margin. Every plot coordinate uses the same adjusted origin.
+    useLayoutEffect(() => {
+        const sizes = [...(yLabelsRef.current?.querySelectorAll('text') ?? [])].map((node) => {
+            const measured = node.getComputedTextLength?.();
+            return isFiniteNumber(measured) && measured > 0 ? measured : axisTextWidth(node.textContent ?? '');
+        });
+        setYLabelWidth(Math.max(0, ...sizes));
+    }, [yLabelsKey, showYLabels, hasData, width]);
 
     return (
         <div className="chart-wrap" ref={wrapRef}>
@@ -378,7 +392,7 @@ export function SeriesChart({
                         onKeyDown={onKeyDown} onBlur={() => setHover(null)}>
                         <defs>
                             <clipPath id={`${id}-plot`}>
-                                <rect x={PAD.left - 4} y={PAD.top} width={plotW + 8} height={plotH} />
+                                <rect x={left - 4} y={PAD.top} width={plotW + 8} height={plotH} />
                             </clipPath>
                             {showXLabels && xTicks?.map((tick, i) => (
                                 <clipPath key={i} id={`${id}-x-label-${i}`}>
@@ -390,16 +404,16 @@ export function SeriesChart({
                         {showGrid && ticks.map((t) => (
                             <line
                                 key={`g${t}`}
-                                x1={PAD.left} x2={PAD.left + plotW}
+                                x1={left} x2={left + plotW}
                                 y1={yOf(t)} y2={yOf(t)}
                                 className={t === 0 && scale.min < 0 ? 'grid-line grid-zero' : 'grid-line'}
                             />
                         ))}
-                        {showYLabels && ticks.map((t) => (
-                            <text key={`yl${t}`} x={PAD.left - 8} y={yOf(t)} className="axis-label" textAnchor="end" dominantBaseline="middle">
-                                {fmt(t)}
+                        {showYLabels && <g ref={yLabelsRef}>{ticks.map((t, i) => (
+                            <text key={`yl${t}`} x={left - 8} y={yOf(t)} className="axis-label" textAnchor="end" dominantBaseline="middle">
+                                {yLabels[i]}
                             </text>
-                        ))}
+                        ))}</g>}
 
                         {/* bars */}
                         {chartType === 'bar' && labels.map((_, i) => {
@@ -533,7 +547,7 @@ export function SeriesChart({
 
                         {/* hit area — one overlay drives index-mode hover */}
                         <rect
-                            x={PAD.left} y={PAD.top} width={plotW} height={plotH}
+                            x={left} y={PAD.top} width={plotW} height={plotH}
                             fill="transparent"
                             style={{ touchAction: 'pan-y' }}
                             onPointerMove={onMove}
