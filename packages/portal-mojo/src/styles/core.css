@@ -459,6 +459,8 @@ button { font: inherit; color: inherit; }
 .legend-swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .chart-svg-area { position: relative; }
 .series-svg { display: block; overflow: visible; }
+.series-svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.chart-accessible { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .grid-line { stroke: var(--line); stroke-width: 1; }
 .grid-zero { stroke: var(--mute); stroke-opacity: 0.5; }
 .axis-label { fill: var(--mute); font-size: 10.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }

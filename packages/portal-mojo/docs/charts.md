@@ -69,6 +69,55 @@ Legend entries toggle series; hover shows the crosshair index tooltip;
 ticks are "nice"-rounded; container width is measured (no viewBox
 smearing).
 
+Sparse histories can opt into numeric X positions without changing categorical
+callers:
+
+```tsx
+<SeriesChart
+    labels={['10:01', '10:02', '10:03', '10:12', '10:13']}
+    xValues={[60, 120, 180, 720, 780]}
+    xDomain={[0, 900]}
+    maxGap={180}
+    datasets={[{ label: 'CPU', data: [12, 24, null, 40, 32] }]}
+    minValue={0} maxValue={100}
+    ariaLabel="Kiosk CPU history"
+    valueFormatter={(value) => `${value}%`}
+    onInspect={(index) => { /* selected original sample index, or null */ }}
+/>
+```
+
+- `Dataset.data` accepts `(number | null | undefined)[]`. Null, undefined,
+  `NaN`, and infinities are unavailable: no zero substitution, connecting
+  line, area fill across the gap, bar, or inspection dot. Tooltips say
+  **Unavailable**; incomplete stacked totals do too. A one-point run always
+  has a dot, even above 40 labels or with routine `showDots={false}`.
+- `xValues?: number[]` aligns with the original labels/data indices. Supply
+  ordered timestamps (seconds or milliseconds both work); labels are display
+  strings only. Numeric spacing uses actual values. A missing/nonfinite X
+  breaks the run and cannot be inspected. Reversed X movement breaks the run.
+  With no `xValues`, the existing evenly spaced category centers remain.
+- `xDomain?: [number, number]` fixes the visible window, including empty time
+  before/after the samples. Out-of-window samples are omitted from drawing,
+  inspection, and automatic Y scaling. Omit it to fit the finite X values;
+  a single distinct X is centered. Invalid/reversed domains fall back to fit.
+- `maxGap?: number` breaks line/area runs when the distance between consecutive
+  numeric X values exceeds the limit, in the **same units** as `xValues`.
+  It does not synthesize timestamps or missing buckets. Omit it for no extra
+  distance threshold. Negative/nonfinite limits are ignored.
+- `minValue` and `maxValue` set exact finite Y bounds; omitted ends are
+  automatically scaled. Geometry is clipped at the plot bounds. A reversed
+  pair falls back to automatic bounds. Percentage callers can use `0`/`100`.
+- `ariaLabel` names the focusable SVG. Left/Right inspect adjacent original
+  samples; Home/End inspect the first/last visible timestamp; Escape and blur
+  clear inspection. A live accessible readout announces the label and each
+  visible series value. Pointer movement and touch use that same index and
+  `onInspect(index: number | null)` callback. Touch selection stays after lift;
+  pointer cancellation clears it. Changing series, values, labels, X positions,
+  or domain clears inspection; equivalent new arrays do not.
+
+`npm run verify:series-chart` mounts the real component to cover these
+contracts alongside categorical stacked/grouped bars and container resize.
+
 ## MetricsChart (the django-mojo metrics widget)
 
 ```tsx

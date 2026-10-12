@@ -19,6 +19,25 @@ export function ChartsDemo() {
                 <h3 className="panel-subtitle" style={{ marginTop: 18 }}>Stacked bars</h3>
                 <SeriesChart labels={LABELS} datasets={DATASETS} chartType="bar" height={220} />
             </div>
+            <div className="panel panel-pad">
+                <div className="eyebrow">SeriesChart · sparse history</div>
+                <h3 className="panel-subtitle">Resource samples with missing readings and an offline gap</h3>
+                <p>Hover, tap, or focus the chart and use the arrow keys to inspect. Missing CPU readings stay unavailable.</p>
+                <SeriesChart
+                    labels={['10:01', '10:02', '10:03', '10:04', '10:12', '10:13', '10:14']}
+                    xValues={[60, 120, 180, 240, 720, 780, 840]}
+                    xDomain={[0, 900]}
+                    maxGap={180}
+                    datasets={[
+                        { label: 'CPU', data: [12, 24, null, 30, 40, 32, 36] },
+                        { label: 'Memory', data: [42, 44, 46, 45, 53, 52, 55] },
+                    ]}
+                    minValue={0} maxValue={100} chartType="area" height={240}
+                    ariaLabel="Resource history with missing and offline samples"
+                    valueFormatter={(value) => `${value}%`}
+                    smoothing={0}
+                />
+            </div>
             <MetricsChart
                 title="MetricsChart · live /api/metrics/fetch"
                 slugs={['api_calls', 'user_activity_day', 'api_errors']}
