@@ -8,11 +8,11 @@ import {
 ```
 
 **THE architecture rule:** one flat params object owns search, sort,
-filters and paging for a table. It is URL-synced (real search string, hash
-router safe), drives the server query, the pills, preset matching, and
+filters and paging for a table. It is URL-synced by default (real search string,
+hash router safe), drives the server query, the pills, preset matching, and
 persistence. Components read it; nothing else holds table state.
 
-## `useTableParams(defaults?) → TableParamsApi`
+## `useTableParams(defaults?, defaultFilters?, excludeKeys?, mode?) → TableParamsApi`
 
 State: `search`, `sort` (`'field' | '-field' | ''`, default `'-created'`
 unless `defaults.sort`), `page` (1-based), `size`.
@@ -31,11 +31,20 @@ unless `defaults.sort`), `page` (1-based), `size`.
 | `setPage(n)` / `setSize(n)` | paging (`PAGE_SIZES = [5,10,25,50,100]`) |
 | `applySaved(saved)` | one-shot rehydrate from a persistence blob (below) |
 
-Every write goes through the URL (`replace`), so table state deep-links and
+With the default `mode: 'url'`, every write goes through the URL (`replace`), so table state deep-links and
 survives reloads by construction. A size equal to the caller's effective
 `defaults.size` (10 when omitted) can be omitted from the URL; every other size
 is explicit. Thus choosing or restoring 10 with a caller default of 25 writes
 `size=10`, and the next render continues to show 10 rows.
+
+`mode: 'local'` selects an empty per-instance `URLSearchParams` held in React
+state. All state/filter/wire transformations above remain the same. Local
+instances start on page 1 with the supplied defaults, ignore route params,
+and never write the URL. Multiple instances on the same route are independent;
+changing the outer URL cannot change them. Choose the mode at mount and remount
+(or change the owner component's React `key`) to reset. The hook still runs
+inside the application's existing router. `TableParamsMode` is exported from
+both `portal-mojo/client` and `portal-mojo/client/runtime`.
 
 ## `excludeKeys` — the fixedParams scrub
 
@@ -77,6 +86,10 @@ Do not register a name that is also a model field.
 
 Precedence on restore: **URL > saved > defaults** per key — except `size`,
 a per-user viewing preference the URL merely echoes, where **saved wins**.
+Local instances start with no explicit params, so saved values override
+defaults without reading or changing the route. Persistence is still opt-in
+through ModelTable's `persistState` (default false); use distinct `persistKey`
+values for independent saved views. Fixed keys are excluded in either mode.
 Corrupt or other-version blobs are discarded AND cleared. `sort: ''`
 (deliberately un-sorted) is not persisted — the default sort returns.
 
@@ -84,5 +97,5 @@ Corrupt or other-version blobs are discarded AND cleared. `sort: ''`
 
 - Values are strings on the wire — booleans as `'true'/'false'`.
 - Never mutate `wire`; it's derived.
-- Don't store table state anywhere else (component state, context, redux
+- Don't create a second table-state store (component state, context, redux
   patterns) — that's the exact drift this store exists to prevent.

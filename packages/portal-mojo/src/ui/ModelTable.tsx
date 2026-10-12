@@ -19,7 +19,7 @@
 //   · exportFormats — server-side export via download_format (csv/json)
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ComponentType, type Dispatch, type SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PAGE_SIZES, useTableParams, readTableState, writeTableState, clearTableState, type PersistedTableState } from '../client/params';
+import { PAGE_SIZES, useTableParams, readTableState, writeTableState, clearTableState, type PersistedTableState, type TableParamsMode } from '../client/params';
 import { useModelList } from '../client/hooks';
 import { mojoDownload } from '../client/client';
 import type { ModelDef } from '../client/model';
@@ -239,7 +239,7 @@ export interface ModelTableQuery<T> {
 
 /** A stable component that owns fetching/caching and renders the shared table. */
 export interface ModelTableQueryAdapterProps<T> {
-    /** Model-normalized URL state, with fixedParams applied last. */
+    /** Model-normalized table state, with fixedParams applied last. */
     params: Params;
     /** False until persistence is hydrated or while fixedParams is null. */
     enabled: boolean;
@@ -249,6 +249,8 @@ export interface ModelTableQueryAdapterProps<T> {
 export interface ModelTableProps<T extends { id: RowId }> {
     /** Replaces the default query entirely. Define the component outside render. */
     queryAdapter?: ComponentType<ModelTableQueryAdapterProps<T>>;
+    /** Default 'url'. 'local' starts fresh per mount, without reading/writing route params. */
+    paramsMode?: TableParamsMode;
     /** A defineModel definition — supplies the endpoint (and, later, schema). */
     model?: ModelDef<T>;
     /** Bare endpoint, for tables without a model definition. */
@@ -264,10 +266,10 @@ export interface ModelTableProps<T extends { id: RowId }> {
     onRowClick?: (row: T) => void;
     addLabel?: string;
     onAdd?: () => void;
-    /** Initial sort when the URL doesn't carry one (default '-created'). */
+    /** Initial sort when the params store doesn't carry one (default '-created'). */
     defaultSort?: string;
     /**
-     * Initial URL-backed query state. URL keys win; persisted state wins over
+     * Initial query state. URL keys win in URL mode; persisted state wins over
      * these defaults. `defaultSort` remains as the backwards-compatible
      * shorthand and wins over `defaultParams.sort` when both are supplied.
      */
@@ -287,7 +289,7 @@ export interface ModelTableProps<T extends { id: RowId }> {
     batchActions?: BatchAction<T>[];
     columnChooser?: boolean;
     persistState?: boolean;
-    /** Storage identity; default derives from route + endpoint. */
+    /** Storage identity; defaults to route + endpoint, or local::endpoint in local mode. */
     persistKey?: string;
     /** Interval refetch in SECONDS (5s floor). 0/absent = off. */
     autoRefresh?: number;
@@ -307,7 +309,7 @@ export interface ModelTableProps<T extends { id: RowId }> {
 }
 
 export function ModelTable<T extends { id: RowId }>(props: ModelTableProps<T>) {
-    const { model, endpoint, columns, defaultSort, defaultParams, fixedParams, searchable = true, persistState = false, persistKey, queryAdapter: Adapter } = props;
+    const { model, endpoint, columns, defaultSort, defaultParams, fixedParams, searchable = true, persistState = false, persistKey, queryAdapter: Adapter, paramsMode = 'url' } = props;
     const resolvedEndpoint = model?.endpoint ?? endpoint;
     if (!resolvedEndpoint) throw new Error('ModelTable: pass `model` or `endpoint`');
     const paramDefaults = useMemo(() => ({
@@ -334,10 +336,10 @@ export function ModelTable<T extends { id: RowId }>(props: ModelTableProps<T>) {
             warnOnce(`ModelTable: "${key}" is in both fixedParams and defaultParams — the defaultParams copy is dead (fixed wins on the wire); remove it`);
         }
     }
-    const p = useTableParams(paramDefaults, defaultFilters, fixedKeys);
+    const p = useTableParams(paramDefaults, defaultFilters, fixedKeys, paramsMode);
 
     // ── View persistence (WM-035): restore once BEFORE the first fetch ──
-    const storageKey = persistKey ?? `${(typeof location !== 'undefined' ? location.hash.split('?')[0] : '') || '#/'}::${resolvedEndpoint}`;
+    const storageKey = persistKey ?? (paramsMode === 'local' ? `local::${resolvedEndpoint}` : `${(typeof location !== 'undefined' ? location.hash.split('?')[0] : '') || '#/'}::${resolvedEndpoint}`);
     const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => new Set());
     const [hydrated, setHydrated] = useState(!persistState);
     const restoreRan = useRef(false);

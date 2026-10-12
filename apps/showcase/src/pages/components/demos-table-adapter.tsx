@@ -42,6 +42,7 @@ function PrivateGroupQuery({ params, enabled, children }: ModelTableQueryAdapter
 export function TableAdapterDemo() {
     const [scope, setScope] = useState<'team' | 'org' | null>('team');
     const [failure, setFailure] = useState(false);
+    const [showLocal, setShowLocal] = useState(false);
     return <div className="demo-stack">
         <div className="panel panel-pad">
             <p>Rows live in this component. Search, sort, filters and paging use the shared table controls. Focus a row and press Enter or Space to open it.</p>
@@ -50,6 +51,7 @@ export function TableAdapterDemo() {
                 <button className="btn" onClick={() => setScope('org')}>Organizations</button>
                 <button className="btn" onClick={() => setScope(null)}>Clear scope</button>
                 <button className="btn" aria-pressed={failure} onClick={() => setFailure(value => !value)}>{failure ? 'Restore connection' : 'Simulate background failure'}</button>
+                <button className="btn" aria-expanded={showLocal} onClick={() => setShowLocal(value => !value)}>{showLocal ? 'Hide independent tables' : 'Show independent tables'}</button>
             </div>
         </div>
         <FailureContext.Provider value={failure}>
@@ -64,5 +66,16 @@ export function TableAdapterDemo() {
                 onRowClick={row => toast.success(`Row opened ${row.name}`)}
             />
         </FailureContext.Provider>
+        {showLocal && <div className="demo-stack">
+            <p>These two tables keep their own search, sort, filters and page. Try changing the main table or either list; the others stay in place. Hide and reopen these lists to start fresh.</p>
+            {(['team', 'org'] as const).map(kind => <ModelTable<Row>
+                key={kind} endpoint="/api/group" title={kind === 'team' ? 'Local teams' : 'Local organizations'}
+                paramsMode="local" queryAdapter={PrivateGroupQuery} fixedParams={{ kind }}
+                defaultSort="name" defaultParams={{ size: 5 }}
+                columns={[{ key: 'name', label: 'Name' }, { key: 'kind', label: 'Kind' }]}
+                presets={[{ key: 'all', label: 'All', params: {} }, { key: 'active', label: 'Active', params: { is_active: 'true' } }]}
+                onRowClick={row => toast.success(`Row opened ${row.name}`)}
+            />)}
+        </div>}
     </div>;
 }

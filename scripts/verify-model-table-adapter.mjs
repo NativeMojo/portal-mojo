@@ -113,6 +113,143 @@ try {
     assert.equal(calls.length, 0);
     assert.equal(qc.getQueryCache().getAll().length, 0);
 
+    // The Fleet page and two modal tables share a router, but modal params
+    // must start fresh and never change the page or one another's requests.
+    const LocalIdentity = React.createContext('fleet');
+    const localSeen = new Map();
+    const localRequests = new Map();
+    function LocalAdapter({ params, enabled, children }) {
+        const id = React.useContext(LocalIdentity);
+        const signature = JSON.stringify(params);
+        localSeen.set(id, { params, enabled });
+        React.useEffect(() => {
+            if (enabled) localRequests.set(id, (localRequests.get(id) ?? 0) + 1);
+        }, [id, signature, enabled]);
+        return children({ data: { rows: [{ id: 1, name: `${id} row` }], count: 100 }, status: 'success', isFetching: false, refetch() {} });
+    }
+    const fleetEntry = '/?page=4&size=25&search=fleet&sort=-created&status=online&group=99';
+    let localScope = { group: 7, graph: 'private' };
+    let localKey = 0;
+    let localPersistence = false;
+    const tableNode = (id, extra) => h('section', { id, key: id }, h(LocalIdentity.Provider, { value: id }, h(ModelTable, {
+        model, columns: [{ key: 'name', label: 'Name' }], title: id, queryAdapter: LocalAdapter,
+        presets: [{ key: 'all', label: 'All', params: {} }, { key: 'done', label: 'Done', params: { status: 'done' } }],
+        ...extra,
+    })));
+    const renderLocal = async () => {
+        await React.act(async () => {
+            root.render(h(QueryClientProvider, { client: qc }, h(MemoryRouter, { key: 'local-contract', initialEntries: [fleetEntry] },
+                tableNode('fleet', { fixedParams: { group: 9 } }),
+                tableNode('schedule', { key: localKey, paramsMode: 'local', fixedParams: localScope, defaultParams: { size: 5, sort: 'name', status: 'queued' }, persistState: localPersistence, persistKey: 'local-schedule' }),
+                tableNode('analytics', { paramsMode: 'local', fixedParams: { group: 8 }, defaultParams: { size: 10, sort: '-id' } }),
+                h(Location))));
+            await settle();
+        });
+    };
+    const paramsOf = id => localSeen.get(id).params;
+    const urlState = () => document.querySelector('#url').textContent;
+    const inTable = (id, selector) => document.querySelector(`#${id} ${selector}`);
+    const searchTable = async (id, term) => {
+        const input = inTable(id, 'input[type="search"]');
+        await React.act(async () => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, term);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        });
+    };
+    const done = id => [...document.querySelectorAll(`#${id} .seg-btn`)].find(n => n.textContent === 'Done');
+    await renderLocal();
+    const initialFleet = { ...paramsOf('fleet') };
+    const initialUrl = urlState();
+    assert.equal(initialFleet.start, 75, 'Fleet consumes the URL page');
+    assert.equal(initialFleet.search, 'fleet');
+    assert.equal(paramsOf('schedule').start, 0, 'local table starts on page one instead of inheriting Fleet page');
+    assert.equal(paramsOf('schedule').search, undefined, 'local table ignores Fleet search');
+    assert.equal(paramsOf('schedule').size, 5);
+    assert.equal(paramsOf('schedule').status, 'queued', 'local defaults ignore Fleet filters');
+    assert.equal(paramsOf('schedule').sort, 'name');
+    assert.equal(paramsOf('analytics').status, undefined);
+    assert.equal(paramsOf('analytics').size, 10);
+    assert.equal(paramsOf('schedule').graph, 'private', 'fixed params still override normalization');
+    const initialAnalytics = { ...paramsOf('analytics') };
+    const fleetRequests = localRequests.get('fleet');
+    const untouchedStorage = localStorage.getItem('mojo:tableview:local-schedule');
+    await click(inTable('schedule', '[title="Next page"]'));
+    assert.equal(paramsOf('schedule').start, 5);
+    await searchTable('schedule', 'schedule term');
+    assert.equal(paramsOf('schedule').search, 'schedule term');
+    assert.equal(paramsOf('schedule').start, 0);
+    await click(inTable('schedule', '.th-sort'));
+    assert.equal(paramsOf('schedule').sort, '-name');
+    await click(done('schedule'));
+    assert.equal(paramsOf('schedule').status, 'done');
+    await click(inTable('schedule', '[title="Remove filter"]'));
+    assert.equal(paramsOf('schedule').status, undefined, 'removing local filter does not resurrect defaults');
+    const localSize = inTable('schedule', '.pager select');
+    await React.act(async () => { localSize.value = '10'; localSize.dispatchEvent(new Event('change', { bubbles: true })); });
+    assert.equal(paramsOf('schedule').size, 10, 'local size serialization uses caller default');
+    assert.deepEqual(paramsOf('fleet'), initialFleet);
+    assert.deepEqual(paramsOf('analytics'), initialAnalytics);
+    assert.equal(localRequests.get('fleet'), fleetRequests, 'local edits trigger no underlying Fleet request');
+    assert.equal(urlState(), initialUrl, 'local writes never touch route state');
+    assert.equal(localStorage.getItem('mojo:tableview:local-schedule'), untouchedStorage, 'local persistence defaults off');
+    const scheduleAfterEdits = { ...paramsOf('schedule') };
+    await click(inTable('analytics', '[title="Next page"]'));
+    await searchTable('analytics', 'analytics term');
+    await click(inTable('analytics', '.th-sort'));
+    await click(done('analytics'));
+    assert.equal(paramsOf('analytics').search, 'analytics term');
+    assert.equal(paramsOf('analytics').sort, 'name');
+    assert.equal(paramsOf('analytics').status, 'done');
+    assert.deepEqual(paramsOf('schedule'), scheduleAfterEdits, 'two local instances remain independent');
+    const analyticsAfterEdits = { ...paramsOf('analytics') };
+    const scheduleRequests = localRequests.get('schedule');
+    const analyticsRequests = localRequests.get('analytics');
+    await click(inTable('fleet', '[title="Next page"]'));
+    await searchTable('fleet', 'fleet changed');
+    assert.equal(paramsOf('fleet').search, 'fleet changed');
+    assert(urlState().includes('search=fleet+changed'), 'default URL behavior remains active');
+    assert.deepEqual(paramsOf('schedule'), scheduleAfterEdits);
+    assert.deepEqual(paramsOf('analytics'), analyticsAfterEdits);
+    assert.equal(localRequests.get('schedule'), scheduleRequests, 'outer URL edits do not requery local tables');
+    assert.equal(localRequests.get('analytics'), analyticsRequests);
+    const changedFleetUrl = urlState();
+    const changedFleetRequests = localRequests.get('fleet');
+    await click(inTable('schedule', '[title="Next page"]'));
+    localScope = { group: 17, graph: 'private' };
+    await renderLocal();
+    assert.equal(paramsOf('schedule').start, 0, 'local scope change resets only local paging');
+    assert.equal(paramsOf('schedule').group, 17);
+    assert.equal(inTable('schedule', '.filter-pills')?.textContent.includes('group') ?? false, false);
+    localScope = null;
+    await renderLocal();
+    assert.equal(localSeen.get('schedule').enabled, false);
+    assert(!document.querySelector('#schedule').textContent.includes('schedule row'));
+    localScope = { group: 17, graph: 'private' };
+    localKey++;
+    await renderLocal();
+    assert.equal(paramsOf('schedule').start, 0);
+    assert.equal(paramsOf('schedule').search, undefined, 'remount starts fresh');
+    assert.equal(paramsOf('schedule').size, 5);
+    assert.equal(paramsOf('schedule').status, 'queued');
+    // Explicit persistence can restore a local table, but never from the URL.
+    localStorage.setItem('mojo:tableview:local-schedule', JSON.stringify({ v: 2, search: 'saved local', sort: '-id', size: 25, filters: { status: 'saved', group: '999' } }));
+    localPersistence = true;
+    localKey++;
+    await renderLocal();
+    assert.equal(paramsOf('schedule').search, 'saved local');
+    assert.equal(paramsOf('schedule').sort, '-id');
+    assert.equal(paramsOf('schedule').size, 25);
+    assert.equal(paramsOf('schedule').status, 'saved');
+    assert.equal(paramsOf('schedule').group, 17, 'saved scope cannot replace fixed identity');
+    assert.equal(JSON.parse(localStorage.getItem('mojo:tableview:local-schedule')).filters.group, undefined, 'fixed scope is never persisted');
+    assert.equal(urlState(), changedFleetUrl, 'scope reset and local hydration never write the URL');
+    assert.equal(localRequests.get('fleet'), changedFleetRequests);
+    assert.deepEqual(paramsOf('analytics'), analyticsAfterEdits);
+    assert.equal(calls.length, 0, 'all adapters suppress underlying default queries');
+    assert.equal(qc.getQueryCache().getAll().length, 0, 'local mode does not introduce shared query caching');
+    console.log('PASS ModelTable local params: outer Fleet URL plus two independent tables, search/sort/filter/pager, no cross-requests, scope reset, remount, and opt-in persistence');
+
     // Default callers still fetch normalized/fixed params and sanitize rows.
     route++;
     props = { ...base, queryAdapter: undefined, persistState: false, searchable: false };

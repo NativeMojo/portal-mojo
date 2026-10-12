@@ -14,7 +14,7 @@ integer-id table is unaffected; nothing narrows an id back to `number`.
 
 Every sort, filter, search and page is a **wire param the server answers**
 — there is no client-side row work (rule #1). Table state lives in the
-URL-synced params store. All features below are opt-in props; a bare
+params store, synced to the URL by default. All features below are opt-in props; a bare
 `<ModelTable model={M} title columns />` renders the base table.
 
 ```tsx
@@ -36,6 +36,36 @@ URL-synced params store. All features below are opt-in props; a bare
     addLabel="Add User" onAdd={addUser}
 />
 ```
+
+## Local params for dialogs and multiple tables
+
+`paramsMode?: 'url' | 'local'` defaults to `'url'`. Use `'local'` for a table
+inside a dialog or beside another table on the same route:
+
+```tsx
+<ModelTable model={ScheduleModel} title="Schedule" columns={columns}
+    paramsMode="local" queryAdapter={ScopedRows}
+    fixedParams={{ kiosk: kioskId }} defaultParams={{ size: 5 }} />
+```
+
+A local instance starts on page 1 using its own defaults. It does not inherit
+the page's search, sort, filters or page size, and its controls never change
+the URL or another table's state. It uses the same params store, normalization,
+fixed-scope rules, controls and query adapter contract. No nested router is
+needed; it remains inside the application's existing router. Choose the mode
+at mount; unmount or change the table's React `key` to start fresh.
+
+`persistState` remains **false by default** in both modes. If explicitly enabled
+for a local table, saved state overrides its defaults without URL precedence
+or URL writes. Its default storage key is `local::${endpoint}`; supply a distinct
+`persistKey` for each independent saved view. Fixed params stay excluded from
+saved state. A scope change resets that instance to page 1 and clears selection;
+use a new React `key` when the entire local view should reset too. Local state
+does not itself isolate private rows: the query adapter still owns actor/scope
+checks and stale-data clearing.
+
+Components → **Private table query** includes two independent local tables
+beside the URL-backed table. Hide and reopen them to test fresh mounting.
 
 ## Columns
 
@@ -94,7 +124,7 @@ filter.
 `queryAdapter?: ComponentType<ModelTableQueryAdapterProps<T>>` replaces the
 built-in list query **entirely**. The default `useModelList` is not mounted:
 there is no generic query observer, fetch, or cache entry. Toolbar, filters,
-URL state, persistence, paging, selection and row rendering stay shared.
+params state, persistence, paging, selection and row rendering stay shared.
 
 ```tsx
 // Define once, OUTSIDE the page's render; inline component identities remount.
@@ -108,7 +138,7 @@ function ScopedRows({ params, enabled, children }: ModelTableQueryAdapterProps<R
 
 The adapter receives:
 
-- `params: Params`: the same URL params, with model normalization applied and
+- `params: Params`: the selected URL or local params, with model normalization applied and
   `fixedParams` merged **last**. Do not create a second table-state store.
 - `enabled: boolean`: false until persisted state restores, or while
   `fixedParams === null`. The adapter must honor this gate.
