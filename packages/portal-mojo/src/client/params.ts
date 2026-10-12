@@ -175,7 +175,9 @@ export function useTableParams(
         if (next.search) out.set('search', next.search);
         if (next.sort) out.set('sort', next.sort);
         if (next.page > 1) out.set('page', String(next.page));
-        if (next.size !== DEFAULT_SIZE) out.set('size', String(next.size));
+        // Omit only the effective default. Omitting the global default (10)
+        // would resurrect a caller's different default on the next render.
+        if (next.size !== (defaults.size ?? DEFAULT_SIZE)) out.set('size', String(next.size));
         for (const [key, value] of Object.entries(nextFilters)) {
             if (value !== '') out.set(key, value);
         }
@@ -186,7 +188,7 @@ export function useTableParams(
             if (carried != null) out.set(key, carried);
         }
         setSp(out, { replace: true });
-    }, [setSp, sp]);
+    }, [setSp, sp, defaults.size]);
 
     const wire = useMemo<Params>(() => ({
         start: (state.page - 1) * state.size,

@@ -1,7 +1,7 @@
 # ModelTable — the server-driven table
 
 ```ts
-import { ModelTable, ExpandingSearch, type Column, type Preset, type BatchAction, type RowId } from 'portal-mojo/ui';
+import { ModelTable, ExpandingSearch, type Column, type Preset, type BatchAction, type RowId, type ModelTableQuery, type ModelTableQueryAdapterProps } from 'portal-mojo/ui';
 ```
 
 ## Row identity
@@ -88,6 +88,54 @@ filter.
   fire against ids selected under the previous scope).
 - **Presets must not carry fixed keys** — their writes are scrubbed from
   filter state, so such a preset never matches as active.
+
+## Controlled query adapter
+
+`queryAdapter?: ComponentType<ModelTableQueryAdapterProps<T>>` replaces the
+built-in list query **entirely**. The default `useModelList` is not mounted:
+there is no generic query observer, fetch, or cache entry. Toolbar, filters,
+URL state, persistence, paging, selection and row rendering stay shared.
+
+```tsx
+// Define once, OUTSIDE the page's render; inline component identities remount.
+function ScopedRows({ params, enabled, children }: ModelTableQueryAdapterProps<Row>) {
+    const query = usePrivateRows(params, enabled); // your scoped request hook
+    return children(query);
+}
+<ModelTable model={RowModel} columns={columns} title="Records"
+    queryAdapter={ScopedRows} fixedParams={{ group: groupId }} />
+```
+
+The adapter receives:
+
+- `params: Params`: the same URL params, with model normalization applied and
+  `fixedParams` merged **last**. Do not create a second table-state store.
+- `enabled: boolean`: false until persisted state restores, or while
+  `fixedParams === null`. The adapter must honor this gate.
+- `children(query)`: render it with `{data?: {rows: T[], count: number},
+  status: 'pending' | 'success' | 'error', isFetching: boolean,
+  isPlaceholderData?: boolean, error?: unknown, refetch: () => unknown}`.
+
+The adapter owns sanitization, actor/scope identity, cancellation, final-send
+checks, cache choice and stale-response rejection. Media capability rows can
+stay in component state. Clear `data` synchronously when scope is invalid or
+changes; never return the previous actor's rows as current data. Keeping
+`data` on an ordinary background error preserves its authorized rows and
+shows a Retry alert. Clearing it removes those rows immediately. Pending
+scope hides rows and disables Refresh even if a misbehaving adapter retains data.
+
+Refresh and completed batches call the adapter's `refetch`. `autoRefresh`
+remains opt-in; no timer is introduced by controlled mode. Controlled exports
+require an explicit `exporter`; the generic download path is never used.
+Avoid persisting sensitive URL filter values; `persistState` is an explicit
+host choice. Live demo: Components → **Private table query**.
+
+## Row activation
+
+With `onRowClick`, the whole row is focusable and responds to click, Enter and
+Space. Native nested links, buttons, inputs and other interactive controls
+keep their own action; their click/key events do not also activate the row.
+The table retains native row/cell semantics.
 
 ## Filters (see also forms.md dialog types)
 
@@ -189,7 +237,9 @@ bounded, immediately sanitized, allowlisted client exports.
 Uncached loads (cold, page/sort/filter changes — `isPlaceholderData`)
 render the column-matched skeleton silhouette; cached pages render
 instantly; background refetches never blank the table. Errors render the
-server's message with a Retry. Empty-with-filters offers Clear filters.
+server's message with a Retry. If current data exists, a background error
+keeps those rows with an alert; an error with no current data shows the full
+error state. Empty-with-filters offers Clear filters.
 
 ## Search
 

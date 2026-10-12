@@ -17,7 +17,7 @@
 //   · groupBy — synthetic header rows interleaved on key change; falsy key
 //     = ungrouped tail (see ui/grouping.ts helpers)
 //   · exportFormats — server-side export via download_format (csv/json)
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ComponentType, type Dispatch, type SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PAGE_SIZES, useTableParams, readTableState, writeTableState, clearTableState, type PersistedTableState } from '../client/params';
 import { useModelList } from '../client/hooks';
@@ -98,6 +98,12 @@ function defaultCell(value: unknown, key: string): string {
         return fmt.code(value) || '[object]';
     }
     return String(value);
+}
+
+/** Nested controls retain their own action; plain cells activate the row. */
+function isRowControl(target: EventTarget, row: HTMLTableRowElement): boolean {
+    return target instanceof Element && target !== row
+        && target.closest('button, a, input, select, textarea, summary, [role="button"], [role="link"], [contenteditable="true"]') !== null;
 }
 
 /** Page-number window: {1, total, current±1} with … for the gaps. */
@@ -221,16 +227,28 @@ function MenuDropdown({ button, children, align = 'end' }: {
  */
 export type RowId = number | string;
 
-export function ModelTable<T extends { id: RowId }>({
-    model, endpoint, columns, filters = [], presets = [], eyebrow, title,
-    searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd, defaultSort, defaultParams, fixedParams,
-    selectable = false, batchActions = [],
-    columnChooser = false, persistState = false, persistKey,
-    autoRefresh = 0,
-    rowExpand, rowExpandMultiple = false,
-    groupBy, groupHeaderLabel, groupHeaderStyle = 'banner',
-    exportFormats = [], exporter, rowTone,
-}: {
+/** Controlled query result. An omitted data value clears previously rendered rows. */
+export interface ModelTableQuery<T> {
+    data?: { rows: T[]; count: number };
+    status: 'pending' | 'success' | 'error';
+    isFetching: boolean;
+    isPlaceholderData?: boolean;
+    error?: unknown;
+    refetch: () => unknown;
+}
+
+/** A stable component that owns fetching/caching and renders the shared table. */
+export interface ModelTableQueryAdapterProps<T> {
+    /** Model-normalized URL state, with fixedParams applied last. */
+    params: Params;
+    /** False until persistence is hydrated or while fixedParams is null. */
+    enabled: boolean;
+    children: (query: ModelTableQuery<T>) => ReactNode;
+}
+
+export interface ModelTableProps<T extends { id: RowId }> {
+    /** Replaces the default query entirely. Define the component outside render. */
+    queryAdapter?: ComponentType<ModelTableQueryAdapterProps<T>>;
     /** A defineModel definition — supplies the endpoint (and, later, schema). */
     model?: ModelDef<T>;
     /** Bare endpoint, for tables without a model definition. */
@@ -286,15 +304,12 @@ export function ModelTable<T extends { id: RowId }>({
     exporter?: (format: 'csv' | 'json', normalizedParams: Params) => Promise<void>;
     /** Semantic queue emphasis without coupling callers to table CSS. */
     rowTone?: (row: T) => RowTone | null;
-}) {
+}
+
+export function ModelTable<T extends { id: RowId }>(props: ModelTableProps<T>) {
+    const { model, endpoint, columns, defaultSort, defaultParams, fixedParams, searchable = true, persistState = false, persistKey, queryAdapter: Adapter } = props;
     const resolvedEndpoint = model?.endpoint ?? endpoint;
     if (!resolvedEndpoint) throw new Error('ModelTable: pass `model` or `endpoint`');
-    if (!GROUP_HEADER_STYLES.includes(groupHeaderStyle)) {
-        console.warn(`ModelTable: unknown groupHeaderStyle "${groupHeaderStyle}" — falling back to 'banner'`);
-        groupHeaderStyle = 'banner';
-    }
-
-    const qc = useQueryClient();
     const paramDefaults = useMemo(() => ({
         ...(defaultParams?.search != null ? { search: String(defaultParams.search) } : {}),
         ...(defaultParams?.size != null ? { size: Number(defaultParams.size) } : {}),
@@ -355,14 +370,57 @@ export function ModelTable<T extends { id: RowId }>({
         model?.normalizeListParams ? model.normalizeListParams(tableParams) : tableParams,
         fixedParams,
     );
-    // fixedParams === null means "scope pending" — hold the query so no
-    // unscoped request is ever fired or cached. undefined = unscoped table.
-    const query = useModelList<T>(resolvedEndpoint, listParams, {
-        enabled: hydrated && fixedParams !== null,
-        sanitizeRow: model?.sanitizeRow,
-    });
-    const rows = useMemo(() => query.data?.rows ?? [], [query.data]);
-    const count = query.data?.count ?? 0;
+    const enabled = hydrated && fixedParams !== null;
+    const render = (query: ModelTableQuery<T>) => (
+        <ModelTableView {...props} query={query} context={{ p, hydrated, hiddenCols, setHiddenCols, storageKey, listParams, fixedSignature, resolvedEndpoint, enabled }} />
+    );
+    return Adapter
+        ? <Adapter params={listParams} enabled={enabled}>{render}</Adapter>
+        : <DefaultTableQuery endpoint={resolvedEndpoint} params={listParams} enabled={enabled} sanitizeRow={model?.sanitizeRow}>{render}</DefaultTableQuery>;
+}
+
+function DefaultTableQuery<T>({ endpoint, params, enabled, sanitizeRow, children }: ModelTableQueryAdapterProps<T> & {
+    endpoint: string;
+    sanitizeRow?: (row: T) => T;
+}) {
+    const query = useModelList<T>(endpoint, params, { enabled, sanitizeRow });
+    return children(query);
+}
+
+interface ModelTableContext {
+    p: ReturnType<typeof useTableParams>;
+    hydrated: boolean;
+    hiddenCols: Set<string>;
+    setHiddenCols: Dispatch<SetStateAction<Set<string>>>;
+    storageKey: string;
+    listParams: Params;
+    fixedSignature: string;
+    resolvedEndpoint: string;
+    enabled: boolean;
+}
+
+function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
+    query: ModelTableQuery<T>;
+    context: ModelTableContext;
+}) {
+    const {
+        columns, filters = [], presets = [], eyebrow, title,
+        searchable = true, searchPlaceholder = 'Search…', onRowClick, addLabel, onAdd,
+        selectable = false, batchActions = [],
+        columnChooser = false, persistState = false,
+        autoRefresh = 0,
+        rowExpand, rowExpandMultiple = false,
+        groupBy, groupHeaderLabel, groupHeaderStyle: requestedGroupHeaderStyle = 'banner',
+        exportFormats = [], exporter, rowTone,
+    } = props;
+    const { query, context: { p, hydrated, hiddenCols, setHiddenCols, storageKey, listParams, fixedSignature, resolvedEndpoint, enabled } } = props;
+    const qc = useQueryClient();
+    const groupHeaderStyle = GROUP_HEADER_STYLES.includes(requestedGroupHeaderStyle) ? requestedGroupHeaderStyle : 'banner';
+    if (groupHeaderStyle !== requestedGroupHeaderStyle) {
+        warnOnce(`ModelTable: unknown groupHeaderStyle "${requestedGroupHeaderStyle}" — falling back to 'banner'`);
+    }
+    const rows = useMemo(() => enabled ? query.data?.rows ?? [] : [], [query.data, enabled]);
+    const count = enabled ? query.data?.count ?? 0 : 0;
     const totalPages = Math.max(1, Math.ceil(count / p.size));
     const firstRow = count === 0 ? 0 : (p.page - 1) * p.size + 1;
     const lastRow = Math.min(count, (p.page - 1) * p.size + rows.length);
@@ -479,7 +537,8 @@ export function ModelTable<T extends { id: RowId }>({
                 toast.error(err instanceof Error ? err.message : `${action.label} failed`);
             }
             setSelected(new Set());
-            void qc.invalidateQueries({ queryKey: [resolvedEndpoint] });
+            if (props.queryAdapter) void query.refetch();
+            else void qc.invalidateQueries({ queryKey: [resolvedEndpoint] });
             return;
         }
         const results = await Promise.allSettled(targets.map((row) => action.run!(row, prepared)));
@@ -491,7 +550,8 @@ export function ModelTable<T extends { id: RowId }>({
         // Always clear + refetch on a non-cancel path so the user sees the
         // partial state after failures.
         setSelected(new Set());
-        void qc.invalidateQueries({ queryKey: [resolvedEndpoint] });
+        if (props.queryAdapter) void query.refetch();
+        else void qc.invalidateQueries({ queryKey: [resolvedEndpoint] });
     };
 
     // ── Row expand ───────────────────────────────────────────────────────
@@ -526,7 +586,7 @@ export function ModelTable<T extends { id: RowId }>({
     refetchRef.current = query.refetch;
     const selectedRef = useRef(selected);
     selectedRef.current = selected;
-    const autoRefreshMs = autoRefresh > 0 ? Math.max(5, autoRefresh) * 1000 : 0;
+    const autoRefreshMs = enabled && autoRefresh > 0 ? Math.max(5, autoRefresh) * 1000 : 0;
     useEffect(() => {
         if (!autoRefreshMs) return;
         const skip = () =>
@@ -610,7 +670,17 @@ export function ModelTable<T extends { id: RowId }>({
                         isExpanded ? 'row-expanded' : '',
                         tone ? `row-tone-${tone}` : '',
                     ].filter(Boolean).join(' ') || undefined}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={onRowClick ? (event) => {
+                        if (event.defaultPrevented || isRowControl(event.target, event.currentTarget)) return;
+                        onRowClick(row);
+                    } : undefined}
+                    onKeyDown={onRowClick ? (event) => {
+                        if (event.target !== event.currentTarget || event.defaultPrevented || event.repeat) return;
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        onRowClick(row);
+                    } : undefined}
                 >
                     {expandEnabled && (
                         <td className="col-expand" onClick={(e) => e.stopPropagation()}>
@@ -710,9 +780,9 @@ export function ModelTable<T extends { id: RowId }>({
                                 )}
                             </MenuDropdown>
                         )}
-                        {exportFormats.length > 0 && (
+                        {exportFormats.length > 0 && (!props.queryAdapter || exporter) && (
                             <MenuDropdown button={(open, toggle) => (
-                                <button className="btn btn-compact" onClick={toggle} aria-expanded={open} title="Export">
+                                <button className="btn btn-compact" disabled={!enabled} onClick={toggle} aria-expanded={open} title="Export">
                                     <i className="bi bi-download" /> <span className="btn-label">Export</span>
                                 </button>
                             )}>
@@ -729,6 +799,7 @@ export function ModelTable<T extends { id: RowId }>({
                         <button
                             className="btn-icon"
                             title={autoRefreshMs > 0 ? `Refresh · auto every ${Math.round(autoRefreshMs / 1000)}s` : 'Refresh'}
+                            disabled={!enabled}
                             onClick={() => query.refetch()}
                         >
                             <i className={`bi bi-arrow-repeat${query.isFetching ? ' spin' : ''}`} />
@@ -786,6 +857,13 @@ export function ModelTable<T extends { id: RowId }>({
                 </div>
             )}
 
+            {enabled && query.status === 'error' && query.data && (
+                <div className="form-alert" role="alert">
+                    {query.error instanceof Error ? query.error.message : 'Could not refresh records'}{' '}
+                    <button className="btn btn-compact" onClick={() => query.refetch()}>Retry</button>
+                </div>
+            )}
+
             <div className="tbl-scroll">
                 <table className="tbl">
                     <thead>
@@ -820,7 +898,7 @@ export function ModelTable<T extends { id: RowId }>({
                             change still serving the previous key's rows
                             (isPlaceholderData). Background refetches of the
                             SAME key (autoRefresh) keep the live rows. */}
-                        {query.isPending || query.isPlaceholderData || !hydrated ? (
+                        {query.status === 'pending' || query.isPlaceholderData || !enabled ? (
                             Array.from({ length: Math.min(p.size, 8) }).map((_, i) => (
                                 <tr key={i} className="skel-row" aria-hidden="true">
                                     {expandEnabled && <td className="col-expand" />}
@@ -842,7 +920,7 @@ export function ModelTable<T extends { id: RowId }>({
                                     ))}
                                 </tr>
                             ))
-                        ) : query.isError ? (
+                        ) : query.status === 'error' && !query.data ? (
                             <tr><td colSpan={totalCols}>
                                 <div className="empty-state">
                                     <i className="bi bi-exclamation-triangle" />

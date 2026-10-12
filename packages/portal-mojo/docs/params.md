@@ -32,7 +32,10 @@ unless `defaults.sort`), `page` (1-based), `size`.
 | `applySaved(saved)` | one-shot rehydrate from a persistence blob (below) |
 
 Every write goes through the URL (`replace`), so table state deep-links and
-survives reloads by construction.
+survives reloads by construction. A size equal to the caller's effective
+`defaults.size` (10 when omitted) can be omitted from the URL; every other size
+is explicit. Thus choosing or restoring 10 with a caller default of 25 writes
+`size=10`, and the next render continues to show 10 rows.
 
 ## `excludeKeys` — the fixedParams scrub
 

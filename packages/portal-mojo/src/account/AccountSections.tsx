@@ -3,8 +3,8 @@
 // Each takes the signed-in `me` row and renders on its own — an app can
 // mount any of them outside the modal (e.g. a settings page).
 import { useQueryClient } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
-import { forgotPassword, getDuid, isPasskeyRegistrationSupported, revokeOtherSessions, type Me } from '../client/runtime';
+import { useState, type ReactNode } from 'react';
+import { mojoCall, forgotPassword, getDuid, isPasskeyRegistrationSupported, revokeOtherSessions, type Me } from '../client/runtime';
 import { Badge, FormView, fmt, modal, toast, useAvatarUrl } from '../ui';
 import type { Field } from '../client/runtime';
 import { disableTotp, type NotificationKind } from './api';
@@ -17,6 +17,7 @@ import {
     openEmailChangeDialog, openPhoneChangeDialog, openRecoveryCodesView, openRegenerateRecoveryCodes,
     openTotpEnrolDialog, openVerifyDialog,
 } from './dialogs';
+import { captureAccountActor } from './actor';
 import { MeSaveModel, OAuthConnectionModel, accountKeys, invalidateMe, useRecoveryCodeStatus } from './models';
 import { NotificationPreferences } from './NotificationPreferences';
 import { PasskeyList } from './PasskeyList';
@@ -138,24 +139,33 @@ const provider = (name: string) => PROVIDERS[name.toLowerCase()] ?? { label: nam
 /** The linked Google/Apple/… sign-ins, one row each, with Unlink. */
 export function LinkedSignIns({ userId }: { userId: number }) {
     const { data } = OAuthConnectionModel.useList({ user: userId, size: 10, sort: '-created' });
-    const del = OAuthConnectionModel.useDelete();
+    const qc = useQueryClient();
+    const [pending, setPending] = useState(false);
     const rows = data?.rows ?? [];
     if (rows.length === 0) return null;
 
     const unlink = async (id: number, label: string) => {
-        const ok = await modal.confirm({
-            title: `Unlink ${label}?`,
-            message: <>You won&rsquo;t be able to sign in with <b>{label}</b> until you sign in with it again from the sign-in page. Your {label} account itself is untouched.</>,
-            confirmText: 'Unlink',
-            danger: true,
-        });
-        if (!ok) return;
+        const actor = captureAccountActor(userId);
         try {
-            await del.mutateAsync({ id });
+            const ok = await modal.confirm({
+                title: `Unlink ${label}?`,
+                message: <>You won&rsquo;t be able to sign in with <b>{label}</b> until you sign in with it again from the sign-in page. Your {label} account itself is untouched.</>,
+                confirmText: 'Unlink',
+                danger: true,
+            });
+            if (!ok) return;
+            actor.check();
+            setPending(true);
+            await mojoCall(`${OAuthConnectionModel.endpoint}/${id}`, { method: 'DELETE', unscoped: true, beforeSend: actor.check });
+            actor.check();
+            void qc.invalidateQueries({ queryKey: [OAuthConnectionModel.endpoint] });
             toast.success(`${label} unlinked`);
         } catch (err) {
             // e.g. 400 "Cannot unlink your only login method. Set a password first." — as written.
             toast.error(accountErrorMessage(err));
+        } finally {
+            actor.dispose();
+            setPending(false);
         }
     };
 
@@ -170,7 +180,7 @@ export function LinkedSignIns({ userId }: { userId: number }) {
                             <span>Signed in with {p.label}{row.email && <> · <span className="dim">{row.email}</span></>}</span>
                         </div>
                         <div className="acct-row-actions">
-                            <button type="button" className="btn btn-compact" disabled={del.isPending} onClick={() => void unlink(row.id, p.label)}>Unlink</button>
+                            <button type="button" className="btn btn-compact" disabled={pending} onClick={() => void unlink(row.id, p.label)}>Unlink</button>
                         </div>
                     </div>
                 );

@@ -163,6 +163,16 @@ wrong domain, cancelled; server text as written).
   `is_dob_verified`, `requires_password_change`, secrets, `has_password`,
   `has_passkey`, ….
 
+Profile actions retain their initiating account through auth refresh and fresh-auth
+retry. A caller change rejects before the final send and before publishing a
+response; returning to the original account does not revive an old action.
+This covers personal autosave, photo attachment, email/phone request and
+confirmation, verification, and linked-sign-in unlink. Email confirmation
+also checks before adopting its replacement session, including any wait for an
+in-flight refresh. `MeSaveModel` accepts a null id for the current caller;
+a supplied id must match that caller. Profile dialogs retain the opening
+account across their request/confirmation steps.
+
 So never post the `me` row back as-is — `MeSaveModel` posts only the changed
 fields. `has_password` is in the `me` graph; passwordless users set a first
 password through `/api/auth/forgot`.

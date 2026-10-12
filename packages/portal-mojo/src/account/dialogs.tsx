@@ -30,6 +30,7 @@ import {
     requestEmailChange, requestPhoneChange, revokeOtherSessions, safeQrDataUrl, sendVerificationCode, startTotpSetup,
     suggestPasskeyName,
 } from './api';
+import { captureAccountActor, type AccountActor } from './actor';
 import { MeSaveModel, PasskeyModel, accountKeys, invalidateMe } from './models';
 
 export const FRESH_AUTH_COPY = 'For your security, sign in again to make this change.';
@@ -517,11 +518,12 @@ function ChangePasswordDialog({ lock, close }: { lock: DismissLock; close: (valu
 
 export function openEmailChangeDialog(): Promise<boolean> {
     const lock = newLock();
-    return modal.open<boolean | null>((close) => <EmailChangeDialog lock={lock} close={close} />, { size: 'sm', canDismiss: () => !lock.locked })
-        .then((v) => v === true);
+    const actor = captureAccountActor();
+    return modal.open<boolean | null>((close) => <EmailChangeDialog actor={actor} lock={lock} close={close} />, { size: 'sm', canDismiss: () => !lock.locked })
+        .then((v) => v === true).finally(actor.dispose);
 }
 
-function EmailChangeDialog({ lock, close }: { lock: DismissLock; close: (value: boolean | null) => void }) {
+function EmailChangeDialog({ actor, lock, close }: { actor: AccountActor; lock: DismissLock; close: (value: boolean | null) => void }) {
     const qc = useQueryClient();
     const me = useMe().data;
     const [email, setEmail] = useState('');
@@ -540,7 +542,7 @@ function EmailChangeDialog({ lock, close }: { lock: DismissLock; close: (value: 
         setBusy(true);
         setError('');
         try {
-            setNotice(await requestEmailChange(target));
+            setNotice(await requestEmailChange(target, actor.check));
             setSentTo(target);
         } catch (err) {
             setError(accountErrorMessage(err));
@@ -554,7 +556,7 @@ function EmailChangeDialog({ lock, close }: { lock: DismissLock; close: (value: 
         setBusy(true);
         setError('');
         try {
-            await confirmEmailChange(code);
+            await confirmEmailChange(code, actor.check);
             await invalidateMe(qc);
             toast.success('Email changed');
             close(true);
@@ -607,11 +609,12 @@ function EmailChangeDialog({ lock, close }: { lock: DismissLock; close: (value: 
 
 export function openPhoneChangeDialog(): Promise<boolean> {
     const lock = newLock();
-    return modal.open<boolean | null>((close) => <PhoneChangeDialog lock={lock} close={close} />, { size: 'sm', canDismiss: () => !lock.locked })
-        .then((v) => v === true);
+    const actor = captureAccountActor();
+    return modal.open<boolean | null>((close) => <PhoneChangeDialog actor={actor} lock={lock} close={close} />, { size: 'sm', canDismiss: () => !lock.locked })
+        .then((v) => v === true).finally(actor.dispose);
 }
 
-function PhoneChangeDialog({ lock, close }: { lock: DismissLock; close: (value: boolean | null) => void }) {
+function PhoneChangeDialog({ actor, lock, close }: { actor: AccountActor; lock: DismissLock; close: (value: boolean | null) => void }) {
     const qc = useQueryClient();
     const me = useMe().data;
     const current = typeof me?.phone_number === 'string' && me.phone_number ? me.phone_number : null;
@@ -632,7 +635,7 @@ function PhoneChangeDialog({ lock, close }: { lock: DismissLock; close: (value: 
         setBusy(true);
         setError('');
         try {
-            const result = await requestPhoneChange(target);
+            const result = await requestPhoneChange(target, actor.check);
             setTicket({ token: result.sessionToken, to: target, message: result.message });
             setCode('');
         } catch (err) {
@@ -648,7 +651,7 @@ function PhoneChangeDialog({ lock, close }: { lock: DismissLock; close: (value: 
         setBusy(true);
         setError('');
         try {
-            await confirmPhoneChange(ticket.token, code);
+            await confirmPhoneChange(ticket.token, code, actor.check);
             await invalidateMe(qc);
             toast.success(current ? 'Phone number changed' : 'Phone number added');
             close(true);
@@ -703,11 +706,12 @@ function PhoneChangeDialog({ lock, close }: { lock: DismissLock; close: (value: 
 
 export function openVerifyDialog(channel: 'email' | 'phone'): Promise<boolean> {
     const lock = newLock();
-    return modal.open<boolean | null>((close) => <VerifyDialog channel={channel} lock={lock} close={close} />, { size: 'sm', canDismiss: () => !lock.locked })
-        .then((v) => v === true);
+    const actor = captureAccountActor();
+    return modal.open<boolean | null>((close) => <VerifyDialog channel={channel} actor={actor} lock={lock} close={close} />, { size: 'sm', canDismiss: () => !lock.locked })
+        .then((v) => v === true).finally(actor.dispose);
 }
 
-function VerifyDialog({ channel, lock, close }: { channel: 'email' | 'phone'; lock: DismissLock; close: (value: boolean | null) => void }) {
+function VerifyDialog({ actor, channel, lock, close }: { actor: AccountActor; channel: 'email' | 'phone'; lock: DismissLock; close: (value: boolean | null) => void }) {
     const qc = useQueryClient();
     const me = useMe().data;
     const target = String((channel === 'email' ? me?.email : me?.phone_number) ?? '');
@@ -722,7 +726,7 @@ function VerifyDialog({ channel, lock, close }: { channel: 'email' | 'phone'; lo
         setBusy(true);
         setError('');
         try {
-            setSent(await sendVerificationCode(channel));
+            setSent(await sendVerificationCode(channel, actor.check));
         } catch (err) {
             setError(accountErrorMessage(err));
         } finally {
@@ -735,7 +739,7 @@ function VerifyDialog({ channel, lock, close }: { channel: 'email' | 'phone'; lo
         setBusy(true);
         setError('');
         try {
-            const message = await confirmVerificationCode(channel, code);
+            const message = await confirmVerificationCode(channel, code, actor.check);
             await invalidateMe(qc);
             toast.success(message);
             close(true);
@@ -770,11 +774,12 @@ function VerifyDialog({ channel, lock, close }: { channel: 'email' | 'phone'; lo
 
 export function openAvatarDialog(): Promise<unknown> {
     const lock = newLock();
-    return modal.open((close) => <AvatarDialog lock={lock} close={() => close(null)} />, { size: 'md', canDismiss: () => !lock.locked });
+    const actor = captureAccountActor();
+    return modal.open((close) => <AvatarDialog actor={actor} lock={lock} close={() => close(null)} />, { size: 'md', canDismiss: () => !lock.locked }).finally(actor.dispose);
 }
 
 /** Personal-scope upload → `POST /api/user/me {avatar: <File id> | null}` (MeSaveModel). */
-function AvatarDialog({ lock, close }: { lock: DismissLock; close: () => void }) {
+function AvatarDialog({ actor, lock, close }: { actor: AccountActor; lock: DismissLock; close: () => void }) {
     const me = useMe().data as Me | undefined;
     const save = MeSaveModel.useSave();
     const [busy, setBusy] = useState(false);
@@ -787,7 +792,9 @@ function AvatarDialog({ lock, close }: { lock: DismissLock; close: () => void })
     const attach = async (avatar: number | null) => {
         setBusy(true);
         try {
-            const saved = await save.mutateAsync({ id: me?.id ?? null, changes: { avatar } });
+            actor.check();
+            const saved = await save.mutateAsync({ id: actor.uid, changes: { avatar } });
+            actor.check();
             setOwnerResult({ generation: ++generation.current, status: 'success', requestedValue: avatar, authoritativeValue: saved.avatar ?? null });
             if ((saved.avatar?.id ?? null) !== avatar) throw new Error('The server did not confirm the new photo');
             toast.success(avatar == null ? 'Photo removed' : 'Photo updated');

@@ -330,12 +330,13 @@ export const GRANT_SIGN_IN_AGAIN = 'Sign in again to continue';
  * access + refresh pair. Serialised behind any in-flight refresh so a
  * refresh that started on the old session can never land on top of it.
  */
-async function adoptGrant(data: TokenGrant | null | undefined, remember = true, event: 'login' | 'rotated' = 'login'): Promise<AuthUser> {
+async function adoptGrant(data: TokenGrant | null | undefined, remember = true, event: 'login' | 'rotated' = 'login', check?: () => void): Promise<AuthUser> {
     if (!data || typeof data.access_token !== 'string' || !data.access_token
         || typeof data.refresh_token !== 'string' || !data.refresh_token) {
         throw new Error(GRANT_SIGN_IN_AGAIN);
     }
     if (refreshPromise) await refreshPromise;
+    check?.();
     setTokens(data.access_token, data.refresh_token, remember);
     startAutoRefresh();
     const user = data.user ?? {};
@@ -686,9 +687,11 @@ export function passkeyErrorMessage(error: unknown): string {
  * adopted here into the storage this session already uses. Emits 'rotated'
  * (never 'login': no explicit sign-in happened).
  */
-export async function confirmEmailChange(code: string): Promise<AuthUser> {
-    const body = await mojoCall('/api/auth/email/change/confirm', { method: 'POST', body: { code } });
-    return adoptGrant(body.data as TokenGrant, sessionIsPersistent(), 'rotated');
+export async function confirmEmailChange(code: string, check?: () => void): Promise<AuthUser> {
+    const body = await mojoCall('/api/auth/email/change/confirm', { method: 'POST', body: { code }, beforeSend: check });
+    // Account dialogs fence both dispatch and adoption of the returned login.
+    check?.();
+    return adoptGrant(body.data as TokenGrant, sessionIsPersistent(), 'rotated', check);
 }
 
 /**

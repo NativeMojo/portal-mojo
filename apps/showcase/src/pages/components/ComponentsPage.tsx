@@ -38,6 +38,7 @@ function lazyDemo<TModule, TKey extends keyof TModule>(load: () => Promise<TModu
 }
 
 const TableDemo = lazyDemo(() => import('./demos-data'), 'TableDemo');
+const TableAdapterDemo = lazyDemo(() => import('./demos-table-adapter'), 'TableAdapterDemo');
 const ScopedTableDemo = lazyDemo(() => import('./demos-data'), 'ScopedTableDemo');
 const RouteErrorDemo = lazyDemo(() => import('./demos-route-error'), 'RouteErrorDemo');
 const MenusDemo = lazyDemo(() => import('./demos-menus'), 'MenusDemo');
@@ -139,6 +140,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'table', title: 'ModelTable', icon: 'bi-table',
                 blurb: 'Server-driven table: every sort, filter, search and page is a wire param. Chooser, persistState, expand, groupBy, export.',
                 render: () => <TableDemo />,
+            },
+            {
+                key: 'table-adapter', title: 'Private table query', icon: 'bi-table',
+                blurb: 'A component-owned query feeds the same ModelTable: private rows, scope clearing, background errors, keyboard row activation and no default list query.',
+                render: () => <TableAdapterDemo />,
             },
             {
                 key: 'scoped-table', title: 'Scoped table', icon: 'bi-lock',

@@ -12,11 +12,11 @@
 // Wire authority: django-mojo account/rest/totp.py, rest/user.py,
 // rest/verify.py, rest/notification_prefs.py (read 2026-10-07).
 import { MojoError } from '../client/errors';
-import { mojoCall } from '../client/client';
-import { withFreshAuth } from '../client/auth';
+import { mojoCall, type FetchOpts } from '../client/client';
+import { withFreshAuth, confirmEmailChange as confirmEmailChangeAuth } from '../client/auth';
+import { withAccountActor } from './actor';
 
 export {
-    confirmEmailChange,
     isPasskeyRegistrationSupported,
     passkeyErrorMessage,
     registerPasskey,
@@ -132,15 +132,37 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
 // ── Email / phone changes and verification ────────────────────────────
 
+// Profile dialogs may pass their opening actor's check, covering time between
+// the request and confirmation steps as well as each request's auth wait.
+async function profileCall(path: string, options: FetchOpts, check?: () => void, fresh = false) {
+    return withAccountActor(async (actor) => {
+        const beforeSend = () => { actor.check(); check?.(); };
+        beforeSend();
+        const send = () => mojoCall(path, { ...options, beforeSend });
+        const body = await (fresh ? withFreshAuth(send) : send());
+        beforeSend();
+        return body;
+    });
+}
+
+/** Confirm and adopt an email change only while its initiating account is current. */
+export async function confirmEmailChange(code: string, check?: () => void) {
+    return withAccountActor(async (actor) => {
+        const beforeSend = () => { actor.check(); check?.(); };
+        beforeSend();
+        return confirmEmailChangeAuth(code, beforeSend);
+    });
+}
+
 /**
  * `POST /api/auth/email/change/request {email, method:'code'}` (fresh auth).
  * A 6-digit code goes to the NEW address; finish with confirmEmailChange().
  */
-export async function requestEmailChange(email: string): Promise<string> {
-    const body = await withFreshAuth(() => mojoCall('/api/auth/email/change/request', {
+export async function requestEmailChange(email: string, check?: () => void): Promise<string> {
+    const body = await profileCall('/api/auth/email/change/request', {
         method: 'POST',
         body: { email, method: 'code' },
-    }));
+    }, check, true);
     return message(body, 'A verification code has been sent to your new email address.');
 }
 
@@ -154,37 +176,37 @@ export interface PhoneChangeTicket {
  * `POST /api/auth/phone/change/request {phone_number}` (fresh auth). The
  * session_token rides at the envelope's TOP level, not under `data`.
  */
-export async function requestPhoneChange(phoneNumber: string): Promise<PhoneChangeTicket> {
-    const body = await withFreshAuth(() => mojoCall('/api/auth/phone/change/request', {
+export async function requestPhoneChange(phoneNumber: string, check?: () => void): Promise<PhoneChangeTicket> {
+    const body = await profileCall('/api/auth/phone/change/request', {
         method: 'POST',
         body: { phone_number: phoneNumber },
-    }));
+    }, check, true);
     const token = (body as { session_token?: unknown }).session_token;
     if (typeof token !== 'string' || !token) throw new MojoError('The server did not return a phone change session', 0);
     return { sessionToken: token, message: message(body, 'A verification code has been sent to your new phone number.') };
 }
 
 /** `POST /api/auth/phone/change/confirm {session_token, code}` — commits + verifies the number. */
-export async function confirmPhoneChange(sessionToken: string, code: string): Promise<string> {
-    const body = await mojoCall('/api/auth/phone/change/confirm', {
+export async function confirmPhoneChange(sessionToken: string, code: string, check?: () => void): Promise<string> {
+    const body = await profileCall('/api/auth/phone/change/confirm', {
         method: 'POST',
         body: { session_token: sessionToken, code },
-    });
+    }, check);
     return message(body, 'Phone number updated successfully.');
 }
 
 /** `POST /api/auth/verify/{email|phone}/send` — a code (email asks for `method:'code'`). */
-export async function sendVerificationCode(channel: 'email' | 'phone'): Promise<string> {
-    const body = await mojoCall(`/api/auth/verify/${channel}/send`, {
+export async function sendVerificationCode(channel: 'email' | 'phone', check?: () => void): Promise<string> {
+    const body = await profileCall(`/api/auth/verify/${channel}/send`, {
         method: 'POST',
         body: channel === 'email' ? { method: 'code' } : {},
-    });
+    }, check);
     return message(body, 'Verification code sent');
 }
 
 /** `POST /api/auth/verify/{email|phone}/confirm {code}`. */
-export async function confirmVerificationCode(channel: 'email' | 'phone', code: string): Promise<string> {
-    const body = await mojoCall(`/api/auth/verify/${channel}/confirm`, { method: 'POST', body: { code } });
+export async function confirmVerificationCode(channel: 'email' | 'phone', code: string, check?: () => void): Promise<string> {
+    const body = await profileCall(`/api/auth/verify/${channel}/confirm`, { method: 'POST', body: { code } }, check);
     return message(body, channel === 'email' ? 'Email verified' : 'Phone verified');
 }
 

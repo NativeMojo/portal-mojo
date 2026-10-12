@@ -8,9 +8,10 @@
 // through — and the account-only query keys.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-    mojoSave, sanitizeMe, useAuthSnapshot, withFreshAuth,
+    mojoCall, sanitizeMe, useAuthSnapshot, withFreshAuth,
     type Me, type SaveVars,
 } from '../client/runtime';
+import { withAccountActor } from './actor';
 import { getNotificationPreferences, getRecoveryCodeStatus, type NotificationPreferencesResponse, type RecoveryCodeStatus } from './api';
 
 // ── /api/user/me ──────────────────────────────────────────────────────
@@ -21,18 +22,24 @@ import { getNotificationPreferences, getRecoveryCodeStatus, type NotificationPre
  * 403s email/username/is_superuser/permissions even unchanged), sanitizes
  * the answer with sanitizeMe, writes `['me', uid]` and refreshes every
  * `/api/user` cache (UserModel.useSave never touches `me`, and vice versa).
- * The `id` in SaveVars is ignored: the endpoint is always the caller.
+ * The endpoint is always the caller. A supplied id must match that caller;
+ * actor checks fence the final send, fresh-auth retry, and cache publication.
  */
 export const MeSaveModel = {
     useSave: () => {
         const qc = useQueryClient();
         const { uid } = useAuthSnapshot();
         return useMutation<Me, Error, SaveVars>({
-            mutationFn: async ({ changes }: SaveVars) => sanitizeMe(await withFreshAuth(() => mojoSave<Me>('/api/user/me', null, changes))),
-            onSuccess: (row) => {
-                qc.setQueryData(['me', uid], row);
+            mutationFn: ({ id, changes }: SaveVars) => withAccountActor(async (actor) => {
+                const body = await withFreshAuth(() => mojoCall('/api/user/me', {
+                    method: 'POST', body: changes, beforeSend: actor.check,
+                }));
+                actor.check();
+                const row = sanitizeMe(body.data as Me);
+                qc.setQueryData(['me', actor.uid], row);
                 void qc.invalidateQueries({ queryKey: ['/api/user'] });
-            },
+                return row;
+            }, id ?? uid),
         });
     },
 };
