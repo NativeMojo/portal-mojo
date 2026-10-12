@@ -19,8 +19,10 @@ const settle = () => new Promise(r => setTimeout(r, 15));
 let root;
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { gcTime: Infinity } } });
 const calls = [];
+let responseStatus = 200;
 globalThis.fetch = async (url, opts) => {
     calls.push({ url: String(url), opts });
+    if (responseStatus !== 200) return { ok: false, status: responseStatus, json: async () => ({ status: false, error: `Access denied (${responseStatus})` }) };
     return { ok: true, json: async () => ({ status: true, data: [{ id: 1, name: 'Network row', secret: 'raw' }], count: 53 }) };
 };
 try {
@@ -123,7 +125,28 @@ try {
     assert.equal(sent.searchParams.has('search'), false, 'searchable=false strips stale URL search before fetching');
     assert(document.body.textContent.includes('Sanitized row'));
     assert(!JSON.stringify(qc.getQueryCache().getAll().map(q => q.state.data)).includes('raw'));
-    console.log('PASS ModelTable adapter: hydration, fixed/normalized URL params, one shared render, zero default fetch/cache, keyboard, nested controls, refresh, pager, search, filters, retained errors, scope clearing, and default callers');
+    // Generic callers have no actor/scope authority to retain rows on errors.
+    // TanStack keeps successful data after a denied refresh, so exercise the
+    // actual success → 403 → 401 path without clearing its cache ourselves.
+    const beforeDeniedActivations = rowActivations;
+    for (const status of [403, 401]) {
+        responseStatus = status;
+        await click(document.querySelector('[title="Refresh"]'));
+        await React.act(settle);
+        const cached = qc.getQueryCache().getAll().find(query => query.queryKey[0] === '/api/adapter-probe');
+        assert.equal(cached.state.status, 'error');
+        assert.equal(cached.state.data.rows[0].name, 'Sanitized row', 'fixture retains the old successful query data');
+        assert(!document.body.textContent.includes('Sanitized row'), `default ${status} hides the old row`);
+        assert.equal(document.querySelectorAll('tr.row-click').length, 0, `default ${status} exposes no activatable row`);
+        assert.equal([...document.querySelectorAll('tbody button')].filter(button => button.textContent === 'Nested').length, 0, `default ${status} exposes no nested row action`);
+        assert(document.body.textContent.includes('Could not load records'));
+        assert(document.body.textContent.includes(`Access denied (${status})`));
+        assert.equal(document.querySelectorAll('.form-alert').length, 0, 'retained-data banner belongs only to a controlled adapter');
+        await key(document.querySelector('tbody'), 'Enter');
+        await key(document.querySelector('tbody'), ' ');
+        assert.equal(rowActivations, beforeDeniedActivations, 'error view cannot activate the previous row');
+    }
+    console.log('PASS ModelTable adapter: hydration, fixed/normalized URL params, one shared render, zero default fetch/cache, keyboard, nested controls, refresh, pager, search, filters, retained errors, scope clearing, default callers, and default success→403→401 row removal');
 } finally {
     if (root) await React.act(async () => root.unmount());
     qc.clear();

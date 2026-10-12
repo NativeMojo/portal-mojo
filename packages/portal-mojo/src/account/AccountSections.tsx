@@ -4,10 +4,10 @@
 // mount any of them outside the modal (e.g. a settings page).
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { mojoCall, forgotPassword, getDuid, isPasskeyRegistrationSupported, revokeOtherSessions, type Me } from '../client/runtime';
+import { forgotPassword, getDuid, isPasskeyRegistrationSupported, revokeOtherSessions, type Me } from '../client/runtime';
 import { Badge, FormView, fmt, modal, toast, useAvatarUrl } from '../ui';
 import type { Field } from '../client/runtime';
-import { disableTotp, type NotificationKind } from './api';
+import { disableTotp, unlinkOwnOAuthConnection, type NotificationKind } from './api';
 import {
     LoginEventModel, UserDeviceModel, browserLabel, deviceIcon,
     type LoginEventRow, type UserDeviceRow,
@@ -156,7 +156,7 @@ export function LinkedSignIns({ userId }: { userId: number }) {
             if (!ok) return;
             actor.check();
             setPending(true);
-            await mojoCall(`${OAuthConnectionModel.endpoint}/${id}`, { method: 'DELETE', unscoped: true, beforeSend: actor.check });
+            await unlinkOwnOAuthConnection(id, actor.check);
             actor.check();
             void qc.invalidateQueries({ queryKey: [OAuthConnectionModel.endpoint] });
             toast.success(`${label} unlinked`);

@@ -237,9 +237,10 @@ bounded, immediately sanitized, allowlisted client exports.
 Uncached loads (cold, page/sort/filter changes — `isPlaceholderData`)
 render the column-matched skeleton silhouette; cached pages render
 instantly; background refetches never blank the table. Errors render the
-server's message with a Retry. If current data exists, a background error
-keeps those rows with an alert; an error with no current data shows the full
-error state. Empty-with-filters offers Clear filters.
+server's message with a Retry and replace the rows for default callers. Only
+a controlled adapter may retain authorized current data on a background error,
+showing an alert alongside those rows; clearing its data shows the full error
+state. Empty-with-filters offers Clear filters.
 
 ## Search
 

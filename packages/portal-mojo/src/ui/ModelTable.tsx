@@ -857,7 +857,7 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
                 </div>
             )}
 
-            {enabled && query.status === 'error' && query.data && (
+            {props.queryAdapter && enabled && query.status === 'error' && query.data && (
                 <div className="form-alert" role="alert">
                     {query.error instanceof Error ? query.error.message : 'Could not refresh records'}{' '}
                     <button className="btn btn-compact" onClick={() => query.refetch()}>Retry</button>
@@ -920,7 +920,7 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
                                     ))}
                                 </tr>
                             ))
-                        ) : query.status === 'error' && !query.data ? (
+                        ) : query.status === 'error' && (!props.queryAdapter || !query.data) ? (
                             <tr><td colSpan={totalCols}>
                                 <div className="empty-state">
                                     <i className="bi bi-exclamation-triangle" />

@@ -37,3 +37,6 @@ const deletion=scan(`import { FileModel as Files } from './storage/models'; cons
 const semantic=scan(`${preamble} function editor(){return dialogs.open(close=><ConfigEditor/>)} function caller(){return editor()}`);
 assert(classifyModalEntries(semantic.entries,[]).some(problem=>problem.includes('Unreviewed modal body')));
 const direct=semantic.entries.find(entry=>entry.launcher==='modal.open'); assert.deepEqual(classifyModalEntries(semantic.entries,[{id:direct.id,fingerprint:direct.fingerprint,category:'editor',purpose:'Configuration editor'}]),[]); assert(semantic.entries.every(entry=>entry.category==='editor'),'Forwarders inherit reviewed editor classification');
+
+const guardedUnlink = scan(`import { unlinkOwnOAuthConnection as unlinkOwn } from '../account/api'; function unlink(){ return unlinkOwn(9, () => {}); }`);
+assert(guardedUnlink.lifecycle.some(item => item.symbol === 'unlinkOwnOAuthConnection'), 'The guarded account unlink remains visible to the finite lifecycle audit through an alias');

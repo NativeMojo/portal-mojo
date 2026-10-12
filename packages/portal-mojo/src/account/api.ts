@@ -145,6 +145,11 @@ async function profileCall(path: string, options: FetchOpts, check?: () => void,
     });
 }
 
+/** Caller-owned provider unlink. The opening account guard remains required. */
+export async function unlinkOwnOAuthConnection(id: number, check: () => void): Promise<void> {
+    await profileCall(`/api/account/oauth_connection/${id}`, { method: 'DELETE', unscoped: true }, check);
+}
+
 /** Confirm and adopt an email change only while its initiating account is current. */
 export async function confirmEmailChange(code: string, check?: () => void) {
     return withAccountActor(async (actor) => {

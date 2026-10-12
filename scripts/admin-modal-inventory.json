@@ -8822,7 +8822,7 @@
       "category": "action",
       "parent": "openEmailChangeDialog",
       "target": null,
-      "fingerprint": "9aebc117dcb0f58a737d",
+      "fingerprint": "e8dd30acb897dcd4507b",
       "categories": [
         "action"
       ]
@@ -8838,7 +8838,7 @@
       "category": "action",
       "parent": "openPhoneChangeDialog",
       "target": null,
-      "fingerprint": "14cbbadc6dcde59cb68c",
+      "fingerprint": "0257e3d705b8c7ddf3fb",
       "categories": [
         "action"
       ]
@@ -8854,7 +8854,7 @@
       "category": "action",
       "parent": "openVerifyDialog",
       "target": null,
-      "fingerprint": "c620446905e171a63995",
+      "fingerprint": "39a68d49d182c075c188",
       "categories": [
         "action"
       ]
@@ -8870,7 +8870,7 @@
       "category": "editor",
       "parent": "openAvatarDialog",
       "target": null,
-      "fingerprint": "77546625f94a86d77c1e",
+      "fingerprint": "bfd397b069bae1aeba39",
       "categories": [
         "editor"
       ]

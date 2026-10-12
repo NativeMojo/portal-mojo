@@ -404,25 +404,25 @@
     },
     {
       "id": "packages/portal-mojo/src/account/dialogs.tsx:openEmailChangeDialog:modal.open:0",
-      "fingerprint": "9aebc117dcb0f58a737d",
+      "fingerprint": "e8dd30acb897dcd4507b",
       "category": "action",
       "purpose": "EmailChangeDialog: request a code to the new address, confirm adopts the re-issued login"
     },
     {
       "id": "packages/portal-mojo/src/account/dialogs.tsx:openPhoneChangeDialog:modal.open:0",
-      "fingerprint": "14cbbadc6dcde59cb68c",
+      "fingerprint": "0257e3d705b8c7ddf3fb",
       "category": "action",
       "purpose": "PhoneChangeDialog: request a code to the new number, confirm with the dialog-held session token"
     },
     {
       "id": "packages/portal-mojo/src/account/dialogs.tsx:openVerifyDialog:modal.open:0",
-      "fingerprint": "c620446905e171a63995",
+      "fingerprint": "39a68d49d182c075c188",
       "category": "action",
       "purpose": "VerifyDialog: send and confirm a verification code for the caller email or phone"
     },
     {
       "id": "packages/portal-mojo/src/account/dialogs.tsx:openAvatarDialog:modal.open:0",
-      "fingerprint": "77546625f94a86d77c1e",
+      "fingerprint": "bfd397b069bae1aeba39",
       "category": "editor",
       "purpose": "AvatarDialog: personal-scope image upload attached through /api/user/me, dismissal locked while uploading"
     },
@@ -535,10 +535,10 @@
     },
     {
       "file": "packages/portal-mojo/src/account/AccountSections.tsx",
-      "symbol": "OAuthConnectionModel.useDelete",
-      "expression": "OAuthConnectionModel.useDelete",
-      "fingerprint": "d4e2e43f47a8850e412b",
-      "permission": "live owner only (self-service; the list is scoped ?user=<me.id>)",
+      "symbol": "unlinkOwnOAuthConnection",
+      "expression": "unlinkOwnOAuthConnection",
+      "fingerprint": "62f83f13b29786b4a449",
+      "permission": "live opening account before final send and publication (self-service; list scoped ?user=<me.id>)",
       "rationale": "Unlink the caller's own provider association; the server refuses the last login method (400) and the provider account stays intact.",
       "runtimeCase": "account-self-oauth-unlink"
     }
