@@ -250,6 +250,36 @@ try {
     assert.equal(qc.getQueryCache().getAll().length, 0, 'local mode does not introduce shared query caching');
     console.log('PASS ModelTable local params: outer Fleet URL plus two independent tables, search/sort/filter/pager, no cross-requests, scope reset, remount, and opt-in persistence');
 
+    // JavaScript callers can supply unknown options; fallback must be visible
+    // to developers, bounded across rerenders, and retain URL semantics.
+    const warnings = [];
+    const originalWarn = console.warn;
+    query = { ...query, data: { rows: [{ id: 1, name: 'Mode row' }], count: 100 } };
+    console.warn = (...args) => warnings.push(args.join(' '));
+    try {
+        for (const mode of [undefined, 'url', 'local', ' modal']) {
+            route++;
+            props = { ...base, persistState: false, paramsMode: mode };
+            await render();
+            assert.equal(seen.at(-1).params.search, mode === 'local' ? undefined : 'initial');
+            if (mode === ' modal') {
+                assert.equal(warnings.length, 1, 'unknown params mode warns once');
+                assert.match(warnings[0], /unknown.*modal.*falling back to.*url/);
+            } else {
+                assert.equal(warnings.length, 0, 'known and omitted params modes do not warn');
+            }
+            const initialModeUrl = urlState();
+            await click(document.querySelector('[title="Next page"]'));
+            assert.equal(seen.at(-1).params.start, 25);
+            if (mode === 'local') assert.equal(urlState(), initialModeUrl);
+            else assert(urlState().includes('page=2'), 'URL/default/unknown mode writes the URL');
+            assert.equal(warnings.length, mode === ' modal' ? 1 : 0, 'rerenders do not repeat the warning');
+        }
+    } finally {
+        console.warn = originalWarn;
+    }
+    console.log('PASS ModelTable params modes: valid modes unchanged; unknown option warns once and falls back to URL');
+
     // Default callers still fetch normalized/fixed params and sanitize rows.
     route++;
     props = { ...base, queryAdapter: undefined, persistState: false, searchable: false };

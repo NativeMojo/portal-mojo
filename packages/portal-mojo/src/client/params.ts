@@ -145,9 +145,15 @@ export function useTableParams(
     // with an empty per-instance source instead of the route's query string.
     mode: TableParamsMode = 'url',
 ): TableParamsApi {
+    const warnedMode = useRef(false);
+    const resolvedMode = mode === 'local' ? 'local' : 'url';
+    if (mode !== 'url' && mode !== 'local' && !warnedMode.current) {
+        warnedMode.current = true;
+        console.warn(`[portal-mojo] useTableParams: unknown mode "${String(mode)}" — falling back to 'url'`);
+    }
     const [urlParams, setUrlParams] = useSearchParams();
     const [localParams, setLocalParams] = useState(() => new URLSearchParams());
-    const sp = mode === 'local' ? localParams : urlParams;
+    const sp = resolvedMode === 'local' ? localParams : urlParams;
     // Defaults seed only the untouched route. Once this table writes params,
     // an intentionally empty filter set must stay empty ("Clear all" must
     // not immediately resurrect a route default).
@@ -194,9 +200,9 @@ export function useTableParams(
             const carried = sp.get(key);
             if (carried != null) out.set(key, carried);
         }
-        if (mode === 'local') setLocalParams(out);
+        if (resolvedMode === 'local') setLocalParams(out);
         else setUrlParams(out, { replace: true });
-    }, [mode, setUrlParams, sp, defaults.size]);
+    }, [resolvedMode, setUrlParams, sp, defaults.size]);
 
     const wire = useMemo<Params>(() => ({
         start: (state.page - 1) * state.size,

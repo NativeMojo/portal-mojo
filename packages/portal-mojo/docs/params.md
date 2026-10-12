@@ -45,6 +45,8 @@ changing the outer URL cannot change them. Choose the mode at mount and remount
 (or change the owner component's React `key`) to reset. The hook still runs
 inside the application's existing router. `TableParamsMode` is exported from
 both `portal-mojo/client` and `portal-mojo/client/runtime`.
+Unknown runtime mode values fall back to `'url'` with one console warning per
+mounted instance; valid and omitted modes do not warn.
 
 ## `excludeKeys` — the fixedParams scrub
 
