@@ -62,7 +62,7 @@ try {
     close(Number(dots()[0].getAttribute('cx')), 48 + 538 / 12, 'explicit domain retains leading empty time');
     close(Number(dots()[1].getAttribute('cx')) - Number(dots()[0].getAttribute('cx')), 538 / 12, 'time separation controls X geometry');
     assert.equal(paths().length, 3, 'maxGap breaks otherwise finite runs');
-    assert.deepEqual([...svg().querySelectorAll('text[text-anchor="end"]')].map((n) => n.textContent), ['0%', '20%', '40%', '60%', '80%', '100%'], 'explicit bounds are exact');
+    assert.deepEqual([...svg().querySelectorAll('text[text-anchor="end"]:not(.series-x-label)')].map((n) => n.textContent), ['0%', '20%', '40%', '60%', '80%', '100%'], 'explicit bounds are exact');
     assert.equal(svg().getAttribute('aria-label'), timed.ariaLabel);
     assert.equal(svg().getAttribute('tabindex'), '0');
     await key('Home');
@@ -90,6 +90,40 @@ try {
     await mount({ ...timed, xDomain: [0, 60] });
     assert.equal(document.querySelector('.chart-tip'), null, 'changed domain clears old inspection');
     assert.equal(inspections.at(-1), null);
+
+    // Numeric axes span the domain even when every sample is clumped at one end.
+    const clustered = {
+        labels: Array.from({ length: 11 }, (_, i) => `October 12, 2026, 2:${String(i).padStart(2, '0')}:00 PM`),
+        xValues: Array.from({ length: 11 }, (_, i) => i * 60), xDomain: [0, 3600],
+        datasets: [{ label: 'CPU', data: Array.from({ length: 11 }, (_, i) => i) }],
+        xValueFormatter: (value) => `${String(14 + Math.floor(value / 3600)).padStart(2, '0')}:${String(Math.round(value / 60) % 60).padStart(2, '0')}`,
+    };
+    const axisLabels = () => [...svg().querySelectorAll('.series-x-label')];
+    for (const width of [320, 390, 960]) {
+        await React.act(async () => resize([{ contentRect: { width } }]));
+        await mount(clustered);
+        const ticks = axisLabels();
+        assert(ticks.length >= 2 && ticks.length <= 6, 'numeric axes use 2–6 readable ticks');
+        assert.equal(ticks[0].getAttribute('aria-label'), '14:00');
+        assert.equal(ticks.at(-1).getAttribute('aria-label'), '15:00');
+        const step = (width - 62) / (ticks.length - 1);
+        ticks.forEach((tick, i) => close(Number(tick.getAttribute('x')), 48 + step * i, 'ticks are evenly spaced across the whole domain'));
+        close(Number(dots().at(-1).getAttribute('cx')), 48 + (width - 62) / 6, 'axis ticks never move clustered samples');
+        await key('End');
+        assert.equal(document.querySelector('.chart-tip-head').textContent, clustered.labels.at(-1), 'inspection keeps full original timestamps');
+        const pointGeometry = dots().map((dot) => dot.getAttribute('cx'));
+        await mount({ ...clustered, xValueFormatter: (value) => `October 12, 2026 at ${value} seconds — unusually long axis text` });
+        assert.equal(axisLabels().length, 2, 'long formatting reduces density before truncating');
+        if (width < 400) assert(axisLabels().every((tick) => tick.querySelector('tspan').textContent.endsWith('…')), 'phone widths abbreviate long labels');
+        assert(axisLabels().every((tick) => tick.querySelector('title').textContent.includes('unusually long axis text')), 'full tick labels remain discoverable');
+        const slots = axisLabels().map((tick) => document.getElementById(tick.getAttribute('clip-path').slice(5, -1)).querySelector('rect'));
+        assert(Number(slots[0].getAttribute('x')) + Number(slots[0].getAttribute('width')) < Number(slots[1].getAttribute('x')), 'clipped label slots cannot overlap');
+        assert.deepEqual(dots().map((dot) => dot.getAttribute('cx')), pointGeometry, 'formatting preserves exact point geometry');
+        finiteGeometry();
+    }
+    await mount({ ...clustered, showXLabels: false });
+    assert.equal(axisLabels().length, 0, 'showXLabels still hides numeric labels');
+    await React.act(async () => resize([{ contentRect: { width: 320 } }]));
 
     await mount(timed);
     await key('Home');
@@ -132,9 +166,9 @@ try {
     await mount({ labels: ['A', 'B', 'C', 'D'], datasets: [{ label: 'Value', data: [1, 2, 3, 1e100] }], xValues: [10, NaN, 20, 100], xDomain: [0, 30] });
     assert.equal(dots().length, 2, 'invalid and out-of-domain X values are omitted');
     assert.equal(paths().length, 0, 'an invalid timestamp breaks a run');
-    assert.ok(![...svg().querySelectorAll('text[text-anchor="end"]')].some((n) => n.textContent.includes('e+')), 'out-of-domain values do not distort visible scale');
+    assert.ok(![...svg().querySelectorAll('text[text-anchor="end"]:not(.series-x-label)')].some((n) => n.textContent.includes('e+')), 'out-of-domain values do not distort visible scale');
     finiteGeometry();
-    console.log('SeriesChart mounted regression: sparse line/area/bar data, finite geometry, timestamp domains/gaps, bounds, categorical stacks/groups, keyboard/pointer/touch inspection and resize passed.');
+    console.log('SeriesChart mounted regression: sparse data, finite geometry, timestamp domains/gaps, responsive numeric ticks, bounds, categorical stacks/groups, keyboard/pointer/touch inspection and resize passed.');
 } finally {
     await React.act(async () => root.unmount());
     assert.ok(disconnected, 'ResizeObserver disconnects on unmount');

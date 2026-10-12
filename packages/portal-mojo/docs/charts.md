@@ -100,6 +100,16 @@ callers:
   before/after the samples. Out-of-window samples are omitted from drawing,
   inspection, and automatic Y scaling. Omit it to fit the finite X values;
   a single distinct X is centered. Invalid/reversed domains fall back to fit.
+- Numeric axes use 2–6 evenly spaced ticks over that domain, including its
+  endpoints, independent of clustered sample positions. `xValueFormatter?:
+  (value: number) => string` formats those ticks in the same units as `xValues`;
+  for epoch seconds, for example, return `new Date(value * 1000).toLocaleTimeString([], {
+  hour: '2-digit', minute: '2-digit' })`. Without a formatter, ticks show numeric
+  values. Width and label length reduce tick density; very long labels shorten
+  with ellipsis inside nonoverlapping slots and retain full text in SVG titles.
+  Inspection tooltips and accessible readouts always retain the original
+  `labels`. No tick adds a sample or moves a data point. Categorical axes retain
+  their existing label thinning, and `showXLabels={false}` hides either axis.
 - `maxGap?: number` breaks line/area runs when the distance between consecutive
   numeric X values exceeds the limit, in the **same units** as `xValues`.
   It does not synthesize timestamps or missing buckets. Omit it for no extra

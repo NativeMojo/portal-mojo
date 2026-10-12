@@ -35,6 +35,8 @@ export interface SeriesChartProps {
     xValues?: number[];
     /** Visible numeric X window, in the same units as xValues. */
     xDomain?: [number, number];
+    /** Numeric X axis ticks only; inspection keeps the original full labels. */
+    xValueFormatter?: (value: number) => string;
     /** Split line/area runs when consecutive numeric X values exceed this gap. */
     maxGap?: number;
     /** Exact Y bounds; omitted bounds are computed from visible data. */
@@ -83,6 +85,39 @@ function defaultFormat(v: number): string {
     return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
+// Axis labels use 10.5px monospace. Budget conservatively, then clip each
+// label to its own slot so custom fonts/long strings cannot overlap a neighbour.
+const axisTextWidth = (text: string) => Array.from(text).reduce((width, char) => width + (char.codePointAt(0)! < 128 ? 7 : 11), 0);
+function fitAxisLabel(text: string, width: number): string {
+    if (axisTextWidth(text) <= width) return text;
+    let shortened = '';
+    for (const char of text) {
+        if (axisTextWidth(shortened + char + '…') > width) break;
+        shortened += char;
+    }
+    return `${shortened}…`;
+}
+
+function numericAxisTicks(domain: [number, number], plotW: number, format: (value: number) => string) {
+    const [min, max] = domain;
+    const make = (count: number) => Array.from({ length: count }, (_, index) => {
+        const fraction = count === 1 ? 0.5 : index / (count - 1);
+        // Weighted interpolation avoids overflowing max - min on extreme feeds.
+        const value = index === 0 ? min : index === count - 1 ? max : min * (1 - fraction) + max * fraction;
+        const x = PAD.left + fraction * plotW;
+        const step = count === 1 ? plotW : plotW / (count - 1);
+        const start = index === 0 ? PAD.left : x - step / 2 + 6;
+        const end = index === count - 1 ? PAD.left + plotW : x + step / 2 - 6;
+        const full = format(value);
+        return { value, x, start, width: Math.max(1, end - start), full,
+            anchor: count === 1 ? 'middle' as const : index === 0 ? 'start' as const : index === count - 1 ? 'end' as const : 'middle' as const };
+    });
+    let count = min === max ? 1 : Math.max(2, Math.min(6, Math.floor(plotW / 64) + 1));
+    let ticks = make(count);
+    while (count > 2 && ticks.some((tick) => axisTextWidth(tick.full) > tick.width)) ticks = make(--count);
+    return ticks.map((tick) => ({ ...tick, text: fitAxisLabel(tick.full, tick.width) }));
+}
+
 /** Catmull-Rom → cubic bezier, matching web-mojo's `smoothing` option. */
 function smoothPath(pts: [number, number][], tension: number): string {
     if (pts.length < 2) return '';
@@ -119,6 +154,7 @@ export function SeriesChart({
     emptyText = 'No data for this range',
     xValues,
     xDomain,
+    xValueFormatter,
     maxGap,
     minValue,
     maxValue,
@@ -169,14 +205,20 @@ export function SeriesChart({
     const plotH = Math.max(40, height - PAD.top - PAD.bottom);
     const n = labels.length;
     const colW = n > 0 ? plotW / n : plotW;
-    const xPositions = useMemo(() => {
-        if (!xValues) return labels.map((_, i) => PAD.left + colW * (i + 0.5));
+    const numericDomain = useMemo<[number, number] | null>(() => {
+        if (!xValues) return null;
         const values = xValues.slice(0, n).filter(isFiniteNumber);
         let min = values.reduce((a, b) => Math.min(a, b), Infinity);
         let max = values.reduce((a, b) => Math.max(a, b), -Infinity);
         if (xDomain && isFiniteNumber(xDomain[0]) && isFiniteNumber(xDomain[1]) && xDomain[1] > xDomain[0]) {
             [min, max] = xDomain;
         }
+        return isFiniteNumber(min) && isFiniteNumber(max) ? [min, max] : null;
+    }, [xValues, xDomain, n]);
+    const xPositions = useMemo(() => {
+        if (!xValues) return labels.map((_, i) => PAD.left + colW * (i + 0.5));
+        if (!numericDomain) return labels.map(() => null);
+        const [min, max] = numericDomain;
         return labels.map((_, i) => {
             const x = xValues[i];
             if (!isFiniteNumber(x) || x < min || x > max) return null;
@@ -185,7 +227,7 @@ export function SeriesChart({
             const fraction = max === min ? 0.5 : (x / 2 - min / 2) / (max / 2 - min / 2);
             return Number.isFinite(fraction) ? PAD.left + fraction * plotW : null;
         });
-    }, [labels, xValues, xDomain, n, colW, plotW]);
+    }, [labels, xValues, numericDomain, colW, plotW]);
     const inspectable = xPositions.flatMap((x, i) => x == null ? [] : [i]);
     const active = hover != null && xPositions[hover] != null ? hover : null;
     const lastInspection = useRef<number | null | undefined>(undefined);
@@ -261,7 +303,9 @@ export function SeriesChart({
         return out;
     }, [scale]);
 
-    // Thin X labels to whatever fits — ~54px per label.
+    // Numeric ticks describe the whole scale, independent of sample clusters.
+    const xTicks = numericDomain ? numericAxisTicks(numericDomain, plotW, xValueFormatter ?? String) : null;
+    // Categorical callers keep their existing label thinning.
     const labelStride = Math.max(1, Math.ceil((n * 54) / Math.max(plotW, 1)));
 
     const colorOf = (ds: Dataset, i: number) => ds.color ?? CHART_PALETTE[i % CHART_PALETTE.length]!;
@@ -336,6 +380,11 @@ export function SeriesChart({
                             <clipPath id={`${id}-plot`}>
                                 <rect x={PAD.left - 4} y={PAD.top} width={plotW + 8} height={plotH} />
                             </clipPath>
+                            {showXLabels && xTicks?.map((tick, i) => (
+                                <clipPath key={i} id={`${id}-x-label-${i}`}>
+                                    <rect x={tick.start} y={height - PAD.bottom} width={tick.width} height={PAD.bottom} />
+                                </clipPath>
+                            ))}
                         </defs>
                         {/* gridlines + Y ticks */}
                         {showGrid && ticks.map((t) => (
@@ -469,13 +518,18 @@ export function SeriesChart({
                         })}
 
                         {/* X labels */}
-                        {showXLabels && labels.map((label, i) => (
+                        {showXLabels && (xTicks ? xTicks.map((tick, i) => (
+                            <text key={`xt${i}`} x={tick.x} y={height - 8} className="axis-label series-x-label"
+                                textAnchor={tick.anchor} clipPath={`url(#${id}-x-label-${i})`} aria-label={tick.full}>
+                                <title>{tick.full}</title><tspan>{tick.text}</tspan>
+                            </text>
+                        )) : labels.map((label, i) => (
                             i % labelStride === 0 && xPositions[i] != null ? (
                                 <text key={`xl${i}`} x={xCenter(i)} y={height - 8} className="axis-label" textAnchor="middle">
                                     {label}
                                 </text>
                             ) : null
-                        ))}
+                        )))}
 
                         {/* hit area — one overlay drives index-mode hover */}
                         <rect

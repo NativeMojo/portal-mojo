@@ -59,7 +59,8 @@ function ScopedMetricsDemo() {
     useEffect(() => () => clearTimeout(expiryTimer.current), [owner]);
     const [revision, setRevision] = useState(0);
     const [mode, setMode] = useState<'ready' | 'loading' | 'error'>('ready');
-    const [narrow, setNarrow] = useState(false);
+    const [chartWidth, setChartWidth] = useState<number | undefined>();
+    const [longAxis, setLongAxis] = useState(false);
     const refresh = () => { setRevision((n) => n + 1); setMode('ready'); if (window.range) setWindow(metricsQuickWindow(window.range, window.granularity)); };
     const times = [60, 120, 180, 240, 720, 780, 840].map((n) => window.dt_end - 900 + n);
     return <div>
@@ -71,17 +72,21 @@ function ScopedMetricsDemo() {
                 <button className="btn" onClick={() => { owner.abort(); setOwner(new AbortController()); }}>New snapshot</button>
                 <button className="btn" onClick={() => setMode('loading')}>Show loading</button>
                 <button className="btn" onClick={() => setMode('error')}>Show error</button>
-                <button className="btn" onClick={() => setNarrow(!narrow)}>{narrow ? 'Wide chart' : 'Narrow chart'}</button>
+                <select className="input input-compact" aria-label="Chart width" value={chartWidth ?? ''} onChange={(event) => setChartWidth(Number(event.target.value) || undefined)}>
+                    <option value="">Wide chart</option><option value="320">320 px chart</option><option value="390">390 px chart</option>
+                </select>
+                <button className="btn" onClick={() => setLongAxis(!longAxis)}>{longAxis ? 'Short axis labels' : 'Long axis labels'}</button>
                 <span>Refreshes: {revision}</span>
             </div>
         </div>
-        <div style={{ maxWidth: narrow ? 360 : undefined }}>
+        <div style={{ maxWidth: chartWidth }}>
             <MetricsChartView title="Resource history" window={window} onWindowChange={setWindow}
                 onRefresh={refresh} loading={mode === 'loading'} error={mode === 'error' ? 'Snapshot request failed' : undefined}
                 labels={times.map((t) => new Date(t * 1000).toLocaleTimeString())}
                 datasets={[{ label: 'CPU', data: [12, 24, null, 30, 40, 32, null] }, { label: 'Memory', data: [42, 44, 46, 45, 53, 52, 55] }]}
                 xValues={times} xDomain={[window.dt_start, window.dt_end]} maxGap={180}
-                minValue={0} maxValue={100} smoothing={0} height={240} showXLabels={false}
+                minValue={0} maxValue={100} smoothing={0} height={240}
+                xValueFormatter={(n) => new Date(n * 1000).toLocaleString(undefined, longAxis ? { dateStyle: 'full', timeStyle: 'long' } : window.range === '1h' || window.range === '24h' ? { hour: '2-digit', minute: '2-digit', hour12: false } : { month: 'short', day: 'numeric' })}
                 valueFormatter={(n) => `${Number(n.toFixed(1))}%`} ariaLabel="Scoped resource history"
                 allowedRanges={QUICK_RANGES.filter((r) => r.value !== '30d')} allowedGranularities={['minutes', 'hours', 'days']}
                 minDate={Math.floor(Date.now() / 1000) - 7 * 86400} maxDate={Math.floor(Date.now() / 1000)}
