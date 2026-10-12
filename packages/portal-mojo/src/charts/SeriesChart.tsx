@@ -203,8 +203,10 @@ export function SeriesChart({
     const shown = datasets.filter((d) => !visible.has(d.label));
     const isStacked = stacked === 'auto' ? chartType === 'bar' : !!stacked;
 
-    const left = Math.max(PAD.left, showYLabels ? Math.ceil(yLabelWidth) + 16 : 0);
-    const plotW = Math.max(40, width - left - PAD.right);
+    // Keep most of the canvas available to data, even for verbose formatters.
+    const maxLeft = Math.min(160, width * 0.4, Math.max(0, width - PAD.right - 40));
+    const left = Math.min(maxLeft, Math.max(PAD.left, showYLabels ? Math.ceil(yLabelWidth) + 16 : 0));
+    const plotW = Math.max(1, width - left - PAD.right);
     const plotH = Math.max(40, height - PAD.top - PAD.bottom);
     const n = labels.length;
     const colW = n > 0 ? plotW / n : plotW;
@@ -311,6 +313,8 @@ export function SeriesChart({
     const xTicks = numericDomain ? numericAxisTicks(numericDomain, plotW, left, xValueFormatter ?? String) : null;
     const yLabels = showYLabels && hasData ? ticks.map((tick) => fmt(tick)) : [];
     const yLabelsKey = JSON.stringify(yLabels);
+    const yLabelSpace = Math.max(0, left - 16);
+    const fittedYLabels = yLabels.map((label) => yLabelWidth > yLabelSpace ? fitAxisLabel(label, yLabelSpace) : label);
     // Categorical callers keep their existing label thinning.
     const labelStride = Math.max(1, Math.ceil((n * 54) / Math.max(plotW, 1)));
 
@@ -346,8 +350,8 @@ export function SeriesChart({
         if (measured && Number.isFinite(measured)) setTipWidth(measured);
     }, [readout, width]);
 
-    // Measure before paint: byte/currency/custom labels can exceed the compact
-    // percentage margin. Every plot coordinate uses the same adjusted origin.
+    // Always measure full, hidden labels, never their abbreviated display text:
+    // clipping must not shrink the next measurement and oscillate the layout.
     useLayoutEffect(() => {
         const sizes = [...(yLabelsRef.current?.querySelectorAll('text') ?? [])].map((node) => {
             const measured = node.getComputedTextLength?.();
@@ -394,6 +398,9 @@ export function SeriesChart({
                             <clipPath id={`${id}-plot`}>
                                 <rect x={left - 4} y={PAD.top} width={plotW + 8} height={plotH} />
                             </clipPath>
+                            <clipPath id={`${id}-y-labels`}>
+                                <rect x={8} y={0} width={yLabelSpace} height={height} />
+                            </clipPath>
                             {showXLabels && xTicks?.map((tick, i) => (
                                 <clipPath key={i} id={`${id}-x-label-${i}`}>
                                     <rect x={tick.start} y={height - PAD.bottom} width={tick.width} height={PAD.bottom} />
@@ -409,11 +416,17 @@ export function SeriesChart({
                                 className={t === 0 && scale.min < 0 ? 'grid-line grid-zero' : 'grid-line'}
                             />
                         ))}
-                        {showYLabels && <g ref={yLabelsRef}>{ticks.map((t, i) => (
-                            <text key={`yl${t}`} x={left - 8} y={yOf(t)} className="axis-label" textAnchor="end" dominantBaseline="middle">
-                                {yLabels[i]}
-                            </text>
-                        ))}</g>}
+                        {showYLabels && <>
+                            <g ref={yLabelsRef} visibility="hidden" aria-hidden="true">
+                                {yLabels.map((label, i) => <text key={i} className="axis-label">{label}</text>)}
+                            </g>
+                            <g clipPath={`url(#${id}-y-labels)`}>{ticks.map((t, i) => (
+                                <text key={`yl${t}`} x={left - 8} y={yOf(t)} className="axis-label" textAnchor="end" dominantBaseline="middle" aria-label={yLabels[i]}>
+                                    {fittedYLabels[i] !== yLabels[i] && <title>{yLabels[i]}</title>}
+                                    <tspan>{fittedYLabels[i]}</tspan>
+                                </text>
+                            ))}</g>
+                        </>}
 
                         {/* bars */}
                         {chartType === 'bar' && labels.map((_, i) => {

@@ -72,6 +72,11 @@ expands for values such as `100.0 MB`, preserving their leading digits inside
 clipped containers. Short percentage labels retain the compact 48px margin;
 switching formatters or hiding Y labels restores it. Plot geometry, numeric X
 ticks and pointer inspection share the adjusted origin.
+The margin is capped at 40% of chart width (at most 160px), preserving plot
+space for exceptional formatters. Longer labels shorten with ellipsis inside
+a clipping boundary; SVG titles and accessible labels retain the full text.
+Measurement always uses the full hidden text, so resizing cannot alternate
+between full and abbreviated widths.
 
 Sparse histories can opt into numeric X positions without changing categorical
 callers:

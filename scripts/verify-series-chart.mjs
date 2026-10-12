@@ -105,6 +105,24 @@ try {
     await key('Home'); assert.match(document.querySelector('.chart-tip').textContent, /100.0 MB/);
     await pointer('pointermove', byteLeft + bytePlot * 100 / 120);
     assert.equal(inspections.at(-1), 3, 'pointer inspection uses the expanded origin');
+    const longFormat = (value) => `Total network data transferred across all interfaces: ${filesize(value)}`;
+    await mount({ ...byteHistory, valueFormatter: longFormat });
+    let narrowOrigin;
+    for (const width of [320, 390, 320]) {
+        await React.act(async () => resize([{ contentRect: { width } }]));
+        const hit = svg().querySelector('[fill="transparent"]');
+        const origin = Number(hit.getAttribute('x'));
+        const plotWidth = Number(hit.getAttribute('width'));
+        assert(origin + plotWidth <= width, 'exceptionally long labels cannot push the plot outside the SVG');
+        assert(plotWidth >= width / 2, 'exceptionally long labels leave useful plot space');
+        const longTick = [...svg().querySelectorAll('text[text-anchor="end"]:not(.series-x-label)')].find((tick) => tick.getAttribute('aria-label') === longFormat(100_000_000));
+        assert.equal(longTick?.querySelector('title')?.textContent, longFormat(100_000_000), 'full exceptional labels remain accessible');
+        assert(longTick.querySelector('tspan').textContent.endsWith('…'), 'visible exceptional labels are abbreviated');
+        if (width === 320) {
+            if (narrowOrigin !== undefined) assert.equal(origin, narrowOrigin, 'remeasurement uses full raw labels and never oscillates after clipping');
+            narrowOrigin = origin;
+        }
+    }
     await mount(timed);
     assert.equal(Number(svg().querySelector('[fill="transparent"]').getAttribute('x')), 48, 'percentage labels restore the compact original margin');
     await mount({ ...byteHistory, showYLabels: false });
