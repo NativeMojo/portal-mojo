@@ -84,6 +84,14 @@ export type DetailMenuEntry<TCtx = unknown> = DetailMenuItem<TCtx> | { divider: 
 
 export interface DetailViewProps<TCtx = unknown> {
     avatarName?: string;
+    /** Image for the header avatar; falls back to `avatarName` initials /
+     *  `icon` when absent or when the image fails to load. Callers pass a
+     *  pre-vetted URL (e.g. through `safePreviewUrl`). */
+    avatarUrl?: string | null;
+    /** Makes the header avatar a button (e.g. open an avatar manager). */
+    onAvatarClick?: () => void;
+    /** Accessible label/tooltip for the avatar button. */
+    avatarLabel?: string;
     icon?: string;
     title: string;
     subtitle?: string;
@@ -228,13 +236,18 @@ function railBadge(value: ReactNode): ReactNode {
 // ── The component ─────────────────────────────────────────────────────
 
 export function DetailView<TCtx = unknown>({
-    avatarName, icon, title, subtitle, chips = [], active,
+    avatarName, avatarUrl, onAvatarClick, avatarLabel, icon, title, subtitle, chips = [], active,
     sections, initialSection, badges, contextMenu, menuContext, onClose,
 }: DetailViewProps<TCtx>) {
     const [sectionsExpanded, setSectionsExpanded] = useState(false);
     const sectionToggleRef = useRef<HTMLButtonElement>(null);
     const can = useCanChecker();
     const warnOnce = useWarnOnce();
+    const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
+    const showImage = Boolean(avatarUrl) && avatarUrl !== failedAvatarUrl;
+    const avatarInner = showImage
+        ? <img src={avatarUrl!} alt="" referrerPolicy="no-referrer" onError={() => setFailedAvatarUrl(avatarUrl ?? null)} />
+        : avatarName ? initials(avatarName) : <i className={`bi ${icon ?? 'bi-file-earmark'}`} />;
 
     // One-time schema lint: duplicate keys break activation + keep-alive
     // keying; badge keys must name a section; a never-matching
@@ -305,9 +318,20 @@ export function DetailView<TCtx = unknown>({
     return (
         <div className={`detail${onClose ? ' detail-modal-body' : ''}`}>
             <header className="detail-header">
-                <div className="detail-avatar">
-                    {avatarName ? initials(avatarName) : <i className={`bi ${icon ?? 'bi-file-earmark'}`} />}
-                </div>
+                {onAvatarClick ? (
+                    <button
+                        type="button"
+                        className="detail-avatar detail-avatar-btn"
+                        onClick={onAvatarClick}
+                        aria-label={avatarLabel ?? 'Change avatar'}
+                        title={avatarLabel ?? 'Change avatar'}
+                    >
+                        {avatarInner}
+                        <span className="detail-avatar-overlay" aria-hidden="true"><i className="bi bi-camera" /></span>
+                    </button>
+                ) : (
+                    <div className="detail-avatar">{avatarInner}</div>
+                )}
                 <div className="detail-id">
                     <h2 className="detail-title">{title}</h2>
                     <div className="detail-sub">

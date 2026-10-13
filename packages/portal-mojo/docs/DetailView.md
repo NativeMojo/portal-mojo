@@ -53,6 +53,11 @@ of the toolkit it must render inside the app's `QueryClientProvider`
 - `sections` mixes `{key, label, icon, render, permissions?}` entries with
   `{divider: 'Label'}` side-labels.
 - `initialSection` picks the starting rail entry.
+- `avatarUrl` shows an image in the header avatar (falls back to
+  `avatarName` initials / `icon` when absent or the image fails to load);
+  pass a pre-vetted URL (`safePreviewUrl`) kept in component state, never a
+  Query cache. `onAvatarClick` turns the avatar into a button with a camera
+  hover overlay (`avatarLabel` sets its label/tooltip).
 
 ## Page embedding — `onClose` is optional
 
@@ -172,6 +177,7 @@ permission behavior, not misconfig.
 | `Eyebrow` | small uppercase section heading inside a panel |
 | `FlatRow` | label + value row; `action` adds the edit pencil (`actionIcon` to override, e.g. `bi-plus-lg` for empty values) |
 | `SecurityItem` | icon + title + description row with a trailing slot (badge/button) |
+| `MetricCard compact` | dense one-line KPI card for detail-view snapshot rows (value never wraps; `title` for a tooltip such as the full timestamp) |
 
 Pencil actions open `formModal` with current values as `initial`. Current-record
 operations live in the header menu or focused dialogs; content rails never

@@ -14,14 +14,15 @@
 // action (kebab + Profile cards + Security rows share them, the source's
 // Phase 4 dedup).
 //
-// Header deviations forced by DetailView's prop surface (read-only this
-// wave — MERGE-WIRE notes filed): chips are not clickable, so the org chip's
-// click-through lives in the kebab ("Open organization") and as an Overview
-// row link; the avatar slot renders initials (no image/click slot), so the
-// shared ImageField avatar manager hangs off the kebab;
-// presence/status/locked/warning render as chips instead of a two-row aux.
-import { useSyncExternalStore } from 'react';
-import { useCan, useMe } from '../../../client/runtime';
+// Header deviations forced by DetailView's prop surface: chips are not
+// clickable, so the org chip's click-through lives in the kebab ("Open
+// organization") and as an Overview row link; presence/status/locked/warning
+// render as chips instead of a two-row aux. The avatar shows the attached
+// image (preview URL fetched component-locally, never cached) and, for
+// admins, clicking it opens the shared ImageField avatar manager (also in
+// the kebab).
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { mojoCall, useCan, useMe } from '../../../client/runtime';
 import {
     DetailView,
     fmt,
@@ -31,6 +32,7 @@ import {
     type Chip,
     type DetailMenuEntry,
 } from '../../../ui';
+import { safePreviewUrl } from '../../../ui/safe-url';
 import { MEMBER_READ_PERMISSIONS } from '../members';
 import {
     USER_DEVICE_PERMISSIONS,
@@ -67,6 +69,23 @@ import {
     useAdminCaller,
 } from './sections/shared';
 
+/** Thumbnail URL for an attached avatar File. Like FileField, the
+ *  capability URL stays in component state — never in a Query cache. */
+function useAvatarPreview(fileId: number | null): string | null {
+    const [preview, setPreview] = useState<{ id: number; url: string | null } | null>(null);
+    useEffect(() => {
+        if (fileId == null) return;
+        const controller = new AbortController();
+        void mojoCall(`/api/fileman/file/${fileId}`, { signal: controller.signal }).then((envelope) => {
+            if (controller.signal.aborted) return;
+            const row = (envelope.data ?? {}) as { url?: unknown; thumbnail?: unknown };
+            setPreview({ id: fileId, url: safePreviewUrl(row.thumbnail) ?? safePreviewUrl(row.url) });
+        }, () => { /* no preview → initials */ });
+        return () => controller.abort();
+    }, [fileId]);
+    return fileId != null && preview?.id === fileId ? preview.url : null;
+}
+
 export interface UserDetailProps {
     id: number;
     onClose: () => void;
@@ -99,6 +118,7 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
     onOpenGroup?: (groupId: number) => void;
 }) {
     const { data: me } = useMe();
+    const avatarUrl = useAvatarPreview(user.avatar?.id ?? null);
     const isSelf = me?.id === user.id;
     const canMembers = useCan(MEMBER_READ_PERMISSIONS).can;
     const canDevices = useCan(USER_DEVICE_PERMISSIONS).can;
@@ -220,6 +240,9 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
     return (
         <DetailView<UserRow>
             avatarName={user.display_name || user.username}
+            avatarUrl={avatarUrl}
+            onAvatarClick={isAdmin ? actions.openAvatarModal : undefined}
+            avatarLabel={user.avatar ? 'Change or remove avatar' : 'Add avatar'}
             title={user.display_name || user.username || user.email || `User #${user.id}`}
             subtitle={[user.email, user.phone_number].filter(Boolean).join(' · ')}
             chips={chips}
@@ -237,7 +260,7 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
                 { divider: 'Access' },
                 ...(canMembers ? [{ key: 'Groups', label: 'Groups', icon: 'bi-people', render: () => <GroupsSection user={user} onOpenGroup={onOpenGroup} /> }] : []),
                 {
-                    key: 'SysPerms', label: 'System permissions', icon: 'bi-shield-check',
+                    key: 'SysPerms', label: 'Sys Perms', icon: 'bi-shield-check',
                     permissions: ADMIN,
                     render: () => <SysPermsSection user={user} />,
                 },

@@ -9,9 +9,18 @@ export function Badge({ tone, children }: { tone?: Tone; children: ReactNode }) 
     return <span className={`chip chip-${t}`}>{children === true ? 'Yes' : children === false ? 'No' : children}</span>;
 }
 
-export function MetricCard({ label, value, hint, icon }: { label: string; value: ReactNode; hint?: string; icon?: string }) {
+export function MetricCard({ label, value, hint, icon, compact, title }: {
+    label: string;
+    value: ReactNode;
+    hint?: string;
+    icon?: string;
+    /** Dense single-line card for detail-view KPI rows (value never wraps). */
+    compact?: boolean;
+    /** Tooltip — e.g. the full timestamp behind a relative value. */
+    title?: string;
+}) {
     return (
-        <div className="metric">
+        <div className={compact ? 'metric metric-compact' : 'metric'} title={title}>
             <div className="metric-top">
                 <span className="metric-label">{label}</span>
                 {icon && <i className={`bi ${icon} metric-icon`} />}

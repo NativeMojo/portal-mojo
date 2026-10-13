@@ -77,11 +77,14 @@ export function OverviewSection({ user, shared, onOpenGroup }: {
     return (
         <>
             <Eyebrow>Account snapshot</Eyebrow>
-            <div className="grid gap-3 grid-cols-2 xl:grid-cols-4" style={{ marginBottom: 14 }}>
-                <MetricCard label="Devices" value={String(deviceTotal)} />
-                <MetricCard label="Last login" value={fmt.relative(lastLogin, '—')} />
-                <MetricCard label="Active sessions" value={String(sessionCount)} />
-                <MetricCard label="Groups" value={String(groupCount)} />
+            {/* Compact KPI strip: the modal body is narrow regardless of the
+                viewport, so columns auto-fit the container (not a viewport
+                breakpoint) and values stay on one line. */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', marginBottom: 16 }}>
+                <MetricCard compact label="Devices" value={String(deviceTotal)} />
+                <MetricCard compact label="Last login" value={fmt.relative(lastLogin, '—')} title={lastLogin ? fmt.datetime(lastLogin) : undefined} />
+                <MetricCard compact label="Active sessions" value={String(sessionCount)} />
+                <MetricCard compact label="Groups" value={String(groupCount)} />
             </div>
 
             <Eyebrow>Identity</Eyebrow>

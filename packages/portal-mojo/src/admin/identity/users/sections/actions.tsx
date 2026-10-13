@@ -639,7 +639,7 @@ function AvatarModal({ user, onClose, onPendingChange }: { user: UserRow; onClos
     return (
         <div className="modal-pad">
             <h2 className="modal-title">Avatar</h2>
-            <p className="dim">Upload an image in your personal File scope, then attach its completed numeric File id to this user.</p>
+            <p className="dim">Upload a new image (cropped square), or clear the current one to fall back to initials.</p>
             <ImageField
                 value={relationId}
                 onChange={(value) => { void attach(value); }}

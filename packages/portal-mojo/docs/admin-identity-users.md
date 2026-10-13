@@ -25,8 +25,13 @@ reason per batch; rows already in the target state are ineligible.
 
 The detail preserves all 14 sections: Overview, Profile, Personal, Security,
 OAuth, Groups, Sys Perms, conditional App Perms, API Keys, Devices, Logins,
-Audit, Notifications, and Metadata. Permission sections are labeled **System
-permissions** and **Product permissions** in the UI. Consuming apps install
+Audit, Notifications, and Metadata. Permission sections are labeled **Sys
+Perms** and **Product permissions** in the rail. Sys Perms opens with every
+granted key (catalog keys neutral, app-registered accent, out-of-catalog
+amber), then **Custom permissions**: out-of-catalog keys with remove (armed)
+and a grant input, then the catalog tabs. Remove sends
+`{permissions: {key: false}}` — django-mojo `User.set_permissions` deletes a
+key on a falsy value (the mock matches). Consuming apps install
 their product tabs with `registerFormTabs(USER_APP_PERMS_TABSET, tabs)`; the
 section stays absent when none are registered. User grants can cover multiple
 groups; use a Member product permission for a single group.
@@ -76,6 +81,10 @@ per endpoint, so `UserDetail` and the fleet-wide tables share one cache.
   explicit unavailable state and make no request.
 
 ## Avatar uploads
+
+The header avatar shows the attached image (thumbnail fetched from
+`/api/fileman/file/<id>` into component state) and, for admins, is a button
+that opens the same manager as the kebab's "Manage avatar…".
 
 Manage avatar uses the shared `ImageField`: it uploads into the acting admin's
 personal File scope, then saves that completed positive numeric File id (or

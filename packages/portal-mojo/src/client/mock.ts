@@ -5230,6 +5230,13 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
         const existing = target[key];
         target[key] = isPlainObject(value) && isPlainObject(existing) ? mergeDicts(existing, value) : value;
     }
+    // User.set_permissions parity: a falsy value REMOVES the key (add_permission
+    // / remove_permission), so permissions only ever holds granted keys.
+    if (isPlainObject(fields.permissions)) {
+        for (const [key, value] of Object.entries(fields.permissions)) {
+            if (!value) delete user.permissions[key];
+        }
+    }
     let actionResp: Record<string, unknown> | null = null;
     for (const [action, value] of actionEntries) {
         const resp = runUserAction(user, action, value, caller);
