@@ -15,6 +15,10 @@ export const MEMBER_GROUP_READ_PERMISSIONS = [
     'groups',
 ];
 
+/** Group-local write gates for fixed-group compositions (a tenant admin's own grants). */
+export const MEMBER_GROUP_SAVE_PERMISSIONS = ['manage_groups', 'manage_group', 'groups'];
+export const MEMBER_GROUP_INVITE_PERMISSIONS = ['manage_users', 'manage_members', 'manage_group', 'manage_groups'];
+
 /** Global Member Admin gates. `sys.` prevents active-group grants leaking in. */
 export const MEMBER_READ_PERMISSIONS = [
     'sys.view_members',

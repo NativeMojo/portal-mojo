@@ -116,6 +116,15 @@ new grant semantics: the backend still decides what each key authorizes.
 
 ## Composition
 
+`GroupMembersPanel` and `MemberDetail` gate writes on the system-pinned
+constants by default. A tenant composition that renders them for the active
+group passes the group-local gates instead (`MEMBER_GROUP_SAVE_PERMISSIONS`,
+`MEMBER_GROUP_INVITE_PERMISSIONS`) through `savePermissions`,
+`invitePermissions` and `directoryPermissions`; the server still decides. A
+product may also pass `roles` (`AdmissionRole[]`): the invite form then shows a
+role select, posts that role's grants with the invitation, and records the role
+label as `metadata.role`.
+
 `MEMBERS_ADMIN_SECTION` is root-relative and dual-mounts as `/members` in the
 standalone Admin and `/system/members` when embedded. It never consumes active
 group context. `GroupMembersPanel` is the reusable Group-detail composition;

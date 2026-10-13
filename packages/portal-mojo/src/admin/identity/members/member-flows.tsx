@@ -5,11 +5,22 @@ import { MemberModel, type MemberRow } from './models';
 
 export interface AdmissionGroup extends Pick<Group, 'id' | 'name' | 'kind'> {}
 
+/** A fixed role a product offers on invite: the grants it sets and the label it records. */
+export interface AdmissionRole {
+    value: string;
+    label: string;
+    permissions: string[];
+    help?: string;
+}
+
 /** Email-only, with no user-directory lookup or existence-dependent branch. */
-export async function inviteMemberByEmail(groupId: number, email: string): Promise<MemberRow | null> {
+export async function inviteMemberByEmail(groupId: number, email: string, permissions?: string[]): Promise<MemberRow | null> {
     const response = await mojoCall('/api/group/member/invite', {
         method: 'POST',
-        body: { group: groupId, email: email.trim() },
+        body: {
+            group: groupId, email: email.trim(),
+            ...(permissions?.length ? { permissions: Object.fromEntries(permissions.map((name) => [name, true])) } : {}),
+        },
     });
     return (response.data ?? null) as MemberRow | null;
 }
@@ -70,6 +81,8 @@ export interface OpenMemberAdmissionOptions {
     initialMode?: AdmissionMode;
     queryClient?: QueryClient;
     onCreated?: (member: MemberRow) => void | Promise<void>;
+    /** Fixed roles shown as a select on the invite form; the first is the default. */
+    roles?: AdmissionRole[];
 }
 
 /** Shared explicit Invite/Add chooser used by global Members and GroupDetail. */
@@ -92,16 +105,29 @@ export async function openMemberAdmissionDialog(options: OpenMemberAdmissionOpti
     try {
         let member: MemberRow | null;
         if (mode === 'invite') {
+            const roles = options.roles ?? [];
             const data = await formModal({
                 title: `Invite a member to ${group.name}`,
                 submitText: 'Send invitation',
                 fields: [{
                     name: 'email', type: 'email', label: 'Email', required: true,
                     help: 'The same confirmation is shown whether this is a new, existing, or already-associated account.',
-                }],
+                }, ...(roles.length ? [{
+                    name: 'role', type: 'select' as const, label: 'Role', required: true,
+                    options: roles.map((role) => ({ value: role.value, label: role.label })),
+                    help: roles.map((role) => role.help ? `${role.label}: ${role.help}` : null).filter(Boolean).join(' '),
+                }] : [])],
+                ...(roles.length ? { initial: { role: roles[0].value } } : {}),
             });
             if (!data?.email) return null;
-            member = await inviteMemberByEmail(group.id, String(data.email));
+            const role = roles.find((candidate) => candidate.value === data.role) ?? roles[0];
+            member = await inviteMemberByEmail(group.id, String(data.email), role?.permissions);
+            // The role label is display-only; the grants above are the authority. A failed
+            // label write leaves a correctly permissioned member, so it is not fatal.
+            if (member && role) {
+                try { member = await mojoSave<MemberRow>(MemberModel.endpoint, member.id, { metadata: { role: role.label } }); }
+                catch { /* label stays "Member"; grants already applied */ }
+            }
             toast.success('Invitation request accepted');
         } else {
             const data = await formModal({

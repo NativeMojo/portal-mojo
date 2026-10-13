@@ -33,6 +33,8 @@ export interface MemberDetailProps extends MemberNavigationCallbacks {
     onClose: () => void;
     /** Global Admin is system-pinned; fixed-group compositions pass their read gate. */
     readPermissions?: PermSpec;
+    /** Same for writes: a fixed-group composition passes the group-local save gate. */
+    savePermissions?: PermSpec;
 }
 
 function AuditTable({ memberId }: { memberId: number }) {
@@ -118,13 +120,14 @@ function GrantSummary({ member }: { member: MemberRow }) {
 export function MemberDetail({
     id, onClose, onNavigateUser, onNavigateGroup,
     readPermissions = MEMBER_READ_PERMISSIONS,
+    savePermissions = MEMBER_SAVE_PERMISSIONS,
 }: MemberDetailProps) {
     const qc = useQueryClient();
     const { can: canRead, isLoading: readLoading } = useCan(readPermissions);
     const query = MemberModel.useOne(canRead ? id : null);
     const save = MemberModel.useSave();
     const resend = MemberModel.useAction('resend_invite');
-    const { can: canSave } = useCan(MEMBER_SAVE_PERMISSIONS);
+    const { can: canSave } = useCan(savePermissions);
     useSyncExternalStore(subscribeMemberPermissions, memberPermissionsVersion, memberPermissionsVersion);
     useSyncExternalStore(subscribeFormTabs, formTabsVersion, formTabsVersion);
 
@@ -200,13 +203,13 @@ export function MemberDetail({
         ...(onNavigateUser && member.user ? [{ label: 'View user', icon: 'bi-person', onSelect: () => onNavigateUser(member.user!.id) }] : []),
         ...(onNavigateGroup && member.group ? [{ label: 'View group', icon: 'bi-people', onSelect: () => onNavigateGroup(member.group!.id) }] : []),
         { divider: true as const },
-        { label: 'Edit role label', icon: 'bi-person-badge', permissions: MEMBER_SAVE_PERMISSIONS, onSelect: () => { void editRole(); } },
-        { label: 'Resend invitation', icon: 'bi-envelope-arrow-up', permissions: MEMBER_SAVE_PERMISSIONS, onSelect: () => { void resendInvite(); } },
+        { label: 'Edit role label', icon: 'bi-person-badge', permissions: savePermissions, onSelect: () => { void editRole(); } },
+        { label: 'Resend invitation', icon: 'bi-envelope-arrow-up', permissions: savePermissions, onSelect: () => { void resendInvite(); } },
         {
             label: member.is_active ? 'Deactivate membership' : 'Activate membership',
             icon: member.is_active ? 'bi-toggle-off' : 'bi-toggle-on',
             danger: member.is_active,
-            permissions: MEMBER_SAVE_PERMISSIONS,
+            permissions: savePermissions,
             onSelect: () => { void setActive(!member.is_active); },
         },
     ];

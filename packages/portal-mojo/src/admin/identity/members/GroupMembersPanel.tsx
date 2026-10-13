@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCan, type Params } from '../../../client/runtime';
 import { Badge, Eyebrow, SecurityItem, fmt, modal } from '../../../ui';
 import { MemberDetail, type MemberNavigationCallbacks } from './MemberDetail';
-import { openMemberAdmissionDialog, type AdmissionGroup, type AdmissionMode } from './member-flows';
+import { openMemberAdmissionDialog, type AdmissionGroup, type AdmissionMode, type AdmissionRole } from './member-flows';
+import type { PermSpec } from '../../../client/runtime';
 import {
     MEMBER_GROUP_READ_PERMISSIONS,
     MEMBER_INVITE_PERMISSIONS,
@@ -59,24 +60,36 @@ function MemberItem({ member, onOpen }: { member: MemberRow; onOpen: () => void 
 
 export interface GroupMembersPanelProps extends MemberNavigationCallbacks {
     group: AdmissionGroup;
+    /** Global Admin gates are system-pinned; a tenant composition passes its group-local gates. */
+    invitePermissions?: PermSpec;
+    savePermissions?: PermSpec;
+    directoryPermissions?: PermSpec;
+    /** Optional fixed roles offered on invite; each sets grants and the role label. */
+    roles?: AdmissionRole[];
 }
 
-export function GroupMembersPanel({ group, onNavigateUser, onNavigateGroup }: GroupMembersPanelProps) {
+export function GroupMembersPanel({
+    group, onNavigateUser, onNavigateGroup, roles,
+    invitePermissions = MEMBER_INVITE_PERMISSIONS,
+    savePermissions = MEMBER_SAVE_PERMISSIONS,
+    directoryPermissions = MEMBER_USER_DIRECTORY_PERMISSIONS,
+}: GroupMembersPanelProps) {
     const qc = useQueryClient();
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState<StatusFilter>('active');
     const [start, setStart] = useState(0);
     useEffect(() => setStart(0), [search, status, group.id]);
     const query = MemberModel.useList(paramsFor(group.id, search, status, start));
-    const { can: canInvite } = useCan(MEMBER_INVITE_PERMISSIONS);
-    const { can: canCreate } = useCan(MEMBER_SAVE_PERMISSIONS);
-    const { can: canReadUsers } = useCan(MEMBER_USER_DIRECTORY_PERMISSIONS);
+    const { can: canInvite } = useCan(invitePermissions);
+    const { can: canCreate } = useCan(savePermissions);
+    const { can: canReadUsers } = useCan(directoryPermissions);
     const members = query.data?.rows ?? [];
     const count = query.data?.count ?? 0;
 
     const admit = (initialMode: AdmissionMode) => openMemberAdmissionDialog({
         group,
         initialMode,
+        roles,
         canInvite,
         canCreate,
         canReadUsers,
@@ -89,6 +102,7 @@ export function GroupMembersPanel({ group, onNavigateUser, onNavigateGroup }: Gr
                 id={member.id}
                 onClose={() => close(null)}
                 readPermissions={MEMBER_GROUP_READ_PERMISSIONS}
+                savePermissions={savePermissions}
                 onNavigateUser={onNavigateUser}
                 onNavigateGroup={onNavigateGroup}
             />
