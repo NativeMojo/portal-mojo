@@ -538,10 +538,10 @@ export function GeoIpDossier({ id, onClose, onOpenLogin, onOpenLocation }: GeoIp
                             />
 
                             <div className="geoip-kpis">
-                                <MetricCard label="Risk score" value={row.risk_score != null ? `${row.risk_score} / 100` : '—'} icon="bi-speedometer2" />
-                                <MetricCard label="Incident events" value={canEvents ? (eventCount ?? '—') : '—'} icon="bi-shield-exclamation" />
-                                <MetricCard label="Logins from this IP" value={canLogins ? (loginCount ?? '—') : '—'} icon="bi-box-arrow-in-right" />
-                                <MetricCard label="Devices seen" value={canDevices ? (deviceCount ?? '—') : '—'} icon="bi-laptop" />
+                                <MetricCard compact label="Risk score" value={row.risk_score != null ? `${row.risk_score} / 100` : '—'} icon="bi-speedometer2" />
+                                <MetricCard compact label="Incident events" value={canEvents ? (eventCount ?? '—') : '—'} icon="bi-shield-exclamation" />
+                                <MetricCard compact label="Logins from this IP" value={canLogins ? (loginCount ?? '—') : '—'} icon="bi-box-arrow-in-right" />
+                                <MetricCard compact label="Devices seen" value={canDevices ? (deviceCount ?? '—') : '—'} icon="bi-laptop" />
                             </div>
 
                             <Eyebrow>Location &amp; network</Eyebrow>

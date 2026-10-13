@@ -234,10 +234,10 @@ export function MemberDetail({
                     key: 'Overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => (
                         <>
                             <div className="detail-kpi-grid">
-                                <MetricCard label="Role label" value={role} />
-                                <MetricCard label="Status" value={member.is_active ? 'Active' : 'Inactive'} />
-                                <MetricCard label="Joined" value={fmt.relative(member.created)} />
-                                <MetricCard label="Effective grants" value={effectiveMemberGrants(member.permissions).length} />
+                                <MetricCard compact label="Role label" value={role} />
+                                <MetricCard compact label="Status" value={member.is_active ? 'Active' : 'Inactive'} />
+                                <MetricCard compact label="Joined" value={fmt.relative(member.created)} />
+                                <MetricCard compact label="Effective grants" value={effectiveMemberGrants(member.permissions).length} />
                             </div>
                             <Eyebrow>This membership</Eyebrow>
                             <FlatRow label="User" action={member.user && onNavigateUser ? () => onNavigateUser(member.user!.id) : undefined} actionTitle="View user">{userLabel}</FlatRow>

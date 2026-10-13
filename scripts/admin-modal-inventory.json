@@ -428,7 +428,7 @@
       "category": "record",
       "parent": "GeoIpDossier",
       "target": null,
-      "fingerprint": "b59b36a5cc7d90871775",
+      "fingerprint": "224037dd72fd0f8067ea",
       "categories": [
         "record"
       ]
@@ -2506,7 +2506,7 @@
       "category": "record",
       "parent": "UserDeviceDetail",
       "target": null,
-      "fingerprint": "d78321b4b71f568af8d7",
+      "fingerprint": "96f2c40b76e102e7bb07",
       "categories": [
         "record"
       ]
@@ -2881,7 +2881,7 @@
       "category": "record",
       "parent": "MemberDetail",
       "target": null,
-      "fingerprint": "0e4a961b1e8528eb1bed",
+      "fingerprint": "c7d3f3ba5d2045d3b033",
       "categories": [
         "record"
       ]
@@ -9168,7 +9168,7 @@
       "owner": "GeoIpDossier",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "8f4eb5119977d50d3f79"
+      "fingerprint": "b1c3dba49ab042868a5a"
     },
     {
       "file": "packages/portal-mojo/src/admin/security/geoip/GeoIpDossier.tsx",
@@ -9511,7 +9511,7 @@
       "owner": "UserDeviceDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "2a794ea4d156917bf2f3"
+      "fingerprint": "4c4d197d4faf5371ea45"
     },
     {
       "file": "packages/portal-mojo/src/admin/security/devices/UserDeviceDetail.tsx",
@@ -9574,7 +9574,7 @@
       "owner": "MemberDetail",
       "key": "'Overview'",
       "label": "Overview",
-      "fingerprint": "e621fdb64491579f082a"
+      "fingerprint": "d9a3bcddcd5f30cc4f2b"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",

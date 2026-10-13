@@ -346,10 +346,10 @@ export function UserDeviceDetail({ id, onClose, onOpenUser }: {
                         <>
                             <Eyebrow>Overview</Eyebrow>
                             <div className="geoip-kpis">
-                                <MetricCard label="Locations" value={canLocations ? (locationCount ?? '—') : '—'} icon="bi-geo-alt" />
-                                <MetricCard label="Logins" value={canLogins ? (loginCount ?? '—') : '—'} icon="bi-box-arrow-in-right" />
-                                <MetricCard label="Days active" value={days ?? '—'} icon="bi-calendar-range" />
-                                <MetricCard label="Last seen" value={device.last_seen != null ? fmt.relative(device.last_seen) : 'Never'} icon="bi-clock-history" />
+                                <MetricCard compact label="Locations" value={canLocations ? (locationCount ?? '—') : '—'} icon="bi-geo-alt" />
+                                <MetricCard compact label="Logins" value={canLogins ? (loginCount ?? '—') : '—'} icon="bi-box-arrow-in-right" />
+                                <MetricCard compact label="Days active" value={days ?? '—'} icon="bi-calendar-range" />
+                                <MetricCard compact label="Last seen" value={device.last_seen != null ? fmt.relative(device.last_seen) : 'Never'} icon="bi-clock-history" />
                             </div>
 
                             <Eyebrow>Threat signals</Eyebrow>
