@@ -94,7 +94,7 @@
       "category": "editor",
       "parent": "openMemberAdmissionDialog",
       "target": null,
-      "fingerprint": "caa229a96206c1ef72b6",
+      "fingerprint": "09d568e0cf5abd5927d8",
       "categories": [
         "editor"
       ]
@@ -2909,7 +2909,7 @@
       "category": "editor",
       "parent": "admit",
       "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog",
-      "fingerprint": "638798bf192f8c6b7396",
+      "fingerprint": "3960ac41c01cb662f4c1",
       "categories": [
         "editor"
       ]
@@ -2925,7 +2925,7 @@
       "category": "record",
       "parent": "openMember",
       "target": null,
-      "fingerprint": "75d82ae5f75d111122cd",
+      "fingerprint": "a36993b45da4ff278283",
       "categories": [
         "record"
       ]
@@ -3663,7 +3663,7 @@
       "category": "record",
       "parent": "UserDetailLoaded",
       "target": null,
-      "fingerprint": "5bb0823687b1251033ef",
+      "fingerprint": "829b876812094590b015",
       "categories": [
         "record"
       ]
@@ -9650,8 +9650,8 @@
       "file": "packages/portal-mojo/src/admin/identity/users/UserDetail.tsx",
       "owner": "UserDetailLoaded",
       "key": "'SysPerms'",
-      "label": "System permissions",
-      "fingerprint": "c26d98a9da4db9c41bce"
+      "label": "Sys Perms",
+      "fingerprint": "8ddb76aee2178cf12039"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/users/UserDetail.tsx",
