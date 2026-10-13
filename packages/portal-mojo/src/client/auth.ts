@@ -212,7 +212,9 @@ async function doRefresh(): Promise<RefreshOutcome> {
     const superseded = (): boolean => getRefreshToken() !== refresh;
     const sessionUsable = (): boolean => checkTokenStatus().action !== 'logout';
     try {
-        const body = await mojoCall(REFRESH_PATH, { method: 'POST', body: { refresh_token: refresh } });
+        const body = await mojoCall(REFRESH_PATH, {
+            method: 'POST', body: { refresh_token: refresh }, signal: AbortSignal.timeout(15_000),
+        });
         if (superseded()) return { ok: sessionUsable() };
         const pkg = body.data as { access_token: string; refresh_token?: string };
         setTokens(pkg.access_token, pkg.refresh_token, persistent);

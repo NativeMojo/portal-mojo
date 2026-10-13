@@ -183,10 +183,6 @@ try {
     assert.equal(dispatchedPings.length, 0, 'server pings are framework frames and are never dispatched to consumers');
 
     const source = await (await import('node:fs/promises')).readFile(new URL('../packages/portal-mojo/src/client/realtime.ts', import.meta.url), 'utf8');
-    assert.match(source, /useEffect\(\(\) => \{ owned\.setToken\(token\); \}, \[owned, token\]\)/);
-    assert.equal((source.match(/owned\.setToken\(token\)/g) ?? []).length, 1, 'refresh and cross-tab replacement share one token-value comparison path');
-    assert.match(source, /return \(\) => owned\.setEnabled\(false\)/, 'StrictMode cleanup must close the owned socket');
-
     const strictMock = createRealtimeMock({ autoOpen: false });
     const strictClient = new RealtimeClient({ socketFactory: strictMock.factory, clock: new FakeClock() });
     strictClient.setToken('strict-token'); strictClient.setEnabled(true);

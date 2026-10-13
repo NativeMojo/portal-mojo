@@ -25,8 +25,8 @@ onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issu
 
 ## Session mechanics
 
-- JWT pair (`access_token`/`refresh_token`); single-flight refresh (3
-  concurrent 401s → ONE refresh POST); pre-request gate throws a synthetic
+- JWT pair (`access_token`/`refresh_token`); single-flight refresh (concurrent
+  gated HTTP requests and realtime reconnects → ONE refresh POST); pre-request gate throws a synthetic
   `AuthRequiredError` instead of firing doomed requests.
 - A temporary refresh failure (network, timeout or server unavailable) blocks
   the protected request and rejects with the original transport error. It
@@ -34,6 +34,10 @@ onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issu
   open. Only expired/unusable credentials or confirmed refresh 401/403 emit
   `unauthorized` and become `AuthRequiredError`. `refreshTokens()` still
   resolves a boolean, and concurrent gated calls share one refresh POST.
+- Refresh POSTs have a 15-second deadline. A timed-out attempt releases the
+  shared flight so a later request or reconnect can try again. RealtimeProvider
+  uses this same gate before connecting and before sending authentication;
+  applications do not need a second refresh timer for WebSockets.
 - `useAuthSnapshot()` → `{authenticated, uid, email}` — live, cross-tab.
 - `logout()` is client-side (django-mojo has no logout endpoint) and emits
   `'logout'`.

@@ -3,7 +3,8 @@ import {
     useSyncExternalStore, type PropsWithChildren,
 } from 'react';
 import { apiOrigin } from './client';
-import { getAccessToken, subscribeAuth } from './auth';
+import { ensureValidToken, getAccessToken, getRefreshToken, subscribeAuth } from './auth';
+import { AuthRequiredError } from './errors';
 
 export type RealtimeLifecycleStatus =
     | 'disabled' | 'idle' | 'connecting' | 'authenticating' | 'ready'
@@ -106,6 +107,9 @@ export class RealtimeClient {
     private readonly topicTimeoutMs: number;
     private socket: RealtimeSocket | null = null;
     private token: string | null = null;
+    private authBinding: { unsubscribe: () => void } | null = null;
+    private preparing: object | null = null;
+    private authSent: RealtimeSocket | null = null;
     private enabled = false;
     private generation = 0;
     private reconnectAttempt = 0;
@@ -142,11 +146,30 @@ export class RealtimeClient {
         return () => this.statusListeners.delete(listener);
     };
 
+    /** Bind one session owner; renewal shares HTTP's single-flight auth gate. */
+    bindAuthSession(): () => void {
+        if (this.authBinding) throw new Error('Realtime client already has an auth session owner');
+        const binding = { unsubscribe: () => {} };
+        this.authBinding = binding;
+        this.stop(this.enabled ? 'idle' : 'disabled');
+        // Synchronous invalidation is essential: a React effect can run after
+        // an old refresh/handshake has completed for the previous account.
+        binding.unsubscribe = subscribeAuth(() => this.setToken(getAccessToken()));
+        this.setToken(getAccessToken());
+        if (this.enabled) this.open();
+        return () => {
+            if (this.authBinding !== binding) return;
+            this.disconnect();
+            binding.unsubscribe();
+            this.authBinding = null;
+        };
+    }
+
     setEnabled(enabled: boolean): void {
         if (this.enabled === enabled) return;
         this.enabled = enabled;
         if (!enabled) this.stop('disabled');
-        else if (this.token) this.open();
+        else if (this.hasCredentials()) this.open();
         else this.setLifecycle('idle');
     }
 
@@ -156,7 +179,7 @@ export class RealtimeClient {
         this.token = token;
         this.suspended = null;
         this.stop(this.enabled && token ? 'idle' : this.enabled ? 'idle' : 'disabled');
-        if (this.enabled && token) this.open();
+        if (this.enabled && this.hasCredentials()) this.open();
     }
 
     connect(token: string): void {
@@ -171,6 +194,8 @@ export class RealtimeClient {
 
     destroy(): void {
         this.disconnect();
+        this.authBinding?.unsubscribe();
+        this.authBinding = null;
         this.statusListeners.clear();
         this.topicListeners.clear();
         this.eventListeners.clear();
@@ -232,14 +257,18 @@ export class RealtimeClient {
     }
 
     nudge(): void {
-        if (!this.enabled || !this.token || this.suspended || this.socket || this.retryTimer == null) return;
+        if (!this.enabled || !this.hasCredentials() || this.suspended || this.socket || this.retryTimer == null) return;
         if (this.clock.now() < this.extendedBackoffUntil) return;
         this.clearRetry();
         this.open();
     }
 
+    private hasCredentials(): boolean {
+        return Boolean(this.token || (this.authBinding && getRefreshToken()));
+    }
+
     private open(): void {
-        if (!this.enabled || !this.token || this.suspended || this.socket) return;
+        if (!this.enabled || !this.hasCredentials() || this.suspended || this.socket || this.preparing) return;
         const run = this.generation;
         // Token refresh and provider remount use this same entry point; neither
         // may bypass a server admission deadline.
@@ -248,6 +277,47 @@ export class RealtimeClient {
             return;
         }
         this.setLifecycle('connecting');
+        this.prepareSession(run, null, () => this.openSocket(run));
+    }
+
+    private prepareSession(run: number, socket: RealtimeSocket | null, ready: () => void): void {
+        const binding = this.authBinding;
+        if (!binding) { ready(); return; }
+        if (this.preparing) return;
+        const attempt = {};
+        this.preparing = attempt;
+        const current = () => this.preparing === attempt && this.authBinding === binding
+            && this.enabled && !this.suspended && run === this.generation && this.socket === socket;
+        void Promise.resolve().then(() => {
+            if (current()) return ensureValidToken();
+        }).then(() => {
+            if (!current()) return;
+            this.preparing = null;
+            ready();
+        }).catch((error: unknown) => {
+            if (!current()) return;
+            this.preparing = null;
+            if (error instanceof AuthRequiredError) this.suspend('auth-failed', 4003, 'Authentication failed');
+            else this.retryAuthentication(run, socket);
+        });
+    }
+
+    private retryAuthentication(run: number, socket: RealtimeSocket | null): void {
+        this.preparing = null;
+        this.authSent = null;
+        this.socket = null;
+        this.clearHeartbeat();
+        this.resetTopicConnectionState();
+        this.scheduleReconnect(run, 0);
+        socket?.close(1000, 'Session renewal pending');
+    }
+
+    private openSocket(run: number): void {
+        // A renewal may have completed while an admission cooldown was set.
+        if (this.clock.now() < this.extendedBackoffUntil) {
+            this.scheduleReconnect(run, 0);
+            return;
+        }
         let socket: RealtimeSocket;
         try {
             socket = this.socketFactory(this.url);
@@ -267,6 +337,8 @@ export class RealtimeClient {
         socket.onerror = () => { /* close is the single retry path */ };
         socket.onclose = (event) => {
             if (!this.isCurrent(run, socket)) return;
+            this.preparing = null;
+            this.authSent = null;
             this.socket = null;
             this.clearHeartbeat();
             this.resetTopicConnectionState();
@@ -283,12 +355,16 @@ export class RealtimeClient {
         if (!frame || typeof frame.type !== 'string') return;
 
         if (frame.type === 'auth_required') {
-            if (this.lifecycle !== 'authenticating' || !this.token) return;
-            socket.send(JSON.stringify({ type: 'authenticate', token: this.token, prefix: 'bearer' }));
+            if (this.lifecycle !== 'authenticating' || !this.token || this.authSent === socket) return;
+            this.prepareSession(run, socket, () => {
+                // Latch before send: a transport may answer synchronously.
+                this.authSent = socket;
+                socket.send(JSON.stringify({ type: 'authenticate', token: this.token, prefix: 'bearer' }));
+            });
             return;
         }
         if (frame.type === 'auth_success') {
-            if (this.lifecycle !== 'authenticating') return;
+            if (this.lifecycle !== 'authenticating' || this.authSent !== socket) return;
             this.reconnectAttempt = 0;
             this.extendedBackoffUntil = 0;
             this.automaticUserTopic = (typeof frame.user_type === 'string' && (typeof frame.user_id === 'number' || typeof frame.user_id === 'string'))
@@ -325,6 +401,8 @@ export class RealtimeClient {
             // Fence queued frames before closing: late auth_success must not
             // clear the deadline or make this refused socket ready.
             this.extendedBackoffUntil = this.clock.now() + 60_000;
+            this.preparing = null;
+            this.authSent = null;
             this.socket = null;
             this.clearHeartbeat();
             this.resetTopicConnectionState();
@@ -335,7 +413,11 @@ export class RealtimeClient {
         }
         if (frame.type === 'error') {
             if (this.lifecycle === 'authenticating') {
-                this.suspend('auth-failed', 4003, 'Authentication failed');
+                // The server's admission timer can expire while renewal is
+                // pending. No credential was rejected in this specific case.
+                if (frame.message === 'Authentication timeout' && this.authBinding && this.authSent !== socket) {
+                    this.retryAuthentication(run, socket);
+                } else this.suspend('auth-failed', 4003, 'Authentication failed');
             } else if (this.topicOperation) {
                 this.denyCurrentTopic();
             } else {
@@ -492,6 +574,9 @@ export class RealtimeClient {
 
     private suspend(reason: 'auth-failed' | 'forced-disconnect', code: number, message: string): void {
         this.suspended = reason;
+        this.preparing = null;
+        this.authSent = null;
+        this.clearRetry();
         this.setLifecycle(reason);
         const socket = this.socket;
         this.socket = null;
@@ -502,6 +587,8 @@ export class RealtimeClient {
 
     private stop(status: RealtimeLifecycleStatus): void {
         this.generation += 1;
+        this.preparing = null;
+        this.authSent = null;
         this.clearRetry();
         this.clearHeartbeat();
         this.resetTopicConnectionState();
@@ -561,8 +648,7 @@ export type RealtimeProviderProps = PropsWithChildren<{
 
 export function RealtimeProvider({ children, enabled = true, client, socketFactory, origin }: RealtimeProviderProps) {
     const owned = useMemo(() => client ?? new RealtimeClient({ socketFactory, origin }), [client, socketFactory, origin]);
-    const token = useSyncExternalStore(subscribeAuth, getAccessToken, getAccessToken);
-    useEffect(() => { owned.setToken(token); }, [owned, token]);
+    useEffect(() => owned.bindAuthSession(), [owned]);
     useEffect(() => {
         owned.setEnabled(enabled);
         return () => owned.setEnabled(false);

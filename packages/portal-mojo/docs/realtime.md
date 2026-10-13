@@ -9,6 +9,20 @@ consumer permissions own topic subscriptions. Disabling the provider or losing
 the auth token closes the socket. A permission loss in one consumer must not
 disable this shared provider.
 
+The provider binds both owned and injected clients to the shared auth session.
+Before opening a socket and again when challenged, it waits for `ensureValidToken()`;
+HTTP and realtime share one refresh POST. A slow or temporarily failed renewal
+keeps the connection in `connecting`/`authenticating`/`backoff`, not `auth-failed`.
+Consumers should preserve their current workspace during these transient states.
+Confirmed refresh denial still fails closed. Token replacement invalidates old
+handshakes synchronously, including during a pending refresh.
+
+For a non-React session consumer, call `const unbind = client.bindAuthSession()`
+before `client.setEnabled(true)`, and call `unbind()` on teardown. One binding
+owns the client at a time; unbinding closes the connection without aborting a
+renewal shared by HTTP. Standalone `connect(token)` clients keep explicit-token
+behavior and are responsible for their token lifecycle.
+
 ## Wire contract
 
 - URL is derived from the configured API origin as exactly `/ws/realtime/`
@@ -55,7 +69,10 @@ A top-level `{type:'error'}` frame is attributed in order:
 
 1. **During authentication** — auth failure: the client closes and suspends
    until the token value changes. Surfaces through the lifecycle status only;
-   no `error` event is dispatched.
+   no `error` event is dispatched. Exception: the exact direct
+   `message === 'Authentication timeout'` before credentials were sent on a
+   session-bound socket is a transport timeout and enters bounded retry.
+   The same error after credentials were sent remains an authentication failure.
 2. **While a subscribe/unsubscribe is pending** — that operation's denial
    (acknowledgements are uncorrelated, so denial is a generic `error`); the
    topic reports `denied`. Surfaces through the topic status only; no `error`
