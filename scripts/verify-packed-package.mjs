@@ -158,7 +158,8 @@ try {
     // The CSS subpath, the layer and the package's own @source all work from
     // node_modules. The consumer's source holds no class name, so a Tailwind
     // utility in its CSS can only come from the package scanning itself:
-    // `xl:grid-cols-4` is used by the Users overview and by no package style.
+    // The overview KPI grid's arbitrary `grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))]`
+    // is used by the Users/Groups overviews and by no package style.
     const assets = join(consumerDir, 'dist/assets');
     const cssAssets = (await readdir(assets)).filter((name) => name.endsWith('.css'));
     assert.equal(cssAssets.length, 1, 'consumer build must emit exactly one CSS asset');
@@ -173,7 +174,7 @@ try {
     assert.ok(layerOrder.includes('utilities'), 'consumer CSS must hold the Tailwind utilities layer');
     assert.ok(/@layer portal-mojo\s*\{/.test(css), 'consumer CSS must hold the portal-mojo layer');
     for (const selector of ['.guardrail-effect', '.signin-card', '.side-nav']) assert.ok(css.includes(selector), `consumer CSS must hold the package rule ${selector}`);
-    assert.ok(css.includes('.xl\\:grid-cols-4'), 'consumer CSS must hold a utility used only in package markup: the package @source must scan from node_modules');
+    assert.ok(css.includes('minmax(7.5rem,1fr)'), 'consumer CSS must hold a utility used only in package markup: the package @source must scan from node_modules');
     const installedRoot = join(consumerDir, 'node_modules/portal-mojo');
     const program = ts.createProgram(await typeScriptFiles(join(installedRoot, 'src')), {
         target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,

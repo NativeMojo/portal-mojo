@@ -52,7 +52,7 @@ export function OverviewSection({ group, openGroup, canViewCredentials, canViewA
 
     return (
         <>
-            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', marginBottom: 16 }}>
+            <div className="grid gap-2 mb-4 grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))]">
                 <MetricCard compact label="Members" value={memberCount} />
                 <MetricCard compact label="Sub-groups" value={subs ? subCount : '—'} />
                 <MetricCard compact label="API keys" value={canViewCredentials ? (keyPeek?.count ?? '—') : 'Unavailable'} />

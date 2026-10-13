@@ -80,7 +80,7 @@ export function OverviewSection({ user, shared, onOpenGroup }: {
             {/* Compact KPI strip: the modal body is narrow regardless of the
                 viewport, so columns auto-fit the container (not a viewport
                 breakpoint) and values stay on one line. */}
-            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', marginBottom: 16 }}>
+            <div className="grid gap-2 mb-4 grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))]">
                 <MetricCard compact label="Devices" value={String(deviceTotal)} />
                 <MetricCard compact label="Last login" value={fmt.relative(lastLogin, '—')} title={lastLogin ? fmt.datetime(lastLogin) : undefined} />
                 <MetricCard compact label="Active sessions" value={String(sessionCount)} />
