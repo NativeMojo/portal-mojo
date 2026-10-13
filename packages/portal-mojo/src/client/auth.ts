@@ -64,7 +64,7 @@ export function setTokens(access: string, refresh?: string | null, persistent = 
     storeTokens(access, refresh, persistent, 'session');
 }
 
-function storeTokens(access: string, refresh: string | null | undefined, persistent: boolean, source: AuthChangeSource): void {
+function storeTokens(access: string, refresh: string | null | undefined, persistent: boolean, source: 'session' | 'refresh'): void {
     // Clear both storages first — a leftover token in the other storage must
     // never shadow this session (web-mojo wrote without clearing).
     clearTokens({ silent: true });
@@ -93,8 +93,13 @@ export interface AuthSnapshot {
 
 let snapshotCache: AuthSnapshot = { authenticated: false, uid: null, email: null };
 let snapshotKey = '∅';
-export type AuthChangeSource = 'session' | 'refresh';
-const authListeners = new Set<(source: AuthChangeSource) => void>();
+let sessionRevision = 0;
+const authListeners = new Set<() => void>();
+
+/** @internal Same-tab replacement fence; ordinary renewal does not advance it. */
+export function getAuthSessionRevision(): number {
+    return sessionRevision;
+}
 
 function computeSnapshot(): void {
     const access = getAccessToken();
@@ -111,9 +116,10 @@ function computeSnapshot(): void {
     };
 }
 
-function notifyAuthChanged(source: AuthChangeSource = 'session'): void {
+function notifyAuthChanged(source: 'session' | 'refresh' = 'session'): void {
+    if (source === 'session') sessionRevision += 1;
     computeSnapshot();
-    for (const cb of authListeners) cb(source);
+    for (const cb of authListeners) cb();
 }
 
 /** Stable snapshot — reference changes only when the stored tokens change. */
@@ -124,8 +130,8 @@ export function getAuthSnapshot(): AuthSnapshot {
 
 let storageListenerInstalled = false;
 
-/** Subscribe to auth-state changes; same-tab renewal is distinguished from replacement. */
-export function subscribeAuth(cb: (source: AuthChangeSource) => void): () => void {
+/** Subscribe to auth-state changes (incl. cross-tab via the storage event). */
+export function subscribeAuth(cb: () => void): () => void {
     if (!storageListenerInstalled && typeof window !== 'undefined') {
         storageListenerInstalled = true;
         window.addEventListener('storage', (e) => {

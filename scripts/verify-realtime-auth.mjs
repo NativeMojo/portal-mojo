@@ -181,15 +181,16 @@ try {
     }
     // A refresh started before revocation must not revive that connection.
     // An intentional replacement session can still authenticate afterwards.
-    for (const terminal of ['forced-disconnect', 'auth-failed']) {
+    for (const terminal of ['forced-disconnect', 'auth-failed']) for (const gap of [false, true]) {
         const r = rig(7200); await flush();
         const old = r.sockets[0]; old.open(); now += 7_500_000;
         old.frame({ type: 'auth_required' }); await flush();
         if (terminal === 'forced-disconnect') old.frame({ type: 'message', timestamp: now / 1000, data: { type: 'disconnect', reason: 'forced_disconnect' } });
         else old.frame({ type: 'error', message: 'Token expired' });
         assert.equal(r.client.getStatus().status, terminal);
+        if (gap) r.unbind();
         succeed(); await flush();
-        assert.equal(r.client.getStatus().status, terminal, 'a pending renewal cannot clear terminal suspension');
+        if (!gap) assert.equal(r.client.getStatus().status, terminal, 'a pending renewal cannot clear terminal suspension');
         r.unbind(); const rebound = r.client.bindAuthSession(); r.client.setEnabled(true);
         assert.equal(r.client.getStatus().status, terminal, 'rebinding the same renewed session retains suspension');
         r.client.nudge(); r.clock.advance(60_000); await flush();

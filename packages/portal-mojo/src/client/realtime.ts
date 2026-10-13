@@ -3,7 +3,7 @@ import {
     useSyncExternalStore, type PropsWithChildren,
 } from 'react';
 import { apiOrigin } from './client';
-import { ensureValidToken, getAccessToken, getRefreshToken, subscribeAuth } from './auth';
+import { ensureValidToken, getAccessToken, getAuthSessionRevision, getRefreshToken, subscribeAuth } from './auth';
 import { AuthRequiredError } from './errors';
 
 export type RealtimeLifecycleStatus =
@@ -108,6 +108,7 @@ export class RealtimeClient {
     private socket: RealtimeSocket | null = null;
     private token: string | null = null;
     private authBinding: { unsubscribe: () => void } | null = null;
+    private authSessionRevision: number | null = null;
     private preparing: object | null = null;
     private authSent: RealtimeSocket | null = null;
     private enabled = false;
@@ -154,16 +155,21 @@ export class RealtimeClient {
         this.stop(this.suspended ?? (this.enabled ? 'idle' : 'disabled'));
         // Synchronous invalidation is essential: a React effect can run after
         // an old refresh/handshake has completed for the previous account.
-        binding.unsubscribe = subscribeAuth((source) => {
+        const syncSession = () => {
+            const revision = getAuthSessionRevision();
+            const replaced = this.authSessionRevision !== revision;
+            this.authSessionRevision = revision;
             // A renewal already in flight when the server denied/revoked this
-            // connection is not an intentional replacement session.
-            if (source === 'refresh' && this.suspended) {
+            // connection is not an intentional replacement session. The fence
+            // also survives a renewal completed while no binding was mounted.
+            if (!replaced && this.suspended) {
                 this.token = getAccessToken();
                 return;
             }
             this.setToken(getAccessToken());
-        });
-        this.setToken(getAccessToken());
+        };
+        binding.unsubscribe = subscribeAuth(syncSession);
+        syncSession();
         if (this.enabled) this.open();
         return () => {
             if (this.authBinding !== binding) return;
