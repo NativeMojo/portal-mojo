@@ -16,6 +16,9 @@ keeps the connection in `connecting`/`authenticating`/`backoff`, not `auth-faile
 Consumers should preserve their current workspace during these transient states.
 Confirmed refresh denial still fails closed. Token replacement invalidates old
 handshakes synchronously, including during a pending refresh.
+An in-flight renewal completing after an authentication failure or forced
+disconnect cannot clear that suspension. An intentional replacement session
+can authenticate again; ordinary token refresh cannot.
 
 For a non-React session consumer, call `const unbind = client.bindAuthSession()`
 before `client.setEnabled(true)`, and call `unbind()` on teardown. One binding

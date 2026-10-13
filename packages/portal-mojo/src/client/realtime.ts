@@ -151,10 +151,18 @@ export class RealtimeClient {
         if (this.authBinding) throw new Error('Realtime client already has an auth session owner');
         const binding = { unsubscribe: () => {} };
         this.authBinding = binding;
-        this.stop(this.enabled ? 'idle' : 'disabled');
+        this.stop(this.suspended ?? (this.enabled ? 'idle' : 'disabled'));
         // Synchronous invalidation is essential: a React effect can run after
         // an old refresh/handshake has completed for the previous account.
-        binding.unsubscribe = subscribeAuth(() => this.setToken(getAccessToken()));
+        binding.unsubscribe = subscribeAuth((source) => {
+            // A renewal already in flight when the server denied/revoked this
+            // connection is not an intentional replacement session.
+            if (source === 'refresh' && this.suspended) {
+                this.token = getAccessToken();
+                return;
+            }
+            this.setToken(getAccessToken());
+        });
         this.setToken(getAccessToken());
         if (this.enabled) this.open();
         return () => {
@@ -169,6 +177,7 @@ export class RealtimeClient {
         if (this.enabled === enabled) return;
         this.enabled = enabled;
         if (!enabled) this.stop('disabled');
+        else if (this.suspended) this.setLifecycle(this.suspended);
         else if (this.hasCredentials()) this.open();
         else this.setLifecycle('idle');
     }

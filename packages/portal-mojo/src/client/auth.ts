@@ -61,13 +61,17 @@ export function sessionIsPersistent(): boolean {
 }
 
 export function setTokens(access: string, refresh?: string | null, persistent = true): void {
+    storeTokens(access, refresh, persistent, 'session');
+}
+
+function storeTokens(access: string, refresh: string | null | undefined, persistent: boolean, source: AuthChangeSource): void {
     // Clear both storages first — a leftover token in the other storage must
     // never shadow this session (web-mojo wrote without clearing).
     clearTokens({ silent: true });
     const storage = persistent ? localStorage : sessionStorage;
     storage.setItem(ACCESS_KEY, access);
     if (refresh) storage.setItem(REFRESH_KEY, refresh);
-    notifyAuthChanged();
+    notifyAuthChanged(source);
 }
 
 export function clearTokens(opts: { silent?: boolean } = {}): void {
@@ -89,7 +93,8 @@ export interface AuthSnapshot {
 
 let snapshotCache: AuthSnapshot = { authenticated: false, uid: null, email: null };
 let snapshotKey = '∅';
-const authListeners = new Set<() => void>();
+export type AuthChangeSource = 'session' | 'refresh';
+const authListeners = new Set<(source: AuthChangeSource) => void>();
 
 function computeSnapshot(): void {
     const access = getAccessToken();
@@ -106,9 +111,9 @@ function computeSnapshot(): void {
     };
 }
 
-function notifyAuthChanged(): void {
+function notifyAuthChanged(source: AuthChangeSource = 'session'): void {
     computeSnapshot();
-    for (const cb of authListeners) cb();
+    for (const cb of authListeners) cb(source);
 }
 
 /** Stable snapshot — reference changes only when the stored tokens change. */
@@ -119,8 +124,8 @@ export function getAuthSnapshot(): AuthSnapshot {
 
 let storageListenerInstalled = false;
 
-/** Subscribe to auth-state changes (incl. cross-tab via the storage event). */
-export function subscribeAuth(cb: () => void): () => void {
+/** Subscribe to auth-state changes; same-tab renewal is distinguished from replacement. */
+export function subscribeAuth(cb: (source: AuthChangeSource) => void): () => void {
     if (!storageListenerInstalled && typeof window !== 'undefined') {
         storageListenerInstalled = true;
         window.addEventListener('storage', (e) => {
@@ -217,7 +222,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
         });
         if (superseded()) return { ok: sessionUsable() };
         const pkg = body.data as { access_token: string; refresh_token?: string };
-        setTokens(pkg.access_token, pkg.refresh_token, persistent);
+        storeTokens(pkg.access_token, pkg.refresh_token, persistent, 'refresh');
         emitAuth('refreshed');
         return { ok: true };
     } catch (error) {

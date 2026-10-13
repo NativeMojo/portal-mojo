@@ -57,7 +57,7 @@ try {
         const unstatus = client.subscribeStatus(() => states.push(client.getStatus().status));
         const unsub = bind ? client.bindAuthSession() : () => {};
         if (bind) client.setEnabled(true);
-        return { client, clock, sockets, sent, states, cleanup: () => { unsub(); unstatus(); client.destroy(); auth.stopAutoRefresh(); } };
+        return { client, clock, sockets, sent, states, unbind: unsub, cleanup: () => { unsub(); unstatus(); client.destroy(); auth.stopAutoRefresh(); } };
     }
     const succeed = (uid = 42) => { const access = jwt(7200, uid); refreshes.at(-1).resolve(response(200, { access_token: access, refresh_token: jwt(86400, uid) })); return access; };
     const authenticate = async r => { const s = r.sockets.at(-1); s.open(); s.frame({ type: 'auth_required' }); await flush(); return s; };
@@ -178,6 +178,25 @@ try {
         }
         if (action === 'disable') { r.client.setEnabled(true); await flush(); assert.equal(r.sockets.length, 1); }
         r.cleanup();
+    }
+    // A refresh started before revocation must not revive that connection.
+    // An intentional replacement session can still authenticate afterwards.
+    for (const terminal of ['forced-disconnect', 'auth-failed']) {
+        const r = rig(7200); await flush();
+        const old = r.sockets[0]; old.open(); now += 7_500_000;
+        old.frame({ type: 'auth_required' }); await flush();
+        if (terminal === 'forced-disconnect') old.frame({ type: 'message', timestamp: now / 1000, data: { type: 'disconnect', reason: 'forced_disconnect' } });
+        else old.frame({ type: 'error', message: 'Token expired' });
+        assert.equal(r.client.getStatus().status, terminal);
+        succeed(); await flush();
+        assert.equal(r.client.getStatus().status, terminal, 'a pending renewal cannot clear terminal suspension');
+        r.unbind(); const rebound = r.client.bindAuthSession(); r.client.setEnabled(true);
+        assert.equal(r.client.getStatus().status, terminal, 'rebinding the same renewed session retains suspension');
+        r.client.nudge(); r.clock.advance(60_000); await flush();
+        assert.equal(r.sockets.length, 1, 'revocation must not open a replacement socket');
+        auth.setTokens(jwt(7200, 99), jwt(86400, 99), false); await flush();
+        assert.equal(r.sockets.length, 2, 'an intentional new session can connect');
+        rebound(); r.cleanup();
     }
     // Admission cooldown survives token rotation, unmount/remount and focus.
     {

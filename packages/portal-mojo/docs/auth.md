@@ -39,6 +39,10 @@ onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issu
   uses this same gate before connecting and before sending authentication;
   applications do not need a second refresh timer for WebSockets.
 - `useAuthSnapshot()` → `{authenticated, uid, email}` — live, cross-tab.
+- `subscribeAuth(listener)` supplies a change source: `refresh` for a renewal
+  in this tab, `session` for explicit replacement/clearing and cross-tab storage
+  events. Existing listeners can ignore the argument. Session-bound realtime
+  uses it to keep a late renewal from undoing a terminal server denial.
 - `logout()` is client-side (django-mojo has no logout endpoint) and emits
   `'logout'`.
 - Every flow that answers with a login grant adopts it only when it carries
