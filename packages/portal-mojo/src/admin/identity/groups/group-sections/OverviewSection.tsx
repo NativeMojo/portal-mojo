@@ -52,11 +52,11 @@ export function OverviewSection({ group, openGroup, canViewCredentials, canViewA
 
     return (
         <>
-            <div className="grid gap-3 grid-cols-2 xl:grid-cols-4" style={{ marginBottom: 14 }}>
-                <MetricCard label="Members" value={memberCount} />
-                <MetricCard label="Sub-groups" value={subs ? subCount : '—'} />
-                <MetricCard label="API keys" value={canViewCredentials ? (keyPeek?.count ?? '—') : 'Unavailable'} />
-                <MetricCard label="Last activity" value={fmt.relative(group.last_activity, '—')} />
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', marginBottom: 16 }}>
+                <MetricCard compact label="Members" value={memberCount} />
+                <MetricCard compact label="Sub-groups" value={subs ? subCount : '—'} />
+                <MetricCard compact label="API keys" value={canViewCredentials ? (keyPeek?.count ?? '—') : 'Unavailable'} />
+                <MetricCard compact label="Last activity" value={fmt.relative(group.last_activity, '—')} title={group.last_activity ? fmt.datetime(group.last_activity) : undefined} />
             </div>
 
             <Eyebrow>This group</Eyebrow>
