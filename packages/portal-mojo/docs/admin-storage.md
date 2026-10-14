@@ -60,8 +60,24 @@ closure, refetches authoritatively, and compares requested owner FKs.
 Creation supports runtime backends `file` and `s3`, explicitly starts private,
 and requires an authorized group/user owner unless the caller is superuser and
 chooses System. Supported payload actions are `test_connection`, `check_cors`,
-`fix_cors`, and `clone`; inner `{status:false}` rejects. CORS is S3-only.
+`fix_cors`, `clone`, and the CDN trio `enable_cdn`, `check_cdn`, `disable_cdn`
+(django-mojo #8250); inner `{status:false}` rejects. CORS and CDN are S3-only.
 FileManager DELETE and `check_public_access` are absent.
+
+**CDN delivery.** The manager graph carries a read-only `cdn` object
+(`projectCdn` keeps only its named keys; `{enabled: false}` otherwise), shown
+as the Overview's CDN row: not enabled, or the CDN address with "public
+links" or "signed links" and whether the distribution is still deploying.
+The detail menu offers **Check CDN** to anyone who can manage the backend
+and **Enable CDN…** / **Disable CDN…** to superusers, each behind a confirm
+that says what changes in AWS (enable provisions CloudFront for the whole
+bucket under the deployment's identity and creates nothing twice; disable
+reverts every manager on the bucket to S3 links and leaves AWS alone).
+Results render as a findings list — status badge, code, message, remedy —
+through `cdnFindings`, never raw JSON. The mock serves the field (the
+"Public media" backend starts enabled) and the three actions, with a
+MANUAL KMS finding on the private uploads backend so the remedy rendering
+is exercised.
 
 ## Files and capability URLs
 
