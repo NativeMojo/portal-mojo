@@ -6,7 +6,7 @@
 // Everything about roles, fields, choices and limits comes from the
 // descriptor. The ONE rule this module hardcodes is the mp4-only trio
 // (`codec`/`crf`/`preset`), which the server refuses on a non-mp4 role.
-import { mojoCall, mojoList, mojoSave, withFreshAuth } from '../../client/runtime';
+import { isReauthRequired, mojoCall, mojoList, mojoSave, withFreshAuth } from '../../client/runtime';
 import type { SettingRow } from '../settings/model';
 
 export type RenditionCategoryKey = 'image' | 'video' | 'document';
@@ -251,13 +251,34 @@ export function routeRenditionError(message: string, knownRoles: readonly string
     return { role: role!, field: field ?? null, message: rest! };
 }
 
-/** Create or update the category's global row. Imperative; a failure rejects. */
+/**
+ * Create or update the category's global row. Imperative; a failure rejects.
+ * With `row === null` the handler proves the row is absent before creating:
+ * it re-reads the global rows and refuses (no write) when that read fails or
+ * finds a row, so no caller can create a duplicate platform-wide override.
+ */
 export async function saveCategoryValue(category: RenditionCategory, row: SettingRow | null, value: Record<string, unknown>): Promise<SettingRow> {
     const changes: Record<string, unknown> = row ? { value } : { key: category.key, is_secret: false, group: null, value };
-    return withFreshAuth(() => mojoSave<SettingRow>('/api/settings', row?.id ?? null, changes));
+    return withFreshAuth(async () => {
+        if (!row) {
+            let existing: SettingRow[];
+            try {
+                existing = await findCategoryRows(category.key);
+            } catch (error) {
+                // A step-up refusal goes back to withFreshAuth, which re-runs the read after re-login.
+                if (isReauthRequired(error)) throw error;
+                throw new Error('The current override could not be read, so nothing was saved. Retry the read first.');
+            }
+            if (existing.length) throw new Error(`A global row for ${category.key} already exists (id ${existing.map((entry) => entry.id).join(', ')}); reload before saving.`);
+        }
+        return mojoSave<SettingRow>('/api/settings', row?.id ?? null, changes);
+    });
 }
 
-/** Reset = write `{}`. The live Setting model refuses DELETE, and `{}` is reported as `override: null`. */
+/**
+ * Reset = write `{}`. The live Setting model refuses DELETE, and `{}` is reported as `override: null`.
+ * Resolves `null` when `row` is null: nothing was reset and nothing was sent.
+ */
 export async function resetCategory(category: RenditionCategory, row: SettingRow | null): Promise<SettingRow | null> {
     if (!row) return null;
     return saveCategoryValue(category, row, {});

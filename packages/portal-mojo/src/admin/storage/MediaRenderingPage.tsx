@@ -94,9 +94,10 @@ function RoleField({ category, draft, role, kind, name, error, disabled, onChang
 function CategoryPanel({ category, categoryKey }: { category: RenditionCategory; categoryKey: string }) {
     const queryClient = useQueryClient();
     const rowsQuery = useQuery({ queryKey: rowQueryKey(category.key), queryFn: () => findCategoryRows(category.key), retry: false, refetchOnWindowFocus: false });
-    const rows = rowsQuery.data ?? [];
-    const row: SettingRow | null = rows[0] ?? null;
-    const duplicates = rows.length > 1;
+    // Rows only from a successful read: a failed or pending read is "unknown", never "no row".
+    const rows = rowsQuery.isSuccess ? rowsQuery.data : null;
+    const row: SettingRow | null = rows?.[0] ?? null;
+    const duplicates = (rows?.length ?? 0) > 1;
     const [draft, setDraft] = useState<CategoryDraft>(() => valueToDraft(category, category.override));
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [formError, setFormError] = useState('');
@@ -134,6 +135,7 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
         setErrors((current) => ({ ...current, [key]: routed.message }));
     };
     const save = async () => {
+        if (!rowsQuery.isSuccess || duplicates) return;
         setBusy(true); setFormError(''); setErrors({});
         try {
             await saveCategoryValue(category, row, value);
@@ -146,6 +148,7 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
         }
     };
     const reset = async () => {
+        if (!rowsQuery.isSuccess || duplicates) return;
         const ok = await modal.confirm({
             title: `Reset ${renditionCategoryLabel(categoryKey).toLowerCase()} rendering to defaults?`,
             message: 'Every role goes back to the framework defaults and the default set of roles runs on upload. Existing files are not touched.',
@@ -155,8 +158,9 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
         if (!ok) return;
         setBusy(true); setFormError(''); setErrors({});
         try {
-            await resetCategory(category, row);
-            toast.success(`${renditionCategoryLabel(categoryKey)} rendering reset to defaults`);
+            const resetRow = await resetCategory(category, row);
+            if (resetRow) toast.success(`${renditionCategoryLabel(categoryKey)} rendering reset to defaults`);
+            else toast.info('There was no stored override to reset.');
             await refresh();
         } catch (reason) {
             fail(reason);
@@ -165,14 +169,17 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
         }
     };
 
-    const disabled = busy || duplicates || rowsQuery.isPending;
+    const disabled = busy || duplicates || !rowsQuery.isSuccess;
+    const status = rowsQuery.isPending ? 'Reading the current override…'
+        : rowsQuery.isError ? 'The current override could not be read — Save is disabled until it loads.'
+        : row ? `Override row #${row.id}` : 'No override row yet — Save creates one.';
     return <div className="media-rendering-panel">
         {hasH265 && <p className="media-rendering-note">
             <b>H.265 (HEVC)</b> encodes take several times longer than H.264 and do not play in every browser. Keep <code>video_mp4</code> as the H.264 compatibility rendition and enable <code>video_hevc</code> on upload only when the extra encode time is worth it.
         </p>}
         {rowsQuery.error && <div className="form-alert" role="alert">The current override could not be read: {rowsQuery.error.message} <button className="btn btn-compact" onClick={() => void rowsQuery.refetch()}>Retry</button></div>}
         {duplicates && <div className="form-alert" role="alert">
-            More than one global row exists for <code>{category.key}</code> (ids {rows.map((entry) => entry.id).join(', ')}). The server reads an undefined one, so this page will not edit them; remove the duplicates on the server first.
+            More than one global row exists for <code>{category.key}</code> (ids {rows?.map((entry) => entry.id).join(', ')}). The server reads an undefined one, so this page will not edit them; remove the duplicates on the server first.
         </div>}
         {formError && <div className="form-alert" role="alert">{formError}</div>}
         <div className="media-rendering-roles">
@@ -210,7 +217,7 @@ function CategoryPanel({ category, categoryKey }: { category: RenditionCategory;
         <div className="media-rendering-actions">
             <button className="btn btn-primary" disabled={disabled || !dirty} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button>
             <button className="btn" disabled={disabled || !row || category.override == null} onClick={() => void reset()}>Reset to defaults…</button>
-            <span className="dim">{row ? `Override row #${row.id}` : 'No override row yet — Save creates one.'}</span>
+            <span className="dim">{status}</span>
         </div>
     </div>;
 }

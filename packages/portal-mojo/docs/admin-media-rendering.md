@@ -53,7 +53,12 @@ with raw `mojoList` — `SettingModel.normalizeListParams` strips `key`, so the
 model's list hook cannot do this. More than one global row for a key disables
 Save and Reset with a notice naming the ids: `Setting.Meta.ordering = ["key"]`
 leaves the server's `.first()` undefined among duplicates, so editing one could
-change a row the renderer never reads.
+change a row the renderer never reads. Save and Reset also stay disabled until
+the lookup succeeds (pending or failed reads say so beside the buttons), and a
+save with no known row (`saveCategoryValue(category, null, …)`) re-reads first:
+it refuses without writing when that read fails or finds a row, and creates
+only when the list is empty. `resetCategory(category, null)` resolves `null`,
+meaning nothing was reset.
 
 **Write:** the whole category as one object — `POST /api/settings` to create
 (`{key, is_secret: false, group: null, value}`) or `POST /api/settings/<id>`
