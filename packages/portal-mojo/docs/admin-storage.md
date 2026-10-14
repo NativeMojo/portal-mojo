@@ -68,8 +68,9 @@ FileManager DELETE and `check_public_access` are absent.
 (`projectCdn` keeps only its named keys; `{enabled: false}` otherwise), shown
 as the Overview's CDN row: not enabled, or the CDN address with "public
 links" or "signed links" and whether the distribution is still deploying.
-The detail menu offers **Check CDN** to anyone who can manage the backend
-and **Enable CDN…** / **Disable CDN…** to superusers, each behind a confirm
+The detail menu offers **Check CDN**, **Enable CDN…** and **Disable CDN…**
+to superusers only (all three run under the deployment's AWS identity and
+the report carries ARNs and policy documents), the two mutating ones behind a confirm
 that says what changes in AWS (enable provisions CloudFront for the whole
 bucket under the deployment's identity and creates nothing twice; disable
 reverts every manager on the bucket to S3 links and leaves AWS alone).

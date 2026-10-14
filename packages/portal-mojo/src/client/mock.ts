@@ -6973,7 +6973,7 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         for (const action of ['enable_cdn', 'check_cdn', 'disable_cdn'] as const) {
             if (!(action in body)) continue;
             if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };
-            if (action !== 'check_cdn' && !caller.is_superuser) return permissionDenied();
+            if (!caller.is_superuser) return permissionDenied(); // all three read or change the account under the deployment identity
             if (manager.backend_type !== 's3') return { status: true, data: { status: false, error: 'CDN delivery is only supported for S3 backends.' } };
             const bucket = manager.backend_url.replace(/^s3:\/\//, '').split('/')[0];
             const report = storageCdnReport(manager, action === 'enable_cdn' ? 'enable' : action === 'check_cdn' ? 'check' : 'disable');

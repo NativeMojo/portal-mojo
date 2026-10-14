@@ -100,8 +100,8 @@ export function FileManagerDetail({ id, onClose }: { id: number; onClose: () => 
             { label: row.is_public ? 'Make private…' : 'Make public…', onSelect: () => void toggle() },
             { label: 'Test connection', onSelect: () => void action('test_connection') },
             ...(row.backend_type === 's3' ? [{ label: 'Check CORS', onSelect: () => void action('check_cors') }, { label: 'Fix CORS', onSelect: () => void action('fix_cors') }] : []),
-            ...(row.backend_type === 's3' ? [{ label: 'Check CDN', onSelect: () => void cdnAction('check_cdn') }] : []),
             ...(row.backend_type === 's3' && isSuperuser ? [
+                { label: 'Check CDN', onSelect: () => void cdnAction('check_cdn') },
                 ...(row.cdn?.enabled ? [{ label: 'Disable CDN…', danger: true, onSelect: () => void disableCdn() }] : [{ label: 'Enable CDN…', onSelect: () => void enableCdn() }]),
             ] : []),
             { label: 'Clone…', onSelect: () => void clone() },
