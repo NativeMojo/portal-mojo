@@ -52,7 +52,6 @@ export function FileManagerDetail({ id, onClose }: { id: number; onClose: () => 
     const row = query.data;
     const edit = async (mode: 'general' | 'credentials' | 'owner') => { const saved = await openFileManagerEditor(mode, row); if (saved) { toast.success(`${saved.name} updated`); await query.refetch(); } };
     const action = async (name: 'test_connection' | 'check_cors' | 'fix_cors') => { try { const result = await runFileManagerAction(id, name); toast.success(name === 'test_connection' ? 'Connection succeeded' : `${name.replace('_', ' ')} completed`); await modal.open((close) => <div className="modal-pad"><h2 className="modal-title">{name.replaceAll('_', ' ')}</h2><pre className="storage-result-json">{JSON.stringify(result, null, 2)}</pre><div className="modal-actions"><button className="btn" onClick={() => close(null)}>Close</button></div></div>); } catch (error) { toast.error(error instanceof Error ? error.message : `${name} failed`); } };
-    const isSuperuser = Boolean(managerPermission.me?.is_superuser);
     const cdnAction = async (name: 'enable_cdn' | 'check_cdn' | 'disable_cdn', value: unknown = true) => {
         try {
             const result = await runFileManagerAction(id, name, value);
@@ -100,7 +99,7 @@ export function FileManagerDetail({ id, onClose }: { id: number; onClose: () => 
             { label: row.is_public ? 'Make private…' : 'Make public…', onSelect: () => void toggle() },
             { label: 'Test connection', onSelect: () => void action('test_connection') },
             ...(row.backend_type === 's3' ? [{ label: 'Check CORS', onSelect: () => void action('check_cors') }, { label: 'Fix CORS', onSelect: () => void action('fix_cors') }] : []),
-            ...(row.backend_type === 's3' && isSuperuser ? [
+            ...(row.backend_type === 's3' ? [
                 { label: 'Check CDN', onSelect: () => void cdnAction('check_cdn') },
                 ...(row.cdn?.enabled ? [{ label: 'Disable CDN…', danger: true, onSelect: () => void disableCdn() }] : [{ label: 'Enable CDN…', onSelect: () => void enableCdn() }]),
             ] : []),
