@@ -4149,6 +4149,7 @@ interface MockFileManager {
     aws_key_masked: string | null; aws_secret_masked: string | null; allowed_origins: string[];
     assume_role_arn: string | null; has_external_id: boolean; group: number | null; user: number | null;
     max_file_size: number; allowed_extensions: string[]; allowed_mime_types: string[]; supports_direct_upload: boolean;
+    cdn?: Record<string, unknown>;
 }
 
 interface MockStorageFile {
@@ -4267,7 +4268,7 @@ function buildFileManagers(): MockFileManager[] {
     const now = Math.floor(Date.now() / 1000);
     return [
         { id: 4101, created: now - 410 * 86400, name: 'Private uploads', use: 'uploads', backend_type: 's3', backend_url: 's3://mojo-private-assets/uploads', is_active: true, is_default: true, is_public: false, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••7D2Q', aws_secret_masked: '••••••••••m9p', allowed_origins: ['https://admin.example.test'], assume_role_arn: null, has_external_id: false, group: 1, user: null, max_file_size: 25_000_000, allowed_extensions: ['jpg', 'png', 'pdf', 'txt'], allowed_mime_types: ['image/*', 'application/pdf', 'text/plain'], supports_direct_upload: true },
-        { id: 4102, created: now - 320 * 86400, name: 'Public media', use: 'media', backend_type: 's3', backend_url: 's3://mojo-public-media/media', is_active: true, is_default: false, is_public: true, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••3K8M', aws_secret_masked: '••••••••••r2x', allowed_origins: ['https://example.test'], assume_role_arn: null, has_external_id: false, group: null, user: 14, max_file_size: 50_000_000, allowed_extensions: [], allowed_mime_types: ['image/*', 'video/*'], supports_direct_upload: true },
+        { cdn: { enabled: true, url: 'https://d2mockmedia.cloudfront.net', bucket: 'mojo-public-media', distribution_id: 'E2MOCKMEDIA', source: 'provisioned', status: 'deployed', signed: false, signing_key_id: 'K2MOCKKEY' }, id: 4102, created: now - 320 * 86400, name: 'Public media', use: 'media', backend_type: 's3', backend_url: 's3://mojo-public-media/media', is_active: true, is_default: false, is_public: true, aws_region: 'us-west-2', aws_key_masked: 'AKIA••••3K8M', aws_secret_masked: '••••••••••r2x', allowed_origins: ['https://example.test'], assume_role_arn: null, has_external_id: false, group: null, user: 14, max_file_size: 50_000_000, allowed_extensions: [], allowed_mime_types: ['image/*', 'video/*'], supports_direct_upload: true },
         { id: 4103, created: now - 70 * 86400, name: 'Local archive', use: 'archive', backend_type: 'file', backend_url: '/srv/mojo/archive', is_active: false, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: 2, user: null, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
         { id: 4104, created: now - 30 * 86400, name: 'System uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/uploads', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: null, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
         { id: 4105, created: now - 20 * 86400, name: 'Ian uploads', use: 'uploads', backend_type: 'file', backend_url: '/srv/mojo/users/1', is_active: true, is_default: false, is_public: false, aws_region: null, aws_key_masked: null, aws_secret_masked: null, allowed_origins: [], assume_role_arn: null, has_external_id: false, group: null, user: 1, max_file_size: 0, allowed_extensions: [], allowed_mime_types: [], supports_direct_upload: false },
@@ -6631,7 +6632,30 @@ function serializeStorageManager(row: MockFileManager): Record<string, unknown> 
         aws_region: row.aws_region, aws_key_masked: row.aws_key_masked,
         aws_secret_masked: row.aws_secret_masked, allowed_origins: [...row.allowed_origins],
         assume_role_arn: row.assume_role_arn, has_external_id: row.has_external_id,
+        cdn: row.cdn ? { ...row.cdn } : { enabled: false },
         group: storageRelation('group', row.group), user: storageRelation('user', row.user),
+    };
+}
+
+/** django-mojo #8250: the aws-check-shaped report the three CDN actions return. */
+function storageCdnReport(manager: MockFileManager, mode: 'enable' | 'check' | 'disable'): Record<string, unknown> {
+    const bucket = manager.backend_url.replace(/^s3:\/\//, '').split('/')[0];
+    const items = mode === 'disable'
+        ? []
+        : [
+            { step: 'preflight', status: 'PASS', code: 'identity.ok', message: 'running as arn:aws:iam::123456789012:role/django-mojo-setup', remedy: null },
+            { step: 'bucket', status: 'PASS', code: 'public_access_block.ok', message: 'Block Public Access is on for every setting', remedy: null },
+            { step: 'signing_key', status: 'PASS', code: 'signing_key.ok', message: 'signing key K2MOCKKEY is active', remedy: null },
+            { step: 'oac', status: 'PASS', code: 'oac.ok', message: `origin access control mojo-fm-oac-${bucket.slice(0, 6)} exists`, remedy: null },
+            { step: 'distribution', status: mode === 'enable' ? 'PENDING' : 'PASS', code: mode === 'enable' ? 'distribution.deploying' : 'distribution.ok', message: mode === 'enable' ? 'distribution EMOCK1 is still deploying to the edge' : `distribution EMOCK1 serves ${bucket} through OAC with the expected behaviors`, remedy: mode === 'enable' ? 'links are issued now and start working when CloudFront reports Deployed' : null },
+            { step: 'bucket_policy', status: 'PASS', code: 'bucket_policy.ok', message: 'the bucket policy lets this distribution read objects', remedy: null },
+            { step: 'kms', status: 'MANUAL', code: 'kms.aws_managed', message: 'objects are encrypted with the AWS-managed aws/s3 key, whose policy cannot be changed, so CloudFront can never decrypt them', remedy: 'create a customer-managed KMS key dedicated to media, set it as the manager\'s kms_key_id and the bucket\'s default encryption, re-encrypt existing objects, then re-run' },
+        ].filter((item) => !(item.step === 'kms' && manager.id !== 4101));
+    const worst = items.some((i) => i.status === 'MANUAL') ? 'MANUAL' : items.some((i) => i.status === 'PENDING') ? 'PENDING' : 'PASS';
+    return {
+        version: 1, mode, bucket, manager: manager.id, harden: false, items, actions: [],
+        worst, blocking: false, converged: worst !== 'MANUAL',
+        distribution: { distribution_id: 'EMOCK1', domain_name: 'emock1.cloudfront.net', status: mode === 'enable' ? 'pending' : 'deployed' },
     };
 }
 
@@ -6946,6 +6970,22 @@ function storageFetch(path: string, opts: MockFetchOpts): Record<string, unknown
         }
         if (method !== 'POST' || !hasGlobalPermission(caller, STORAGE_MANAGE_GRANTS)) return permissionDenied();
         const body = opts.body ?? {};
+        for (const action of ['enable_cdn', 'check_cdn', 'disable_cdn'] as const) {
+            if (!(action in body)) continue;
+            if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };
+            if (manager.backend_type !== 's3') return { status: true, data: { status: false, error: 'CDN delivery is only supported for S3 backends.' } };
+            const bucket = manager.backend_url.replace(/^s3:\/\//, '').split('/')[0];
+            const report = storageCdnReport(manager, action === 'enable_cdn' ? 'enable' : action === 'check_cdn' ? 'check' : 'disable');
+            const siblings = db.fileManagers.filter((row) => row.backend_type === 's3' && row.backend_url.replace(/^s3:\/\//, '').split('/')[0] === bucket);
+            if (action === 'enable_cdn' && report.converged) {
+                for (const row of siblings) row.cdn = { enabled: true, url: 'https://emock1.cloudfront.net', bucket, distribution_id: 'EMOCK1', source: 'provisioned', status: 'pending', signed: !row.is_public, signing_key_id: 'K2MOCKKEY' };
+            }
+            if (action === 'disable_cdn') {
+                for (const row of siblings) row.cdn = { enabled: false };
+                return { status: true, data: { status: true, result: { status: true, disabled: true, distribution_id: 'EMOCK1', retired: Boolean((body[action] as Record<string, unknown> | undefined)?.retire) } } };
+            }
+            return { status: true, data: { status: true, result: report } };
+        }
         for (const action of ['test_connection', 'check_cors', 'fix_cors', 'clone'] as const) {
             if (!(action in body)) continue;
             if (!manager) return { status: false, error: 'FileManager not found', error_code: 404 };

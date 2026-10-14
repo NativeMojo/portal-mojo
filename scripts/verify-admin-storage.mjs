@@ -77,6 +77,16 @@ try {
     const sanitized = models.sanitizeFileManagerRow({ id: 1, created: 1, name: 'Safe', use: 'x', backend_type: 's3', backend_url: 's3://safe', is_active: true, is_default: false, is_public: false, aws_key: canary, aws_secret: canary, secrets: { nested: canary }, group: { id: 1, name: 'G', secret: canary } });
     assert(!JSON.stringify(sanitized).includes(canary));
     assert.deepEqual(models.scrubFileManagerChanges({ aws_key: '', aws_secret: ' ', aws_key_masked: 'x', name: 'A' }), { name: 'A' });
+    // CDN delivery (django-mojo #8250): the cdn object projects positively; a report's findings are typed.
+    assert.deepEqual(sanitized.cdn, { enabled: false }, 'no cdn field reads as not enabled');
+    const cdnRow = models.sanitizeFileManagerRow({ id: 2, created: 1, name: 'C', use: 'x', backend_type: 's3', backend_url: 's3://b', is_active: true, is_default: false, is_public: true,
+        cdn: { enabled: true, url: 'https://d1.cloudfront.net', bucket: 'b', distribution_id: 'E1', source: 'provisioned', status: 'deployed', signed: false, signing_key_id: 'K1', private_key_pem: canary, mojo_secrets: canary } });
+    assert.deepEqual(cdnRow.cdn, { enabled: true, url: 'https://d1.cloudfront.net', bucket: 'b', distribution_id: 'E1', source: 'provisioned', status: 'deployed', signed: false, signing_key_id: 'K1' });
+    assert(!JSON.stringify(cdnRow).includes(canary), 'nothing outside the named cdn keys reaches the row');
+    assert.deepEqual(models.projectCdn({ enabled: 'yes' }), { enabled: false }, 'enabled must be boolean true');
+    assert.deepEqual(models.cdnFindings({ items: [{ step: 'kms', status: 'MANUAL', code: 'kms.aws_managed', message: 'm', remedy: 'r' }, 7] }),
+        [{ step: 'kms', status: 'MANUAL', code: 'kms.aws_managed', message: 'm', remedy: 'r' }]);
+    assert.deepEqual(models.cdnFindings({}), []);
     const queryClient = new QueryClient();
     queryClient.setQueryData(models.FileManagerModel.keys.one(1), sanitized);
     assert(!JSON.stringify(queryClient.getQueryCache().getAll().map((query) => query.state.data)).includes(canary));
