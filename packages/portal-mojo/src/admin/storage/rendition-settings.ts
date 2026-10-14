@@ -255,7 +255,9 @@ export function routeRenditionError(message: string, knownRoles: readonly string
  * Create or update the category's global row. Imperative; a failure rejects.
  * With `row === null` the handler proves the row is absent before creating:
  * it re-reads the global rows and refuses (no write) when that read fails or
- * finds a row, so no caller can create a duplicate platform-wide override.
+ * finds a row, so no caller creates one blind. The read and the create are
+ * separate requests: two admins saving at the same moment can still both
+ * create (#8200 Challenge row 2); server-side uniqueness is #8201.
  */
 export async function saveCategoryValue(category: RenditionCategory, row: SettingRow | null, value: Record<string, unknown>): Promise<SettingRow> {
     const changes: Record<string, unknown> = row ? { value } : { key: category.key, is_secret: false, group: null, value };

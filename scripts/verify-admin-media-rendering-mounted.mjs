@@ -32,8 +32,12 @@ const descriptor = { status: true, data: { categories: { image: category }, engi
 const existingRow = { id: 41, key: KEY, group: null, is_secret: false, value: category.override };
 
 // One programmable backend: `settingsRead` answers GET /api/settings ('fail' | 'hang' | rows[]).
+// `readQueue` / `postQueue` answer the next GETs / POSTs first; 'reauth' is a 440 step-up challenge.
 let calls = [];
 let settingsRead = 'fail';
+let readQueue = [];
+let postQueue = [];
+const challenge = () => reply(440, { status: false, error: 'reauth_required', code: 440 });
 const reply = (status, body) => ({ ok: status < 400, status, headers: new dom.window.Headers({ 'content-type': 'application/json' }), json: async () => body, text: async () => JSON.stringify(body) });
 globalThis.fetch = async (input, opts = {}) => {
     const url = new URL(String(input));
@@ -41,11 +45,15 @@ globalThis.fetch = async (input, opts = {}) => {
     calls.push({ path: url.pathname, method, body: opts.body ?? null });
     if (url.pathname === '/api/fileman/renditions/options') return reply(200, descriptor);
     if (url.pathname.startsWith('/api/settings') && method === 'GET') {
+        const answer = readQueue.length ? readQueue.shift() : settingsRead;
+        if (answer === 'reauth') return challenge();
+        if (answer !== settingsRead) return reply(200, { status: true, data: answer, count: answer.length, start: 0, size: 10 });
         if (settingsRead === 'hang') return new Promise(() => {});
         if (settingsRead === 'fail') return reply(503, { status: false, error: 'settings read unavailable', code: 503 });
         return reply(200, { status: true, data: settingsRead, count: settingsRead.length, start: 0, size: 10 });
     }
     if (url.pathname.startsWith('/api/settings') && method === 'POST') {
+        if (postQueue.length && postQueue.shift() === 'reauth') return challenge();
         const body = JSON.parse(opts.body ?? '{}');
         return reply(200, { status: true, data: { id: url.pathname.split('/')[3] ? Number(url.pathname.split('/')[3]) : 99, key: KEY, group: null, is_secret: false, value: body.value } });
     }
@@ -61,7 +69,7 @@ const typeInto = async (input, value) => act(async () => {
 
 const results = [];
 const check = async (name, body) => {
-    calls = [];
+    calls = []; readQueue = []; postQueue = [];
     try { await body(); results.push({ name, ok: true }); console.log(`PASS ${name}`); } catch (error) { results.push({ name, ok: false }); console.log(`FAIL ${name}\n     ${error.message.split('\n')[0]}`); }
 };
 
@@ -155,6 +163,47 @@ try {
         assert.equal(await settings.resetCategory(category, null), null);
         assert.equal(calls.length, 0);
     });
+
+    // Step-up (440) on the null-row path must reach withFreshAuth, not become "could not be read" (Brenda, review 104363).
+    const reauthPrompts = [];
+    const answerPrompts = (ok) => auth.setFreshAuthHandler(async () => { reauthPrompts.push(ok); return ok; });
+    const callTrail = () => calls.filter((call) => call.path.startsWith('/api/settings')).map((call) => call.method);
+
+    await check('(f) a 440 on the re-read prompts re-login, re-reads, then creates once when no row exists', async () => {
+        reauthPrompts.length = 0; answerPrompts(true);
+        readQueue = ['reauth', []];
+        const saved = await settings.saveCategoryValue(category, null, { thumbnail: { width: 200 } });
+        assert.equal(saved.id, 99);
+        assert.deepEqual(reauthPrompts, [true], 'exactly one re-login prompt');
+        assert.deepEqual(callTrail(), ['GET', 'GET', 'POST']);
+    });
+
+    await check('(g) a 440 on the re-read, then a re-read that finds a row, refuses and creates nothing', async () => {
+        reauthPrompts.length = 0; answerPrompts(true);
+        readQueue = ['reauth', [existingRow]];
+        await assert.rejects(settings.saveCategoryValue(category, null, { thumbnail: { width: 200 } }), /already exists \(id 41\)/);
+        assert.deepEqual(reauthPrompts, [true]);
+        assert.equal(posts().length, 0);
+    });
+
+    await check('(h) a 440 on the re-read with the re-login cancelled rejects with the challenge and sends no POST', async () => {
+        reauthPrompts.length = 0; answerPrompts(false);
+        readQueue = ['reauth'];
+        const error = await settings.saveCategoryValue(category, null, { thumbnail: { width: 200 } }).then(() => null, (caught) => caught);
+        assert(error, 'the save rejects');
+        assert.equal(auth.isReauthRequired(error), true, `the caller sees the step-up challenge, not "could not be read": ${error?.message}`);
+        assert.deepEqual(reauthPrompts, [false]);
+        assert.deepEqual(callTrail(), ['GET']);
+    });
+
+    await check('(i) a 440 on the create repeats the lookup before the retried create', async () => {
+        reauthPrompts.length = 0; answerPrompts(true);
+        readQueue = [[], []]; postQueue = ['reauth'];
+        const saved = await settings.saveCategoryValue(category, null, { thumbnail: { width: 200 } });
+        assert.equal(saved.id, 99);
+        assert.deepEqual(callTrail(), ['GET', 'POST', 'GET', 'POST'], 'the retry proves absence again before creating');
+    });
+    auth.setFreshAuthHandler(null);
 } finally {
     await unmountPage();
     await server.close();
