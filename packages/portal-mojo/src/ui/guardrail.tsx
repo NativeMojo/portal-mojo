@@ -41,6 +41,8 @@ export interface Guardrail {
     typeToConfirm?: string;
     /** false = primary button + warn tint for a stop that is not destructive. Default true. */
     danger?: boolean;
+    /** End this confirmation when its initiating record or authority is disposed. */
+    signal?: AbortSignal;
 }
 
 function GuardrailBody({ g, close }: { g: Guardrail; close: (v: boolean) => void }) {
@@ -102,7 +104,7 @@ function GuardrailBody({ g, close }: { g: Guardrail; close: (v: boolean) => void
 
 /** Open the guardrail and resolve true only when the operator confirms. */
 export function confirmGuardrail(g: Guardrail): Promise<boolean> {
-    return modal.open<boolean>((close) => <GuardrailBody g={g} close={close} />, { size: 'sm' })
+    return modal.open<boolean>((close) => <GuardrailBody g={g} close={close} />, { size: 'sm', signal: g.signal })
         .then((v) => v === true);
 }
 

@@ -135,3 +135,31 @@ Member product tabs only render `permissions.<grant>` fields whose grant is
 registered through `registerMemberPermissions()` and editable. System/derived
 grants, unregistered names and unrelated fields (such as `group` or `user`)
 are ignored; tabs with no valid fields do not appear.
+
+## Operation lifetime
+
+Member admission captures the initiating authentication session and active group.
+The selected group remains fixed throughout its form and the optional role-label
+write. An account/group change, even switching away and back, permanently ends
+the operation's client continuations. Ordinary JWT renewal keeps the session.
+The no-oracle success message is still shown for an accepted invitation with no
+member row, and a refused display-label write does not undo its accepted grants.
+
+`openMemberAdmissionDialog({ signal })` accepts the initiating panel's lifetime.
+`GroupMembersPanel`, global `MembersPage` and the Group detail admission action
+supply it automatically. Custom hosts should abort their controller when they
+unmount or change the record/authority used to open the dialog. Forms remain open
+through the request and disable repeated submission and Escape/backdrop dismissal
+while pending. Owner disposal always closes them. A request already received by
+the server is not cancelled or rolled back by closing its view.
+
+`MemberDetail` also accepts `ownerSignal` for a fixed-group host. Its activation,
+role, resend and permission changes bind the final pre-send check, returned row,
+cache invalidation and notices to the initiating detail scope. Disposed outcomes
+cannot populate a later account's cache. Live successful saves still update the
+shared member row immediately and invalidate the member lists. Errors keep the
+saved row and surface the server refusal; autosaved fields revert normally.
+
+The browser fixture sends no real invitations: start
+`node scripts/member-lifecycle-server.mjs`, then run
+`uv run --with playwright python scripts/verify-member-lifecycle.py`.

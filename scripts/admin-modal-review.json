@@ -2,7 +2,7 @@
   "bodies": [
     {
       "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:chooseAdmissionMode:modal.open:0",
-      "fingerprint": "27731687c685fab5cd6d",
+      "fingerprint": "189b0ef1042fe596e850",
       "category": "editor",
       "purpose": "Choose the member admission path"
     },
@@ -431,6 +431,18 @@
       "fingerprint": "0f99adcbe2ae2688289d",
       "category": "record",
       "purpose": "AccountModal: the signed-in user's own account (rail of flat sections)"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx:memberForm:modal.open:0",
+      "fingerprint": "2338f11eb7a224604c36",
+      "category": "editor",
+      "purpose": "Scope-bound SchemaForm for member admission and role editing; waits for mutation, locks dismissal while pending, and discards late outcomes after owner disposal"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/storage/FileManagerDetail.tsx:cdnAction:modal.open:0",
+      "fingerprint": "2b8f3d83a6799d51a51a",
+      "category": "action",
+      "purpose": "CDN provider-operation report: status and findings with Close; an action result, matching the existing CORS report."
     }
   ],
   "lifecycle": [

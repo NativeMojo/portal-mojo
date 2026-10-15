@@ -1,9 +1,12 @@
-import { useSyncExternalStore, type ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCan, type PermSpec } from '../../../client/runtime';
+import { mojoCall, withFreshAuth, type SaveVars } from '../../../client/runtime';
+import { saveMemberInScope, useMemberScope } from './member-scope';
+import { memberForm } from './member-dialog';
 import {
     Badge, DetailView, Eyebrow, FlatRow, FormView, JsonBlock, MetricCard,
-    ModelTable, confirmGuardrail, fmt, formModal, toast, getFormTabs, formTabsVersion, subscribeFormTabs,
+    ModelTable, confirmGuardrail, fmt, toast, getFormTabs, formTabsVersion, subscribeFormTabs,
     type Column, type DetailMenuEntry,
 } from '../../../ui';
 import { LOGS_ADMIN_PERMISSIONS, LogModel, type LogRow } from '../../monitoring';
@@ -35,6 +38,8 @@ export interface MemberDetailProps extends MemberNavigationCallbacks {
     readPermissions?: PermSpec;
     /** Same for writes: a fixed-group composition passes the group-local save gate. */
     savePermissions?: PermSpec;
+    /** Fixed-group owner lifetime; closing/changing its panel disposes this detail. */
+    ownerSignal?: AbortSignal;
 }
 
 function AuditTable({ memberId }: { memberId: number }) {
@@ -76,7 +81,7 @@ const ESCALATING_GRANTS: Record<string, { label: string; why: ReactNode }> = {
 };
 
 /** beforeSave gate: stops only when an escalating grant flips ON. */
-function confirmGrantEscalation(member: MemberRow, changes: Record<string, unknown>): Promise<boolean> | true {
+function confirmGrantEscalation(member: MemberRow, changes: Record<string, unknown>, signal?: AbortSignal): Promise<boolean> | true {
     const perms = changes.permissions;
     if (!perms || typeof perms !== 'object') return true;
     const granting = Object.keys(ESCALATING_GRANTS).filter((key) => (perms as Record<string, unknown>)[key] === true);
@@ -85,6 +90,7 @@ function confirmGrantEscalation(member: MemberRow, changes: Record<string, unkno
     const group = member.group?.name || 'this group';
     const labels = granting.map((key) => ESCALATING_GRANTS[key]!.label).join(' + ');
     return confirmGuardrail({
+        signal,
         title: `Grant ${labels} to ${who}?`,
         effect: <><b>{who}</b> holds <b>{granting.join(' and ')}</b> in <b>{group}</b> the moment this saves — there is no save button and no second step.</>,
         why: granting.map((key) => ESCALATING_GRANTS[key]!.why),
@@ -120,14 +126,46 @@ function GrantSummary({ member }: { member: MemberRow }) {
 export function MemberDetail({
     id, onClose, onNavigateUser, onNavigateGroup,
     readPermissions = MEMBER_READ_PERMISSIONS,
-    savePermissions = MEMBER_SAVE_PERMISSIONS,
+    savePermissions = MEMBER_SAVE_PERMISSIONS, ownerSignal,
 }: MemberDetailProps) {
     const qc = useQueryClient();
     const { can: canRead, isLoading: readLoading } = useCan(readPermissions);
     const query = MemberModel.useOne(canRead ? id : null);
-    const save = MemberModel.useSave();
-    const resend = MemberModel.useAction('resend_invite');
     const { can: canSave } = useCan(savePermissions);
+    const owner = `${id}:${canRead}:${canSave}`;
+    const scope = useMemberScope(owner, onClose);
+    useEffect(() => {
+        if (ownerSignal?.aborted) onClose();
+        ownerSignal?.addEventListener('abort', onClose, { once: true });
+        return () => ownerSignal?.removeEventListener('abort', onClose);
+    }, [ownerSignal, onClose]);
+    const isCurrent = () => scope.current?.owner === owner && scope.current.current() && !ownerSignal?.aborted;
+    // Local mutation boundary: generic model hooks publish unconditionally. A late
+    // member response must never write through into the next account's cache.
+    const guardedModel = useMemo(() => ({
+        useSave() {
+            return useMutation({
+                gcTime: 0,
+                mutationFn: async ({ id: target, changes }: SaveVars) => {
+                    const started = scope.current;
+                    const check = () => {
+                        started?.assert();
+                        if (!started || scope.current !== started || ownerSignal?.aborted)
+                            throw new DOMException('Membership context ended', 'AbortError');
+                    };
+                    const row = await withFreshAuth(() => {
+                        check();
+                        return saveMemberInScope(target, changes, check);
+                    });
+                    check();
+                    qc.setQueryData(MemberModel.keys.one(row.id), row);
+                    void MemberModel.invalidate(qc);
+                    return row;
+                },
+            });
+        },
+    }), [qc, scope, ownerSignal]);
+    const save = guardedModel.useSave();
     useSyncExternalStore(subscribeMemberPermissions, memberPermissionsVersion, memberPermissionsVersion);
     useSyncExternalStore(subscribeFormTabs, formTabsVersion, formTabsVersion);
 
@@ -163,39 +201,50 @@ export function MemberDetail({
     const deploymentOnly = raw.filter((name) => !catalogNames.has(name) && !ignoredMemberGrants(member.permissions).includes(name));
 
     const editRole = async () => {
-        const values = await formModal({
-            title: 'Edit role label',
-            submitText: 'Update label',
-            fields: [{
-                name: 'role', type: 'text', label: 'Role label',
-                help: 'Presentation only. This label does not grant authorization.',
-            }],
+        const started = scope.current;
+        if (!canSave || !isCurrent() || !started) return;
+        await memberForm(started, {
+            title: 'Edit role label', submitText: 'Update label',
+            fields: [{ name: 'role', type: 'text', label: 'Role label',
+                help: 'Presentation only. This label does not grant authorization.' }],
             initial: { role },
+        }, async (values, current) => {
+            if (!current() || scope.current !== started) return null;
+            const result = await save.mutateAsync({ id: member.id, changes: { metadata: { role: String(values.role ?? '').trim() } } });
+            if (current()) toast.success('Role label updated');
+            return result;
         });
-        if (!values) return;
-        try {
-            await save.mutateAsync({ id: member.id, changes: { metadata: { role: String(values.role ?? '').trim() } } });
-            toast.success('Role label updated');
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Role update failed');
-        }
     };
 
     const setActive = async (next: boolean) => {
+        const started = scope.current;
+        if (!canSave || !isCurrent()) return;
         try {
             await save.mutateAsync({ id: member.id, changes: { is_active: next } });
-            toast.success(next ? 'Membership activated' : 'Membership deactivated');
+            if (started?.current() && scope.current === started)
+                toast.success(next ? 'Membership activated' : 'Membership deactivated');
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Membership update failed');
+            if (started?.current() && scope.current === started)
+                toast.error(error instanceof Error ? error.message : 'Membership update failed');
         }
     };
 
     const resendInvite = async () => {
+        const started = scope.current;
+        if (!canSave || !isCurrent() || !started) return;
         try {
-            await resend.mutateAsync({ id: member.id });
+            await withFreshAuth(() => mojoCall(`${MemberModel.endpoint}/${member.id}`, {
+                method: 'POST', body: { resend_invite: {} }, unscoped: true, beforeSend: () => {
+                    started.assert();
+                    if (ownerSignal?.aborted) throw new DOMException('Membership context ended', 'AbortError');
+                },
+            }));
+            if (!started.current() || scope.current !== started) return;
             toast.success('Invitation resent');
+            void MemberModel.invalidate(qc);
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Invitation resend failed');
+            if (started.current() && scope.current === started)
+                toast.error(error instanceof Error ? error.message : 'Invitation resend failed');
         }
     };
 
@@ -225,7 +274,7 @@ export function MemberDetail({
                 { icon: 'bi-person-badge', text: role, tone: 'primary' as const },
                 { text: `${effectiveMemberGrants(member.permissions).length} effective grants`, tone: 'muted' as const },
             ]}
-            active={canSave ? { value: member.is_active, onChange: (next) => { void setActive(next); } } : undefined}
+            active={canSave ? { value: member.is_active, disabled: save.isPending, onChange: (next) => { void setActive(next); } } : undefined}
             contextMenu={menu}
             menuContext={member}
             onClose={onClose}
@@ -259,11 +308,10 @@ export function MemberDetail({
                             {canSave
                                 ? (
                                     <FormView
-                                        model={MemberModel}
+                                        model={guardedModel} isCurrent={isCurrent}
                                         row={member}
                                         fields={groupFields}
-                                        beforeSave={({ changes }) => confirmGrantEscalation(member, changes)}
-                                        onSaved={() => { void MemberModel.invalidate(qc); }}
+                                        beforeSave={({ changes }) => confirmGrantEscalation(member, changes, scope.current?.signal)}
                                     />
                                 )
                                 : <GrantSummary member={member} />}
@@ -279,9 +327,9 @@ export function MemberDetail({
                             <Eyebrow>Product permissions</Eyebrow>
                             <p className="dim">These grants apply only to this membership’s group. Changes save automatically.</p>
                             {canSave ? (
-                                <FormView model={MemberModel} row={member} tabs={productTabs}
-                                    beforeSave={({ changes }) => confirmGrantEscalation(member, changes)}
-                                    onSaved={() => { void MemberModel.invalidate(qc); }} />
+                                <FormView model={guardedModel} isCurrent={isCurrent} row={member} tabs={productTabs}
+                                    beforeSave={({ changes }) => confirmGrantEscalation(member, changes, scope.current?.signal)}
+                                />
                             ) : <GrantSummary member={member} />}
                         </>
                     ),
