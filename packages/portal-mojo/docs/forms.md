@@ -106,6 +106,7 @@ if (!data) return;   // cancelled → null
     onSaved={({ changes, fields, row }) => …}
     onSaveError={({ changes, fields, error }) => …}
     beforeSave={({ changes, names, row }) => …}   // once per batch, BEFORE the POST (below)
+    isCurrent={() => ownerScope.current()}      // optional owner lifetime fence
     onPendingChange={(uploading) => setDetailDismissLocked(uploading)}
 />
 ```
@@ -175,6 +176,21 @@ contract is pinned by `npm run verify:form-autosave`.
    another form's save) becomes the new snapshot; untouched fields follow it.
    Server normalization is visible: save `555 010 0142`, the field comes back
    `+15550100142`.
+
+### Owner lifetime
+
+`isCurrent?: () => boolean` is an optional, synchronous lifetime predicate for
+forms whose account, group or owning dialog can end while a save is pending.
+Returning `false` prevents the batch before and after its asynchronous
+`beforeSave` gate, and suppresses late success/error callbacks and autosave
+feedback. Capture a one-way scope: leaving and returning must not revive the
+old operation. Omitting it preserves the existing autosave behavior.
+
+This guard covers the form's continuations, not a model's own mutation effects.
+An owner-scoped model must also check its scope at the transport's final
+`beforeSend` boundary and before writing response data to a shared cache.
+MemberDetail provides that guarded mutation boundary. Already-sent server writes
+are not rolled back when the view closes.
 
 ### `file` / `image` relations
 

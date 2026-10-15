@@ -13,6 +13,23 @@ export const USER_DIRECTORY_PERMS = USER_VIEW_PERMISSIONS;
 
 export interface RelationRow { id: number; name?: string | null; display_name?: string | null; email?: string | null }
 
+/** The manager graph's read-only `cdn` object (django-mojo #8250). */
+export interface FileManagerCdn {
+    enabled: boolean;
+    url?: string;
+    bucket?: string;
+    distribution_id?: string;
+    source?: string;
+    status?: string;
+    signed?: boolean;
+    signing_key_id?: string | null;
+}
+
+export type FileManagerAction = 'test_connection' | 'check_cors' | 'fix_cors' | 'clone' | 'enable_cdn' | 'check_cdn' | 'disable_cdn';
+
+/** One finding of a CDN enable/check/disable report, aws-check shaped. */
+export interface CdnFinding { step: string; status: string; code: string; message: string; remedy: string | null }
+
 export interface FileManagerRow {
     id: number;
     created: number;
@@ -29,6 +46,7 @@ export interface FileManagerRow {
     allowed_origins?: string[];
     assume_role_arn?: string | null;
     has_external_id?: boolean;
+    cdn?: FileManagerCdn;
     group?: RelationRow | number | null;
     user?: RelationRow | number | null;
 }
@@ -181,9 +199,39 @@ export function sanitizeFileManagerRow(input: FileManagerRow): FileManagerRow {
         allowed_origins: Array.isArray(raw.allowed_origins) ? raw.allowed_origins.map(String) : [],
         assume_role_arn: raw.assume_role_arn == null ? null : String(raw.assume_role_arn),
         has_external_id: Boolean(raw.has_external_id),
+        cdn: projectCdn(raw.cdn),
         group: relation(raw.group),
         user: relation(raw.user),
     };
+}
+
+/** Positive projection of the `cdn` object: named keys only, never key material. */
+export function projectCdn(value: unknown): FileManagerCdn {
+    if (value == null || typeof value !== 'object' || Array.isArray(value)) return { enabled: false };
+    const raw = value as Record<string, unknown>;
+    if (raw.enabled !== true) return { enabled: false };
+    const text = (key: string) => (typeof raw[key] === 'string' ? raw[key] as string : undefined);
+    return {
+        enabled: true,
+        url: text('url'), bucket: text('bucket'), distribution_id: text('distribution_id'),
+        source: text('source'), status: text('status'), signed: raw.signed === true,
+        signing_key_id: typeof raw.signing_key_id === 'string' ? raw.signing_key_id : null,
+    };
+}
+
+/** The findings list out of an enable/check/disable action result. */
+export function cdnFindings(result: unknown): CdnFinding[] {
+    if (result == null || typeof result !== 'object') return [];
+    const items = (result as Record<string, unknown>).items;
+    if (!Array.isArray(items)) return [];
+    return items.flatMap((item) => {
+        if (item == null || typeof item !== 'object') return [];
+        const raw = item as Record<string, unknown>;
+        return [{
+            step: String(raw.step ?? ''), status: String(raw.status ?? ''), code: String(raw.code ?? ''),
+            message: String(raw.message ?? ''), remedy: typeof raw.remedy === 'string' ? raw.remedy : null,
+        }];
+    });
 }
 
 export function sanitizeFileManagerUploadPolicyRow(input: FileManagerUploadPolicyRow): FileManagerUploadPolicyRow {
@@ -367,7 +415,7 @@ export function storageRefreshFailure(error: unknown): unknown {
 // hand-normalize the wrapped `{data:{status:false, error}}` shape themselves
 // and answer a caller-shaped `{status, id, result}` evidence dict — migrating
 // would change both the thrown type and the resolved shape for no gain.
-export async function runFileManagerAction(id: number, action: 'test_connection' | 'check_cors' | 'fix_cors' | 'clone', value: unknown = true): Promise<Record<string, unknown>> {
+export async function runFileManagerAction(id: number, action: FileManagerAction, value: unknown = true): Promise<Record<string, unknown>> {
     const body = await mojoCall(`${FileManagerModel.endpoint}/${id}`, { method: 'POST', body: { [action]: value } });
     const data = body.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error(`${action} returned no result`);

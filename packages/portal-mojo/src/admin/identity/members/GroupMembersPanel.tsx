@@ -4,6 +4,7 @@ import { useCan, type Params } from '../../../client/runtime';
 import { Badge, Eyebrow, SecurityItem, fmt, modal } from '../../../ui';
 import { MemberDetail, type MemberNavigationCallbacks } from './MemberDetail';
 import { openMemberAdmissionDialog, type AdmissionGroup, type AdmissionMode, type AdmissionRole } from './member-flows';
+import { useMemberScope } from './member-scope';
 import type { PermSpec } from '../../../client/runtime';
 import {
     MEMBER_GROUP_READ_PERMISSIONS,
@@ -83,6 +84,7 @@ export function GroupMembersPanel({
     const { can: canInvite } = useCan(invitePermissions);
     const { can: canCreate } = useCan(savePermissions);
     const { can: canReadUsers } = useCan(directoryPermissions);
+    const scope = useMemberScope(`${group.id}:${canInvite}:${canCreate}:${canReadUsers}`);
     const members = query.data?.rows ?? [];
     const count = query.data?.count ?? 0;
 
@@ -94,6 +96,7 @@ export function GroupMembersPanel({
         canCreate,
         canReadUsers,
         queryClient: qc,
+        signal: scope.current?.signal,
     });
     const openMember = (member: MemberRow) => {
         void MemberModel.fetchOne(qc, member.id).catch(() => {});
@@ -103,6 +106,7 @@ export function GroupMembersPanel({
                 onClose={() => close(null)}
                 readPermissions={MEMBER_GROUP_READ_PERMISSIONS}
                 savePermissions={savePermissions}
+                ownerSignal={scope.current?.signal}
                 onNavigateUser={onNavigateUser}
                 onNavigateGroup={onNavigateGroup}
             />

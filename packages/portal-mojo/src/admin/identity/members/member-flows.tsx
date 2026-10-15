@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { mojoCall, mojoSave, type Group } from '../../../client/runtime';
-import { formModal, modal, toast } from '../../../ui';
+import { mojoCall, type Group } from '../../../client/runtime';
+import { modal, toast } from '../../../ui';
+import { memberForm } from './member-dialog';
+import { captureMemberScope, saveMemberInScope, type MemberScope } from './member-scope';
 import { MemberModel, type MemberRow } from './models';
 
 export interface AdmissionGroup extends Pick<Group, 'id' | 'name' | 'kind'> {}
@@ -14,9 +16,10 @@ export interface AdmissionRole {
 }
 
 /** Email-only, with no user-directory lookup or existence-dependent branch. */
-export async function inviteMemberByEmail(groupId: number, email: string, permissions?: string[]): Promise<MemberRow | null> {
+export async function inviteMemberByEmail(groupId: number, email: string, permissions?: string[], beforeSend?: () => void): Promise<MemberRow | null> {
     const response = await mojoCall('/api/group/member/invite', {
         method: 'POST',
+        beforeSend,
         body: {
             group: groupId, email: email.trim(),
             ...(permissions?.length ? { permissions: Object.fromEntries(permissions.map((name) => [name, true])) } : {}),
@@ -27,7 +30,7 @@ export async function inviteMemberByEmail(groupId: number, email: string, permis
 
 export type AdmissionMode = 'invite' | 'add';
 
-function chooseAdmissionMode(group: AdmissionGroup, showInvite: boolean, showAdd: boolean): Promise<AdmissionMode | null> {
+function chooseAdmissionMode(group: AdmissionGroup, showInvite: boolean, showAdd: boolean, signal: AbortSignal): Promise<AdmissionMode | null> {
     return modal.open<AdmissionMode>((close) => (
         <div className="modal-pad">
             <h2 className="modal-title">Add a member to {group.name}</h2>
@@ -50,11 +53,11 @@ function chooseAdmissionMode(group: AdmissionGroup, showInvite: boolean, showAdd
                 <button type="button" className="btn" onClick={() => close(null as unknown as AdmissionMode)}>Cancel</button>
             </div>
         </div>
-    ), { size: 'md' });
+    ), { size: 'md', signal });
 }
 
-async function pickGroup(): Promise<AdmissionGroup | null> {
-    const data = await formModal({
+async function pickGroup(scope: MemberScope): Promise<AdmissionGroup | null> {
+    const data = await memberForm(scope, {
         title: 'Choose a group',
         submitText: 'Continue',
         fields: [{
@@ -83,30 +86,26 @@ export interface OpenMemberAdmissionOptions {
     onCreated?: (member: MemberRow) => void | Promise<void>;
     /** Fixed roles shown as a select on the invite form; the first is the default. */
     roles?: AdmissionRole[];
+    /** Abort when the initiating panel unmounts or its group/authority changes. */
+    signal?: AbortSignal;
 }
 
 /** Shared explicit Invite/Add chooser used by global Members and GroupDetail. */
 export async function openMemberAdmissionDialog(options: OpenMemberAdmissionOptions): Promise<MemberRow | null> {
-    const group = options.group ?? await pickGroup();
-    if (!group) return null;
-    const canAddExisting = options.canCreate && options.canReadUsers;
-    if (!options.canInvite && !canAddExisting) return null;
-
-    const allowedInitial = options.initialMode === 'invite'
-        ? options.canInvite
-        : options.initialMode === 'add'
-            ? canAddExisting
-            : false;
-    const mode = allowedInitial
-        ? options.initialMode!
-        : await chooseAdmissionMode(group, options.canInvite, canAddExisting);
-    if (!mode) return null;
-
+    const scope = captureMemberScope(options.signal);
     try {
-        let member: MemberRow | null;
-        if (mode === 'invite') {
-            const roles = options.roles ?? [];
-            const data = await formModal({
+        const group = options.group ?? await pickGroup(scope);
+        if (!scope.current() || !group) return null;
+        const canAddExisting = options.canCreate && options.canReadUsers;
+        if (!options.canInvite && !canAddExisting) return null;
+        const allowedInitial = options.initialMode === 'invite' ? options.canInvite
+            : options.initialMode === 'add' ? canAddExisting : false;
+        const mode = allowedInitial ? options.initialMode!
+            : await chooseAdmissionMode(group, options.canInvite, canAddExisting, scope.signal);
+        if (!scope.current() || !mode) return null;
+        const roles = options.roles ?? [];
+        const result = mode === 'invite'
+            ? await memberForm<{ member: MemberRow | null } | null>(scope, {
                 title: `Invite a member to ${group.name}`,
                 submitText: 'Send invitation',
                 fields: [{
@@ -118,21 +117,28 @@ export async function openMemberAdmissionDialog(options: OpenMemberAdmissionOpti
                     help: roles.map((role) => role.help ? `${role.label}: ${role.help}` : null).filter(Boolean).join(' '),
                 }] : [])],
                 ...(roles.length ? { initial: { role: roles[0].value } } : {}),
-            });
-            if (!data?.email) return null;
-            const role = roles.find((candidate) => candidate.value === data.role) ?? roles[0];
-            member = await inviteMemberByEmail(group.id, String(data.email), role?.permissions);
-            // The role label is display-only; the grants above are the authority. A failed
-            // label write leaves a correctly permissioned member, so it is not fatal.
-            if (member && role) {
-                try { member = await mojoSave<MemberRow>(MemberModel.endpoint, member.id, { metadata: { role: role.label } }); }
-                catch { /* label stays "Member"; grants already applied */ }
-            }
-            toast.success('Invitation request accepted');
-        } else {
-            const data = await formModal({
-                title: `Add an existing user to ${group.name}`,
-                submitText: 'Add to group',
+            }, async (data, current) => {
+                const role = roles.find((candidate) => candidate.value === data.role) ?? roles[0];
+                let result = await inviteMemberByEmail(group.id, String(data.email), role?.permissions, () => {
+                    scope.assert();
+                    if (!current()) throw new DOMException('Member dialog closed', 'AbortError');
+                });
+                if (!current()) return null;
+                // The grants are authoritative. A refused display-label write is non-fatal.
+                if (result && role) {
+                    try {
+                        result = await saveMemberInScope(result.id, { metadata: { role: role.label } }, () => {
+                            scope.assert();
+                            if (!current()) throw new DOMException('Member dialog closed', 'AbortError');
+                        });
+                    } catch { /* invitation already accepted; keep its authoritative row */ }
+                }
+                if (!current()) return null;
+                toast.success('Invitation request accepted');
+                return { member: result };
+            })
+            : await memberForm<{ member: MemberRow }>(scope, {
+                title: `Add an existing user to ${group.name}`, submitText: 'Add to group',
                 fields: [{
                     name: 'user', type: 'collection', label: 'User', required: true,
                     endpoint: '/api/user', labelField: 'email', valueField: 'id',
@@ -140,19 +146,23 @@ export async function openMemberAdmissionDialog(options: OpenMemberAdmissionOpti
                     placeholder: 'Search users by email…',
                     help: 'This directory-backed option is available only to authorized user-directory viewers.',
                 }],
+            }, async (data, current) => {
+                const result = await saveMemberInScope(null,
+                    { group: group.id, user: Number(data.user) }, () => {
+                        scope.assert();
+                        if (!current()) throw new DOMException('Member dialog closed', 'AbortError');
+                    });
+                if (current()) toast.success('Existing user added to the group');
+                return { member: result };
             });
-            if (data?.user == null || data.user === '') return null;
-            member = await mojoSave<MemberRow>(MemberModel.endpoint, null, {
-                group: group.id,
-                user: Number(data.user),
-            });
-            toast.success('Existing user added to the group');
-        }
+        if (!scope.current() || !result) return null;
+        const member = result.member;
         if (member) await options.onCreated?.(member);
+        if (!scope.current()) return null;
         if (options.queryClient) await MemberModel.invalidate(options.queryClient);
-        return member;
+        return scope.current() ? member : null;
     } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Member admission failed');
+        if (scope.current()) toast.error(error instanceof Error ? error.message : 'Member admission failed');
         return null;
-    }
+    } finally { scope.dispose(); }
 }

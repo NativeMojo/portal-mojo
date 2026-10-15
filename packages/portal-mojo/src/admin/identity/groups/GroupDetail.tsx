@@ -37,6 +37,7 @@ import {
     MemberModel, openMemberAdmissionDialog,
 } from '../members';
 import { LogModel } from '../../monitoring';
+import { useMemberScope } from '../members/member-scope';
 import {
     GROUP_DESTRUCTIVE_PERMS, GROUP_MANAGE_PERMS,
     GroupModel, type GroupRow,
@@ -93,6 +94,8 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
     const { can: canCreateMember } = useCan(MEMBER_SAVE_PERMISSIONS);
     const { can: canReadUsers } = useCan(MEMBER_USER_DIRECTORY_PERMISSIONS);
 
+    const admissionScope = useMemberScope(`${id}:${canInviteMember}:${canCreateMember}:${canReadUsers}`);
+
     // Rail count badges (source setBadge wiring, as controlled props). The
     // member/apikey peeks share Overview's keys and dedupe; the gated ones
     // hold off until the caller could actually open the section.
@@ -148,6 +151,7 @@ export function GroupDetail({ id, onClose }: { id: number; onClose: () => void }
                     canCreate: canCreateMember,
                     canReadUsers,
                     queryClient: qc,
+                    signal: admissionScope.current?.signal,
                 });
             },
         },

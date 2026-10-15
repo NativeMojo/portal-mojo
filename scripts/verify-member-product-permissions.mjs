@@ -13,12 +13,14 @@ const { createRoot } = await import('react-dom/client');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 const { MemoryRouter } = await import('react-router-dom');
 const { act } = React;
+const fixture = globalThis.__memberProductFixture = { writes: [], row: null };
 const server = await createServer({
     root: fileURLToPath(new URL('..', import.meta.url)), appType: 'custom', logLevel: 'silent',
     server: { middlewareMode: true },
     plugins: [{ name: 'member-operator-fixture', enforce: 'pre', transform(source, id) {
         if (!id.endsWith('/members/MemberDetail.tsx')) return;
-        return source.replace("import { useCan, type PermSpec } from '../../../client/runtime';", "import { type PermSpec } from '../../../client/runtime'; const useCan = () => ({ can: true, isLoading: false });");
+        return source.replace("import { useCan, type PermSpec } from '../../../client/runtime';", "import { type PermSpec } from '../../../client/runtime'; const useCan = () => ({ can: true, isLoading: false });")
+            .replace("import { saveMemberInScope, useMemberScope } from './member-scope';", `import { useMemberScope } from './member-scope'; const saveMemberInScope = async (id, changes, check) => { check(); const f = globalThis.__memberProductFixture; f.writes.push({id, changes}); f.row.permissions = {...f.row.permissions, ...changes.permissions}; return {...f.row}; };`);
     } }],
 });
 let root;
@@ -28,14 +30,9 @@ try {
     const models = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/members/models.ts');
     const { MemberDetail } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx');
     const row = { id: 27, group: { id: 4, name: 'Test tenant' }, user: { id: 8, display_name: 'Test member' }, is_active: true, permissions: { untouched: true }, metadata: {}, created: 1, modified: 1 };
-    const writes = [];
+    fixture.row = row;
+    const writes = fixture.writes;
     models.MemberModel.useOne = () => ({ data: row, isPending: false });
-    models.MemberModel.useSave = () => ({ mutateAsync: async (vars) => {
-        writes.push(vars);
-        row.permissions = { ...row.permissions, ...vars.changes.permissions };
-        return { ...row };
-    } });
-    models.MemberModel.useAction = () => ({ mutateAsync: async () => ({}) });
     models.MemberModel.invalidate = async () => {};
     const render = () => React.createElement(QueryClientProvider, { client: qc }, React.createElement(MemoryRouter, null, React.createElement(MemberDetail, { id: row.id, onClose() {} })));
     root = createRoot(document.getElementById('root'));
