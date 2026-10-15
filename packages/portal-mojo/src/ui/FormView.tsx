@@ -111,6 +111,8 @@ export interface FormViewProps<T extends { id: number | string }> {
      * proceeds. Put a `confirmGuardrail` here for grants/identity fields.
      */
     beforeSave?: AutosaveBeforeSave<T>;
+    /** Owner scope fence for delayed writes and feedback after account/group changes. */
+    isCurrent?: () => boolean;
     /** True while any FileField transfer is active. Owners can block dismissal. */
     onPendingChange?: (pending: boolean) => void;
     className?: string;
@@ -186,12 +188,18 @@ function OwnedFormView<T extends { id: number | string }>(props: FormViewProps<T
         save: (changes) => save.mutateAsync({ id: row.id, changes } satisfies SaveVars),
         debounceMs,
         savedFlashMs,
-        beforeSave,
+        beforeSave: props.isCurrent ? async (info) => {
+            if (props.isCurrent?.() === false) return false;
+            const result = await beforeSave?.(info);
+            return props.isCurrent?.() === false ? false : result;
+        } : beforeSave,
         onSaved: (info) => {
+            if (props.isCurrent?.() === false) return;
             publishOwnerResult(info.fields, 'success', info.changes, info.row);
             onSaved?.(info);
         },
         onSaveError: (info) => {
+            if (props.isCurrent?.() === false) return;
             publishOwnerResult(info.fields, 'failed', info.changes);
             // Unmissable failure (workspec): pinned field error + toast.
             toast.error(info.error.message);

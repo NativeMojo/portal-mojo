@@ -31,7 +31,9 @@ fails; successful DetailView bodies supply the normal header close.
 Already-aborted signals resolve null without adding an entry. Later abort removes
 only that entry immediately and resolves null, even before `ModalHost` mounts;
 normal close removes the listener. Owner disposal bypasses `canDismiss` because
-it ends the data scope. An owner must also abort its controller on unmount.
+it ends the data scope. An owner must also abort its controller on unmount. `confirmGuardrail({ signal })`
+passes the same lifetime to its underlying modal, so an awaiting confirmation
+closes with its record or authority.
 
 ## Executable inventory
 

@@ -6,6 +6,7 @@ import {
 } from '../../../ui';
 import { MemberDetail, type MemberNavigationCallbacks } from './MemberDetail';
 import { openMemberAdmissionDialog } from './member-flows';
+import { useMemberScope } from './member-scope';
 import {
     MEMBER_INVITE_PERMISSIONS,
     MEMBER_SAVE_PERMISSIONS,
@@ -67,6 +68,8 @@ export function MembersPage({ onNavigateUser, onNavigateGroup }: MemberNavigatio
     const { can: canInvite } = useCan(MEMBER_INVITE_PERMISSIONS);
     const { can: canReadUsers } = useCan(MEMBER_USER_DIRECTORY_PERMISSIONS);
 
+    const admissionScope = useMemberScope(`${canSave}:${canInvite}:${canReadUsers}`);
+
     const batchActions: BatchAction<MemberRow>[] = canSave ? [
         {
             key: 'activate', label: 'Activate', icon: 'bi-check-circle',
@@ -101,6 +104,7 @@ export function MembersPage({ onNavigateUser, onNavigateGroup }: MemberNavigatio
         void modal.detail((close) => (
             <MemberDetail
                 id={member.id}
+                ownerSignal={admissionScope.current?.signal}
                 onClose={() => close(null)}
                 onNavigateUser={onNavigateUser}
                 onNavigateGroup={onNavigateGroup}
@@ -113,6 +117,7 @@ export function MembersPage({ onNavigateUser, onNavigateGroup }: MemberNavigatio
         canCreate: canSave,
         canReadUsers,
         queryClient: qc,
+        signal: admissionScope.current?.signal,
     });
 
     return (

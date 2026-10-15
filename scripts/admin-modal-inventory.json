@@ -24,6 +24,24 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx:memberForm:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx",
+      "owner": "memberForm",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "SchemaForm"
+      ],
+      "category": "editor",
+      "parent": "memberForm",
+      "target": null,
+      "fingerprint": "2338f11eb7a224604c36",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:chooseAdmissionMode:modal.open:0",
       "file": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx",
       "owner": "chooseAdmissionMode",
@@ -38,21 +56,21 @@
       "category": "editor",
       "parent": "chooseAdmissionMode",
       "target": null,
-      "fingerprint": "27731687c685fab5cd6d",
+      "fingerprint": "189b0ef1042fe596e850",
       "categories": [
         "editor"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:pickGroup:formModal:0",
+      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:pickGroup:memberForm:0",
       "file": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx",
       "owner": "pickGroup",
-      "launcher": "formModal",
+      "launcher": "memberForm",
       "body": [],
       "category": "editor",
       "parent": "pickGroup",
-      "target": null,
-      "fingerprint": "837fcf8034c1a96263e2",
+      "target": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx:memberForm",
+      "fingerprint": "72caccb86ebcbdbb036e",
       "categories": [
         "editor"
       ]
@@ -66,7 +84,7 @@
       "category": "editor",
       "parent": "openMemberAdmissionDialog",
       "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:pickGroup",
-      "fingerprint": "e46f9a486f0e2d14bfc8",
+      "fingerprint": "9d36acdfc24a43ef5d8a",
       "categories": [
         "editor"
       ]
@@ -80,35 +98,35 @@
       "category": "editor",
       "parent": "openMemberAdmissionDialog",
       "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:chooseAdmissionMode",
-      "fingerprint": "c4cdf140f55c06474dcf",
+      "fingerprint": "44d02d1f0fbc56b50b3c",
       "categories": [
         "editor"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog:formModal:0",
+      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog:memberForm:0",
       "file": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx",
       "owner": "openMemberAdmissionDialog",
-      "launcher": "formModal",
+      "launcher": "memberForm",
       "body": [],
       "category": "editor",
       "parent": "openMemberAdmissionDialog",
-      "target": null,
-      "fingerprint": "09d568e0cf5abd5927d8",
+      "target": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx:memberForm",
+      "fingerprint": "74e23fdba6c4288ac4a8",
       "categories": [
         "editor"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog:formModal:1",
+      "id": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog:memberForm:1",
       "file": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx",
       "owner": "openMemberAdmissionDialog",
-      "launcher": "formModal",
+      "launcher": "memberForm",
       "body": [],
       "category": "editor",
       "parent": "openMemberAdmissionDialog",
-      "target": null,
-      "fingerprint": "4530d1e9dbbf1f501371",
+      "target": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx:memberForm",
+      "fingerprint": "fed61decaa87de434fde",
       "categories": [
         "editor"
       ]
@@ -2833,15 +2851,15 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx:editRole:formModal:0",
+      "id": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx:editRole:memberForm:0",
       "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",
       "owner": "editRole",
-      "launcher": "formModal",
+      "launcher": "memberForm",
       "body": [],
       "category": "editor",
       "parent": "editRole",
-      "target": null,
-      "fingerprint": "50fbba7cee749bc712d2",
+      "target": "packages/portal-mojo/src/admin/identity/members/member-dialog.tsx:memberForm",
+      "fingerprint": "90d7599354be89c53ad1",
       "categories": [
         "editor"
       ]
@@ -2881,7 +2899,7 @@
       "category": "record",
       "parent": "MemberDetail",
       "target": null,
-      "fingerprint": "c7d3f3ba5d2045d3b033",
+      "fingerprint": "5f5e36ddf1849fec8940",
       "categories": [
         "record"
       ]
@@ -2909,7 +2927,7 @@
       "category": "editor",
       "parent": "admit",
       "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog",
-      "fingerprint": "3960ac41c01cb662f4c1",
+      "fingerprint": "10d9e07a7fe2a4635a1b",
       "categories": [
         "editor"
       ]
@@ -2925,7 +2943,7 @@
       "category": "record",
       "parent": "openMember",
       "target": null,
-      "fingerprint": "a36993b45da4ff278283",
+      "fingerprint": "4b4cf76a8e2bb0016b7e",
       "categories": [
         "record"
       ]
@@ -2997,7 +3015,7 @@
       "category": "record",
       "parent": "openMember",
       "target": null,
-      "fingerprint": "0d6af6d6d123861ca6c2",
+      "fingerprint": "0b01e9bae335ff47d20d",
       "categories": [
         "record"
       ]
@@ -3011,7 +3029,7 @@
       "category": "editor",
       "parent": "admit",
       "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog",
-      "fingerprint": "7fb61f240504be6aa7a0",
+      "fingerprint": "20aad37a18f12f82140e",
       "categories": [
         "editor"
       ]
@@ -4292,7 +4310,7 @@
       "category": "editor",
       "parent": "GroupDetail",
       "target": "packages/portal-mojo/src/admin/identity/members/member-flows.tsx:openMemberAdmissionDialog",
-      "fingerprint": "10efa841b1d7868e118f",
+      "fingerprint": "86054e11eb1c499a16bb",
       "categories": [
         "editor"
       ]
@@ -9581,14 +9599,14 @@
       "owner": "MemberDetail",
       "key": "'Permissions'",
       "label": "Permissions",
-      "fingerprint": "6a0ce55fda85a9683c18"
+      "fingerprint": "989a2a181dc7ed558895"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",
       "owner": "MemberDetail",
       "key": "'ProductPermissions'",
       "label": "Product permissions",
-      "fingerprint": "289953cca1d6fc9ececa"
+      "fingerprint": "cbd8e28e38b38953cff2"
     },
     {
       "file": "packages/portal-mojo/src/admin/identity/members/MemberDetail.tsx",
