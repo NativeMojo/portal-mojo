@@ -7,7 +7,7 @@ import {
 } from 'portal-mojo/client';
 
 type Surface = 'setup' | 'conversations' | 'skills' | 'memory';
-const SCENARIOS: readonly MockAssistantSetupScenario[] = ['ready', 'missing-policy', 'missing-key', 'handler', 'bedrock', 'static-stop', 'rejected-key', 'discovery-failure', 'grants', 'deployment'];
+const SCENARIOS: readonly MockAssistantSetupScenario[] = ['ready', 'missing-policy', 'missing-key', 'handler', 'bedrock', 'static-stop', 'rejected-key', 'discovery-failure', 'grants', 'deployment', 'manual-pin', 'fixed-policy', 'deployment-pin', 'admin-over-deployment-pin', 'fresh-failure', 'stale-failure', 'unavailable-model', 'throttled', 'in-progress', 'legacy-server', 'malformed-capability'];
 function RealtimeLifecycleDemo() {
     const realtime = useRealtimeStatus();
     const topic = useRealtimeTopic('showcase:lifecycle');
@@ -40,7 +40,7 @@ export function AdminAssistantDemo() {
         {surface === 'setup' ? <>
             <div className="panel panel-pad">
                 <h3>Fake setup fixtures</h3>
-                <p className="dim">This showcase uses synthetic credentials and mock-only installation state. Owner and denied permission-admin sessions are explicit.</p>
+                <p className="dim">This showcase uses synthetic credentials and mock-only installation state. Owner and denied permission-admin sessions are explicit. The fixture-sonnet-2099 identifiers are fake. In ready, Refresh provider catalogue advances to a newer fixture; manual pins survive that refresh.</p>
                 <div className="assistant-action-row">
                     <button className="btn" disabled={switching} onClick={() => void switchPersona(true)}>Use fake installation owner</button>
                     <button className="btn" disabled={switching} onClick={() => void switchPersona(false)}>Use denied permission admin</button>

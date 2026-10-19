@@ -195,11 +195,19 @@ reopen #1263 and require a newly verified artifact and updated pinned digest.
 There is no scaffolder or capabilities-handshake prerequisite for this artifact;
 those are independent future product work. Embedded section architecture remains.
 
-## Assistant Setup producer and framework handoff (#8580)
+## Assistant Setup producer and framework handoff (#8580, #8758)
 
 The Portal producer now includes the owner-only `/assistant/setup` lazy page and
-its schema-2 protected Assistant endpoint client. Deliver the complete canonical
-artifact using the pinned toolchain above, record its source revision, package
+its schema-2 protected Assistant endpoint client. The producer consumes Django
+#8757's additive runtime-model capability: explicit Anthropic `auto:sonnet`
+selection, protected manual pin actions, exact resolved IDs, catalogue freshness
+and explicit refresh verdicts. Fixed policies/Bedrock stay read-only; deployment
+pins permit manual overrides and block Automatic. Older or malformed capability
+responses expose runtime facts with unavailable selection controls. Generic
+saves omit the legacy model only with a valid capability; selection writes carry
+no unrelated switches or keys. The browser performs no provider discovery.
+
+Deliver the complete canonical artifact using the pinned toolchain above, record its source revision, package
 version, committed lockfile SHA-256, final manifest-byte SHA-256 and retrieval
 location, and attach the two-build reproducibility evidence. CI retains
 `portal-mojo-admin-<version>-<full-revision>`; a local canonical `dist/admin`
@@ -212,7 +220,13 @@ the framework or copy only a visible entry chunk. After vendoring, Django must
 perform protected-browser acceptance under its real same-origin asset mount:
 owner navigation/direct Setup access, denied permission-admin sessions, stale
 600-second authentication with explicit key re-entry, CSP/lazy assets and the
-schema-2 backend response. Owners enter any real credential directly in that
-protected browser; agents never obtain keys or change environments. Portal
+schema-2 backend response. The consuming acceptance must also exercise auto →
+manual pin → catalogue refresh preserving the pin → return to auto, the exact
+resolved runtime ID, fresh/stale failure and unavailable states, fixed/provider/
+deployment restrictions, and capability-absent schema-2 compatibility. A
+successful HTTP envelope alone must never count as a successful refresh;
+`model.refresh.ok === true` is required. Guarded admission (`route.can_invoke`)
+is separate from actual configuration readiness (`route.ready`). Owners enter
+any real credential directly in that protected browser; agents never obtain keys or change environments. Portal
 artifact delivery proves producer readiness, not completed framework vendoring
 or production activation. Existing Voice6533 activation stays independent.

@@ -25,6 +25,7 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
     const stateRef = useRef(state); stateRef.current = state;
     const [draft, setDraft] = useState(''); const [handlerDraft, setHandlerDraft] = useState('');
     const [modelDraft, setModelDraft] = useState('');
+    const [modeDraft, setModeDraft] = useState<'auto' | 'pinned' | ''>('');
     const [before, setBefore] = useState(''); const [limit, setLimit] = useState('25');
     const [pending, setPending] = useState(''); const [notice, setNotice] = useState(''); const [error, setError] = useState('');
     const [confirmation, setConfirmation] = useState<{ message: string; accept: () => void; cancel: () => void } | null>(null);
@@ -35,7 +36,7 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
         const me = queryClient.getQueryData<Me>(['me', auth.uid]);
         return live.current && getAuthSessionRevision() === revision && auth.authenticated && auth.uid === String(ownerId) && me?.id === ownerId && me.is_superuser === true;
     };
-    const clearDrafts = () => { setDraft(''); setHandlerDraft(''); setBefore(''); setLimit('25'); setModelDraft(''); };
+    const clearDrafts = () => { setDraft(''); setHandlerDraft(''); setBefore(''); setLimit('25'); setModelDraft(''); setModeDraft(''); };
     const dispose = () => {
         operation.current?.controller.abort(); operation.current = null;
         clearDrafts(); setConfirmation(null); setPending(''); setState(null); stateRef.current = null; setNotice(''); setError('');
@@ -44,7 +45,7 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
         if (!validOwner() || operation.current !== op || op.controller.signal.aborted) throw new DOMException('Setup scope ended', 'AbortError');
     };
     const options = (op: Operation) => ({ signal: op.controller.signal, beforeSend: () => guard(op) });
-    const apply = (next: AssistantSetupState, op: Operation) => { guard(op); stateRef.current = next; setState(next); setModelDraft(next.model.selected); };
+    const apply = (next: AssistantSetupState, op: Operation) => { guard(op); stateRef.current = next; setState(next); setModelDraft(next.model.capability?.mode === 'pinned' ? next.model.selected : ''); setModeDraft(next.model.capability?.mode === 'auto' || next.model.capability?.mode === 'pinned' ? next.model.capability.mode : ''); };
     const begin = (label: string): Operation | null => {
         if (!validOwner() || operation.current) return null;
         const op = { controller: new AbortController(), revision }; operation.current = op; setPending(label); setNotice(''); setError(''); return op;
@@ -65,7 +66,15 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
     }
     async function load(probe?: 'models' | 'discovery') {
         const op = begin(probe ? 'Checking…' : 'Loading setup…'); if (!op) return;
-        try { apply(await getAssistantSetup(options(op), probe), op); if (probe) { guard(op); setNotice(probe === 'models' ? 'Provider catalogue refreshed.' : 'Discovery check completed. Review its verdict below.'); } }
+        try {
+            const next = await getAssistantSetup(options(op), probe); apply(next, op);
+            if (probe === 'models') {
+                guard(op);
+                const refresh = next.model.capability?.refresh;
+                if (refresh?.ok === true) setNotice('Provider catalogue refreshed. Review the resolved runtime model below.');
+                else setError(refresh?.code === 'refresh_in_progress' ? 'A catalogue refresh is already in progress. Returned configuration is unchanged; try again later.' : refresh?.code === 'refresh_throttled' ? 'Catalogue refresh is temporarily limited. Returned configuration is unchanged; try again later.' : 'Provider catalogue refresh was not confirmed. Any returned cached model keeps its reported freshness; no newer model is confirmed.');
+            } else if (probe === 'discovery') { guard(op); setNotice('Discovery check completed. Review its verdict below.'); }
+        }
         catch (err) { await failure(err, op, false); } finally { finish(op); }
     }
     function change(make: (current: AssistantSetupState) => SetupAction, label: string, confirm?: string, credential?: SetupTarget) {
@@ -109,6 +118,16 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const locked = pending !== '';
+    const capability = state?.model.capability;
+    const modelEditable = capability?.editable === true && capability.policy_model === 'auto:sonnet' && capability.mode !== 'fixed' && (capability.restriction === '' || capability.restriction === 'deployment_pin');
+    const autoAvailable = modelEditable && capability?.restriction !== 'deployment_pin';
+    const restriction = !capability ? 'Runtime model selection is unavailable on this server. Upgrade the backend to select Automatic or a manual pin.'
+        : capability.restriction === 'fixed_policy' ? 'The deployed policy fixes the model. Model selection is read-only.'
+        : capability.restriction === 'provider_unsupported' ? 'This provider uses a deployment-owned model. Automatic Sonnet and manual selection are unavailable.'
+        : capability.restriction === 'policy_unavailable' ? 'The deployed model policy is unavailable. Model selection is read-only.'
+        : capability.restriction === 'deployment_pin' ? 'A deployment pin is active beneath owner overrides. You may save a manual pin; remove the deployment pin before choosing Automatic.'
+        : !modelEditable ? 'Runtime model selection is read-only for this deployment.' : '';
+
     const saveKey = (target: SetupTarget) => change((current) => assistantSetupSave(current, target === 'assistant' ? { api_key: draft } : { handler_api_key: handlerDraft }), 'Checking and saving key…', undefined, target);
     const clearKey = (target: SetupTarget) => change((current) => assistantSetupSave(current, target === 'assistant' ? { clear_api_key: true } : { clear_handler_api_key: true }), 'Clearing protected key…', 'Clear the protected Admin credential? A deployment credential may become active. Review the returned source after saving.', target);
     const openPlatform = () => { if (platform.current) platform.current.open = true; platformTitle.current?.focus(); };
@@ -119,7 +138,26 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
         {confirmation && <section className="panel panel-pad assistant-setup-confirm" role="group" aria-label="Confirm setup operation"><p>{confirmation.message}</p><div className="assistant-action-row"><button className="btn" type="button" autoFocus onClick={confirmation.cancel}>Cancel</button><button className="btn btn-primary" type="button" onClick={confirmation.accept}>Confirm operation</button></div></section>}
         {state && <>
             <section className="panel panel-pad"><div className="eyebrow">Basic setup</div><h2>{state.enabled && state.route.ready && !state.emergency_stop && state.assistant_installed && state.realtime_installed ? 'Ready to use' : 'Needs attention'}</h2><p>{assistantSetupReadiness(state)}</p>
-                <dl className="assistant-setup-facts"><div><dt>Provider</dt><dd>{state.route.provider === 'anthropic' ? 'Anthropic' : state.route.provider === 'bedrock' ? 'AWS Bedrock' : 'Unavailable'}</dd></div><div><dt>Model</dt><dd>{state.route.model || 'Unavailable'}</dd></div><div><dt>Selected credential</dt><dd>{state.route.credential === 'admin' ? 'Assistant key' : state.route.credential === 'handler' ? 'Platform key' : state.route.credential === 'aws' ? 'AWS identity' : 'Unavailable'}</dd></div><div><dt>Deployment configuration</dt><dd>{state.route.ready ? 'Ready' : 'Needs attention'}</dd></div></dl>
+                <dl className="assistant-setup-facts"><div><dt>Provider</dt><dd>{state.route.provider === 'anthropic' ? 'Anthropic' : state.route.provider === 'bedrock' ? 'AWS Bedrock' : 'Unavailable'}</dd></div><div><dt>Resolved runtime model</dt><dd><code>{state.model.effective || state.route.model || 'Unavailable'}</code></dd></div><div><dt>Selected credential</dt><dd>{state.route.credential === 'admin' ? 'Assistant key' : state.route.credential === 'handler' ? 'Platform key' : state.route.credential === 'aws' ? 'AWS identity' : 'Unavailable'}</dd></div><div><dt>Deployment configuration</dt><dd>{state.route.ready ? 'Ready' : 'Needs attention'}</dd></div>{state.route.can_invoke !== undefined && <div><dt>Guarded request admission</dt><dd>{state.route.can_invoke ? 'Allowed to attempt' : 'Blocked'} · separate from configuration readiness</dd></div>}</dl>
+                <section className="assistant-setup-model" aria-labelledby="assistant-model-title">
+                    <h3 id="assistant-model-title">Model selection</h3>
+                    <p>Selection mode: <strong>{capability?.mode === 'auto' ? 'Automatic' : capability?.mode === 'pinned' ? 'Manual pin' : capability?.mode === 'fixed' ? 'Fixed by deployment' : 'Unavailable'}</strong> · source: {capability ? state.model.source : state.model.source || 'Unavailable'}</p>
+                    {restriction && <p className="assistant-setup-warning" id="assistant-model-restriction">{restriction}</p>}
+                    {capability && <p className="dim">Deployed policy model: <code>{capability.policy_model || 'Unavailable'}</code></p>}
+                    {modelEditable && <>
+                        <label className="assistant-setup-field" htmlFor="assistant-model-mode">Selection method<select className="input" id="assistant-model-mode" value={modeDraft} disabled={locked} onChange={(event) => setModeDraft(event.target.value as 'auto' | 'pinned')} aria-describedby="assistant-model-help">
+                            {!modeDraft && <option value="" disabled>Choose selection method</option>}<option value="auto" disabled={!autoAvailable}>Automatic — latest Sonnet</option><option value="pinned">Manual pin</option>
+                        </select></label>
+                        {modeDraft === 'pinned' && <label className="assistant-setup-field" htmlFor="assistant-model-pin">Manual model identifier<input className="input" id="assistant-model-pin" value={modelDraft} onChange={(event) => setModelDraft(event.target.value)} disabled={locked} list="assistant-model-choices" maxLength={81} autoComplete="off" spellCheck={false} /></label>}
+                        <datalist id="assistant-model-choices">{state.model.choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</datalist>
+                        <p className="dim" id="assistant-model-help">Automatic lets the backend resolve a compatible Sonnet from its provider catalogue. A manual pin takes effect only after saving. Refreshing cannot replace a manual pin.</p>
+                        <div className="assistant-action-row"><button className="btn btn-primary" type="button" disabled={locked || !modeDraft || (modeDraft === 'auto' ? !autoAvailable : !/^[a-z0-9][a-z0-9.\-]{0,80}$/.test(modelDraft))} onClick={() => change(() => modeDraft === 'auto' ? { action: 'set_model_selection', mode: 'auto' } : { action: 'set_model_selection', mode: 'pinned', model: modelDraft }, 'Saving model selection…')}>Save model selection</button><button className="btn" type="button" disabled={locked} onClick={() => void load('models')}>Refresh provider catalogue</button></div>
+                    </>}
+                    {capability && <div className="assistant-setup-catalogue" aria-label="Provider catalogue status">
+                        <p>Catalogue: <strong>{capability.discovery.status === 'fresh' ? 'Fresh cache' : capability.discovery.status === 'stale' ? 'Stale cache — cached resolution only' : capability.discovery.status === 'unavailable' ? 'Unavailable — no usable automatic resolution' : 'Not applicable to the selected mode'}</strong>{capability.discovery.error_code && ' · The backend reports a discovery problem.'}</p>
+                        <dl className="assistant-setup-facts"><div><dt>Last successful fetch</dt><dd>{capability.discovery.fetched_at || 'None reported'}</dd></div><div><dt>Last attempt</dt><dd>{capability.discovery.attempted_at || 'None reported'}</dd></div><div><dt>Fresh until</dt><dd>{capability.discovery.expires_at || 'Not applicable'}</dd></div><div><dt>Usable cached limit</dt><dd>{capability.discovery.max_stale_at || 'Not applicable'}</dd></div></dl>
+                    </div>}
+                </section>
                 {state.route.credential === 'handler' && <div className="assistant-setup-warning"><p>This deployed route uses the Platform credential. An Assistant key will not supply it.</p><button className="btn" type="button" onClick={openPlatform}>Open Platform credential</button></div>}
                 {state.route.credential === 'aws' && <p>The Bedrock route uses deployment AWS identity. Browser key fields do not configure that identity.</p>}
                 <KeySummary label="Assistant key" value={state.key} check={state.verify} />
@@ -142,7 +180,6 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
                 <div className="assistant-table-scroll"><table><caption>Guarded request aggregates</caption><thead><tr><th>Provider / feature</th><th>Status</th><th>Requests</th><th>Tokens in / out</th></tr></thead><tbody>{state.safety.requests.map((row, i) => <tr key={i}><td>{row.provider} / {row.feature}</td><td>{row.status}</td><td>{row.requests}</td><td>{row.input_tokens} / {row.output_tokens}</td></tr>)}</tbody></table></div>
                 <h3>Circuit breakers</h3><div className="assistant-table-scroll"><table><caption>Breaker state by provider</caption><thead><tr><th>Provider</th><th>State</th><th>Error</th><th>Count</th></tr></thead><tbody>{state.safety.breakers.map((row, i) => <tr key={i}><td>{row.provider}</td><td>{row.state}</td><td>{row.error_code || 'None'}</td><td>{row.count}</td></tr>)}</tbody></table></div>
                 <div className="assistant-action-row">{(['all', 'anthropic', 'bedrock'] as const).map((provider) => <button key={provider} type="button" className="btn" disabled={locked} onClick={() => change(() => ({ action: 'reset_breaker', ...(provider === 'all' ? {} : { provider }) }), 'Resetting breakers…', `Reset ${provider} circuit breakers? Requests may try again; policy and emergency stops remain enforced.`)}>Reset {provider} breakers</button>)}</div>
-                <h3>Legacy model pin</h3><p className="dim">This picker does not control the guarded runtime route. Refreshing the catalogue explicitly contacts the provider.</p><label className="assistant-setup-field" htmlFor="assistant-model-pin">Legacy model identifier<input className="input" id="assistant-model-pin" value={modelDraft} onChange={(event) => setModelDraft(event.target.value)} disabled={locked} list="assistant-model-choices" maxLength={81} /></label><datalist id="assistant-model-choices">{state.model.choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</datalist><div className="assistant-action-row"><button className="btn" type="button" disabled={locked} onClick={() => change((current) => assistantSetupSave(current, { model: modelDraft }), 'Saving legacy model pin…')}>Save legacy model pin</button><button className="btn" type="button" disabled={locked} onClick={() => void load('models')}>Refresh provider catalogue</button></div>
             </div></details>
             <details className="panel assistant-setup-advanced"><summary>Remote agent access and connections</summary><div className="panel-pad"><p>Remote agents can receive Tools, Full API or both kinds of access according to their grants. Full API access carries the signed-in user’s API authority. Turning access off pauses connections without revoking them.</p>
                 <p>Remote access is <strong>{state.mcp.enabled ? 'on' : 'off'}</strong>.</p><button type="button" className="btn" disabled={locked} onClick={() => change((current) => assistantSetupSave(current, { mcp_enabled: !current.mcp.enabled }), 'Saving remote access…', 'Change remote agent access? Existing grants are retained; Disconnect revokes them.')}>{state.mcp.enabled ? 'Pause remote access' : 'Enable remote access'}</button>

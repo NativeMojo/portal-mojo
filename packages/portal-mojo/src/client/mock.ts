@@ -4917,37 +4917,66 @@ function publicAuthConfig(config: Record<string, unknown>): Record<string, unkno
 }
 
 // Owner-only Assistant setup. Fake fixtures retain configuration/check outcomes, NEVER submitted key bytes.
-export type MockAssistantSetupScenario = 'ready' | 'missing-policy' | 'missing-key' | 'handler' | 'bedrock' | 'static-stop' | 'rejected-key' | 'discovery-failure' | 'grants' | 'deployment';
+export type MockAssistantSetupScenario = 'ready' | 'missing-policy' | 'missing-key' | 'handler' | 'bedrock' | 'static-stop' | 'rejected-key' | 'discovery-failure' | 'grants' | 'deployment' | 'manual-pin' | 'fixed-policy' | 'deployment-pin' | 'admin-over-deployment-pin' | 'fresh-failure' | 'stale-failure' | 'unavailable-model' | 'throttled' | 'in-progress' | 'legacy-server' | 'malformed-capability';
 const mockSetupCheck = (ok: boolean | null = null): SetupCheck => ({ ok, code: ok === null ? '' : ok ? 'verified' : 'invalid_key', message: ok === null ? '' : ok ? 'Anthropic accepted this key.' : 'Anthropic rejected this key.', at: ok === null ? '' : '2026-10-19T12:00:00Z' });
 let setupScenario: MockAssistantSetupScenario = 'ready';
 let setupPolicy = true;
+// Deliberately impossible future identifiers: fixtures are never a production latest-model list.
+const SETUP_FIXTURE_MODEL = 'fixture-sonnet-2099-01';
+const SETUP_FIXTURE_SUCCESSOR = 'fixture-sonnet-2099-02';
+let setupCatalogueModel = SETUP_FIXTURE_MODEL;
+let setupCatalogueDiscovery: NonNullable<AssistantSetupState['model']['capability']>['discovery'];
 let mockSetupState: AssistantSetupState;
 /** Resettable fake-only showcase/test seam. No environment, real credential or deployment writes. */
 export function setMockAssistantSetupScenario(scenario: MockAssistantSetupScenario): void {
-    setupScenario = scenario; setupPolicy = scenario !== 'missing-policy';
+    setupScenario = scenario; setupPolicy = scenario !== 'missing-policy'; setupCatalogueModel = SETUP_FIXTURE_MODEL;
     mockSetupState = {
         schema_version: 2, enabled: scenario !== 'missing-key', key: { configured: scenario !== 'missing-key', source: scenario === 'missing-key' ? 'none' : scenario === 'deployment' ? 'deployment' : 'admin', hint: scenario === 'missing-key' ? '' : '••••DEMO' },
-        handler_key: { configured: true, source: 'deployment', hint: '••••FAKE' }, model: { selected: '', effective: 'claude-sonnet-4-6', source: 'automatic', choices: [{ id: 'claude-sonnet-4-6', label: 'Sonnet · fake catalogue' }] },
+        handler_key: { configured: true, source: 'deployment', hint: '••••FAKE' }, model: { selected: '', effective: SETUP_FIXTURE_MODEL, source: 'automatic', choices: [{ id: SETUP_FIXTURE_MODEL, label: 'Future Sonnet · fake fixture only' }], capability: {
+            mode: 'auto', editable: true, policy_model: 'auto:sonnet', restriction: '',
+            discovery: { status: 'fresh', fetched_at: '2026-10-19T12:00:00Z', attempted_at: '2026-10-19T12:00:00Z', expires_at: '2026-10-20T12:00:00Z', max_stale_at: '2026-10-26T12:00:00Z', error_code: '' },
+            refresh: { attempted: false, ok: null, code: '' },
+        } },
         verify: mockSetupCheck(), handler_verify: mockSetupCheck(), emergency_stop: scenario === 'static-stop', emergency_stop_static: scenario === 'static-stop', emergency_stop_database: false,
-        route: { feature: 'assistant', provider: scenario === 'bedrock' ? 'bedrock' : 'anthropic', model: scenario === 'bedrock' ? 'us.amazon.nova-2-lite-v1:0' : 'claude-sonnet-4-6', credential: scenario === 'bedrock' ? 'aws' : scenario === 'handler' ? 'handler' : 'admin', credential_configured: true, ready: true, error: '' },
+        route: { feature: 'assistant', provider: scenario === 'bedrock' ? 'bedrock' : 'anthropic', model: scenario === 'bedrock' ? 'us.amazon.nova-2-lite-v1:0' : SETUP_FIXTURE_MODEL, credential: scenario === 'bedrock' ? 'aws' : scenario === 'handler' ? 'handler' : 'admin', credential_configured: true, ready: true, error: '' },
         autonomous_triage: false, autonomous_triage_activated_at: '', assistant_installed: true, realtime_installed: true,
         mcp: { enabled: true, path: '/api/assistant/mcp/', url: 'https://demo.example.test/api/assistant/mcp/', discovery_url: 'https://demo.example.test/.well-known/oauth-protected-resource/api/assistant/mcp/', discovery: { ok: null, code: '', detail: '', checked_at: '' }, grant_count: 2,
             grants: [1, 2].map((id) => ({ id, client: { id, client_id: `fake-client-${id}`, name: `Demo agent ${id}` }, user: { id: 51, email: 'assistant.owner@nativemojo.com', display_name: 'Demo Owner' }, resource: id === 1 ? 'https://demo.example.test/api/assistant/mcp/' : 'https://demo.example.test/api/', scopes: [id === 1 ? 'mcp' : 'api'], access: id === 1 ? 'tools' : 'api', created: '2026-10-18T12:00:00Z', last_used: '2026-10-19T12:00:00Z', expires: '2026-10-26T12:00:00Z', is_active: true, revoked_reason: '' })) },
         safety: { hours: 24, error: '', requests: [{ provider: 'anthropic', feature: 'assistant', status: 'success', requests: 12, input_tokens: 500, output_tokens: 200 }], breakers: [{ provider: 'anthropic', state: 'closed', error_code: '', count: 1 }] },
     };
     if (scenario === 'grants') mockSetupState.mcp.grant_count = 202;
+    const model = mockSetupState.model, capability = model.capability!;
+    setupCatalogueDiscovery = structuredClone(capability.discovery);
+    if (['manual-pin', 'deployment-pin', 'admin-over-deployment-pin'].includes(scenario)) {
+        model.selected = model.effective = 'fixture-owner-pin'; model.source = scenario === 'deployment-pin' ? 'deployment' : 'admin'; capability.mode = 'pinned';
+        capability.restriction = scenario === 'manual-pin' ? '' : 'deployment_pin';
+        capability.discovery = { status: 'not_applicable', fetched_at: null, attempted_at: null, expires_at: null, max_stale_at: null, error_code: '' }; model.choices = [];
+    }
+    if (['bedrock', 'fixed-policy', 'missing-policy'].includes(scenario)) {
+        capability.mode = 'fixed'; capability.editable = false; model.source = 'policy';
+        capability.policy_model = scenario === 'bedrock' ? 'us.amazon.nova-2-lite-v1:0' : scenario === 'fixed-policy' ? 'fixture-policy-model' : '';
+        capability.restriction = scenario === 'bedrock' ? 'provider_unsupported' : scenario === 'fixed-policy' ? 'fixed_policy' : 'policy_unavailable';
+        model.effective = capability.policy_model; model.selected = 'fixture-inert-legacy-pin'; model.choices = [];
+        capability.discovery = { status: 'not_applicable', fetched_at: null, attempted_at: null, expires_at: null, max_stale_at: null, error_code: '' };
+    }
+    if (scenario === 'stale-failure') { capability.discovery.status = 'stale'; capability.discovery.fetched_at = '2026-10-17T12:00:00Z'; capability.discovery.expires_at = '2026-10-18T12:00:00Z'; capability.discovery.max_stale_at = '2026-10-24T12:00:00Z'; }
+    if (scenario === 'unavailable-model') { model.effective = ''; model.choices = []; capability.discovery = { status: 'unavailable', fetched_at: null, attempted_at: null, expires_at: null, max_stale_at: null, error_code: 'catalogue_unavailable' }; }
+    if (capability.mode === 'auto') setupCatalogueDiscovery = structuredClone(capability.discovery);
+    if (scenario === 'legacy-server') { delete model.capability; model.selected = 'fixture-legacy-pin'; model.source = 'setting'; }
+
 }
 setMockAssistantSetupScenario('ready');
-function setupWireState(): AssistantSetupState {
+function setupWireState(refresh = { attempted: false, ok: null as boolean | null, code: '' }) {
     const state = structuredClone(mockSetupState);
     const credential = state.route.credential;
     const configured = credential === 'aws' || (credential === 'handler' ? state.handler_key.configured : state.key.configured);
     state.emergency_stop = state.emergency_stop_static || state.emergency_stop_database;
-    if (!setupPolicy || !configured) state.route = { feature: 'assistant', provider: '', model: '', credential: '', credential_configured: false, ready: false, error: !setupPolicy ? 'policy_not_activated' : 'credential_missing' };
-    else state.route = { ...state.route, credential_configured: true, ready: !state.emergency_stop, error: state.emergency_stop ? 'emergency_stopped' : '' };
-    state.model.effective = state.route.model;
-    return state;
+    if (!setupPolicy || !configured) state.route = { feature: 'assistant', provider: '', model: '', credential: '', credential_configured: false, ready: false, can_invoke: false, error: !setupPolicy ? 'policy_not_activated' : 'credential_missing' };
+    else state.route = { ...state.route, model: state.model.effective, credential_configured: true, ready: !state.emergency_stop && !!state.model.effective, can_invoke: !state.emergency_stop, error: state.emergency_stop ? 'emergency_stopped' : !state.model.effective ? 'catalogue_unavailable' : '' };
+    const { capability, ...model } = state.model;
+    return { ...state, model: { ...model, ...(capability ? { ...capability, refresh } : {}), ...(setupScenario === 'malformed-capability' ? { mode: 'future-unknown-mode' } : {}) } };
 }
+
 function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
     const caller = userFromBearer(opts.headers);
     const claims = decodeMockJwt((opts.headers?.Authorization ?? '').replace(/^Bearer /, ''));
@@ -4955,8 +4984,24 @@ function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
     if (!caller) return permissionDenied(401);
     if (caller.is_superuser !== true || claims?.credential_kind === 'api_key' || claims?.credential_kind === 'group_scoped_token') return permissionDenied();
     if (method === 'GET') {
+        const refresh = { attempted: false, ok: null as boolean | null, code: '' };
+        if (opts.params?.refresh === 'models' && mockSetupState.model.capability) {
+            const capability = mockSetupState.model.capability;
+            refresh.attempted = !['throttled', 'in-progress'].includes(setupScenario);
+            refresh.ok = !['fresh-failure', 'stale-failure', 'unavailable-model', 'throttled', 'in-progress'].includes(setupScenario);
+            refresh.code = refresh.ok ? '' : setupScenario === 'throttled' ? 'refresh_throttled' : setupScenario === 'in-progress' ? 'refresh_in_progress' : 'provider_unavailable';
+            if (refresh.ok) {
+                setupCatalogueModel = SETUP_FIXTURE_SUCCESSOR;
+                setupCatalogueDiscovery = { status: 'fresh', fetched_at: '2026-10-19T12:01:00Z', attempted_at: '2026-10-19T12:01:00Z', expires_at: '2026-10-20T12:01:00Z', max_stale_at: '2026-10-26T12:01:00Z', error_code: '' };
+                if (capability.mode === 'auto') {
+                    mockSetupState.model.effective = setupCatalogueModel;
+                    mockSetupState.model.choices = [{ id: setupCatalogueModel, label: 'Newer future Sonnet · fake fixture only' }];
+                    capability.discovery = structuredClone(setupCatalogueDiscovery);
+                }
+            } else if (capability.mode === 'auto' && refresh.attempted) { capability.discovery.attempted_at = '2026-10-19T12:01:00Z'; capability.discovery.error_code = refresh.code; setupCatalogueDiscovery = structuredClone(capability.discovery); }
+        }
         if (opts.params?.check === 'discovery') mockSetupState.mcp.discovery = { ok: setupScenario !== 'discovery-failure' && mockSetupState.mcp.enabled, code: setupScenario === 'discovery-failure' ? 'status' : mockSetupState.mcp.enabled ? 'ok' : 'disabled', detail: setupScenario === 'discovery-failure' ? 'The public address did not serve the discovery document.' : mockSetupState.mcp.enabled ? 'The discovery document is reachable at the public address.' : 'Remote agent access is switched off.', checked_at: '2026-10-19T12:00:00Z' };
-        return { status: true, data: setupWireState() };
+        return { status: true, data: setupWireState(refresh) };
     }
     if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
     const authTime = authTimeFromBearer(opts.headers);
@@ -4964,13 +5009,15 @@ function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
     // Browser requests naturally supply Origin; the mock accepts omission and rejects an explicit mismatch.
     if (opts.headers?.Origin && opts.headers.Origin !== window.location.origin) return permissionDenied();
     const body = opts.body ?? {}; const action = body.action;
-    const keys: Record<string, string[]> = { save: ['action', 'enabled', 'model', 'api_key', 'clear_api_key', 'handler_api_key', 'clear_handler_api_key', 'mcp_enabled', 'emergency_stop', 'autonomous_triage'], verify: ['action', 'target', 'api_key'], activate_policy: ['action'], reset_breaker: ['action', 'provider'], historical_triage: ['action', 'before', 'limit'], revoke_grant: ['action', 'grant_id'], revoke_all_grants: ['action'] };
+    const keys: Record<string, string[]> = { set_model_selection: ['action', 'mode', 'model'], save: ['action', 'enabled', 'model', 'api_key', 'clear_api_key', 'handler_api_key', 'clear_handler_api_key', 'mcp_enabled', 'emergency_stop', 'autonomous_triage'], verify: ['action', 'target', 'api_key'], activate_policy: ['action'], reset_breaker: ['action', 'provider'], historical_triage: ['action', 'before', 'limit'], revoke_grant: ['action', 'grant_id'], revoke_all_grants: ['action'] };
     if (typeof action !== 'string' || !keys[action] || Object.keys(body).some((key) => !keys[action]!.includes(key))) return bad();
     const result: Record<string, unknown> = { schema_version: 2 };
     const candidateValid = (value: unknown) => value == null || value === '' || (typeof value === 'string' && value.length <= 4096 && !/\s/.test(value.trim()));
     const accepted = (value: unknown) => setupScenario !== 'rejected-key' && !(typeof value === 'string' && value.includes('reject'));
     if (action === 'save') {
-        if (typeof body.enabled !== 'boolean' || typeof body.model !== 'string' || (body.model !== '' && !/^[a-z0-9][a-z0-9.\-]{0,80}$/.test(body.model))) return bad();
+        if (typeof body.enabled !== 'boolean' || (body.model !== undefined && (typeof body.model !== 'string' || (body.model !== '' && !/^[a-z0-9][a-z0-9.\-]{0,80}$/.test(body.model))))) return bad();
+        if (!mockSetupState.model.capability && typeof body.model !== 'string') return bad();
+        if (mockSetupState.model.capability && body.model !== undefined && body.model !== mockSetupState.model.selected) return bad('Use set_model_selection to change the Assistant model');
         for (const key of ['mcp_enabled', 'emergency_stop', 'autonomous_triage']) if (body[key] != null && typeof body[key] !== 'boolean') return bad();
         for (const key of ['api_key', 'handler_api_key']) if (!candidateValid(body[key]) || (body[key] && body[`clear_${key}`] === true)) return bad();
         if (body.api_key && !accepted(body.api_key)) return bad('The api key was not accepted. Anthropic rejected this key.');
@@ -4981,10 +5028,23 @@ function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
                 mockSetupState[target] = { configured: setupScenario === 'deployment' || target === 'handler_key', source: setupScenario === 'deployment' || target === 'handler_key' ? 'deployment' : 'none', hint: setupScenario === 'deployment' || target === 'handler_key' ? '••••FAKE' : '' }; mockSetupState[check] = mockSetupCheck();
             } else if (body[input]) { mockSetupState[target] = { configured: true, source: 'admin', hint: '••••DEMO' }; mockSetupState[check] = mockSetupCheck(true); }
         }
-        mockSetupState.enabled = body.enabled; mockSetupState.model.selected = body.model;
+        mockSetupState.enabled = body.enabled; if (!mockSetupState.model.capability && typeof body.model === 'string') mockSetupState.model.selected = body.model;
         if (typeof body.mcp_enabled === 'boolean') { mockSetupState.mcp.enabled = body.mcp_enabled; mockSetupState.mcp.discovery = { ok: null, code: '', detail: '', checked_at: '' }; }
         if (typeof body.emergency_stop === 'boolean') mockSetupState.emergency_stop_database = body.emergency_stop;
         if (typeof body.autonomous_triage === 'boolean') { if (body.autonomous_triage && !mockSetupState.autonomous_triage) mockSetupState.autonomous_triage_activated_at = '2026-10-19T12:00:00Z'; mockSetupState.autonomous_triage = body.autonomous_triage; }
+        result.saved = true;
+    } else if (action === 'set_model_selection') {
+        const model = mockSetupState.model, capability = model.capability;
+        if (!capability || !setupPolicy || !capability.editable || capability.policy_model !== 'auto:sonnet' || capability.mode === 'fixed') return bad('This deployment policy fixes the model; model selection is unavailable');
+        if (body.mode === 'auto') {
+            if (Object.hasOwn(body, 'model') || capability.restriction === 'deployment_pin') return bad();
+            model.selected = ''; model.source = 'automatic'; model.effective = setupScenario === 'unavailable-model' ? '' : setupCatalogueModel; capability.mode = 'auto';
+            capability.discovery = structuredClone(setupCatalogueDiscovery);
+            model.choices = model.effective ? [{ id: setupCatalogueModel, label: 'Future Sonnet · fake fixture only' }] : [];
+        } else if (body.mode === 'pinned' && typeof body.model === 'string' && /^[a-z0-9][a-z0-9.\-]{0,80}$/.test(body.model)) {
+            model.selected = model.effective = body.model; model.source = 'admin'; capability.mode = 'pinned'; model.choices = [];
+            capability.discovery = { status: 'not_applicable', fetched_at: null, attempted_at: null, expires_at: null, max_stale_at: null, error_code: '' };
+        } else return bad();
         result.saved = true;
     } else if (action === 'verify') {
         if (body.target !== undefined && body.target !== '' && body.target !== 'assistant' && body.target !== 'handler') return bad();

@@ -16,7 +16,7 @@ also rejects confined ApiKey/GroupScopedToken sessions and enforces person
 ownership; the client does not invent a broader per-user-key ban.
 
 The basic section shows deployment readiness, exact provider/model/key
-selection, credential source and optional server hint, blank replacement input,
+selection, Automatic — latest Sonnet or an explicit manual pin, credential source and optional server hint, blank replacement input,
 Check and save key, Check current key and enable/disable. A configured key and
 an enabled switch do not prove readiness. `route.ready` describes configuration,
 not current provider health. Unknown routes remain unknown: a missing
@@ -25,15 +25,36 @@ credential can cause the backend to omit the entire route. Only an explicit
 identity from deployment. Assistant, Platform and AWS credentials never
 substitute for one another. Missing Assistant/realtime applications are also
 reported. Runtime model identifiers preserve provider punctuation, including
-Bedrock colons; only the legacy pin uses the backend's restricted pin syntax.
+Bedrock colons; only a manual pin uses the backend's restricted pin syntax.
 
 Advanced native details separate Platform credentials, deployed policy/safety,
 remote access/connections and incident triage. Policy activation acknowledges
 the deployed policy on this node, does not edit it and never establishes
 fleet-wide agreement. Static, database and effective emergency stops are
 separate; only the database switch is writable. Activation and breaker reset
-cannot release a stop. The legacy pin/catalogue is explicitly separate from
-the deployed runtime model. Refresh catalogue is an explicit provider request;
+cannot release a stop.
+
+Model selection controls the protected runtime selection only when the backend
+returns a valid capability for the explicit Anthropic `auto:sonnet` policy.
+Fixed Anthropic policies, Bedrock and unavailable policies remain read-only.
+A deployment pin permits an owner manual override, but Automatic remains
+unavailable until deployment removes that pin. Mode is authoritative even when
+a fixed route retains an inert legacy `selected` value.
+
+The exact resolved runtime identifier (`model.effective`) and source are
+separate from the selection draft and `route.ready`. The additive
+`route.can_invoke` reports admission to the guarded request path: a cold
+automatic catalogue can admit a request while configuration readiness remains
+false. It does not prove that a usable model or healthy provider is ready.
+
+Refresh catalogue is an explicit backend request; only the backend contacts the
+provider. The browser never decides which model is newest. A refresh announces
+success only for `model.refresh.ok === true`, including when a manual pin
+remains selected. Failed/throttled/in-flight attempts may retain a fresh or
+stale cached resolution; the page reports its exact freshness, last successful
+fetch and attempt without claiming a newer model. Passive reads neither refresh
+the catalogue nor repeat the preceding explicit refresh outcome.
+
 Check public discovery explicitly probes this installation's public address
 (server cache: 60 seconds). Ordinary page reads trigger neither probe.
 
@@ -65,13 +86,27 @@ Protocol helpers are exported from `portal-mojo/admin/assistant`:
 `signal` and a `beforeSend` validity guard; mutation helpers enforce same-origin
 before and after auth preflight and use the existing `mojoCall` envelope boundary.
 `schema_version: 2` responses are positively projected with bounds of 200
-connections/request aggregates and 100 breaker rows.
+model choices/connections/request aggregates and 100 breaker rows. Runtime IDs
+preserve provider punctuation; only manual pins use the backend's restricted
+81-character lowercase alphanumeric/dot/hyphen syntax.
+
+The additive wire fields live directly under `model`: `mode` (`auto`, `pinned`,
+`fixed`), `editable`, `policy_model`, `restriction` (empty, `fixed_policy`,
+`provider_unsupported`, `deployment_pin`, `policy_unavailable`), `discovery`
+(`status`: `fresh`, `stale`, `unavailable`, `not_applicable`; nullable ISO
+`fetched_at`, `attempted_at`, `expires_at`, `max_stale_at`; safe `error_code`),
+and `refresh` (`attempted`, nullable boolean `ok`, safe `code`). The client
+positively projects the complete valid set into optional `model.capability`.
+Absent, malformed or unknown capabilities keep runtime facts visible, with
+upgrade/read-only copy and no enabled selection action. No latest ID ships in
+the production UI; returned bounded choices supply the datalist.
 
 | Request | Exact body / query |
 |---|---|
 | Passive GET `/api/account/admin/assistant` | No probe parameters |
 | Explicit catalogue / discovery GET | `refresh=models` / `check=discovery` |
-| Save POST | `{action:'save',enabled:boolean,model:string}` plus only intended optional `api_key`, `clear_api_key`, `handler_api_key`, `clear_handler_api_key`, `mcp_enabled`, `emergency_stop`, `autonomous_triage` |
+| Save POST | `{action:'save',enabled:boolean,model?:string}` plus only intended optional `api_key`, `clear_api_key`, `handler_api_key`, `clear_handler_api_key`, `mcp_enabled`, `emergency_stop`, `autonomous_triage` |
+| Model selection POST | Exactly `{action:'set_model_selection',mode:'auto'}` (no `model`) or `{action:'set_model_selection',mode:'pinned',model:ID}`; `saved:boolean` |
 | Verify POST | `{action:'verify',target:'assistant'|'handler',api_key?}`; omitted candidate checks that exact stored credential |
 | Policy POST | Exactly `{action:'activate_policy'}`; `activated:boolean` |
 | Breaker POST | `{action:'reset_breaker',provider?:'anthropic'|'bedrock'}`; `reset:number` |
@@ -80,8 +115,13 @@ connections/request aggregates and 100 breaker rows.
 
 Every mutation returns fresh `state` plus the action result. Verification may
 return `result.ok:false` in a successful envelope; that remains a failed check.
-Save always sends authoritative `enabled` and the selected legacy `model`:
-the backend writes both even when omitted. Optional section switches are not
+Save always sends authoritative `enabled`. With a valid capability it omits
+`model` and cannot reset runtime selection; only the dedicated selection action
+can change it. Capability-absent older schema-2 servers retain the required
+`enabled`/legacy `model` baseline because they write both even when omitted.
+New servers reject a differing legacy model echo, preventing stale clients from
+reverting the active choice. Model actions carry no enabled/key/stop/MCP/triage
+fields, and all selection drafts reset from each authoritative response. Optional section switches are not
 echoed during unrelated saves, and effective stop is never used as the database
 stop. Replacement and clear are separate operations. The server retains its
 600-second fresh-auth, protected settings, auditing and same-origin checks;
@@ -98,7 +138,12 @@ an explicit cutoff, bounded limit and confirmation.
 The mock-only Assistant showcase adds Setup with explicit fake owner/denied
 permission-admin buttons, a one-shot fresh-auth challenge button, and ready, missing policy/key, handler, Bedrock, static
 stop, rejected key, discovery failure, bounded-grants and deployment-fallback
-scenarios. Seeded `assistant.owner@nativemojo.com` is a literal superuser;
+scenarios. Model scenarios include manual pins, fixed policy, deployment pin
+(including an owner override), fresh/stale refresh failure, unavailable
+resolution, throttled/in-flight refresh, old-server capability absence and
+malformed capability. `fixture-sonnet-2099-01` and `fixture-sonnet-2099-02` are
+visibly fake future IDs; explicit catalogue refresh advances the fake catalogue,
+preserves manual pins, and returning to Automatic adopts the successor. Seeded `assistant.owner@nativemojo.com` is a literal superuser;
 `assistant.wildcard@nativemojo.com` has permission-driven admin only. Both use
 fake password `mojo`. No real credentials or deployment changes belong in demos.
 `verify:admin-assistant-setup` covers wire contracts, owner navigation/admission,
