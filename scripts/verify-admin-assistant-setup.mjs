@@ -120,6 +120,9 @@ try {
         mock.setMockAssistantSetupScenario(scenario); state = await api.getAssistantSetup();
         assert.equal(state.model.capability.mode, 'fixed'); assert.equal(state.model.selected, 'fixture-inert-legacy-pin', 'An inert legacy pin does not change fixed mode');
         assert.equal((await raw({ action: 'set_model_selection', mode: 'pinned', model: 'fixture-invalid-override' })).status, false);
+        const fixedRuntime = state.model.effective;
+        state = (await api.mutateAssistantSetup({ action: 'save', enabled: state.enabled, model: 'fixture-inert-legacy-update' })).state;
+        assert.equal(state.model.selected, 'fixture-inert-legacy-update', 'Nondelegated routes retain the inert legacy writer'); assert.equal(state.model.capability.mode, 'fixed'); assert.equal(state.model.effective, fixedRuntime, 'An inert legacy write cannot change a fixed runtime');
     }
     for (const scenario of ['deployment-pin', 'admin-over-deployment-pin']) {
         mock.setMockAssistantSetupScenario(scenario); state = await api.getAssistantSetup();
@@ -236,6 +239,10 @@ try {
     // Mounted model lifecycle: drafts, explicit actions, cache verdicts, and security fences.
     auth.initAuth(); auth.stopAutoRefresh(); await signIn(); mock.setMockAssistantSetupScenario('ready'); await render(20);
     assert.equal(document.getElementById('assistant-model-mode').value, 'auto'); assert.match(document.body.textContent, /fixture-sonnet-2099-01/);
+    const basicSetup = document.querySelector('.assistant-setup > section');
+    const advancedPolicy = [...document.querySelectorAll('details')].find((element) => element.querySelector('summary').textContent === 'Deployed policy and safety');
+    assert.doesNotMatch(basicSetup.textContent, /Guarded request admission|Deployed policy model/);
+    assert.match(advancedPolicy.textContent, /Guarded request admission.*Allowed to attempt/); assert.match(advancedPolicy.textContent, /Deployed policy model.*auto:sonnet/);
     const beforeDraft = postCount(); await select('pinned'); await input('assistant-model-pin', 'fixture-mounted-pin'); assert.equal(postCount(), beforeDraft, 'Changing selection edits only the draft');
     await click('Save model selection'); assert.equal(document.getElementById('assistant-model-mode').value, 'pinned'); assert.match(document.body.textContent, /source: admin/);
     state = await api.getAssistantSetup(); assert.equal(state.model.effective, 'fixture-mounted-pin'); assert.deepEqual(baseline(state), [true, true, false, false]);
@@ -262,7 +269,7 @@ try {
     mock.setMockAssistantSetupScenario('ready'); await render(50); await select('pinned'); await input('assistant-model-pin', 'fixture-held-pin');
     mock.armMockResponseOnce('POST', path, { extraDelayMs: 450 }); const beforeHeldModel = postCount();
     await click('Save model selection', false); await React.act(async () => button('Save model selection').click());
-    await waitFor(() => postCount() === beforeHeldModel + 1, 'One model action is sent'); assert(button('Refresh provider catalogue').disabled); await settle(650); assert.equal(postCount(), beforeHeldModel + 1, 'Repeat clicks cannot send overlapping selection actions');
+    await waitFor(() => postCount() === beforeHeldModel + 1, 'One model action is sent'); assert(button('Refresh provider catalogue').disabled); await waitFor(ready, 'Held model operation completes before the next action'); assert.equal(postCount(), beforeHeldModel + 1, 'Repeat clicks cannot send overlapping selection actions');
     mock.armMockResponseOnce('GET', path, { extraDelayMs: 450 }); await click('Refresh provider catalogue', false);
     await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await waitFor(ready, 'Replacement page loads'); await settle(650);
     assert.doesNotMatch(document.querySelector('[role=status]').textContent, /refreshed/, 'Held refresh cannot announce success after session replacement');

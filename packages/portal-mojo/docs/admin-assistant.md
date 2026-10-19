@@ -42,7 +42,8 @@ unavailable until deployment removes that pin. Mode is authoritative even when
 a fixed route retains an inert legacy `selected` value.
 
 The exact resolved runtime identifier (`model.effective`) and source are
-separate from the selection draft and `route.ready`. The additive
+separate from the selection draft and `route.ready`. Advanced → Deployed policy
+and safety contains the raw policy model and admission diagnostic. The additive
 `route.can_invoke` reports admission to the guarded request path: a cold
 automatic catalogue can admit a request while configuration readiness remains
 false. It does not prove that a usable model or healthy provider is ready.
@@ -119,9 +120,12 @@ Save always sends authoritative `enabled`. With a valid capability it omits
 `model` and cannot reset runtime selection; only the dedicated selection action
 can change it. Capability-absent older schema-2 servers retain the required
 `enabled`/legacy `model` baseline because they write both even when omitted.
-New servers reject a differing legacy model echo, preventing stale clients from
-reverting the active choice. Model actions carry no enabled/key/stop/MCP/triage
-fields, and all selection drafts reset from each authoritative response. Optional section switches are not
+On delegated `auto:sonnet` routes, new servers reject a differing legacy model
+echo, preventing stale clients from reverting the active choice. Fixed policies,
+Bedrock and unavailable-policy routes retain an inert legacy writer; these
+values cannot change their deployed runtime model. Model actions carry no
+enabled/key/stop/MCP/triage fields, and all selection drafts reset from each
+authoritative response. Optional section switches are not
 echoed during unrelated saves, and effective stop is never used as the database
 stop. Replacement and clear are separate operations. The server retains its
 600-second fresh-auth, protected settings, auditing and same-origin checks;

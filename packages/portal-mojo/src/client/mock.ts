@@ -5016,8 +5016,9 @@ function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
     const accepted = (value: unknown) => setupScenario !== 'rejected-key' && !(typeof value === 'string' && value.includes('reject'));
     if (action === 'save') {
         if (typeof body.enabled !== 'boolean' || (body.model !== undefined && (typeof body.model !== 'string' || (body.model !== '' && !/^[a-z0-9][a-z0-9.\-]{0,80}$/.test(body.model))))) return bad();
+        const delegated = mockSetupState.model.capability?.policy_model === 'auto:sonnet' && mockSetupState.model.capability.editable;
         if (!mockSetupState.model.capability && typeof body.model !== 'string') return bad();
-        if (mockSetupState.model.capability && body.model !== undefined && body.model !== mockSetupState.model.selected) return bad('Use set_model_selection to change the Assistant model');
+        if (delegated && body.model !== undefined && body.model !== mockSetupState.model.selected) return bad('Use set_model_selection to change the Assistant model');
         for (const key of ['mcp_enabled', 'emergency_stop', 'autonomous_triage']) if (body[key] != null && typeof body[key] !== 'boolean') return bad();
         for (const key of ['api_key', 'handler_api_key']) if (!candidateValid(body[key]) || (body[key] && body[`clear_${key}`] === true)) return bad();
         if (body.api_key && !accepted(body.api_key)) return bad('The api key was not accepted. Anthropic rejected this key.');
@@ -5028,7 +5029,7 @@ function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
                 mockSetupState[target] = { configured: setupScenario === 'deployment' || target === 'handler_key', source: setupScenario === 'deployment' || target === 'handler_key' ? 'deployment' : 'none', hint: setupScenario === 'deployment' || target === 'handler_key' ? '••••FAKE' : '' }; mockSetupState[check] = mockSetupCheck();
             } else if (body[input]) { mockSetupState[target] = { configured: true, source: 'admin', hint: '••••DEMO' }; mockSetupState[check] = mockSetupCheck(true); }
         }
-        mockSetupState.enabled = body.enabled; if (!mockSetupState.model.capability && typeof body.model === 'string') mockSetupState.model.selected = body.model;
+        mockSetupState.enabled = body.enabled; if (!delegated && typeof body.model === 'string') mockSetupState.model.selected = body.model;
         if (typeof body.mcp_enabled === 'boolean') { mockSetupState.mcp.enabled = body.mcp_enabled; mockSetupState.mcp.discovery = { ok: null, code: '', detail: '', checked_at: '' }; }
         if (typeof body.emergency_stop === 'boolean') mockSetupState.emergency_stop_database = body.emergency_stop;
         if (typeof body.autonomous_triage === 'boolean') { if (body.autonomous_triage && !mockSetupState.autonomous_triage) mockSetupState.autonomous_triage_activated_at = '2026-10-19T12:00:00Z'; mockSetupState.autonomous_triage = body.autonomous_triage; }
