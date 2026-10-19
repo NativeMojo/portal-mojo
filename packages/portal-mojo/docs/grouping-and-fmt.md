@@ -45,7 +45,7 @@ the type checker and was the source's silent-failure vector) and the
 
 | Fn | Notes |
 |---|---|
-| `fmt.date(v, fallback='—')` / `fmt.datetime(v, fallback='—')` | `MM/DD/YYYY` / `Mon D, YYYY h:mm` — accepts **epoch seconds** (the django-mojo wire shape), ms, ISO, Date |
+| `fmt.date(v, fallback='—')` / `fmt.datetime(v, fallback='—')` | `MM/DD/YYYY` / `Mon D, YYYY h:mm` — accepts **epoch seconds** (the django-mojo wire shape), ms, ISO, Date. A **date-only** value (`'YYYY-MM-DD'`, `'YYYY-MM'`, `'YYYY'`) shows its own calendar day at its own precision in every browser zone, with no time: `10/17/2026` / `Oct 17, 2026`, `10/2026` / `Oct 2026`, `2026` / `2026`; `groupByDay`/`groupByRecency` bucket it under that same day |
 | `fmt.relative(v, fallback='Never')` | "3 weeks ago" style |
 | `fmt.relativeShort(v, fallback='—')` | compact age for chips: `now` / `5h` / `3d` / `3w` / `2mo` / `1y`. **Magnitude only** — a future date reads the same as a past one (use `relative` when direction matters). Source boundaries kept (`>`, not `>=`): 7d is `7d`, 8d is `1w` |
 

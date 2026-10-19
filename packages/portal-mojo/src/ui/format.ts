@@ -11,7 +11,7 @@
 //      overrides it; `slug` documents `''` instead). A formatter is the last
 //      thing allowed to take a row down.
 //   2. Fixed 'en-US' locale — the portal's house style, not the browser's.
-import { toDateSmart } from './date/fns';
+import { calendarParts, toDateSmart } from './date/fns';
 import { warnOnce } from './warn-once';
 
 const DASH = '—';
@@ -90,12 +90,36 @@ const DATETIME_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'nu
 // string clothing (JSONField metadata). See date/fns.ts detectTemporal.
 const toDate = toDateSmart;
 
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function pad2(n: number): string { return n < 10 ? '0' + n : String(n); }
+
+// A date-only value ('YYYY-MM-DD' DateField, 'YYYY-MM', 'YYYY') is a calendar
+// day, not an instant: it shows its own fields at its own precision in every
+// browser zone, never a converted day and never an invented time.
+function dateOnlyParts(value: unknown) {
+    const p = calendarParts(value);
+    return p && p.precision !== 'instant' ? p : null;
+}
+
 export function date(value: string | number | null | undefined, fallback = '—'): string {
+    const p = dateOnlyParts(value);
+    if (p) {
+        if (p.precision === 'year') return String(p.y);
+        if (p.precision === 'month') return `${pad2(p.m)}/${p.y}`;
+        return `${pad2(p.m)}/${pad2(p.d)}/${p.y}`;
+    }
     const d = toDate(value);
     return d ? DATE_FMT.format(d) : fallback;
 }
 
 export function datetime(value: string | number | null | undefined, fallback = '—'): string {
+    const p = dateOnlyParts(value);
+    if (p) {
+        if (p.precision === 'year') return String(p.y);
+        if (p.precision === 'month') return `${MONTHS_SHORT[p.m - 1]} ${p.y}`;
+        return `${MONTHS_SHORT[p.m - 1]} ${p.d}, ${p.y}`;
+    }
     const d = toDate(value);
     return d ? DATETIME_FMT.format(d) : fallback;
 }

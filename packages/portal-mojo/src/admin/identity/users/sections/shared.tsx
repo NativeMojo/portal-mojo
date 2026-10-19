@@ -163,9 +163,11 @@ export function toMs(value: number | string | null | undefined): number | null {
 
 /** Day-relative header label: Today / Yesterday / Mon, Jun 3. */
 export function dayLabel(value: number | string | null | undefined): string {
-    const ms = toMs(value);
-    if (ms == null) return 'Unknown date';
-    const d = new Date(ms);
+    // Calendar parts, not the instant: a date-only value is its own day in
+    // every zone (a UTC-midnight instant reads as the day before west of UTC).
+    const p = dateFns.calendarParts(value);
+    if (!p) return 'Unknown date';
+    const d = p.precision === 'instant' ? new Date(toMs(value)!) : new Date(p.y, p.m - 1, p.d);
     const today = new Date();
     const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const diffDays = Math.round((startOf(today) - startOf(d)) / 864e5);

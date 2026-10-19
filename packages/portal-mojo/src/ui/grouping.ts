@@ -6,7 +6,7 @@
 //
 // A falsy key means "ungrouped tail": the row renders without a new header,
 // visually continuing the prior section.
-import { toDateSmart } from './date/fns';
+import { calendarParts, toDateSmart } from './date/fns';
 
 // Interfaces without index signatures (User, …) aren't assignable to
 // Record<string, unknown> under strict TS, so the row constraint is plain
@@ -23,6 +23,15 @@ function resolveAccessor<T extends Row>(fieldOrAccessor: string | Accessor<T>): 
  *  One shared sniffer (date/fns detectTemporal) so a grouped bucket and the
  *  cell rendered inside it can never disagree about what day a row is on. */
 const toDate = toDateSmart;
+
+/** The local Date whose calendar day is the value's own: a date-only value
+ *  ('YYYY-MM-DD') lands at local midnight of ITS day, so it buckets under
+ *  that day in every zone; an instant is read in local time as before. */
+function toDayDate(raw: unknown): Date | null {
+    const p = calendarParts(raw);
+    if (!p) return null;
+    return p.precision === 'instant' ? toDate(raw) : new Date(p.y, p.m - 1, p.d);
+}
 
 /** Stable local-time YYYY-MM-DD bucket key. */
 function isoDayKey(date: Date): string {
@@ -56,7 +65,7 @@ export function groupByDay<T extends Row>(fieldOrAccessor: string | Accessor<T>)
     const access = resolveAccessor(fieldOrAccessor);
     return {
         groupBy: (row) => {
-            const date = toDate(access(row));
+            const date = toDayDate(access(row));
             return date ? isoDayKey(date) : null;
         },
         groupHeaderLabel: formatDayLabel,
@@ -116,7 +125,7 @@ function recencyBucketKey(date: Date | null): string | null {
 export function groupByRecency<T extends Row>(fieldOrAccessor: string | Accessor<T>): GroupSpec<T> {
     const access = resolveAccessor(fieldOrAccessor);
     return {
-        groupBy: (row) => recencyBucketKey(toDate(access(row))),
+        groupBy: (row) => recencyBucketKey(toDayDate(access(row))),
         groupHeaderLabel: (key) => RECENCY_LABELS[key] ?? key,
     };
 }

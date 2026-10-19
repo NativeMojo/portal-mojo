@@ -662,6 +662,38 @@ export function toDateSmart(raw: unknown): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** A value's calendar fields. `precision` is the date-only string's own
+ *  ('year' | 'month' | 'day'), or 'instant' for anything with a time. */
+export interface CalendarParts {
+    y: number;
+    m: number;
+    d: number;
+    precision: Precision | 'instant';
+}
+
+/**
+ * The calendar day a value is ON, for display and grouping. A date-only
+ * string ('YYYY', 'YYYY-MM', 'YYYY-MM-DD') is a day, not an instant: its own
+ * fields are returned with no zone conversion, so '2026-10-17' is the 17th in
+ * every browser zone. (`detectTemporal` keeps resolving it at UTC midnight for
+ * the wire; reading that instant in local time is what shifted it a day west
+ * of UTC.) Every other value is an instant and reads in local time.
+ */
+export function calendarParts(raw: unknown): CalendarParts | null {
+    const t = detectTemporal(raw);
+    if (!t) return null;
+    if (t.kind === 'date-string') {
+        const str = String(raw).trim();
+        const p = parseYmd(str.length === 4 ? `${str}-01-01` : str.length === 7 ? `${str}-01` : str);
+        if (!p) return null;
+        const precision: Precision = str.length === 4 ? 'year' : str.length === 7 ? 'month' : 'day';
+        return { y: p.y, m: p.m, d: p.d, precision };
+    }
+    const d = new Date(t.ms);
+    if (Number.isNaN(d.getTime())) return null;
+    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), precision: 'instant' };
+}
+
 // ── Internal ───────────────────────────────────────────────────────
 
 /** '±HH:MM' → signed minutes, or null when malformed. */
