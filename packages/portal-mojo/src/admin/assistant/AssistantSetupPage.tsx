@@ -114,7 +114,7 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
     const openPlatform = () => { if (platform.current) platform.current.open = true; platformTitle.current?.focus(); };
     return <main className="assistant-setup" aria-labelledby="assistant-setup-title">
         <header className="assistant-setup-header"><div><div className="eyebrow">Installation owner</div><h1 id="assistant-setup-title">AI Assistant setup</h1><p className="dim">Set up your AI Assistant and review the controls that keep it safe.</p></div><button type="button" className="btn" disabled={locked} onClick={() => void load()}>Refresh setup</button></header>
-        <div role="status" aria-live="polite">{pending && !confirmation ? pending : notice}</div>
+        <div role="status" aria-live="polite">{notice || (pending && !confirmation ? pending : '')}</div>
         {error && <div className="assistant-setup-warning" role="alert">{error}</div>}
         {confirmation && <section className="panel panel-pad assistant-setup-confirm" role="group" aria-label="Confirm setup operation"><p>{confirmation.message}</p><div className="assistant-action-row"><button className="btn" type="button" autoFocus onClick={confirmation.cancel}>Cancel</button><button className="btn btn-primary" type="button" onClick={confirmation.accept}>Confirm operation</button></div></section>}
         {state && <>

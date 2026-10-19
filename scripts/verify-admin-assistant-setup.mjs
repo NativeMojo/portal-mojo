@@ -105,16 +105,29 @@ try {
     // Mounted lifecycle: real auth, real mock endpoint, Query and Mutation caches inspected.
     client.installAuthHooks(null);
     auth.initAuth();
-    const signIn = async (email = 'assistant.owner@nativemojo.com') => {
+    const signIn = async (email = 'assistant.owner@nativemojo.com') => React.act(async () => {
         await auth.login(email, 'mojo'); auth.stopAutoRefresh();
         const uid = auth.getAuthSnapshot().uid;
         const me = (await client.mojoCall('/api/user/me')).data;
-        await React.act(async () => qc.setQueryData(['me', uid], me));
+        qc.setQueryData(['me', uid], me);
+    });
+    const settle = async (ms = 25) => React.act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
+    const waitFor = async (predicate, message, timeout = 2500) => {
+        const deadline = Date.now() + timeout;
+        while (!predicate() && Date.now() < deadline) await settle();
+        assert(predicate(), message);
     };
-    const settle = async (ms = 270) => React.act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
-    const render = async (key = 0) => { await React.act(async () => root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(page.AssistantSetupPage, { key })))); await settle(); };
     const button = (label) => [...document.querySelectorAll('button')].find((element) => element.textContent.trim() === label);
-    const click = async (label, wait = true) => { const element = button(label); assert(element, `Missing button ${label}`); assert(!element.disabled, `Disabled button ${label}`); await React.act(async () => element.click()); if (wait) await settle(); };
+    const ready = () => document.body.textContent.includes('Owner access required') || (document.getElementById('assistant-replacement-key') && !button('Refresh setup')?.disabled);
+    const render = async (key = 0) => {
+        await React.act(async () => root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(page.AssistantSetupPage, { key }))));
+        await waitFor(ready, 'Setup finishes its initial read or renders owner denial');
+    };
+    const click = async (label, wait = true) => {
+        const element = button(label); assert(element, `Missing button ${label}`); assert(!element.disabled, `Disabled button ${label}`);
+        await React.act(async () => element.click());
+        if (wait) await waitFor(ready, `Operation ${label} settles`);
+    };
     const input = async (id, value) => { const element = document.getElementById(id); assert(element, `Missing input ${id}`); await React.act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); }); };
     const cacheSafe = () => {
         assert(!JSON.stringify(qc.getQueryCache().getAll().map((query) => query.state.data)).includes(SENTINEL));
@@ -130,10 +143,10 @@ try {
     await input('assistant-replacement-key', SENTINEL);
     await React.act(async () => { await auth.refreshTokens(); }); await settle();
     assert.equal(document.getElementById('assistant-replacement-key').value, SENTINEL, 'Same-tab token renewal preserves draft');
-    await React.act(async () => window.dispatchEvent(new dom.window.StorageEvent('storage', { key: 'access_token', newValue: auth.getAccessToken() }))); await settle();
+    await React.act(async () => window.dispatchEvent(new dom.window.StorageEvent('storage', { key: 'access_token', newValue: auth.getAccessToken() }))); await waitFor(ready, 'Cross-tab replacement reload finishes');
     assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Cross-tab auth change conservatively clears draft');
     await input('assistant-replacement-key', SENTINEL);
-    await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await settle();
+    await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await waitFor(ready, 'Replacement session reload finishes');
     assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Explicit same-person replacement clears draft');
     await input('assistant-replacement-key', SENTINEL); await React.act(async () => root.render(null)); await render(2);
     assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Leaving setup destroys drafts');
@@ -141,7 +154,7 @@ try {
     assert.equal(document.querySelector('details').open, true); assert.equal(document.activeElement.textContent, 'Platform credential');
     await input('handler-replacement-key', SENTINEL); await click('Check and save Platform key'); assert.equal(document.getElementById('handler-replacement-key').value, '');
     mock.setMockAssistantSetupScenario('rejected-key'); await render(4); await click('Check current key'); assert.match(document.body.textContent, /Anthropic rejected this key/);
-    await input('assistant-replacement-key', SENTINEL); await click('Check and save key', false); await settle(530); assert.match(document.body.textContent, /rejected|could not be confirmed/); cacheSafe();
+    await input('assistant-replacement-key', SENTINEL); await click('Check and save key'); assert.match(document.body.textContent, /rejected|could not be confirmed/); cacheSafe();
     mock.setMockAssistantSetupScenario('ready'); await render(5);
     await input('assistant-replacement-key', SENTINEL); await click('Acknowledge deployed policy', false);
     assert(button('Confirm operation')); assert.equal(document.activeElement.textContent, 'Cancel');
@@ -152,12 +165,16 @@ try {
     assert(!button('Confirm operation')); assert(!document.querySelector('input[type=password]')); assert.equal(postCount(), countBeforeRevoke, 'Revocation while confirming sends no action');
     await signIn(); await render(6);
     let releaseAuth; auth.setFreshAuthHandler(() => new Promise((resolve) => { releaseAuth = resolve; }));
-    await input('assistant-replacement-key', SENTINEL); mock.armMockReauth('POST', path); await click('Check and save key');
+    await input('assistant-replacement-key', SENTINEL); mock.armMockReauth('POST', path); await click('Check and save key', false);
+    await waitFor(() => typeof releaseAuth === 'function', '440 opens the registered fresh-auth UI');
     assert.equal(document.getElementById('assistant-replacement-key').value, '', '440 clears draft before fresh-auth UI'); assert.match(document.body.textContent, /re-enter any key/);
     const challengedCount = postCount(); await React.act(async () => qc.setQueryData(['me', auth.getAuthSnapshot().uid], { ...owner.user, is_superuser: false })); await React.act(async () => releaseAuth(true)); await settle();
     assert.equal(postCount(), challengedCount, 'Fresh-auth completion cannot replay old credentials after revocation');
     await signIn(); mock.setMockAssistantSetupScenario('ready'); await render(7); await input('assistant-replacement-key', SENTINEL);
-    mock.armMockResponseOnce('POST', path, { extraDelayMs: 450 }); await click('Check and save key', false); await settle(270);
+    mock.armMockResponseOnce('POST', path, { extraDelayMs: 450 }); await click('Check and save key', false);
+    let written; await React.act(async () => { written = await api.getAssistantSetup(); });
+    assert.equal(written.verify.ok, true, 'Server processed the credential before the delayed response is released');
+    assert(button('Refresh setup').disabled, 'Credential response remains deferred');
     await React.act(async () => auth.logout()); await settle(750);
     assert.match(document.body.textContent, /Owner access required/); assert(!document.querySelector('input[type=password]')); assert(!document.body.textContent.includes('Configuration saved')); cacheSafe();
     // A held auth preflight must recheck owner and session immediately before transmission.
@@ -165,7 +182,7 @@ try {
     let releaseGate; let gateCount = 0; client.installAuthHooks({ preRequest: () => gateCount++ === 0 ? new Promise((resolve) => { releaseGate = resolve; }) : Promise.resolve(), authHeader: () => `Bearer ${auth.getAccessToken()}` });
     const beforeGate = postCount(); await click('Check and save key', false);
     await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken()));
-    await React.act(async () => releaseGate()); await settle(); assert.equal(postCount(), beforeGate, 'Session replacement during auth wait cannot transmit the old draft');
+    await React.act(async () => releaseGate()); await waitFor(ready, 'Replacement read finishes after the stale preflight is released'); assert.equal(postCount(), beforeGate, 'Session replacement during auth wait cannot transmit the old draft');
     cacheSafe();
     const [source, release] = await Promise.all([readFile('packages/portal-mojo/src/admin/assistant/AssistantSetupPage.tsx', 'utf8'), readFile('package.json', 'utf8')]);
     assert.doesNotMatch(source, /withFreshAuth|useMutation|useQuery\(|defineModel|localStorage|sessionStorage|console\./);
