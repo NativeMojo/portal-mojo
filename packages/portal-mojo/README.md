@@ -145,3 +145,15 @@ The non-negotiables live in the repo root `PLAN.md` ("Architecture rules") and
 boundary; failure is unmissable; controlled inputs only; models are
 definitions + hooks (TanStack Query owns cache); `ReactNode` slots, never
 trusted-HTML strings; both themes from day one.
+
+### Owner-only AI Assistant setup
+
+The Assistant domain includes a dedicated `/assistant/setup` page (also embedded
+under the Admin mount prefix), protected by the additive literal-superuser
+`AdminRoute.requireSuperuser` / `MenuItem.requireSuperuser` gate. It provides
+explicit key check/save and enablement, with separate advanced Platform key,
+deployed policy/safety, remote access and incident triage sections. Setup secrets
+and actions stay page-local and cache-free. Fresh-auth requires key re-entry,
+and deployment owns the runtime route. See [Admin Assistant](docs/admin-assistant.md)
+for exact schema-2 actions, lifecycle guarantees, mock showcase and verification;
+[Admin credentials](docs/admin-credentials.md) documents the shared core gate.

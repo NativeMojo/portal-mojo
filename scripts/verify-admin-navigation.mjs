@@ -110,6 +110,15 @@ try {
     assert.equal(menus.itemVisible(alpha, ctx({}, { view_alpha: true, manage_alpha: true })), false,
         'active-group member grants must not satisfy sys.* Admin clauses');
 
+    assert(admin.adminSectionRoutes([admin.ASSISTANT_ADMIN_SECTION], { mount: '/system' }).some((route) => route.path === 'system/assistant/setup'));
+    for (const grouped of [false, true]) {
+        const setupMenu = admin.adminSectionsMenu([admin.ASSISTANT_ADMIN_SECTION], { grouped, mount: '/system' });
+        const walk = (items) => items.flatMap((item) => [item, ...walk(item.children ?? [])]);
+        const setup = walk(setupMenu.items).find((item) => item.route === '/system/assistant/setup');
+        assert(setup?.requireSuperuser, 'owner requirement survives both menu presentations');
+        assert.equal(menus.itemVisible(setup, ctx({ admin: true, manage_settings: true, assistant: true }, { admin: true })), false);
+        assert.equal(menus.itemVisible(setup, { me: { id: 1, is_superuser: true }, member: null, group: null }), true);
+    }
     console.log('admin navigation contract verified');
 } finally {
     await server.close();

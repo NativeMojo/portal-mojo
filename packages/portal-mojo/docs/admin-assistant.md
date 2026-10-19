@@ -2,7 +2,109 @@
 
 Import from `portal-mojo/admin`.
 
-`ASSISTANT_ADMIN_SECTION` registers Conversations, Skills, and Memory beneath the Assistant navigation group. Its section clause is global-only ANY-of `sys.view_admin` or `sys.assistant`; Memory narrows its route to `sys.assistant`, matching the backend. Active-group grants never reveal it. `AssistantLauncher` uses the section gate. `AssistantContextLauncher` additionally requires `sys.view_security` or `sys.security` and only accepts `incident.Incident` or `incident.Ticket`.
+`ASSISTANT_ADMIN_SECTION` registers Setup, Conversations, Skills, and Memory beneath the Assistant navigation group. Its section clause is global-only ANY-of `sys.view_admin` or `sys.assistant`; Memory narrows its route to `sys.assistant`, matching the backend. Active-group grants never reveal it. `AssistantLauncher` uses the section gate. `AssistantContextLauncher` additionally requires `sys.view_security` or `sys.security` and only accepts `incident.Incident` or `incident.Ticket`.
+
+## AI Assistant setup
+
+`AssistantSetupPage` is a dedicated global owner page at `/assistant/setup`, or
+`/system/assistant/setup` when the Admin helpers receive `mount: '/system'`.
+The literal `me.is_superuser === true` requirement applies before lazy loading,
+in grouped and ordinary menu entries, landing selection, direct component
+mounting and every action. Permission-driven `admin`, `manage_settings`,
+Assistant permissions and member/group grants cannot satisfy it. The server
+also rejects confined ApiKey/GroupScopedToken sessions and enforces person
+ownership; the client does not invent a broader per-user-key ban.
+
+The basic section shows deployment readiness, exact provider/model/key
+selection, credential source and optional server hint, blank replacement input,
+Check and save key, Check current key and enable/disable. A configured key and
+an enabled switch do not prove readiness. `route.ready` describes configuration,
+not current provider health. Unknown routes remain unknown: a missing
+credential can cause the backend to omit the entire route. Only an explicit
+`handler` route points to the Platform credential section. Bedrock uses AWS
+identity from deployment. Assistant, Platform and AWS credentials never
+substitute for one another. Missing Assistant/realtime applications are also
+reported. Runtime model identifiers preserve provider punctuation, including
+Bedrock colons; only the legacy pin uses the backend's restricted pin syntax.
+
+Advanced native details separate Platform credentials, deployed policy/safety,
+remote access/connections and incident triage. Policy activation acknowledges
+the deployed policy on this node, does not edit it and never establishes
+fleet-wide agreement. Static, database and effective emergency stops are
+separate; only the database switch is writable. Activation and breaker reset
+cannot release a stop. The legacy pin/catalogue is explicitly separate from
+the deployed runtime model. Refresh catalogue is an explicit provider request;
+Check public discovery explicitly probes this installation's public address
+(server cache: 60 seconds). Ordinary page reads trigger neither probe.
+
+Both credential drafts and all setup operations stay imperative and page-local.
+There is no autosave, model definition, Query/Mutation entry, browser
+persistence, export, URL value or secret-bearing mock history. The backend
+checks a replacement before encrypted storage; a candidate-only verification
+never updates the stored-key check record. Successful credential saves and
+clears empty the relevant draft. Clearing protected storage may reveal a
+deployment fallback, so the returned source remains authoritative. Fixed
+backend pre-write rejection/unreachable messages map to safe actionable copy;
+unknown failures refresh authoritative state and report an uncertain outcome
+without replaying the operation.
+
+One operation/confirmation lock, AbortSignal and live owner/session guard cover
+loads, confirmations, auth waits and late responses. Leaving the page,
+revocation, logout or explicit session replacement discards drafts and pending
+work. Ordinary same-tab token renewal preserves a draft. Cross-tab auth-storage
+changes conservatively discard it: the shared auth API cannot distinguish
+renewal from same-person replacement across tabs. A 440 uses the existing
+fresh-auth UI after clearing credential drafts; even successful reauthentication
+requires explicit re-entry/retry. No secret is silently replayed. Confirmation
+is page-local, focuses Cancel, and ends with the page/session scope.
+
+Protocol helpers are exported from `portal-mojo/admin/assistant`:
+`getAssistantSetup(options, probe?)`, `mutateAssistantSetup(action, options)`,
+`assistantSetupSave(state, changes)`, `projectAssistantSetup`,
+`assistantSetupReadiness`, and `assistantSetupCredentialRefusal`. Options accept
+`signal` and a `beforeSend` validity guard; mutation helpers enforce same-origin
+before and after auth preflight and use the existing `mojoCall` envelope boundary.
+`schema_version: 2` responses are positively projected with bounds of 200
+connections/request aggregates and 100 breaker rows.
+
+| Request | Exact body / query |
+|---|---|
+| Passive GET `/api/account/admin/assistant` | No probe parameters |
+| Explicit catalogue / discovery GET | `refresh=models` / `check=discovery` |
+| Save POST | `{action:'save',enabled:boolean,model:string}` plus only intended optional `api_key`, `clear_api_key`, `handler_api_key`, `clear_handler_api_key`, `mcp_enabled`, `emergency_stop`, `autonomous_triage` |
+| Verify POST | `{action:'verify',target:'assistant'|'handler',api_key?}`; omitted candidate checks that exact stored credential |
+| Policy POST | Exactly `{action:'activate_policy'}`; `activated:boolean` |
+| Breaker POST | `{action:'reset_breaker',provider?:'anthropic'|'bedrock'}`; `reset:number` |
+| Historical triage POST | Exactly `{action:'historical_triage',before:ISO,limit:1..100}`; `queued:number` |
+| Disconnect POST | Exactly `{action:'revoke_grant',grant_id:positiveInteger}` or `{action:'revoke_all_grants'}`; `revoked:number` |
+
+Every mutation returns fresh `state` plus the action result. Verification may
+return `result.ok:false` in a successful envelope; that remains a failed check.
+Save always sends authoritative `enabled` and the selected legacy `model`:
+the backend writes both even when omitted. Optional section switches are not
+echoed during unrelated saves, and effective stop is never used as the database
+stop. Replacement and clear are separate operations. The server retains its
+600-second fresh-auth, protected settings, auditing and same-origin checks;
+generic Settings still cannot write the Assistant-owned protected keys.
+
+Remote access off pauses existing grants without revoking them. The connection
+count remains the full server count when rows are capped at 200. Tools, Full API
+and combined grants are labeled separately; Full API carries the signed-in
+user's API authority. Disconnect all spans both resource paths for every user.
+Returned addresses are inert text/read-only select-to-copy inputs. Triage
+activation establishes the no-history watermark; historical processing requires
+an explicit cutoff, bounded limit and confirmation.
+
+The mock-only Assistant showcase adds Setup with explicit fake owner/denied
+permission-admin buttons, a one-shot fresh-auth challenge button, and ready, missing policy/key, handler, Bedrock, static
+stop, rejected key, discovery failure, bounded-grants and deployment-fallback
+scenarios. Seeded `assistant.owner@nativemojo.com` is a literal superuser;
+`assistant.wildcard@nativemojo.com` has permission-driven admin only. Both use
+fake password `mojo`. No real credentials or deployment changes belong in demos.
+`verify:admin-assistant-setup` covers wire contracts, owner navigation/admission,
+projections and mounted auth/draft/confirmation/fresh-auth/transport/cache
+lifecycle; it is wired into `verify:release`. Browser checks separately establish
+both-theme layout, native details, keyboard controls and console behavior.
 
 ## Conversation transport
 

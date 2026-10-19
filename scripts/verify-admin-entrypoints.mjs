@@ -92,5 +92,17 @@ try {
     renderRoute({ lazy: true });
     assert.equal(allowedLoads, 1, 'an allowed route must invoke its loader inside the guards');
     assert.equal('component' in lazySection.routes[0], false, 'lazy routes never infer from callability');
+    let ownerLoads = 0;
+    const ownerSection = { ...lazySection, routes: [{ path: 'setup', requireSuperuser: true, loadComponent: async () => { ownerLoads++; return { default: SyncPage }; } }] };
+    const ownerRoute = core.adminSectionRoutes([ownerSection], { mount: '/system' }).find((route) => route.path === 'system/lazy/setup');
+    const renderOwner = (user) => {
+        const client = new QueryClient(); client.setQueryData(['me', null], user);
+        renderToString(createElement(QueryClientProvider, { client }, ownerRoute.element));
+    };
+    renderOwner({ id: 1, permissions: { admin: true, lazy: true } });
+    renderOwner({ id: 1, is_superuser: 1, permissions: { admin: true } });
+    assert.equal(ownerLoads, 0, 'permission admin and nonliteral owner cannot load owner-only chunks');
+    renderOwner({ id: 1, is_superuser: true, permissions: {} });
+    assert.equal(ownerLoads, 1, 'literal owner can load the protected chunk');
     console.log('admin entrypoints, source exports, side effects, registry identity and lazy contract verified');
 } finally { await server.close(); }

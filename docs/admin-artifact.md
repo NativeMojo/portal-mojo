@@ -194,3 +194,25 @@ uploads/blob/media/email/realtime, and negative CSP checks. Upstream defects
 reopen #1263 and require a newly verified artifact and updated pinned digest.
 There is no scaffolder or capabilities-handshake prerequisite for this artifact;
 those are independent future product work. Embedded section architecture remains.
+
+## Assistant Setup producer and framework handoff (#8580)
+
+The Portal producer now includes the owner-only `/assistant/setup` lazy page and
+its schema-2 protected Assistant endpoint client. Deliver the complete canonical
+artifact using the pinned toolchain above, record its source revision, package
+version, committed lockfile SHA-256, final manifest-byte SHA-256 and retrieval
+location, and attach the two-build reproducibility evidence. CI retains
+`portal-mojo-admin-<version>-<full-revision>`; a local canonical `dist/admin`
+retrieval path is also valid evidence. Draft builds must not be consumed.
+
+Django owns the separate vendoring step: copy the complete exact inventory,
+verify the producer's manifest digest before/after transfer and record that
+same digest on its consuming work item. Do not rebuild the Portal source inside
+the framework or copy only a visible entry chunk. After vendoring, Django must
+perform protected-browser acceptance under its real same-origin asset mount:
+owner navigation/direct Setup access, denied permission-admin sessions, stale
+600-second authentication with explicit key re-entry, CSP/lazy assets and the
+schema-2 backend response. Owners enter any real credential directly in that
+protected browser; agents never obtain keys or change environments. Portal
+artifact delivery proves producer readiness, not completed framework vendoring
+or production activation. Existing Voice6533 activation stays independent.

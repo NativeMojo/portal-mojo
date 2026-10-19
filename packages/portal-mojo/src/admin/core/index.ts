@@ -40,6 +40,8 @@ type AdminRouteBase = {
     permissions?: PermSpec;
     label?: string;
     fallbackToFirstVisible?: boolean;
+    /** Literal installation owner; permission and group grants cannot satisfy it. */
+    requireSuperuser?: boolean;
 };
 
 /** External routes may stay synchronous; packaged routes use the explicit lazy arm. */
@@ -114,6 +116,11 @@ function AdminDenied() {
         createElement('p', { className: 'dim' }, 'Your account does not have permission to open this admin page.')));
 }
 
+function AdminOwnerOnly({ children }: { children: ReactNode }) {
+    const { data: me } = useMe();
+    return me?.is_superuser === true ? children : createElement(AdminDenied);
+}
+
 function routeElement(route: AdminRoute): ReactNode {
     return 'loadComponent' in route
         ? createElement(AdminLazyPage, { load: route.loadComponent! })
@@ -124,7 +131,9 @@ function guardedElement(section: AdminSection, route: AdminRoute, sections: read
     const fallback = route.fallbackToFirstVisible
         ? createElement(AdminMountLanding, { sections: sections.filter((candidate) => candidate !== section), mount })
         : createElement(AdminDenied);
-    const page = routeElement(route);
+    const page = route.requireSuperuser
+        ? createElement(AdminOwnerOnly, { children: routeElement(route) })
+        : routeElement(route);
     const routeGuarded = route.permissions
         ? createElement(Guarded, { permission: route.permissions, fallback, children: page })
         : page;
@@ -150,7 +159,8 @@ export function AdminGlobalScope({ children }: { children: ReactNode }) {
 }
 
 function routeVisible(section: AdminSection, route: AdminRoute, me: ReturnType<typeof useMe>['data']): boolean {
-    return hasPermission(me ?? null, section.permissions, null)
+    return (!route.requireSuperuser || me?.is_superuser === true)
+        && hasPermission(me ?? null, section.permissions, null)
         && (!route.permissions || hasPermission(me ?? null, route.permissions, null));
 }
 
@@ -207,7 +217,7 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
             const labeled = section.routes.filter((route) => route.label);
             const destinations: MenuItem[] = labeled.length > 0 ? labeled.map((route) => ({
                 id: `admin:${section.id}:${route.path || 'index'}`, label: route.label!, keywords: [section.title],
-                route: absolutePath(base, route.path), exact: true, permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
+                route: absolutePath(base, route.path), exact: true, requireSuperuser: route.requireSuperuser, permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
             })) : [{ id: `admin:${section.id}`, label: section.title, keywords: [section.title], route: absolutePath(base), exact: true, permissionClauses: [section.permissions] }];
             if (section.navigationGroup === null) {
                 items.push(...destinations.map((destination) => ({ ...destination, icon: section.icon })));
@@ -228,7 +238,7 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
         items.push({
             label: section.title, icon: section.icon, permissions: section.permissions,
             ...(base ? { route: absolutePath(base), exact: true } : {}),
-            children: labeled.map((route) => ({ label: route.label!, route: absolutePath(base, route.path), exact: true, permissions: route.permissions })),
+            children: labeled.map((route) => ({ label: route.label!, route: absolutePath(base, route.path), exact: true, permissions: route.permissions, requireSuperuser: route.requireSuperuser })),
         });
     }
     return { name: opts.name ?? 'admin', scope: 'admin', presentation: opts.presentation ?? 'static', items };

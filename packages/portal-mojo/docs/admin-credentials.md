@@ -26,6 +26,17 @@ use `basePath: ''`; its labeled routes become visible child links rather than
 claiming `/`. Prefixed sections receive an index redirect to the first route
 the current operator can see.
 
+## Literal-owner routes
+
+`AdminRoute.requireSuperuser?: boolean` is an additive opt-in gate. It requires
+literal `me.is_superuser === true` before a lazy page can load and during
+section/mount landing selection. `adminSectionsMenu` carries it into grouped
+and ordinary `MenuItem.requireSuperuser` entries. Permission-driven admin and
+group grants never satisfy it; existing permission semantics remain unchanged.
+Built-in Assistant Setup uses this gate and additionally checks live ownership
+and session lifetime within the component/actions. Toolkit consumers can opt
+into the same route/menu guard without changing other routes.
+
 ## Group API keys
 
 ```tsx

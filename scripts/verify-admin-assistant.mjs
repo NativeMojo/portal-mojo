@@ -52,7 +52,7 @@ try {
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
 
     assert.deepEqual(admin.ASSISTANT_PERMISSIONS, ['sys.view_admin', 'sys.assistant']);
-    assert.deepEqual(admin.ASSISTANT_ADMIN_SECTION.routes.map((route) => route.path), ['conversations', 'skills', 'memories']);
+    assert.deepEqual(admin.ASSISTANT_ADMIN_SECTION.routes.map((route) => route.path), ['setup', 'conversations', 'skills', 'memories']);
     assert(admin.ADMIN_SECTIONS.includes(admin.ASSISTANT_ADMIN_SECTION));
     assert.equal(me.hasPermission({ id: 42, permissions: {} }, 'sys.assistant', { permissions: { assistant: true } }), false);
 

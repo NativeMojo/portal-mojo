@@ -32,7 +32,7 @@ export * from './realtime-mock';
 export * from './types';
 // Dev affordance: per-endpoint call counts from the mock (single-flight proof).
 export {
-    armMockReauth, clearMockRequestHistory, getMockCallCounts,
+    armMockReauth, clearMockRequestHistory, getMockCallCounts, setMockAssistantSetupScenario,
     getMockRequestHistory, setMockDnsConfigMalformed, setMockDnsAcmeMode, armMockDnsWriteFault,
     getMockPhoneConfigCredentialState, getMockEffectivePhoneConfigId,
     deleteMockPhoneGroupForTest,
@@ -40,3 +40,5 @@ export {
     getMockPushConfigCredentialState,
     armMockUploadFault, armMockRecordNoteFault, clearMockUploadObservations, getMockUploadObservations, setMockUploadMode,
 } from './mock';
+
+export type { MockAssistantSetupScenario } from './mock';

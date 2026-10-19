@@ -35,6 +35,8 @@ export interface MenuItem {
     children?: MenuItem[];
     /** Permission name(s) required to see the item (ANY-of; member-aware). */
     permissions?: string | string[];
+    /** Opt-in literal-superuser gate, independent of permission wildcards. */
+    requireSuperuser?: boolean;
     /**
      * Additional permission clauses: ANY within one clause, AND across clauses.
      * `permissions`, when present, is evaluated as one more required clause.
@@ -151,6 +153,7 @@ export function routesMatch(itemRoute: string, pathname: string, exact = false):
 /** Permission + group-kind visibility for one item (dividers always show). */
 export function itemVisible(item: MenuItem, ctx: MenuContext): boolean {
     if (item.divider) return true;
+    if (item.requireSuperuser && ctx.me?.is_superuser !== true) return false;
     if (item.permissions && !hasPermission(ctx.me, item.permissions, ctx.member)) return false;
     if (item.permissionClauses?.some((clause) => !hasPermission(ctx.me, clause, ctx.member))) return false;
     if (item.requiresGroupKind) {

@@ -1,3 +1,4 @@
+import type { AssistantSetupState, SetupCheck } from '../admin/assistant/setup';
 import { fleetMock } from './fleet-mock';
 import { describeRenditions, validateRenditionSetting } from './renditions-mock';
 // In-memory django-mojo mock. Speaks the EXACT wire contract the real client
@@ -2790,6 +2791,14 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     pushMetricsViewer.is_active = true; pushMetricsViewer.is_superuser = false;
     pushMetricsViewer.username = 'push.metrics-viewer'; pushMetricsViewer.email = 'push.metrics-viewer@nativemojo.com';
     pushMetricsViewer.display_name = 'Push Metrics Viewer'; pushMetricsViewer.permissions = { view_metrics: true };
+    const assistantOwner = at(51);
+    assistantOwner.is_active = true; assistantOwner.is_superuser = true; assistantOwner.requires_mfa = false;
+    assistantOwner.username = 'assistant.owner'; assistantOwner.email = 'assistant.owner@nativemojo.com';
+    assistantOwner.display_name = 'Assistant Installation Owner'; assistantOwner.permissions = {};
+    const assistantWildcard = at(52);
+    assistantWildcard.is_active = true; assistantWildcard.is_superuser = false; assistantWildcard.requires_mfa = false;
+    assistantWildcard.username = 'assistant.wildcard'; assistantWildcard.email = 'assistant.wildcard@nativemojo.com';
+    assistantWildcard.display_name = 'Assistant Permission Admin'; assistantWildcard.permissions = { admin: true, manage_settings: true };
     const assistantManager = at(47);
     assistantManager.is_active = true; assistantManager.is_superuser = false;
     assistantManager.username = 'assistant.manager'; assistantManager.email = 'assistant.manager@nativemojo.com';
@@ -4905,6 +4914,99 @@ function publicAuthConfig(config: Record<string, unknown>): Record<string, unkno
             supporting_copy: login.supporting_copy ?? '',
         },
     };
+}
+
+// Owner-only Assistant setup. Fake fixtures retain configuration/check outcomes, NEVER submitted key bytes.
+export type MockAssistantSetupScenario = 'ready' | 'missing-policy' | 'missing-key' | 'handler' | 'bedrock' | 'static-stop' | 'rejected-key' | 'discovery-failure' | 'grants' | 'deployment';
+const mockSetupCheck = (ok: boolean | null = null): SetupCheck => ({ ok, code: ok === null ? '' : ok ? 'verified' : 'invalid_key', message: ok === null ? '' : ok ? 'Anthropic accepted this key.' : 'Anthropic rejected this key.', at: ok === null ? '' : '2026-10-19T12:00:00Z' });
+let setupScenario: MockAssistantSetupScenario = 'ready';
+let setupPolicy = true;
+let mockSetupState: AssistantSetupState;
+/** Resettable fake-only showcase/test seam. No environment, real credential or deployment writes. */
+export function setMockAssistantSetupScenario(scenario: MockAssistantSetupScenario): void {
+    setupScenario = scenario; setupPolicy = scenario !== 'missing-policy';
+    mockSetupState = {
+        schema_version: 2, enabled: scenario !== 'missing-key', key: { configured: scenario !== 'missing-key', source: scenario === 'missing-key' ? 'none' : scenario === 'deployment' ? 'deployment' : 'admin', hint: scenario === 'missing-key' ? '' : '••••DEMO' },
+        handler_key: { configured: true, source: 'deployment', hint: '••••FAKE' }, model: { selected: '', effective: 'claude-sonnet-4-6', source: 'automatic', choices: [{ id: 'claude-sonnet-4-6', label: 'Sonnet · fake catalogue' }] },
+        verify: mockSetupCheck(), handler_verify: mockSetupCheck(), emergency_stop: scenario === 'static-stop', emergency_stop_static: scenario === 'static-stop', emergency_stop_database: false,
+        route: { feature: 'assistant', provider: scenario === 'bedrock' ? 'bedrock' : 'anthropic', model: scenario === 'bedrock' ? 'us.amazon.nova-2-lite-v1:0' : 'claude-sonnet-4-6', credential: scenario === 'bedrock' ? 'aws' : scenario === 'handler' ? 'handler' : 'admin', credential_configured: true, ready: true, error: '' },
+        autonomous_triage: false, autonomous_triage_activated_at: '', assistant_installed: true, realtime_installed: true,
+        mcp: { enabled: true, path: '/api/assistant/mcp/', url: 'https://demo.example.test/api/assistant/mcp/', discovery_url: 'https://demo.example.test/.well-known/oauth-protected-resource/api/assistant/mcp/', discovery: { ok: null, code: '', detail: '', checked_at: '' }, grant_count: 2,
+            grants: [1, 2].map((id) => ({ id, client: { id, client_id: `fake-client-${id}`, name: `Demo agent ${id}` }, user: { id: 51, email: 'assistant.owner@nativemojo.com', display_name: 'Demo Owner' }, resource: id === 1 ? 'https://demo.example.test/api/assistant/mcp/' : 'https://demo.example.test/api/', scopes: [id === 1 ? 'mcp' : 'api'], access: id === 1 ? 'tools' : 'api', created: '2026-10-18T12:00:00Z', last_used: '2026-10-19T12:00:00Z', expires: '2026-10-26T12:00:00Z', is_active: true, revoked_reason: '' })) },
+        safety: { hours: 24, error: '', requests: [{ provider: 'anthropic', feature: 'assistant', status: 'success', requests: 12, input_tokens: 500, output_tokens: 200 }], breakers: [{ provider: 'anthropic', state: 'closed', error_code: '', count: 1 }] },
+    };
+    if (scenario === 'grants') mockSetupState.mcp.grant_count = 202;
+}
+setMockAssistantSetupScenario('ready');
+function setupWireState(): AssistantSetupState {
+    const state = structuredClone(mockSetupState);
+    const credential = state.route.credential;
+    const configured = credential === 'aws' || (credential === 'handler' ? state.handler_key.configured : state.key.configured);
+    state.emergency_stop = state.emergency_stop_static || state.emergency_stop_database;
+    if (!setupPolicy || !configured) state.route = { feature: 'assistant', provider: '', model: '', credential: '', credential_configured: false, ready: false, error: !setupPolicy ? 'policy_not_activated' : 'credential_missing' };
+    else state.route = { ...state.route, credential_configured: true, ready: !state.emergency_stop, error: state.emergency_stop ? 'emergency_stopped' : '' };
+    state.model.effective = state.route.model;
+    return state;
+}
+function assistantSetupFetch(method: string, opts: MockFetchOpts): unknown {
+    const caller = userFromBearer(opts.headers);
+    const claims = decodeMockJwt((opts.headers?.Authorization ?? '').replace(/^Bearer /, ''));
+    const bad = (error = 'Invalid Assistant setup action') => ({ status: false, error, error_code: 400 });
+    if (!caller) return permissionDenied(401);
+    if (caller.is_superuser !== true || claims?.credential_kind === 'api_key' || claims?.credential_kind === 'group_scoped_token') return permissionDenied();
+    if (method === 'GET') {
+        if (opts.params?.check === 'discovery') mockSetupState.mcp.discovery = { ok: setupScenario !== 'discovery-failure' && mockSetupState.mcp.enabled, code: setupScenario === 'discovery-failure' ? 'status' : mockSetupState.mcp.enabled ? 'ok' : 'disabled', detail: setupScenario === 'discovery-failure' ? 'The public address did not serve the discovery document.' : mockSetupState.mcp.enabled ? 'The discovery document is reachable at the public address.' : 'Remote agent access is switched off.', checked_at: '2026-10-19T12:00:00Z' };
+        return { status: true, data: setupWireState() };
+    }
+    if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+    const authTime = authTimeFromBearer(opts.headers);
+    if (authTime === undefined || Date.now() / 1000 - authTime > 600) return { status: false, error: 'reauth_required', error_code: 440 };
+    // Browser requests naturally supply Origin; the mock accepts omission and rejects an explicit mismatch.
+    if (opts.headers?.Origin && opts.headers.Origin !== window.location.origin) return permissionDenied();
+    const body = opts.body ?? {}; const action = body.action;
+    const keys: Record<string, string[]> = { save: ['action', 'enabled', 'model', 'api_key', 'clear_api_key', 'handler_api_key', 'clear_handler_api_key', 'mcp_enabled', 'emergency_stop', 'autonomous_triage'], verify: ['action', 'target', 'api_key'], activate_policy: ['action'], reset_breaker: ['action', 'provider'], historical_triage: ['action', 'before', 'limit'], revoke_grant: ['action', 'grant_id'], revoke_all_grants: ['action'] };
+    if (typeof action !== 'string' || !keys[action] || Object.keys(body).some((key) => !keys[action]!.includes(key))) return bad();
+    const result: Record<string, unknown> = { schema_version: 2 };
+    const candidateValid = (value: unknown) => value == null || value === '' || (typeof value === 'string' && value.length <= 4096 && !/\s/.test(value.trim()));
+    const accepted = (value: unknown) => setupScenario !== 'rejected-key' && !(typeof value === 'string' && value.includes('reject'));
+    if (action === 'save') {
+        if (typeof body.enabled !== 'boolean' || typeof body.model !== 'string' || (body.model !== '' && !/^[a-z0-9][a-z0-9.\-]{0,80}$/.test(body.model))) return bad();
+        for (const key of ['mcp_enabled', 'emergency_stop', 'autonomous_triage']) if (body[key] != null && typeof body[key] !== 'boolean') return bad();
+        for (const key of ['api_key', 'handler_api_key']) if (!candidateValid(body[key]) || (body[key] && body[`clear_${key}`] === true)) return bad();
+        if (body.api_key && !accepted(body.api_key)) return bad('The api key was not accepted. Anthropic rejected this key.');
+        if (body.handler_api_key && !accepted(body.handler_api_key)) return bad('The handler api key was not accepted. Anthropic rejected this key.');
+        for (const [input, target, check] of [['api_key', 'key', 'verify'], ['handler_api_key', 'handler_key', 'handler_verify']] as const) {
+            if (body[`clear_${input}`] === true) {
+                // A protected clear may expose deployment fallback. No credential bytes are retained.
+                mockSetupState[target] = { configured: setupScenario === 'deployment' || target === 'handler_key', source: setupScenario === 'deployment' || target === 'handler_key' ? 'deployment' : 'none', hint: setupScenario === 'deployment' || target === 'handler_key' ? '••••FAKE' : '' }; mockSetupState[check] = mockSetupCheck();
+            } else if (body[input]) { mockSetupState[target] = { configured: true, source: 'admin', hint: '••••DEMO' }; mockSetupState[check] = mockSetupCheck(true); }
+        }
+        mockSetupState.enabled = body.enabled; mockSetupState.model.selected = body.model;
+        if (typeof body.mcp_enabled === 'boolean') { mockSetupState.mcp.enabled = body.mcp_enabled; mockSetupState.mcp.discovery = { ok: null, code: '', detail: '', checked_at: '' }; }
+        if (typeof body.emergency_stop === 'boolean') mockSetupState.emergency_stop_database = body.emergency_stop;
+        if (typeof body.autonomous_triage === 'boolean') { if (body.autonomous_triage && !mockSetupState.autonomous_triage) mockSetupState.autonomous_triage_activated_at = '2026-10-19T12:00:00Z'; mockSetupState.autonomous_triage = body.autonomous_triage; }
+        result.saved = true;
+    } else if (action === 'verify') {
+        if (body.target !== undefined && body.target !== '' && body.target !== 'assistant' && body.target !== 'handler') return bad();
+        if (!candidateValid(body.api_key)) return bad();
+        const target = body.target === 'handler' ? 'handler_key' : 'key'; const stored = !body.api_key;
+        const configured = stored ? mockSetupState[target].configured : true;
+        const check = configured ? mockSetupCheck(accepted(body.api_key)) : { ok: false, code: 'not_configured', message: 'No API key is configured to check.', at: '' };
+        if (stored && configured) mockSetupState[target === 'key' ? 'verify' : 'handler_verify'] = check;
+        result.verified = true; result.result = check;
+    } else if (action === 'activate_policy') { setupPolicy = true; result.activated = true;
+    } else if (action === 'reset_breaker') {
+        if (body.provider !== undefined && body.provider !== 'anthropic' && body.provider !== 'bedrock') return bad();
+        const rows = mockSetupState.safety.breakers.filter((row) => body.provider === undefined || row.provider === body.provider);
+        result.reset = rows.reduce((count, row) => count + row.count, 0); for (const row of rows) { row.state = 'closed'; row.error_code = ''; }
+    } else if (action === 'historical_triage') {
+        if (Object.keys(body).length !== 3 || typeof body.before !== 'string' || !/^\d{4}-\d\d-\d\dT/.test(body.before) || !Number.isFinite(Date.parse(body.before)) || typeof body.limit !== 'number' || !Number.isInteger(body.limit) || body.limit < 1 || body.limit > 100) return bad();
+        result.queued = Math.min(body.limit, 3);
+    } else if (action === 'revoke_grant') {
+        if (Object.keys(body).length !== 2 || typeof body.grant_id !== 'number' || !Number.isSafeInteger(body.grant_id) || body.grant_id <= 0) return bad();
+        const found = mockSetupState.mcp.grants.some((row) => row.id === body.grant_id); mockSetupState.mcp.grants = mockSetupState.mcp.grants.filter((row) => row.id !== body.grant_id); if (found) mockSetupState.mcp.grant_count--; result.revoked = found ? 1 : 0;
+    } else { result.revoked = mockSetupState.mcp.grant_count; mockSetupState.mcp.grants = []; mockSetupState.mcp.grant_count = 0; }
+    return { status: true, data: { ...result, state: setupWireState() } };
 }
 
 // ══ System Sign-in admin (#5547) — GET/POST /api/account/admin/signin ══
@@ -9624,6 +9726,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         const had = db.throttle.delete(uid);
         return { status: true, data: { deleted: had ? 1 : 0 } };
     }
+    if (path === '/api/account/admin/assistant') return assistantSetupFetch(method, opts);
     if (path === '/api/account/admin/signin') return signinFetch(method, opts.body ?? {}, opts.headers);
     if (path === '/api/login' || path === '/api/token/refresh' || path.startsWith('/api/auth/')) {
         return authFetch(path, opts.body ?? {}, opts.params ?? {});

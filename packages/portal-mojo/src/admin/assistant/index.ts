@@ -9,3 +9,5 @@ export * from './pages';
 export * from './streaming';
 
 export { ASSISTANT_ADMIN_SECTION } from '../domains/assistant';
+export * from './setup';
+export * from './AssistantSetupPage';
