@@ -42,11 +42,12 @@ try {
     const artifact = packed[0];
     assert.equal(artifact.name, 'portal-mojo', 'packed package name must be portal-mojo');
     assert.match(artifact.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'package version must be SemVer');
-    // Audited #8272/#8142 integration: baseline 5,511,436 bytes; 543 intended
-    // source/docs/style files now total 5,523,983 bytes (1,490,393 compressed).
-    // 5.6 MB leaves 1.38% headroom; file/content and consumer checks remain below.
-    // With #8203 merged on 0.2.17: 5,526,074 bytes, 543 files (1.32% headroom).
-    assert.ok(artifact.unpackedSize <= 5_600_000, `unpacked package exceeds 5.6 MB budget (${artifact.unpackedSize})`);
+    // Audited #8758 at 344ad0a: 545 intended source/docs/style files total
+    // 5,613,524 unpacked bytes (1,516,864 compressed). Baseline 413100d was
+    // 5,592,671 bytes; five Assistant files add 20,853 bytes, with no new files.
+    // 5.65 MB leaves 36,476 bytes (0.65%) headroom. All file/content/consumer
+    // assertions below and the independent runtime bundle budgets stay intact.
+    assert.ok(artifact.unpackedSize <= 5_650_000, `unpacked package exceeds 5.65 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).
