@@ -165,15 +165,24 @@ export function toMs(value: number | string | null | undefined): number | null {
 export function dayLabel(value: number | string | null | undefined): string {
     // Calendar parts, not the instant: a date-only value is its own day in
     // every zone (a UTC-midnight instant reads as the day before west of UTC).
+    // Both days become UTC-midnight stamps of their calendar fields, so no
+    // local midnight (which a zone can skip) and no 2-digit-year mapping is
+    // involved, and the label is formatted in UTC from those same fields.
     const p = dateFns.calendarParts(value);
     if (!p) return 'Unknown date';
-    const d = p.precision === 'instant' ? new Date(toMs(value)!) : new Date(p.y, p.m - 1, p.d);
-    const today = new Date();
-    const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-    const diffDays = Math.round((startOf(today) - startOf(d)) / 864e5);
+    const now = new Date();
+    const day = utcDay(p.y, p.m, p.d);
+    const diffDays = Math.round((utcDay(now.getFullYear(), now.getMonth() + 1, now.getDate()) - day) / 864e5);
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return new Date(day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+/** Epoch ms of UTC midnight on a calendar day; setUTCFullYear keeps years 0–99. */
+function utcDay(y: number, m: number, d: number): number {
+    const t = new Date(0);
+    t.setUTCFullYear(y, m - 1, d);
+    return t.getTime();
 }
 
 /**

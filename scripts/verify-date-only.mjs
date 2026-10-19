@@ -11,7 +11,9 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const ZONES = ['America/Los_Angeles', 'UTC', 'Asia/Tokyo'];
+// Apia skipped 2011-12-30 entirely (it jumped across the date line), so a
+// local midnight on that day does not exist there.
+const ZONES = ['America/Los_Angeles', 'UTC', 'Asia/Tokyo', 'Pacific/Apia'];
 const self = fileURLToPath(import.meta.url);
 
 if (!process.env.VERIFY_DATE_ONLY_CHILD) {
@@ -50,6 +52,10 @@ const PINNED = {
         [ISO]: ['10/18/2026', 'Oct 18, 2026, 12:30 AM', '2026-10-18'],
         [EPOCH]: ['10/17/2026', 'Oct 17, 2026, 12:30 PM', '2026-10-17'],
     },
+    'Pacific/Apia': {
+        [ISO]: ['10/18/2026', 'Oct 18, 2026, 4:30 AM', '2026-10-18'],
+        [EPOCH]: ['10/17/2026', 'Oct 17, 2026, 4:30 PM', '2026-10-17'],
+    },
 };
 
 // The same in every zone: the value's own fields.
@@ -59,13 +65,18 @@ const DATE_ONLY = {
     '2026-11-01': ['11/01/2026', 'Nov 1, 2026', '2026-11-01'],
     '2026-10': ['10/2026', 'Oct 2026', '2026-10-01'],
     '2026': ['2026', '2026', '2026-01-01'],
+    '2011-12-30': ['12/30/2011', 'Dec 30, 2011', '2011-12-30'],
+    '0099-06-15': ['06/15/0099', 'Jun 15, 0099', '0099-06-15'],
 };
 
 try {
     const fmt = await server.ssrLoadModule('/packages/portal-mojo/src/ui/format.ts');
     const grouping = await server.ssrLoadModule('/packages/portal-mojo/src/ui/grouping.ts');
     const wire = await server.ssrLoadModule('/packages/portal-mojo/src/ui/field-wire.ts');
-    const dayKey = grouping.groupByDay((row) => row.value).groupBy;
+    const shared = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/users/sections/shared.tsx');
+    const byDay = grouping.groupByDay((row) => row.value);
+    const dayKey = byDay.groupBy;
+    const recency = grouping.groupByRecency((row) => row.value).groupBy;
     const shown = (value) => [fmt.date(value), fmt.datetime(value), dayKey({ value })];
 
     for (const [value, expected] of Object.entries(DATE_ONLY)) {
@@ -78,6 +89,47 @@ try {
     assert.deepEqual(shown(ISO), pinned[ISO], `${zone}: ISO datetime display changed`);
     assert.deepEqual(shown(EPOCH), pinned[EPOCH], `${zone}: epoch display changed`);
     assert.deepEqual(shown(String(EPOCH)), pinned[EPOCH], `${zone}: epoch-string display changed`);
+
+    // Labels with no frozen clock: these days are never today or yesterday.
+    assert.equal(shared.dayLabel('2011-12-30'), 'Fri, Dec 30', `${zone}: dayLabel on a day Apia skipped`);
+    assert.equal(shared.dayLabel('0099-06-15'), 'Mon, Jun 15', `${zone}: dayLabel for year 0099`);
+    assert.equal(byDay.groupHeaderLabel('0099-06-15'), 'Jun 15, 0099', `${zone}: day header for year 0099`);
+    assert.equal(shared.dayLabel(null), 'Unknown date');
+
+    // Today / Yesterday / recency against a frozen local "now", including the
+    // day after each US DST change.
+    const RealDate = Date;
+    const freeze = (y, m, d) => {
+        const fixed = new RealDate(y, m - 1, d, 12).getTime();
+        globalThis.Date = class extends RealDate {
+            constructor(...args) { super(...(args.length ? args : [fixed])); }
+            static now() { return fixed; }
+        };
+    };
+    try {
+        for (const [today, yesterday] of [['2026-10-19', '2026-10-18'], ['2026-03-09', '2026-03-08'], ['2026-11-02', '2026-11-01']]) {
+            freeze(...today.split('-').map(Number));
+            assert.equal(shared.dayLabel(today), 'Today', `${zone}: dayLabel ${today}`);
+            assert.equal(shared.dayLabel(yesterday), 'Yesterday', `${zone}: dayLabel ${yesterday}`);
+            assert.equal(recency({ value: today }), 'recency-0-today', `${zone}: recency ${today}`);
+            assert.equal(recency({ value: yesterday }), 'recency-1-yesterday', `${zone}: recency ${yesterday}`);
+            assert.equal(byDay.groupHeaderLabel(dayKey({ value: yesterday })), 'Yesterday', `${zone}: day header ${yesterday}`);
+        }
+        freeze(2026, 10, 19);
+        const buckets = {
+            '2026-10-14': 'recency-2-this-week',
+            '2026-10-02': 'recency-3-this-month',
+            '2026-03-08': 'recency-4-this-year',
+            '2026': 'recency-4-this-year',
+            '2025-12-31': 'recency-5-older',
+            '0099-06-15': 'recency-5-older',
+        };
+        for (const [value, expected] of Object.entries(buckets)) {
+            assert.equal(recency({ value }), expected, `${zone}: recency ${value}`);
+        }
+    } finally {
+        globalThis.Date = RealDate;
+    }
 
     assert.equal(fmt.date(null), '—');
     assert.equal(fmt.datetime('not a date', 'x'), 'x');

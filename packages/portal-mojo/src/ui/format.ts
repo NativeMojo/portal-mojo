@@ -93,6 +93,7 @@ const toDate = toDateSmart;
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function pad2(n: number): string { return n < 10 ? '0' + n : String(n); }
+function year4(y: number): string { return String(y).padStart(4, '0'); }
 
 // A date-only value ('YYYY-MM-DD' DateField, 'YYYY-MM', 'YYYY') is a calendar
 // day, not an instant: it shows its own fields at its own precision in every
@@ -105,9 +106,9 @@ function dateOnlyParts(value: unknown) {
 export function date(value: string | number | null | undefined, fallback = '—'): string {
     const p = dateOnlyParts(value);
     if (p) {
-        if (p.precision === 'year') return String(p.y);
-        if (p.precision === 'month') return `${pad2(p.m)}/${p.y}`;
-        return `${pad2(p.m)}/${pad2(p.d)}/${p.y}`;
+        if (p.precision === 'year') return year4(p.y);
+        if (p.precision === 'month') return `${pad2(p.m)}/${year4(p.y)}`;
+        return `${pad2(p.m)}/${pad2(p.d)}/${year4(p.y)}`;
     }
     const d = toDate(value);
     return d ? DATE_FMT.format(d) : fallback;
@@ -116,9 +117,9 @@ export function date(value: string | number | null | undefined, fallback = '—'
 export function datetime(value: string | number | null | undefined, fallback = '—'): string {
     const p = dateOnlyParts(value);
     if (p) {
-        if (p.precision === 'year') return String(p.y);
-        if (p.precision === 'month') return `${MONTHS_SHORT[p.m - 1]} ${p.y}`;
-        return `${MONTHS_SHORT[p.m - 1]} ${p.d}, ${p.y}`;
+        if (p.precision === 'year') return year4(p.y);
+        if (p.precision === 'month') return `${MONTHS_SHORT[p.m - 1]} ${year4(p.y)}`;
+        return `${MONTHS_SHORT[p.m - 1]} ${p.d}, ${year4(p.y)}`;
     }
     const d = toDate(value);
     return d ? DATETIME_FMT.format(d) : fallback;

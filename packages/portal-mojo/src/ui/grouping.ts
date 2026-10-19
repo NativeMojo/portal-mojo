@@ -24,20 +24,27 @@ function resolveAccessor<T extends Row>(fieldOrAccessor: string | Accessor<T>): 
  *  cell rendered inside it can never disagree about what day a row is on. */
 const toDate = toDateSmart;
 
-/** The local Date whose calendar day is the value's own: a date-only value
- *  ('YYYY-MM-DD') lands at local midnight of ITS day, so it buckets under
- *  that day in every zone; an instant is read in local time as before. */
-function toDayDate(raw: unknown): Date | null {
-    const p = calendarParts(raw);
-    if (!p) return null;
-    return p.precision === 'instant' ? toDate(raw) : new Date(p.y, p.m - 1, p.d);
+/** YYYY-MM-DD from calendar fields; the 4-digit year keeps keys sortable. */
+function partsKey(y: number, m: number, d: number): string {
+    return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 /** Stable local-time YYYY-MM-DD bucket key. */
 function isoDayKey(date: Date): string {
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${date.getFullYear()}-${m}-${d}`;
+    return partsKey(date.getFullYear(), date.getMonth() + 1, date.getDate());
+}
+
+/** The day a value is ON, as a key. A date-only value ('YYYY-MM-DD') keys by
+ *  its own fields and never passes through a local Date (local midnight can
+ *  be skipped by a zone, and `new Date(99, …)` means 1999), so it buckets
+ *  under that day in every zone; an instant is read in local time as before. */
+interface DayOf { key: string; y: number; m: number; instant: Date | null }
+function dayOf(raw: unknown): DayOf | null {
+    const p = calendarParts(raw);
+    if (!p) return null;
+    if (p.precision !== 'instant') return { key: partsKey(p.y, p.m, p.d), y: p.y, m: p.m, instant: null };
+    const date = toDate(raw);
+    return date ? { key: isoDayKey(date), y: date.getFullYear(), m: date.getMonth() + 1, instant: date } : null;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -52,7 +59,7 @@ function formatDayLabel(key: string): string {
     const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
     if (key === isoDayKey(yesterday)) return 'Yesterday';
     const label = `${MONTHS[month - 1] ?? ''} ${day}`;
-    return year === now.getFullYear() ? label : `${label}, ${year}`;
+    return year === now.getFullYear() ? label : `${label}, ${String(year).padStart(4, '0')}`;
 }
 
 export interface GroupSpec<T> {
@@ -65,8 +72,7 @@ export function groupByDay<T extends Row>(fieldOrAccessor: string | Accessor<T>)
     const access = resolveAccessor(fieldOrAccessor);
     return {
         groupBy: (row) => {
-            const date = toDayDate(access(row));
-            return date ? isoDayKey(date) : null;
+            return dayOf(access(row))?.key ?? null;
         },
         groupHeaderLabel: formatDayLabel,
     };
@@ -107,17 +113,17 @@ const RECENCY_LABELS: Record<string, string> = {
     'recency-5-older': 'Older',
 };
 
-function recencyBucketKey(date: Date | null): string | null {
-    if (!date) return null;
+function recencyBucketKey(day: DayOf | null): string | null {
+    if (!day) return null;
     const now = new Date();
-    const dateKey = isoDayKey(date);
-    if (dateKey === isoDayKey(now)) return 'recency-0-today';
+    if (day.key === isoDayKey(now)) return 'recency-0-today';
     const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    if (dateKey === isoDayKey(yesterday)) return 'recency-1-yesterday';
+    if (day.key === isoDayKey(yesterday)) return 'recency-1-yesterday';
     const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-    if (date >= sevenDaysAgo) return 'recency-2-this-week';
-    if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()) return 'recency-3-this-month';
-    if (date.getFullYear() === now.getFullYear()) return 'recency-4-this-year';
+    // An instant compares as an instant; a date-only day compares by key.
+    if (day.instant ? day.instant >= sevenDaysAgo : day.key >= isoDayKey(sevenDaysAgo)) return 'recency-2-this-week';
+    if (day.y === now.getFullYear() && day.m === now.getMonth() + 1) return 'recency-3-this-month';
+    if (day.y === now.getFullYear()) return 'recency-4-this-year';
     return 'recency-5-older';
 }
 
@@ -125,7 +131,7 @@ function recencyBucketKey(date: Date | null): string | null {
 export function groupByRecency<T extends Row>(fieldOrAccessor: string | Accessor<T>): GroupSpec<T> {
     const access = resolveAccessor(fieldOrAccessor);
     return {
-        groupBy: (row) => recencyBucketKey(toDayDate(access(row))),
+        groupBy: (row) => recencyBucketKey(dayOf(access(row))),
         groupHeaderLabel: (key) => RECENCY_LABELS[key] ?? key,
     };
 }
