@@ -20,7 +20,8 @@ export interface PasskeyRow {
     rp_id: string;
     is_enabled: boolean;
     sign_count: number;
-    transports: string | null;
+    /** WebAuthn transport hints as django-mojo stores them: a JSON list, `[]` when none. */
+    transports: string[];
     aaguid: string | null;
     last_used: number | null;
     created: number;

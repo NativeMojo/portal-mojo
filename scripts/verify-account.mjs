@@ -122,7 +122,7 @@ try {
     assert(options.user.id instanceof ArrayBuffer, 'publicKey.user.id is decoded to bytes');
     assert(options.excludeCredentials?.length > 0 && options.excludeCredentials.every((c) => c.id instanceof ArrayBuffer), 'excludeCredentials ids are decoded to bytes');
     assert.equal(registered.friendly_name, 'Work laptop', 'friendly_name is trimmed and sent');
-    assert.equal(registered.transports, 'internal,hybrid', 'transports ride at the credential top level');
+    assert.deepEqual(registered.transports, ['internal', 'hybrid'], 'transports ride at the credential top level and are stored as a list');
     // Decode by BYTES: pin known base64url values (no padding, '-' and '_'
     // in play) on begin and compare what reached navigator.credentials.create.
     const knownChallenge = Uint8Array.from({ length: 32 }, (_, i) => (251 + i * 37) & 0xff);
@@ -182,6 +182,7 @@ try {
     // ── Passkey reads are owner-scoped without a users grant ──
     const own = await mock.mockFetch('/api/account/passkeys', { headers: bearer(), params: { size: 100 } });
     assert(own.data.length >= 3 && own.data.every((row) => row.user?.id === me.id), 'a plain owner sees only their passkeys');
+    assert(own.data.every((row) => Array.isArray(row.transports)), 'passkey transports are a JSON list, as django-mojo serializes them');
     const manager = await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'showcase.operator@nativemojo.com', password: 'mojo' } });
     const managerHeaders = { Authorization: `Bearer ${manager.data.access_token}` };
     const scoped = await mock.mockFetch('/api/account/passkeys', { headers: managerHeaders, params: { user: me.id, size: 100 } });

@@ -34,7 +34,7 @@ export function shortDate(epochSeconds: number | null | undefined): string {
 }
 
 function passkeyIcon(row: PasskeyRow): string {
-    const transports = (row.transports ?? '').split(',');
+    const transports = Array.isArray(row.transports) ? row.transports : [];
     if (transports.includes('usb') || transports.includes('nfc')) return 'bi-usb-drive';
     const name = (row.friendly_name ?? '').toLowerCase();
     if (/iphone|android|phone/.test(name)) return 'bi-phone';
