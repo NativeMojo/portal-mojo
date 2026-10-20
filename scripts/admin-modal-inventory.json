@@ -3385,6 +3385,22 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:setTemporaryPassword:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
+      "owner": "setTemporaryPassword",
+      "launcher": "modal.open",
+      "body": [
+        "TemporaryPasswordModal"
+      ],
+      "category": "action",
+      "parent": "setTemporaryPassword",
+      "target": null,
+      "fingerprint": "9e67e378c621569a2e68",
+      "categories": [
+        "action"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:resetMfa:formModal:0",
       "file": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx",
       "owner": "resetMfa",

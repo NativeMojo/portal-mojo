@@ -64,6 +64,39 @@ try {
     const target = directory.data.find((row) => row.is_active && row.id !== 13);
     assert(target);
 
+    const temporaryPath = '/api/account/admin/user/password/temporary';
+    const temporaryTarget = directory.data.find((row) => row.is_active && !row.is_superuser && row.id !== 13);
+    assert(temporaryTarget, 'a non-superuser target is available');
+    const issueTemporary = (headers, user = temporaryTarget.id, method = 'POST') => mock.mockFetch(temporaryPath, { method, headers, body: { user } });
+    assert.equal((await issueTemporary(undefined)).error_code, 401, 'anonymous callers cannot issue temporary passwords');
+    assert.equal((await issueTemporary(ordinary)).error_code, 403, 'ordinary callers cannot issue temporary passwords');
+    assert.equal((await issueTemporary(manager, temporaryTarget.id, 'GET')).error_code, 405, 'issuance requires POST');
+    assert.equal((await issueTemporary(manager, 'invalid')).error_code, 400, 'invalid targets are refused');
+    assert.equal((await issueTemporary(manager, 999999)).error_code, 400, 'missing targets are refused');
+    const privilegedTarget = directory.data.find((row) => row.is_superuser);
+    assert(privilegedTarget, 'a superuser target is available');
+    assert.equal((await issueTemporary(manager, privilegedTarget.id)).error_code, 403, 'subordinate admins cannot recover superusers');
+    const withClaims = (extra) => {
+        const token = manager.Authorization.slice(7).split('.');
+        token[1] = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(token[1], 'base64url').toString()), ...extra })).toString('base64url');
+        return { Authorization: `Bearer ${token.join('.')}` };
+    };
+    assert.equal((await issueTemporary(withClaims({ auth_time: 1 }))).error_code, 440, 'stale sessions require fresh authentication');
+    for (const credential_kind of ['api_key', 'group_scoped_token']) {
+        assert.equal((await issueTemporary(withClaims({ credential_kind }))).error_code, 403, 'key-backed sessions cannot recover a user');
+    }
+    const oldSession = await login(temporaryTarget.email);
+    const issued = await issueTemporary(manager);
+    assert.equal(issued.status, true, 'an authorized fresh session can issue a temporary password');
+    assert.equal(issued.data.user, temporaryTarget.id);
+    assert.equal(issued.data.requires_password_change, true);
+    assert.equal(typeof issued.data.temporary_password, 'string');
+    assert(issued.data.temporary_password.length >= 18, 'a generated password is revealed once');
+    assert.equal((await mock.mockFetch('/api/user/me', { headers: oldSession })).error_code, 401, 'issuance revokes the target session');
+    const afterTemporary = await mock.mockFetch(`/api/user/${temporaryTarget.id}`, { headers: manager });
+    assert.equal(afterTemporary.data.requires_password_change, true);
+    assert(!JSON.stringify(afterTemporary).includes(issued.data.temporary_password), 'later user reads never expose the generated password');
+
     const changedName = `${target.username}.contract`;
     const changed = await mock.mockFetch(`/api/user/${target.id}`, {
         method: 'POST', headers: manager, body: { change_username: { username: changedName } },

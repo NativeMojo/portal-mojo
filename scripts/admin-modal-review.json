@@ -55,6 +55,12 @@
       "purpose": "ChangePasswordModal: collect and save fields"
     },
     {
+      "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:setTemporaryPassword:modal.open:0",
+      "fingerprint": "9e67e378c621569a2e68",
+      "category": "action",
+      "purpose": "TemporaryPasswordModal: confirmed session revocation with a transient one-time password reveal; held-write and permission-loss coverage in verify-admin-temp-password.mjs"
+    },
+    {
       "id": "packages/portal-mojo/src/admin/identity/users/sections/actions.tsx:openAvatarModal:modal.open:0",
       "fingerprint": "73f84cfbd1c5e9e3260f",
       "category": "editor",

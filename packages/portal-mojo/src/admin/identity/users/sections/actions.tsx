@@ -10,11 +10,12 @@
 // the public, admin-targetable verification sender (NOT the JWT-scoped
 // auth/verify/email/send).
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { mojoCall, withFreshAuth, type Field } from '../../../../client/runtime';
 import {
     ImageField,
     PasswordStrengthMeter,
+    SecretBox,
     formModal,
     modal,
     toast,
@@ -46,6 +47,7 @@ export interface UserAdminActions {
     editUser: () => Promise<void>;
     editAccount: () => Promise<void>;
     changePassword: () => Promise<void>;
+    setTemporaryPassword: () => Promise<void>;
     resetMfa: () => Promise<void>;
     toggleMfaRequirement: () => Promise<void>;
     disableTotp: () => Promise<void>;
@@ -65,6 +67,7 @@ export function useUserAdminActions(
     opts: { throttleRetry?: number; refetchThrottle?: () => void; onOpenGroup?: (groupId: number) => void } = {},
 ): UserAdminActions {
     const qc = useQueryClient();
+    const canManage = useAdminCaller();
     const save = UserModel.useSave();
     const disable = UserModel.useAction('disable');
     const reactivate = UserModel.useAction('reactivate');
@@ -342,6 +345,18 @@ export function useUserAdminActions(
         await modal.open((close) => <ChangePasswordModal user={user} onClose={() => close(null)} />);
     };
 
+    const setTemporaryPassword = async () => {
+        if (!canManage) return;
+        let pending = false;
+        let issued = false;
+        await modal.open((close) => <TemporaryPasswordModal user={user}
+            onClose={() => close(null)} onIssued={() => { issued = true; }} onPendingChange={(next) => { pending = next; }} />,
+        { canDismiss: () => !pending });
+        // Issuing for yourself revokes this session too. Keep the reveal visible
+        // until dismissed before a refetch can discover that revocation.
+        if (issued) void UserModel.invalidate(qc);
+    };
+
     // ── MFA ───────────────────────────────────────────────────────────
 
     const resetMfa = async () => {
@@ -524,7 +539,7 @@ export function useUserAdminActions(
     return {
         sendMagicLink, sendPasswordReset, sendVerificationEmail, setVerification,
         editDisplayName, editUsername, editEmail, editPhone, setPhone, clearPhone,
-        editUser, editAccount, changePassword,
+        editUser, editAccount, changePassword, setTemporaryPassword,
         resetMfa, toggleMfaRequirement, disableTotp,
         clearRateLimit, revokeAllSessions, resendInvite,
         disableUser, reactivateUser,
@@ -533,6 +548,64 @@ export function useUserAdminActions(
 }
 
 // ── Modal bodies (proper components so hooks are legal) ───────────────
+
+/** The generated secret lives only in this mounted dialog, outside Query/Mutation cache. */
+function TemporaryPasswordModal({ user, onClose, onIssued, onPendingChange }: {
+    user: UserRow; onClose: () => void; onIssued: () => void; onPendingChange: (pending: boolean) => void;
+}) {
+    const canManage = useAdminCaller();
+    const mounted = useRef(true);
+    const pending = useRef(false);
+    const [busy, setBusy] = useState(false);
+    const [secret, setSecret] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+    useEffect(() => { if (!canManage) onClose(); }, [canManage, onClose]);
+
+    const submit = async () => {
+        if (!canManage || pending.current || secret) return;
+        pending.current = true;
+        onPendingChange(true);
+        setBusy(true);
+        setError(null);
+        try {
+            const response = await withFreshAuth(() => mojoCall('/api/account/admin/user/password/temporary', {
+                method: 'POST', body: { user: user.id },
+            }));
+            const result = response.data as { user?: number; requires_password_change?: boolean; temporary_password?: string } | undefined;
+            if (result?.user !== user.id || result.requires_password_change !== true || typeof result.temporary_password !== 'string' || !result.temporary_password) {
+                throw new Error('The server did not return a temporary password.');
+            }
+            if (mounted.current) {
+                setSecret(result.temporary_password);
+                onIssued();
+            }
+        } catch (err) {
+            if (mounted.current) setError(err instanceof Error ? err.message : 'Failed to set temporary password');
+        } finally {
+            pending.current = false;
+            onPendingChange(false);
+            if (mounted.current) setBusy(false);
+        }
+    };
+
+    if (!canManage) return null;
+    return <div className="modal-pad">
+        <h2 className="modal-title">{secret ? 'Temporary password' : 'Set temporary password'}</h2>
+        <p className="modal-message">{secret
+            ? <>Save this password now and share it securely with <b>{user.display_name || user.username}</b>. It is shown only once.</>
+            : <>Generate a temporary password for <b>{user.display_name || user.username}</b>? This replaces their password and signs them out of all sessions.</>}</p>
+        <div className="ga-secret-warning" role="alert">They must change their password before they can finish signing in.</div>
+        {secret && <SecretBox secret={secret} ariaLabel="Temporary password" />}
+        {error && <div className="field-error" role="alert">{error}</div>}
+        <div className="modal-actions">
+            <button className="btn" onClick={onClose} disabled={busy}>{secret ? 'Close' : 'Cancel'}</button>
+            {!secret && <button className="btn btn-primary" onClick={() => void submit()} disabled={busy}>
+                {busy ? 'Generating…' : 'Set temporary password'}
+            </button>}
+        </div>
+    </div>;
+}
 
 /**
  * Admin direct password set — `model.save({new_password})`; django-mojo lets

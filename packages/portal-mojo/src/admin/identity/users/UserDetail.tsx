@@ -192,6 +192,7 @@ function UserDetailLoaded({ user, isAdmin, hasAppPerms, onClose, onOpenGroup }: 
         },
         { divider: true },
         { label: 'Change password', icon: 'bi-key', permissions: ADMIN, onSelect: () => void actions.changePassword() },
+        { label: 'Set temporary password', icon: 'bi-key', permissions: ADMIN, onSelect: () => void actions.setTemporaryPassword() },
         { label: 'Send password reset', icon: 'bi-envelope', permissions: ADMIN, onSelect: () => void actions.sendPasswordReset() },
         { label: 'Send magic login link', icon: 'bi-link-45deg', permissions: ADMIN, onSelect: () => void actions.sendMagicLink() },
         {
