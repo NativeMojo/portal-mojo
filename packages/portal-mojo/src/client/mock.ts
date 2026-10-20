@@ -1438,7 +1438,7 @@ interface MockPasskey {
     rp_id: string;
     is_enabled: boolean;
     sign_count: number;
-    transports: string | null;
+    transports: string[];
     aaguid: string | null;
     last_used: number | null;
     created: number;
@@ -2456,10 +2456,10 @@ function buildPasskeys(): MockPasskey[] {
     const rand = mulberry32(20260810);
     const nowSec = Math.floor(Date.now() / 1000);
     const DAY = 86400;
-    const seeds: { user: number; name: string | null; ageDays: number; usedDays: number | null; count: number; enabled?: boolean; transports?: string }[] = [
-        { user: 1, name: 'Mac — Chrome', ageDays: 140, usedDays: 1, count: 212, transports: 'internal,hybrid' },
-        { user: 2, name: 'iPhone — Safari', ageDays: 60, usedDays: 0, count: 88, transports: 'internal' },
-        { user: 2, name: null, ageDays: 300, usedDays: null, count: 0, enabled: false, transports: 'usb' },
+    const seeds: { user: number; name: string | null; ageDays: number; usedDays: number | null; count: number; enabled?: boolean; transports?: string[] }[] = [
+        { user: 1, name: 'Mac — Chrome', ageDays: 140, usedDays: 1, count: 212, transports: ['internal', 'hybrid'] },
+        { user: 2, name: 'iPhone — Safari', ageDays: 60, usedDays: 0, count: 88, transports: ['internal'] },
+        { user: 2, name: null, ageDays: 300, usedDays: null, count: 0, enabled: false, transports: ['usb'] },
     ];
     return seeds.map((s, i) => ({
         id: 70 + i,
@@ -2469,7 +2469,7 @@ function buildPasskeys(): MockPasskey[] {
         rp_id: 'localhost',
         is_enabled: s.enabled ?? true,
         sign_count: s.count,
-        transports: s.transports ?? null,
+        transports: s.transports ?? [],
         aaguid: mockUuid(rand),
         last_used: s.usedDays == null ? null : nowSec - s.usedDays * DAY - 900,
         created: nowSec - s.ageDays * DAY,
@@ -6400,7 +6400,7 @@ function accountSelfFetch(path: string, method: string, opts: MockFetchOpts): un
         let row = db.passkeys.find((p) => p.credential_id === credential.rawId);
         if (row && row.user !== user.id) return { status: false, error: 'Credential already registered to another user', error_code: 403 };
         if (row) {
-            row.transports = transports.join(',') || null;
+            row.transports = transports;
             if (friendly) row.friendly_name = friendly;
             row.is_enabled = true;
             row.last_used = null;
@@ -6413,7 +6413,7 @@ function accountSelfFetch(path: string, method: string, opts: MockFetchOpts): un
                 rp_id: 'localhost',
                 is_enabled: true,
                 sign_count: 0,
-                transports: transports.join(',') || null,
+                transports,
                 aaguid: null,
                 last_used: null,
                 created: nowSec,
