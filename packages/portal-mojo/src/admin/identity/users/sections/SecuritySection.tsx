@@ -55,6 +55,10 @@ export function SecuritySection({ user, actions, canManage, canPasskeys }: {
                 </SecurityItem>
             )}
 
+            {canManage && <SecurityItem icon="bi-key" title="Temporary password" desc="Generate a password that the user must replace when signing in">
+                <button className="btn btn-compact" onClick={() => void actions.setTemporaryPassword()}>Set temporary password…</button>
+            </SecurityItem>}
+
             <Eyebrow>Multi-factor authentication</Eyebrow>
 
             {canManage && (

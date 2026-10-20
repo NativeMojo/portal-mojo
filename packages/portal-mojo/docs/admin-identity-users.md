@@ -62,6 +62,16 @@ per endpoint, so `UserDetail` and the fleet-wide tables share one cache.
 
 ## Action contracts
 
+- **Set temporary password** is available in the user header menu and Security
+  section with `sys.users | sys.manage_users`. Confirmation identifies the user
+  and explains that their password is replaced and all sessions are revoked.
+  `POST /api/account/admin/user/password/temporary` sends only `{user: id}`
+  through `withFreshAuth` (440 prompts and retries once). The generated password
+  appears once in a copyable dialog; closing or losing permission removes it.
+  It never enters Query/Mutation cache, storage, or a toast. The server requires
+  a person session, restricts superuser recovery to superusers, and forces the
+  recipient to replace the password before completing sign-in. This uses the
+  existing django-mojo endpoint; no backend upgrade or new permission is added.
 - Username changes use the `change_username` POST_SAVE_ACTION, not a direct
   field save. Model saves/actions retry one fresh-auth 440 automatically;
   combined `disable_totp` writes explicitly use `withFreshAuth`.

@@ -9920,6 +9920,28 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             data: { id: record.id, jti, expires: record.expires, token: `mock_ak_${jti}` },
         };
     }
+    if (path === '/api/account/admin/user/password/temporary') {
+        if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+        const caller = userFromBearer(opts.headers);
+        if (!caller) return permissionDenied(401);
+        const claims = decodeMockJwt((opts.headers?.Authorization ?? '').replace(/^Bearer /, ''));
+        if (claims?.credential_kind === 'api_key' || claims?.credential_kind === 'group_scoped_token'
+            || !hasGlobalPermission(caller, ['users', 'manage_users'])) return permissionDenied();
+        const authTime = authTimeFromBearer(opts.headers);
+        if (authTime === undefined || Date.now() / 1000 - authTime > 600) return { status: false, error: 'reauth_required', error_code: 440 };
+        const id = Number(opts.body?.user);
+        if (!Number.isSafeInteger(id) || id <= 0) return { status: false, error: 'user must be an integer', error_code: 400 };
+        const target = db.users.find((user) => user.id === id);
+        if (!target) return { status: false, error: 'User not found', error_code: 400 };
+        if (target.is_superuser && !caller.is_superuser) return permissionDenied();
+        Object.assign(target, { requires_password_change: true });
+        passwordlessUsers.delete(target.id);
+        rotateAuthKey(target.id);
+        return { status: true, data: {
+            user: target.id, requires_password_change: true,
+            temporary_password: `Mock-${crypto.randomUUID()}!9a`,
+        } };
+    }
     if (path === '/api/auth/manage/throttle') {
         // GET {user_id|username, key='login'} → the per-account attempt
         // counter (rest/user.py on_read_throttle). Admin-tier; reading never
