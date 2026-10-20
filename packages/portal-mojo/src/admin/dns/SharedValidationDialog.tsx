@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getAuthSessionRevision, getAuthSnapshot, hasPermission, requestFreshAuth, useAuthSnapshot, useMe } from '../../client/runtime';
+import { getAuthSessionRevision, getAuthSnapshot, hasPermission, requestFreshAuth, subscribeAuth, useAuthSnapshot, useMe } from '../../client/runtime';
 import { CollectionSelect, FlatRow, modal, toast } from '../../ui';
 import { DNS_MANAGE_PERMISSIONS, DomainModel, sanitizeDomainRow, type DnsGroupChoice, type DomainRow } from './models';
 import { checkValidation, connectValidation, getAllocations, getHubCapabilities, getParticipants, getRecipient, grantValidation, invalidateValidation, requestWildcard, revokeValidation, sanitizeSetupGroup, SETUP_GROUP_ENDPOINT, useValidationPlan } from './shared-validation-api';
@@ -19,7 +19,7 @@ export function openSharedValidation(domain?: DomainRow) {
 export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: { domain?: DomainRow; close: () => void; onBusy?: (value: boolean) => void }) {
     const qc = useQueryClient(); const { data: me } = useMe(); const auth = useAuthSnapshot();
     const canManage = auth.authenticated && hasPermission(me ?? null, DNS_MANAGE_PERMISSIONS, null);
-    const revision = getAuthSessionRevision();
+    const revision = useSyncExternalStore(subscribeAuth, getAuthSessionRevision, getAuthSessionRevision);
     const [mode, setMode] = useState<'project' | 'controller'>('project');
     const [targetKind, setTargetKind] = useState<'existing' | 'new'>('existing');
     const [domain, setDomain] = useState<DomainRow | null>(fixedDomain ?? null);
@@ -27,7 +27,12 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
     const nameRef = useRef<HTMLInputElement>(null), allocationRef = useRef<HTMLInputElement>(null), descriptorRef = useRef<HTMLTextAreaElement>(null);
     const [inspected, setInspected] = useState<{ target: SetupTarget; allocation?: string } | null>(fixedDomain ? { target: { domain: fixedDomain.id } } : null);
     const plan = useValidationPlan(mode === 'project' ? inspected?.target ?? null : null, inspected?.allocation);
-    const [caps, setCaps] = useState<HubCapabilities | null>(null);
+    const controllerIdentity = JSON.stringify([auth.uid, revision, canManage]);
+    const [controllerAuthority, setControllerAuthority] = useState<{ identity: string; caps: HubCapabilities } | null>(null);
+    // A replacement session never borrows the previous session's controller proof,
+    // including the render before the cleanup effect clears its selected facts.
+    const caps = controllerAuthority?.identity === controllerIdentity ? controllerAuthority.caps : null;
+    const setCaps = (value: HubCapabilities | null) => setControllerAuthority(value ? { identity: controllerIdentity, caps: value } : null);
     const [descriptor, setDescriptor] = useState<ConnectionRequest | null>(null);
     const [allocations, setAllocations] = useState<Page<Allocation> | null>(null);
     const [allocation, setAllocation] = useState<Allocation | null>(null);
@@ -48,10 +53,8 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
     }, [selection]);
     useEffect(() => () => { onBusy?.(false); }, [onBusy]);
     useEffect(() => {
-        if (!auth.authenticated || !canManage) {
-            setCaps(null); setDescriptor(null); setAllocations(null); setAllocation(null); setRecipient(null); setParticipants(null);
-            if (descriptorRef.current) descriptorRef.current.value = '';
-        }
+        setControllerAuthority(null); setDescriptor(null); setAllocations(null); setAllocation(null); setRecipient(null); setParticipants(null);
+        if (descriptorRef.current) descriptorRef.current.value = '';
     }, [auth.authenticated, canManage, auth.uid, revision]);
     const scope = () => {
         const selected = selection, uid = auth.uid, rev = revision;

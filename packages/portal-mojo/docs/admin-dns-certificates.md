@@ -184,6 +184,9 @@ responses after scope loss. After every attempted write, safe Domain,
 Certificate and legacy delegation caches are invalidated and plan/trust is
 refreshed. Ambiguous results require successful Refresh before another write.
 A 440 prompts authentication but never automatically repeats the operation.
+Every explicit session replacement, including the same user signing in again,
+clears controller capabilities, recipients and participant facts. Check controller
+access and resolve the exact request again before a new grant or revoke.
 Closing a view cannot cancel a write already submitted.
 
 Controller POSTs use only the local `/api/dnsman/acme` endpoints:
