@@ -88,7 +88,8 @@
         "verify:form-autosave": "node scripts/verify-form-autosave.mjs && node scripts/verify-form-owner.mjs",
         "verify:account": "node scripts/verify-account.mjs && node scripts/verify-account-actor.mjs",
         "verify:admin-fleet": "node scripts/verify-admin-fleet.mjs",
-        "verify:admin-assistant-setup": "node scripts/verify-admin-assistant-setup-route.mjs && node scripts/verify-admin-assistant-setup.mjs"
+        "verify:admin-assistant-setup": "node scripts/verify-admin-assistant-setup-route.mjs && node scripts/verify-admin-assistant-setup.mjs",
+        "verify:admin-dns-shared-validation": "node scripts/verify-admin-dns-shared-validation.mjs && node scripts/verify-admin-dns-shared-validation-mounted.mjs"
     },
     "devDependencies": {
         "jsdom": "^26.1.0"

@@ -33,7 +33,7 @@ export * from './types';
 // Dev affordance: per-endpoint call counts from the mock (single-flight proof).
 export {
     armMockReauth, clearMockRequestHistory, getMockCallCounts, setMockAssistantSetupScenario,
-    getMockRequestHistory, setMockDnsConfigMalformed, setMockDnsAcmeMode, armMockDnsWriteFault,
+    getMockRequestHistory, setMockSharedValidationScenario, armMockSharedValidationFault, type MockSharedValidationScenario, setMockDnsConfigMalformed, setMockDnsAcmeMode, armMockDnsWriteFault,
     getMockPhoneConfigCredentialState, getMockEffectivePhoneConfigId,
     deleteMockPhoneGroupForTest,
     setMockDnsRegistrarMode, armMockRegistrarPurchaseFault,

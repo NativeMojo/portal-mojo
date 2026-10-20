@@ -6,6 +6,9 @@ import { revokeCertificate, useAcmeDelegations, useDnsCapabilities } from './api
 import {
     canInspectHouseCertificate, certificateStatusTone, deriveCertificateRenewalHealth,
 } from './certificate-data';
+import { SharedValidationPanel } from './SharedValidationPanel';
+import { openSharedValidation } from './SharedValidationDialog';
+import { useValidationPlan } from './shared-validation-api';
 import { CertificateModel, DNS_MANAGE_PERMISSIONS, type CertificateRow, type DomainRow } from './models';
 
 function healthLabel(row: CertificateRow): string {
@@ -23,6 +26,7 @@ function AllowedCertificateDetail({ id, domain, onClose }: { id: number; domain:
     const groupId = typeof domain.group === 'number' ? domain.group : domain.group?.id ?? null;
     const capabilities = useDnsCapabilities(groupId);
     const delegations = useAcmeDelegations(domain.id);
+    const shared = useValidationPlan({ domain: domain.id });
     const [revoking, setRevoking] = useState(false);
     const certificate = query.data;
     if (query.isPending) return <div className="modal-pad dim">Loading certificate…</div>;
@@ -89,17 +93,18 @@ function AllowedCertificateDetail({ id, domain, onClose }: { id: number; domain:
             </div> },
             { key: 'delegation', label: 'Delegation', icon: 'bi-diagram-2', render: () => <div className="dns-cert-detail-section">
                 <Eyebrow>DNS-01 routing</Eyebrow>
-                {delegations.isPending ? <p className="dim">Loading delegation status…</p> : delegation ? <>
+                {delegations.isPending ? <p className="dim">Loading delegation status…</p> : delegations.error ? <p className="dns-errors">Delegation status could not be loaded. DNS routing is unknown.</p> : delegation ? <>
                     <FlatRow label="State"><Badge tone={delegation.state === 'verified' ? 'success' : delegation.state === 'broken' ? 'danger' : 'warning'}>{delegation.state}</Badge></FlatRow>
                     <FlatRow label="Source"><code>{delegation.source ?? '—'}</code></FlatRow>
                     <FlatRow label="Target"><code>{delegation.target ?? '—'}</code></FlatRow>
                     {delegation.last_error_code && <FlatRow label="Error code"><code>{delegation.last_error_code}</code></FlatRow>}
                     {delegation.verified_at && delegation.state === 'broken' && <div className="dns-errors">This delegation is sticky after verification. Repair it; issuance will not fall back to direct provider DNS.</div>}
-                </> : <p className="dim">No delegated ACME route is attached; provider DNS is used directly.</p>}
+                </> : <p className="dim">{shared.data?.connection?.mode === 'shared' ? 'An explicit shared connection controls validation; direct DNS fallback is disabled.' : shared.error || shared.loading ? 'Shared routing status is unavailable; no direct-routing claim can be made.' : 'No legacy delegated ACME route is attached.'}</p>}
+                <SharedValidationPanel domain={domain} />
             </div> },
         ]}
         initialSection="overview"
-        contextMenu={canManage && certificate.status === 'active' ? [{ label: revoking ? 'Revoking…' : 'Revoke certificate', icon: 'bi-x-octagon', danger: true, onSelect: () => void revoke() }] : []}
+        contextMenu={[...(canManage && shared.data?.capabilities.group_choices ? [{ label: 'Set up shared validation', icon: 'bi-diagram-2', onSelect: () => void openSharedValidation(domain) }] : []), ...(canManage && certificate.status === 'active' ? [{ label: revoking ? 'Revoking…' : 'Revoke certificate', icon: 'bi-x-octagon', danger: true, onSelect: () => void revoke() }] : [])]}
         menuContext={certificate}
         onClose={onClose}
     />;

@@ -26,3 +26,25 @@
     .dns-cert-card .badge { align-self: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { .dns-cert-readiness .spin { animation: none; } }
+
+.dns-shared-dialog, .dns-shared-facts, .dns-shared-panel, .dns-shared-showcase { display: grid; gap: 14px; min-width: 0; }
+.dns-shared-dialog code, .dns-shared-facts code, .dns-shared-confirm code, .dns-shared-request code, .dns-shared-showcase code { overflow-wrap: anywhere; white-space: normal; }
+.dns-shared-showcase { grid-template-columns: minmax(0, 1fr); }
+.dns-shared-showcase > * { min-width: 0; max-width: 100%; }
+.dns-shared-actions, .dns-shared-demo-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.dns-shared-actions .btn { white-space: normal; }
+.dns-shared-request { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+.dns-shared-request dl { margin: 0; display: grid; gap: 8px; }
+.dns-shared-request dt { color: var(--mute); font-size: 12px; }
+.dns-shared-request dd { margin: 0; }
+.dns-shared-dialog .seg { flex-wrap: wrap; }
+.dns-shared-dialog .field { min-width: 0; }
+.dns-shared-dialog .modal-actions { position: static; }
+.dns-shared-dialog .dns-shared-facts { border-top: 1px solid var(--line); padding-top: 14px; }
+
+/* Keep this DNS walkthrough usable when the showcase host itself is narrow. */
+@media (max-width: 640px) {
+    .cmp-layout:has(.dns-shared-showcase) { flex-direction: column; align-items: stretch; }
+    .cmp-layout:has(.dns-shared-showcase) > .cmp-rail { width: 100%; max-height: 160px; overflow: auto; position: static; }
+    .cmp-layout:has(.dns-shared-showcase) > .cmp-body { width: 100%; min-width: 0; }
+}

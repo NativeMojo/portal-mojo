@@ -5702,6 +5702,162 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:confirmShared:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "confirmShared",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "button"
+      ],
+      "category": "action",
+      "parent": "confirmShared",
+      "target": null,
+      "fingerprint": "7359402254c54bdf669d",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:openSharedValidation:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "openSharedValidation",
+      "launcher": "modal.open",
+      "body": [
+        "SharedValidationDialog"
+      ],
+      "category": "action",
+      "parent": "openSharedValidation",
+      "target": null,
+      "fingerprint": "2ad558f5a323346fc0a3",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:localAction:confirmShared:0",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "localAction",
+      "launcher": "confirmShared",
+      "body": [
+        "div",
+        "p",
+        "code"
+      ],
+      "category": "action",
+      "parent": "localAction",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:confirmShared",
+      "fingerprint": "8775f04f3d49d85e3d5f",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:controllerAction:confirmShared:0",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "controllerAction",
+      "launcher": "confirmShared",
+      "body": [
+        "div",
+        "p",
+        "strong",
+        "code",
+        "br"
+      ],
+      "category": "action",
+      "parent": "controllerAction",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:confirmShared",
+      "fingerprint": "29b9451dc7ec5bb26130",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:SharedValidationDialog:localAction:0",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "SharedValidationDialog",
+      "launcher": "localAction",
+      "body": [],
+      "category": "action",
+      "parent": "SharedValidationDialog",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:localAction",
+      "fingerprint": "0c757f6e6f294314cf5e",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:SharedValidationDialog:localAction:1",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "SharedValidationDialog",
+      "launcher": "localAction",
+      "body": [],
+      "category": "action",
+      "parent": "SharedValidationDialog",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:localAction",
+      "fingerprint": "a49c10968d46c8b37a3a",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:SharedValidationDialog:localAction:2",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "SharedValidationDialog",
+      "launcher": "localAction",
+      "body": [],
+      "category": "action",
+      "parent": "SharedValidationDialog",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:localAction",
+      "fingerprint": "6ad28e7701119a824c88",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:SharedValidationDialog:localAction:3",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "SharedValidationDialog",
+      "launcher": "localAction",
+      "body": [],
+      "category": "action",
+      "parent": "SharedValidationDialog",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:localAction",
+      "fingerprint": "b960157a9d1c1695f816",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:SharedValidationDialog:controllerAction:0",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "SharedValidationDialog",
+      "launcher": "controllerAction",
+      "body": [],
+      "category": "action",
+      "parent": "SharedValidationDialog",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:controllerAction",
+      "fingerprint": "3fb453927e3e987c7484",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:SharedValidationDialog:controllerAction:1",
+      "file": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx",
+      "owner": "SharedValidationDialog",
+      "launcher": "controllerAction",
+      "body": [],
+      "category": "action",
+      "parent": "SharedValidationDialog",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:controllerAction",
+      "fingerprint": "c8d57d4e204ae1687f30",
+      "categories": [
+        "action"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/dns/CertificateDetail.tsx:revoke:modal.confirm:0",
       "file": "packages/portal-mojo/src/admin/dns/CertificateDetail.tsx",
       "owner": "revoke",
@@ -5733,14 +5889,29 @@
         "span",
         "ul",
         "li",
-        "p"
+        "p",
+        "SharedValidationPanel"
       ],
       "category": "record",
       "parent": "AllowedCertificateDetail",
       "target": null,
-      "fingerprint": "3fce48bc39994df4b8d4",
+      "fingerprint": "92f8c88043b1f9a1d40b",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/CertificateDetail.tsx:AllowedCertificateDetail:openSharedValidation:0",
+      "file": "packages/portal-mojo/src/admin/dns/CertificateDetail.tsx",
+      "owner": "AllowedCertificateDetail",
+      "launcher": "openSharedValidation",
+      "body": [],
+      "category": "action",
+      "parent": "AllowedCertificateDetail",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:openSharedValidation",
+      "fingerprint": "d2410a90865b9fc8ca57",
+      "categories": [
+        "action"
       ]
     },
     {
@@ -5755,6 +5926,36 @@
       "fingerprint": "cff3920da7aeaf3cf187",
       "categories": [
         "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/CertificateRequestDialog.tsx:submit:confirmShared:0",
+      "file": "packages/portal-mojo/src/admin/dns/CertificateRequestDialog.tsx",
+      "owner": "submit",
+      "launcher": "confirmShared",
+      "body": [
+        "code"
+      ],
+      "category": "action",
+      "parent": "submit",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:confirmShared",
+      "fingerprint": "e1a5646a49924bd16dcd",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/CertificateRequestDialog.tsx:CertificateRequestDialog:submit:0",
+      "file": "packages/portal-mojo/src/admin/dns/CertificateRequestDialog.tsx",
+      "owner": "CertificateRequestDialog",
+      "launcher": "submit",
+      "body": [],
+      "category": "action",
+      "parent": "CertificateRequestDialog",
+      "target": "packages/portal-mojo/src/admin/dns/CertificateRequestDialog.tsx:submit",
+      "fingerprint": "0c14bb24d16a36ccdb9b",
+      "categories": [
+        "action"
       ]
     },
     {
@@ -5830,15 +6031,30 @@
         "code",
         "button",
         "i",
+        "SharedValidationPanel",
         "DnsRecordsPanel",
         "DomainCertificatesSection"
       ],
       "category": "record",
       "parent": "DomainDetail",
       "target": null,
-      "fingerprint": "9b2bcae495861f17ada6",
+      "fingerprint": "a7b77ed2e3b168303bf9",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:DomainDetail:openSharedValidation:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
+      "owner": "DomainDetail",
+      "launcher": "openSharedValidation",
+      "body": [],
+      "category": "action",
+      "parent": "DomainDetail",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:openSharedValidation",
+      "fingerprint": "d2410a90865b9fc8ca57",
+      "categories": [
+        "action"
       ]
     },
     {
@@ -5869,6 +6085,20 @@
       "fingerprint": "0f9850f48a3ec66c0ed0",
       "categories": [
         "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx:DomainsPage:openSharedValidation:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx",
+      "owner": "DomainsPage",
+      "launcher": "openSharedValidation",
+      "body": [],
+      "category": "action",
+      "parent": "DomainsPage",
+      "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:openSharedValidation",
+      "fingerprint": "236871e3164585c6c7b1",
+      "categories": [
+        "action"
       ]
     },
     {
@@ -10113,7 +10343,7 @@
       "owner": "AllowedCertificateDetail",
       "key": "'delegation'",
       "label": "Delegation",
-      "fingerprint": "b6dd629502da5247596d"
+      "fingerprint": "51932b73c15f08a92cf3"
     },
     {
       "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
@@ -10121,6 +10351,13 @@
       "key": "'overview'",
       "label": "Overview",
       "fingerprint": "969baf383d4d4471c619"
+    },
+    {
+      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
+      "owner": "DomainDetail",
+      "key": "'validation'",
+      "label": "Validation",
+      "fingerprint": "086a194d01a80ab0c116"
     },
     {
       "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",

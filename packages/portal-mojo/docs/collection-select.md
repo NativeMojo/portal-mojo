@@ -130,3 +130,17 @@ too — there is no parallel fetch path.
   handed a picker that says to pick a group they can't pick there.
 - Don't wire `onChange` to a per-keystroke autosave expectation — it fires
   on commit (that is the point; see the B3 autosave contract).
+
+### Optional ingress projection
+
+`sanitizeRow={(row) => publicProjection(row)}` projects list and one-record
+responses before Query cache storage. Such pickers use a separate cache keyed
+by the sanitizer identity, auth UID and session revision; they never scan or
+reuse raw endpoint caches. Keep the callback stable. Default consumers retain
+the existing shared model keys and behavior. The callback must return only the
+approved fields or reject malformed input. Full selected objects also need to
+be projected by the caller before passing them in.
+
+An endpoint with query-based hydration should hydrate through its own safe
+`?id=` helper and pass the full selected object; do not pass a bare id that
+would invent a `/<id>` record route.

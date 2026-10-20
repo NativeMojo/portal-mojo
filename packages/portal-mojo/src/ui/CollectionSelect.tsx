@@ -35,15 +35,24 @@
 //   · "Start typing to search…" is actually reachable — in the source it
 //     was dead code (its showNoResults guard required hasSearched).
 import { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useModel, useModelList } from '../client/hooks';
+import { keepPreviousData, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { mojoGet, mojoList } from '../client/client';
+import { getAuthSessionRevision } from '../client/auth';
 import type { ModelDef } from '../client/model';
 import type { Params } from '../client/types';
+import { useAuthSnapshot } from '../client/me';
 import { GroupContext } from '../client/group-context';
 import { Popover } from './Popover';
 
 /** Every id comparison in this component goes through here — string and
  *  number ids (and mixes of the two) work by construction. */
+const sanitizerIds = new WeakMap<Function, number>();
+let nextSanitizerId = 1;
+function sanitizerId(fn: Function): number {
+    if (!sanitizerIds.has(fn)) sanitizerIds.set(fn, nextSanitizerId++);
+    return sanitizerIds.get(fn)!;
+}
+
 const keyOf = (v: string | number): string => String(v);
 
 /** MOJOUtils.getNestedValue heritage: dot-notation nested access. */
@@ -76,8 +85,8 @@ const coerceFetchId = (id: string | number): string | number =>
  *  root for the row (ModelTable pages, other pickers, this picker's own
  *  fetches all share the [endpoint, params] keys). Non-reactive by design:
  *  a miss falls through to the reactive one-record fetch. */
-function findRowInListCaches(qc: QueryClient, endpoint: string, key: string, valueField: string): unknown {
-    for (const [, data] of qc.getQueriesData<unknown>({ queryKey: [endpoint] })) {
+function findRowInListCaches(qc: QueryClient, endpoint: string, key: string, valueField: string, safeRoot?: readonly unknown[]): unknown {
+    for (const [, data] of qc.getQueriesData<unknown>({ queryKey: safeRoot ?? [endpoint] })) {
         if (data == null || typeof data !== 'object') continue;
         const rows = (data as { rows?: unknown }).rows;
         if (!Array.isArray(rows)) continue; // skips [endpoint,'one',id] entries
@@ -109,6 +118,8 @@ export type CollectionSelectValue = string | number | Record<string, unknown> | 
 export interface CollectionSelectProps<T extends { id: number | string }> {
     /** A defineModel definition — supplies the endpoint (and the row type). */
     model?: ModelDef<T>;
+    /** Optional ingress projection. Uses an auth-scoped isolated cache; raw caches are never read. */
+    sanitizeRow?: (row: T) => T;
     /** Bare endpoint, for lists without a model definition. */
     endpoint?: string;
     /** Selected id — CONTROLLED. Accepts id | null | row-object (see CollectionSelectValue). */
@@ -156,7 +167,7 @@ export interface CollectionSelectProps<T extends { id: number | string }> {
 }
 
 export function CollectionSelect<T extends { id: number | string }>({
-    model, endpoint, value, onChange,
+    model, endpoint, value, onChange, sanitizeRow,
     labelField = 'name', valueField = 'id',
     maxItems = 10, placeholder = 'Search…', debounceMs = 400,
     emptyFetch = true, defaultParams, requiresActiveGroup = false,
@@ -167,6 +178,8 @@ export function CollectionSelect<T extends { id: number | string }>({
     if (!resolvedEndpoint) throw new Error('CollectionSelect: pass `model` or `endpoint`');
 
     const qc = useQueryClient();
+    const auth = useAuthSnapshot();
+    const safeRoot = sanitizeRow ? [resolvedEndpoint, 'safe-select', sanitizerId(sanitizeRow), auth.uid, getAuthSessionRevision()] as const : undefined;
     const uid = useId();
     const inputDomId = `colsel-input-${uid}`;
     const listboxId = `colsel-list-${uid}`;
@@ -239,7 +252,12 @@ export function CollectionSelect<T extends { id: number | string }>({
     // Fetch only while the dropdown is open (the source fetched on focus);
     // with emptyFetch off, additionally only once there is a search term.
     const listEnabled = open && !waitingForGroup && (emptyFetch || term !== '');
-    const query = useModelList<T>(resolvedEndpoint, wire, { enabled: listEnabled });
+    const query = useQuery({
+        queryKey: safeRoot ? [...safeRoot, wire] : [resolvedEndpoint, wire],
+        queryFn: async () => { const page = await mojoList<T>(resolvedEndpoint, wire); return sanitizeRow ? { ...page, rows: page.rows.map(sanitizeRow) } : page; },
+        placeholderData: sanitizeRow ? undefined : keepPreviousData,
+        enabled: listEnabled && (!sanitizeRow || auth.authenticated),
+    });
     // A held query (emptyFetch=false with no term, or no active group) must
     // show its empty state — keepPreviousData would otherwise keep serving
     // the previous key's rows through the placeholder.
@@ -275,7 +293,7 @@ export function CollectionSelect<T extends { id: number | string }>({
     const pickedLabel = selKey != null && picked?.key === selKey ? picked.label : null;
     let scanLabel: string | null = null;
     if (selKey != null && seedLabel == null && pickedLabel == null) {
-        const row = findRowInListCaches(qc, resolvedEndpoint, selKey, valueField);
+        const row = findRowInListCaches(qc, resolvedEndpoint, selKey, valueField, safeRoot);
         if (row != null) {
             const raw = getPath(row, labelField);
             // A row without the label field stays unresolved — the one-record
@@ -284,7 +302,11 @@ export function CollectionSelect<T extends { id: number | string }>({
         }
     }
     const needFetch = selKey != null && seedLabel == null && pickedLabel == null && scanLabel == null;
-    const oneQuery = useModel<T>(resolvedEndpoint, needFetch && selId != null ? coerceFetchId(selId) : null);
+    const oneQuery = useQuery({
+        queryKey: safeRoot ? [...safeRoot, 'one', coerceFetchId(selId ?? '')] : [resolvedEndpoint, 'one', needFetch && selId != null ? coerceFetchId(selId) : null],
+        queryFn: async () => { const row = await mojoGet<T>(resolvedEndpoint, coerceFetchId(selId!), { unscoped: true }); return sanitizeRow ? sanitizeRow(row) : row; },
+        enabled: needFetch && selId != null && (!sanitizeRow || auth.authenticated),
+    });
     let oneLabel: string | null = null;
     if (needFetch && oneQuery.data != null) {
         const raw = getPath(oneQuery.data, labelField);

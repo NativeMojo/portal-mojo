@@ -1,0 +1,49 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { createServer } from 'vite';
+const storage = () => { const values = new Map(); return { getItem: (k) => values.get(k) ?? null, setItem: (k,v) => values.set(k,String(v)), removeItem: (k) => values.delete(k) }; };
+globalThis.localStorage = storage(); globalThis.sessionStorage = storage();
+globalThis.window = { addEventListener(){}, removeEventListener(){}, location: { hash:'', pathname:'/', search:'' }, matchMedia: () => ({matches:false,addEventListener(){},removeEventListener(){}}), setTimeout, clearTimeout };
+const server = await createServer({ root:process.cwd(), appType:'custom',logLevel:'silent',server:{middlewareMode:true} });
+let checks = 0; const receipts=[];
+try {
+ const data = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/shared-validation-data.ts');
+ const api = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/shared-validation-api.ts');
+ const auth = await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');
+ auth.initAuth();
+ const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
+ const login = async (email) => { const r=await mock.mockFetch('/api/login',{method:'POST',body:{username:email,password:'mojo'}}); auth.setTokens(r.data.access_token,r.data.refresh_token); };
+ const target={group:1,name:'customer.example'}, allocation='shared-customer.acme-hub.example';
+ const post=async(path,body,email='dns.manager@nativemojo.com')=> { const r=await mock.mockFetch('/api/login',{method:'POST',body:{username:email,password:'mojo'}}); const out=await mock.mockFetch(path,{method:'POST',headers:{Authorization:`Bearer ${r.data.access_token}`},body}); receipts.push({path,body,response:out}); return out; };
+ mock.setMockSharedValidationScenario('ready'); await login('dns.manager@nativemojo.com');
+ const before=await api.getValidationPlan(target,allocation); assert.equal(before.connection,null,'GET plan must not prepare a reference'); checks++;
+ const prepared=await api.connectValidation(target,allocation,false); assert.equal(prepared.trust.state,'missing','explicit prepare awaits controller consent'); assert.equal(prepared.connection_request.version,1,'prepare exports supported public descriptor');
+ assert.deepEqual(Object.keys(prepared.connection_request).sort(),['allocation_ref','client_ref','consumer_project_uuid','domain','version'],'descriptor has exactly five public keys'); checks+=3;
+ const repeated=await api.connectValidation(target,allocation,false); assert.equal(repeated.connection.client_ref,prepared.connection.client_ref,'repeated connect retains immutable client reference'); checks++;
+ const managerGrant=await post('/api/dnsman/acme/trust/grant',{connection_request:prepared.connection_request}); assert.equal(managerGrant.status,false,'ordinary DNS manager cannot self-grant'); checks++;
+ await login('dns.platform@nativemojo.com'); const caps=await api.getHubCapabilities(); assert.equal(caps.can_manage_trust,true,'genuine controller can manage'); assert.equal(caps.can_consume,false,'human JWT is not a protected consumer'); checks+=2;
+ const page=await api.getAllocations(target.name); const selected=page.items[0]; assert.equal(selected.allocation_ref,allocation,'controller resolves exact existing target');
+ const recipient=await api.getRecipient(selected,prepared.connection_request.consumer_project_uuid); assert.equal(recipient.active,true,'exact recipient is active');
+ const grant=await api.grantValidation(selected,prepared.connection_request); const grantAgain=await api.grantValidation(selected,prepared.connection_request); assert.equal(grantAgain.participant_ref,grant.participant_ref,'grant retries retain one participant'); checks+=3;
+ await assert.rejects(()=>api.grantValidation(selected,{...prepared.connection_request,domain:'wrong.example'}),undefined,'wrong domain grant is refused'); checks++;
+ await login('dns.manager@nativemojo.com'); const joined=await api.connectValidation(target,allocation,false); assert.equal(joined.connection.state,'pending','join alone does not claim local verification');
+ const verified=await api.checkValidation(joined.connection.id,target,allocation); assert.equal(verified.connection.state,'verified','explicit check binds group-managed local domain');
+ const requested=await api.requestWildcard(verified.connection.id,target,allocation); assert.equal(requested.certificate.state,'pending','request queues local issuance'); assert.deepEqual(requested.certificate.names,['customer.example','*.customer.example'],'shared request has exact SAN profile');
+ let issued;for(let i=0;i<4;i++) issued=await api.getValidationPlan(target,allocation); assert.equal(issued.certificate.state,'active','bounded mock lifecycle converges to issued local material'); checks+=5;
+ await login('dns.platform@nativemojo.com'); mock.armMockSharedValidationFault('revoke-cleanup'); await assert.rejects(()=>api.revokeValidation(selected,grant.participant_ref),undefined,'ambiguous cleanup does not imply revoke rollback');
+ const revoked=await api.getParticipants(selected); assert.equal(revoked.items[0].trust_state,'revoked','revoke persisted before cleanup failure'); await assert.rejects(()=>api.grantValidation(selected,prepared.connection_request),undefined,'revoked references cannot be regranted'); checks+=3;
+ await login('dns.manager@nativemojo.com'); const restartPlan=await api.getValidationPlan(target,allocation); assert.equal(restartPlan.certificate.serving_valid,true,'revoked trust preserves still-valid local certificate'); const restarted=await api.connectValidation(target,allocation,true); assert.notEqual(restarted.connection.client_ref,prepared.connection.client_ref,'explicit restart creates fresh reference'); assert.equal(restarted.alias.target,allocation,'restart never rotates target'); checks+=3;
+ const raw=structuredClone(issued); raw.private_key_pem='secret-canary'; raw.metadata={api_key:'secret-canary'}; raw.certificate.key='secret-canary'; assert(!JSON.stringify(data.parseReadiness(raw,target,allocation)).includes('secret-canary'),'unknown secret containers drop before component/cache state'); checks++;
+ for(const mutate of [r=>r.capabilities.can_request='true',r=>r.profile.names=['customer.example'],r=>r.alias.source='_acme-challenge.foreign.example',r=>r.connection.client_ref='invalid',r=>r.alias.target='https://user:key@bad.example',r=>r.connection_request.scope=['*']]) {const bad=structuredClone(issued);mutate(bad);assert.throws(()=>data.parseReadiness(bad,target,allocation),undefined,'malformed or inconsistent action/identity/scope must refuse');checks++;}
+ for(const certNames of [['foreign.example','*.foreign.example'],['customer.example','*.customer.example','foreign.example']]) {const bad=structuredClone(issued);bad.certificate.names=certNames;assert.throws(()=>data.parseReadiness(bad,target,allocation),undefined,'foreign or additional certificate SANs cannot cross the requested profile boundary');checks++;}
+ const reordered=structuredClone(issued);reordered.certificate.names.reverse();assert.doesNotThrow(()=>data.parseReadiness(reordered,target,allocation),'exact certificate SAN profile accepts either serializer ordering');checks++;
+ for(const mutate of [r=>r.hub.state='unavailable',r=>r.hub.consumer_project_uuid=null]) {const bad=structuredClone(issued);bad.capabilities.can_request=true;mutate(bad);assert.throws(()=>data.parseReadiness(bad,target,allocation),undefined,'request capability requires a ready hub and known consumer identity');checks++;}
+ const badTarget=structuredClone(issued);assert.throws(()=>data.parseReadiness(badTarget,{group:2,name:target.name}),undefined,'selected group identity cannot change');checks++;
+ for(const scenario of ['old-api','malformed']) {mock.setMockSharedValidationScenario(scenario);await assert.rejects(()=>api.getValidationPlan({domain:8201}),e=>e.kind==='unsupported',`${scenario} isolates shared setup compatibility`);checks++;}
+ for(const scenario of ['revoked','pending-dns','changed-alias','chained-alias','renewal-error','unconfigured','unavailable','disabled']) {mock.setMockSharedValidationScenario(scenario);const r=await api.getValidationPlan({domain:8201});assert(r.next_action.code,'every failure state has a fixed next action'); if(scenario==='renewal-error'){assert.equal(r.certificate.serving_valid,true,'renewal failure preserves validity');assert.equal(r.renewal.state,'failed','renewal failure is shown separately');} checks++;}
+ mock.setMockSharedValidationScenario('ready');const house=await api.getValidationPlan({domain:8209});assert.equal(house.next_action.code,'unsupported_domain_scope','house domain has truthful scope limitation');assert(!Object.values(house.capabilities).some(Boolean),'house scope has no mutations or descriptor');checks+=2;
+ await login('dns.viewer@nativemojo.com');const viewer=await api.getValidationPlan({domain:8201});assert(!Object.values(viewer.capabilities).some(Boolean),'viewer receives no mutation capabilities');assert.equal(viewer.connection_request,null,'viewer receives no descriptor');checks+=2;
+ if(process.env.DNS_SHARED_FIXTURES){const fixtures=JSON.parse(await readFile(process.env.DNS_SHARED_FIXTURES,'utf8'));for(const [name,r]of Object.entries(fixtures.responses)){assert.doesNotThrow(()=>data.parseReadiness(r),`${name} production-serializer fixture matches adapter`);checks++;}}
+ await writeFile('/tmp/portal-8940-api-receipts.json',JSON.stringify({provenance:'local central mock request/response receipts; no live operations',receipts},null,2));
+ console.log(`PASS shared-validation API/projection contracts: ${checks} checks; mock receipts /tmp/portal-8940-api-receipts.json`);
+}finally{await server.close();}

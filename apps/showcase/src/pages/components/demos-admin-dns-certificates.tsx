@@ -1,54 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { CertificatesPage } from 'portal-mojo/admin/infrastructure';
-import {
-    getAuthSnapshot, login, mojoGet, setMockDnsAcmeMode, type Me,
-} from 'portal-mojo/client';
+import { CertificatesPage, DomainsPage, DomainDetail } from 'portal-mojo/admin/infrastructure';
+import { getAuthSnapshot, login, mojoGet, setMockDnsAcmeMode, setMockSharedValidationScenario, type MockSharedValidationScenario, type Me } from 'portal-mojo/client';
+import { openSharedValidation } from '../../../../../packages/portal-mojo/src/admin/dns/SharedValidationDialog';
 
-type Leg = 'manager-staging' | 'viewer' | 'platform' | 'unconfigured';
-
-const LEGS: Array<{ key: Leg; label: string; email: string }> = [
-    { key: 'manager-staging', label: 'Manager · staging', email: 'dns.manager@nativemojo.com' },
-    { key: 'viewer', label: 'Viewer', email: 'dns.viewer@nativemojo.com' },
-    { key: 'platform', label: 'Platform house access', email: 'dns.platform@nativemojo.com' },
-    { key: 'unconfigured', label: 'ACME unconfigured', email: 'dns.manager@nativemojo.com' },
+const scenarios: Array<{ value: MockSharedValidationScenario; label: string }> = [
+    { value: 'ready', label: 'New handshake' }, { value: 'missing-trust', label: 'Awaiting controller' }, { value: 'revoked', label: 'Trust revoked' }, { value: 'pending-dns', label: 'DNS lookup pending' }, { value: 'changed-alias', label: 'Changed alias' }, { value: 'chained-alias', label: 'Chained alias' }, { value: 'unavailable', label: 'Hub disconnected' }, { value: 'unconfigured', label: 'Server unconfigured' }, { value: 'old-api', label: 'Older backend' }, { value: 'disabled', label: 'Sharing disabled' }, { value: 'renewal-error', label: 'Valid certificate · failed renewal' },
 ];
-
 export function AdminDnsCertificatesDemo() {
-    const [leg, setLeg] = useState<Leg>('manager-staging');
-    const [switching, setSwitching] = useState(true);
-    const queryClient = useQueryClient();
+    const [scenario, setScenario] = useState<MockSharedValidationScenario>('ready');
+    const [persona, setPersona] = useState('dns.manager@nativemojo.com');
+    const [surface, setSurface] = useState('domains'); const [narrow, setNarrow] = useState(false);
+    const [switching, setSwitching] = useState(true); const qc = useQueryClient();
+    useEffect(() => { setMockSharedValidationScenario(scenario); void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'dnsman' || String(q.queryKey[0]).startsWith('/api/dnsman') }); }, [scenario, qc]);
     useEffect(() => {
-        let active = true;
-        const select = async () => {
-            setSwitching(true);
-            const entry = LEGS.find((candidate) => candidate.key === leg)!;
-            setMockDnsAcmeMode(leg === 'unconfigured' ? 'unconfigured' : 'staging');
-            await login(entry.email, 'mojo');
-            if (!active) return;
-            queryClient.removeQueries({ queryKey: ['me'] });
-            const uid = getAuthSnapshot().uid;
-            if (uid) await queryClient.fetchQuery({ queryKey: ['me', uid], queryFn: () => mojoGet<Me>('/api/user', 'me') });
-            queryClient.removeQueries({ queryKey: ['dnsman'] });
-            queryClient.removeQueries({ queryKey: ['/api/dnsman/certificate'] });
-            queryClient.removeQueries({ queryKey: ['/api/dnsman/domain'] });
-            if (active) setSwitching(false);
-        };
-        void select();
+        let active = true; setSwitching(true); setMockDnsAcmeMode('staging');
+        void (async () => { await login(persona, 'mojo'); if (!active) return; qc.removeQueries({ queryKey: ['me'] }); const uid = getAuthSnapshot().uid; if (uid) await qc.fetchQuery({ queryKey: ['me', uid], queryFn: () => mojoGet<Me>('/api/user', 'me') }); if (active) { await qc.invalidateQueries(); setSwitching(false); } })();
         return () => { active = false; };
-    }, [leg, queryClient]);
-    useEffect(() => () => {
-        setMockDnsAcmeMode('staging');
-        void login('showcase.operator@nativemojo.com', 'mojo');
-    }, []);
-    return <div style={{ display: 'grid', gap: 14 }}>
-        <div className="panel panel-pad">
-            <div className="eyebrow">DNSMan certificate custody</div>
-            <p className="dim" style={{ marginBottom: 0 }}>Pending, issuing, healthy, due-renewal, renewal-error, failed, revoked, house, verified-delegation, broken-sticky-delegation, malformed-response and no-material fixtures all use the central exact mock. No PEM fixture or material route exists.</p>
+    }, [persona, qc]);
+    useEffect(() => () => { setMockSharedValidationScenario('ready'); setMockDnsAcmeMode('staging'); void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
+    return <div className="dns-shared-showcase">
+        <div className="panel panel-pad"><div className="eyebrow">Independent wildcard certificates</div><p className="dim">Use existing <code>shared-acme.acme-hub.example</code> for acme.example, or <code>shared-customer.acme-hub.example</code> for a new customer.example in an eligible group. Prepare as Manager, copy the public request, switch to Controller and grant it, then switch back to connect, check and request. Persona changes preserve the mock handshake. Scenario changes reset it.</p></div>
+        <div className="dns-shared-demo-controls">
+            <label className="field"><span className="field-label">Scenario</span><select className="input" value={scenario} onChange={(e) => { setScenario(e.target.value as MockSharedValidationScenario); setSurface('domains'); }}>{scenarios.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
+            <label className="field"><span className="field-label">Identity</span><select className="input" disabled={switching} value={persona} onChange={(e) => setPersona(e.target.value)}><option value="dns.manager@nativemojo.com">Project manager</option><option value="dns.platform@nativemojo.com">Allocation controller</option><option value="dns.viewer@nativemojo.com">Viewer</option></select></label>
+            <label className="field"><span className="field-label">Existing DNS surface</span><select className="input" value={surface} onChange={(e) => setSurface(e.target.value)}><option value="domains">Domains entry</option><option value="detail">Fixed-domain detail</option><option value="certificates">Certificates</option></select></label>
+            <label><input type="checkbox" checked={narrow} onChange={(e) => setNarrow(e.target.checked)} /> 390px embedded content</label>
+            {persona !== 'dns.viewer@nativemojo.com' && <button className="btn" disabled={switching} onClick={() => void openSharedValidation()}>Open shared setup</button>}
         </div>
-        <div className="seg" style={{ flexWrap: 'wrap' }} aria-label="Certificate showcase state">
-            {LEGS.map((entry) => <button key={entry.key} type="button" disabled={switching} className={`seg-btn${entry.key === leg ? ' seg-active' : ''}`} onClick={() => setLeg(entry.key)}>{entry.label}</button>)}
+        <div style={{ width: narrow ? 390 : '100%', maxWidth: '100%' }}>
+            {switching ? <div className="panel panel-pad dim">Switching controlled DNS identity…</div> : surface === 'detail' ? <DomainDetail id={8201} onClose={() => setSurface('domains')} /> : surface === 'certificates' ? <CertificatesPage /> : <DomainsPage />}
         </div>
-        {switching ? <div className="panel panel-pad dim">Switching controlled certificate identity…</div> : <CertificatesPage />}
     </div>;
 }
