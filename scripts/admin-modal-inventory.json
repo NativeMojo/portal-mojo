@@ -5784,7 +5784,7 @@
       "category": "action",
       "parent": "controllerAction",
       "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:confirmShared",
-      "fingerprint": "29b9451dc7ec5bb26130",
+      "fingerprint": "8c43cc2433b7a7c22e6f",
       "categories": [
         "action"
       ]
