@@ -4019,6 +4019,20 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:confirmDeactivateKey:import:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "confirmDeactivateKey",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "confirmDeactivateKey",
+      "target": null,
+      "fingerprint": "dbec374e3fd21deb87f8",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:modal.open:0",
       "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
       "owner": "createKey",

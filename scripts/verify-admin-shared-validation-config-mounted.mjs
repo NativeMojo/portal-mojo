@@ -19,7 +19,7 @@ try{
  const auth=await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');auth.initAuth();const mock=await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');const ui=await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
  const {SharedValidationConnectionPanel:Panel}=await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx');
  const{AcmeConsumerKeyDialog:KeyDialog}=await server.ssrLoadModule('/packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx');
- const login=async(email='dns.platform@nativemojo.com')=>act(async()=>auth.login(email,'mojo'));
+ const login=async(email='dns.platform@nativemojo.com')=>act(async()=>{await auth.login(email,'mojo');auth.stopAutoRefresh();});
  const mount=async(C=Panel,props={})=>{qc=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});root=createRoot(document.getElementById('root'));await act(async()=>root.render(React.createElement(QueryClientProvider,{client:qc},React.createElement(MemoryRouter,{initialEntries:['/custom/system/fleet-configuration/shared-validation']},React.createElement(React.StrictMode,null,React.createElement(C,{pollInterval:5,pollLimit:12,close(){},...props}),React.createElement(ui.ModalHost))))));};
  const unmount=async()=>{await act(async()=>{root?.unmount();root=null;ui.modal.closeAll();});qc?.clear();};
  const posts=()=>mock.getMockRequestHistory().filter(r=>r.method==='POST'&&r.path.startsWith('/api/account/admin/fleet'));

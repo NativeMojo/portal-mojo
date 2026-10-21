@@ -10,7 +10,7 @@ try{
  const nav=await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/operator-destinations.ts');
  const auth=await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');auth.initAuth();
  const mock=await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
- const login=async(email='dns.platform@nativemojo.com')=>auth.login(email,'mojo');
+ const login=async(email='dns.platform@nativemojo.com')=>{const result=await auth.login(email,'mojo');auth.stopAutoRefresh();return result;};
  await login();mock.setMockConnectionScenario('ready');const initial=await api.readConnection();assert(initial.available,'ready topic is discoverable');assert(initial.profiles.length,'approved profile is named');checks+=2;
  const selected=initial.profiles[0],input={expected_revision:initial.revision,expected_catalog_revision:initial.catalog_revision,profile_id:selected.id,key_action:'replace',replacement_key:'mock-new-key'};
  const preview=await api.previewConnection(input,selected);assert.equal(preview.identity.observed_project_uuid,selected.consumer_project_uuid,'preview binds authenticated exact original UUID');assert.equal((await api.readConnection()).revision,initial.revision,'preview persists no publication');checks+=2;receipts.push({step:'preview',request:{...input,replacement_key:'[redacted]'},response:preview});
