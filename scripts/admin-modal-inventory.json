@@ -9297,6 +9297,20 @@
       ]
     },
     {
+      "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:<module>:import:0",
+      "file": "apps/portal/src/pages/auth/FreshAuthHost.tsx",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "f5cc2be95f3c23933393",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
       "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:FreshAuthDialog:dialog:0",
       "file": "apps/portal/src/pages/auth/FreshAuthHost.tsx",
       "owner": "FreshAuthDialog",
