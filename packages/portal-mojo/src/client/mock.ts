@@ -5429,7 +5429,11 @@ function saveUser(user: MockUser, body: Record<string, unknown>, caller?: MockUs
 // django-mojo account/models/group.py RestMeta: POST_SAVE_ACTIONS include
 // disable/reactivate (reason REQUIRED ∈ GROUP_REST_REASONS = admin | abuse |
 // archived — one more than users get); NO_SAVE_FIELDS id/pk/created.
-const GROUP_ACTIONS = new Set(['disable', 'reactivate']);
+// allow_member_subgroups (#9126) switches metadata.protected's sub-group
+// policy (#9107): a boolean only, off removes the key, and the reply is the
+// handler's flat {status, allow_member_subgroups}, not the row.
+const GROUP_ACTIONS = new Set(['disable', 'reactivate', 'allow_member_subgroups']);
+const GROUP_SUBGROUP_POLICY_KEY = 'allow_member_subgroups';
 const GROUP_DISABLE_REASONS = new Set(['abuse', 'admin', 'archived']);
 // NO_SAVE_FIELDS parity (id/pk/created); member_count additionally blocked
 // here because it is a graph EXTRA, not a column (uuid IS savable live).
@@ -5444,6 +5448,10 @@ function serializeGroup(g: MockGroup): Record<string, unknown> {
 }
 
 function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
+    // Group.on_rest_save judges the switch before anything is written.
+    if (GROUP_SUBGROUP_POLICY_KEY in body && typeof body[GROUP_SUBGROUP_POLICY_KEY] !== 'boolean') {
+        return { status: false, error: `${GROUP_SUBGROUP_POLICY_KEY} must be true or false`, error_code: 400 };
+    }
     const fields: Record<string, unknown> = {};
     const actionEntries: [string, unknown][] = [];
     for (const [key, value] of Object.entries(body)) {
@@ -5477,9 +5485,17 @@ function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
             target[key] = isPlainObject(value) && isPlainObject(existing) ? mergeDicts(existing, value) : value;
         }
     }
+    let actionReply: Record<string, unknown> | null = null;
     for (const [action, value] of actionEntries) {
         const dict = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
-        if (action === 'disable') {
+        if (action === GROUP_SUBGROUP_POLICY_KEY) {
+            const metadata = isPlainObject(group.metadata) ? group.metadata : {};
+            const protectedMeta = isPlainObject(metadata.protected) ? { ...metadata.protected } : {};
+            if (value === true) protectedMeta[GROUP_SUBGROUP_POLICY_KEY] = true;
+            else delete protectedMeta[GROUP_SUBGROUP_POLICY_KEY];
+            group.metadata = { ...metadata, protected: protectedMeta };
+            actionReply = { status: true, [GROUP_SUBGROUP_POLICY_KEY]: value };
+        } else if (action === 'disable') {
             const reason = String(dict.reason ?? '');
             if (!GROUP_DISABLE_REASONS.has(reason)) {
                 return { status: false, error: `reason must be one of: ${[...GROUP_DISABLE_REASONS].sort().join(', ')}`, error_code: 400 };
@@ -5490,6 +5506,7 @@ function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
         }
     }
     group.modified = Math.floor(Date.now() / 1000);
+    if (actionReply) return actionReply;
     return { status: true, data: serializeGroup(group), graph: 'default' };
 }
 
@@ -11963,7 +11980,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         }
         if (opts.method === 'POST' && opts.body) {
             if (!groupCanManage(caller, group.id)) return permissionDenied();
-            if (('disable' in opts.body || 'reactivate' in opts.body)
+            if (('disable' in opts.body || 'reactivate' in opts.body || GROUP_SUBGROUP_POLICY_KEY in opts.body)
                 && !hasGlobalPermission(caller, ['manage_groups', 'groups'])) return permissionDenied();
             return saveGroup(group, opts.body);
         }

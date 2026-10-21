@@ -66,5 +66,7 @@ export const GroupModel = defineModel<GroupRow>({
     actions: {
         disable: { permissions: GROUP_DESTRUCTIVE_PERMS },
         reactivate: { permissions: GROUP_DESTRUCTIVE_PERMS },
+        // django-mojo #9126: answers {status, allow_member_subgroups}, not the row.
+        allow_member_subgroups: { permissions: GROUP_MANAGE_PERMS, response: 'payload' },
     },
 });

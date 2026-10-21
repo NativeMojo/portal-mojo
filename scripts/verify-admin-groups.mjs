@@ -101,6 +101,49 @@ try {
         method: 'POST', headers: manager, body: { reactivate: {} },
     });
     assert.equal(reactivated.data.is_active, true);
+
+    // #9127: the system-admin sub-group switch (django-mojo #9126 action).
+    assert.deepEqual(models.GroupModel.actions.allow_member_subgroups,
+        { permissions: models.GROUP_MANAGE_PERMS, response: 'payload' });
+    const subGroups = await server.ssrLoadModule('/packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx');
+    assert.equal(subGroups.allowsMemberSubgroups({ metadata: { protected: { allow_member_subgroups: true } } }), true);
+    for (const metadata of [{}, { protected: null }, { protected: { allow_member_subgroups: 'true' } }, { allow_member_subgroups: true }]) {
+        assert.equal(subGroups.allowsMemberSubgroups({ metadata }), false, `only protected === true is on: ${JSON.stringify(metadata)}`);
+    }
+    const subGroupsSource = await readFile(new URL('../packages/portal-mojo/src/admin/identity/groups/group-sections/SubGroupsSection.tsx', import.meta.url), 'utf8');
+    assert.match(subGroupsSource, /\{canManage && <MemberSubgroupsSwitch /, 'the switch renders only for GROUP_MANAGE_PERMS holders');
+    const policyOn = await mock.mockFetch(`/api/group/${target.id}`, {
+        method: 'POST', headers: manager, body: { allow_member_subgroups: true },
+    });
+    assert.deepEqual(policyOn, { status: true, allow_member_subgroups: true });
+    const afterOn = await mock.mockFetch(`/api/group/${target.id}`, { headers: manager });
+    assert.equal(afterOn.data.metadata.protected.allow_member_subgroups, true);
+    const policyOff = await mock.mockFetch(`/api/group/${target.id}`, {
+        method: 'POST', headers: manager, body: { allow_member_subgroups: false },
+    });
+    assert.deepEqual(policyOff, { status: true, allow_member_subgroups: false });
+    const afterOff = await mock.mockFetch(`/api/group/${target.id}`, { headers: manager });
+    assert.equal('allow_member_subgroups' in afterOff.data.metadata.protected, false, 'off removes the key');
+    const nonBoolean = await mock.mockFetch(`/api/group/${target.id}`, {
+        method: 'POST', headers: manager, body: { allow_member_subgroups: 'yes' },
+    });
+    assert.equal(nonBoolean.error_code, 400);
+    // A member who may save this group's fields still needs the global grant.
+    const memberManaged = memberRows.data.find((group) => group.id % 2 === 1);
+    assert(memberManaged);
+    const memberSave = await mock.mockFetch(`/api/group/${memberManaged.id}`, {
+        method: 'POST', headers: member, body: { name: memberManaged.name },
+    });
+    assert.equal(memberSave.status, true, 'precondition: the member persona manages this group');
+    const memberPolicy = await mock.mockFetch(`/api/group/${memberManaged.id}`, {
+        method: 'POST', headers: member, body: { allow_member_subgroups: true },
+    });
+    assert.equal(memberPolicy.error_code, 403);
+    const viewerPolicy = await mock.mockFetch(`/api/group/${target.id}`, {
+        method: 'POST', headers: viewer, body: { allow_member_subgroups: true },
+    });
+    assert.equal(viewerPolicy.error_code, 403);
+
     const parentSave = await mock.mockFetch(`/api/group/${target.id}`, {
         method: 'POST', headers: manager, body: { parent: 1 },
     });

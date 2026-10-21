@@ -35,6 +35,18 @@ existing system permission gate and conditional queries. Parent, child, member
 and user navigation opens native detail modals while keeping the directory
 underneath.
 
+The Sub-Groups section carries the "Administrators can create sub-groups"
+switch for `sys.groups | sys.manage_groups` holders only; nobody else sees it.
+It reads `metadata.protected.allow_member_subgroups === true` (anything else
+is off) and changes it only through the django-mojo Group action
+`POST /api/group/<id> {"allow_member_subgroups": true|false}`, which answers
+`{"status": true, "allow_member_subgroups": <bool>}`. Never write
+`metadata.protected` directly: that path refuses `manage_groups` admins. The
+action needs django-mojo with #9126; the server refuses a caller without the
+global grant with 403 and a non-boolean with 400. While on, people who manage
+the group as members can create groups directly under it; the setting is not
+inherited by the new groups, and turning it off leaves existing groups alone.
+
 The group model and section code are adapted from the reference portal at
 `v0.2.5` commit `93c7fdfeb3096d33010e72bd4483cf9ca6e3d6f5`. The source hashes
 and corresponding package hashes are recorded in
