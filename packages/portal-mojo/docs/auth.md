@@ -102,11 +102,25 @@ its bot-check interstitial). Flow:
    `<origin>/auth?redirect=<HASH-FREE current url>`. Hash-free is
    load-bearing: the page string-appends `?auth_code=<code>` to the
    redirect, and a `#` in it would swallow the code.
-2. User signs in on the hosted page; it mints a single-use 60s handoff code
+2. User signs in using that page's configured methods (Google, password,
+   passkey, etc.). Same-origin return uses its existing stored session;
+   a cross-origin return mints a single-use 60s handoff code
    (`POST /api/auth/handoff`) and navigates back with `?auth_code=`.
 3. `handleAuthCodeFromURL()` (boot) exchanges it (`POST /api/auth/exchange`),
    scrubs the code from the URL synchronously, restores the stashed route.
-   Handles a hash-embedded `#/route?auth_code=` landing too.
+   It also restores same-origin returns without a code. Handles a
+   hash-embedded `#/route?auth_code=` landing too. Await this at boot before
+   creating the router.
+
+`redirectToHostedAuth({forceReauth: true})` uses the same page with
+`force_reauth=1`, bypassing its automatic existing-session check. It retains
+the initiating persistent/session-only choice, including when the hosted
+page writes localStorage. `remember` may explicitly supply the choice captured
+when the challenge opened. Tab-local return metadata contains only the route,
+destination, time and storage choice; it is consumed once, expires after 30
+minutes, and applies only at the matching origin/path/query. It never carries
+an operation or establishes freshness. The server still enforces `auth_time`.
+When storage cannot retain the choice, step-up navigation returns false.
 
 `hostedAuthUrl()` returns null under the mock transport — there is no page
 to host; the UI should fall back to a dev affordance (`__mojo.login(...)`).

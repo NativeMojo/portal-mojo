@@ -124,12 +124,18 @@ Client surface (`portal-mojo/client`):
 - `withFreshAuth(fn)` — run fn; on a 440 prompt, then retry **once** after a
   successful re-login; a dismissed prompt rejects with the ORIGINAL error.
 
-The modal re-prompts credentials OVER the current screen — page state
-survives. It pins the identity to the current session's email (step-up is
-"prove you are still you"), offers password + passkey + the MFA step, and
-keeps the session in its original storage (`sessionIsPersistent()` →
-`remember`). Dev affordance: `__mojo.requestFreshAuth()` in the console
-exercises the modal without a 440.
+In hosted mode (including packaged Admin), the native dialog offers Cancel
+and Continue to sign-in. Continue opens the existing configured sign-in page
+with `force_reauth=1`, so Google-only deployments can use Google. It preserves
+the exact return route and original storage choice. The pending challenge
+resolves false before unloading: after returning, re-read and deliberately
+retry the action. Picking another account starts a new session and screen;
+the former account's operation is never carried over.
+
+In explicit in-app/mock mode the modal re-prompts credentials over the current
+screen, pins the current email when available, and keeps the existing
+password/passkey/MFA and storage behavior. Dev affordance:
+`__mojo.requestFreshAuth()` exercises the modal without a 440.
 
 Call-site pattern:
 
@@ -171,6 +177,12 @@ bouncer-enforcing deployments.
   state instead of the scorer's non-empty-string complaint.
 
 ## Mock affordances
+
+`npm run verify:hosted-reauth` covers the mounted hosted confirmation and
+return/storage paths. For native dialog, responsive and theme checks, run
+`node scripts/serve-hosted-reauth.mjs` and open its printed local URL. The
+fixture uses the actual Portal host/bridge and a simulated Google-only sign-in
+page; it does not prove a live OAuth provider exchange.
 
 Under the mock transport the pages show inline dev hints: password `mojo`
 for any seeded user (e.g. `ian@mojoverify.com`); Maya (seeded user 2) requires

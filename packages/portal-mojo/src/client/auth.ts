@@ -753,10 +753,11 @@ let freshAuthPromise: Promise<boolean> | null = null;
 
 /**
  * Register the UI that answers step-up challenges (one per app — the C3
- * FreshAuthHost). Pass null to unregister. The handler re-authenticates via
+ * FreshAuthHost). Pass null to unregister. An inline handler re-authenticates via
  * the normal login flows, so the fresh tokens (and their new auth_time) are
  * stored before it resolves true; keep the session's storage by passing
- * `{remember: sessionIsPersistent()}` to the login call.
+ * `{remember: sessionIsPersistent()}` to the login call. A hosted handler
+ * resolves false before leaving, so returning never replays the pending action.
  */
 export function setFreshAuthHandler(handler: FreshAuthHandler | null): void {
     freshAuthHandler = handler;
@@ -813,22 +814,22 @@ let exchangePromise: Promise<AuthUser | null> | null = null;
  * server-enforced) for tokens. Single-flight; resolves null on failure
  * (the code is burned either way — nothing to retry).
  */
-export function exchangeAuthCode(code: string): Promise<AuthUser | null> {
+export function exchangeAuthCode(code: string, opts: Pick<LoginOptions, 'remember'> = {}): Promise<AuthUser | null> {
     if (!exchangePromise) {
-        exchangePromise = doExchange(code).finally(() => {
+        exchangePromise = doExchange(code, opts.remember).finally(() => {
             exchangePromise = null;
         });
     }
     return exchangePromise;
 }
 
-async function doExchange(code: string): Promise<AuthUser | null> {
+async function doExchange(code: string, remember = true): Promise<AuthUser | null> {
     try {
         // Hosted sign-in is also a recovery path: stale credentials must not
         // block exchanging the fresh one-time login code.
         if (checkTokenStatus().action === 'logout') clearTokens({ silent: true });
         const body = await mojoCall('/api/auth/exchange', { method: 'POST', body: { code } });
-        return await adoptGrant(body.data as TokenGrant);
+        return await adoptGrant(body.data as TokenGrant, remember);
     } catch (error) {
         emitAuth('refresh-failed', error);
         return null;
@@ -846,7 +847,8 @@ async function doExchange(code: string): Promise<AuthUser | null> {
  *     redirectToHostedAuth() produces by sending a hash-free return URL;
  *   · inside the hash query (`/#/route?auth_code=x`) — a deployment that
  *     passed a full hash-router URL as the redirect.
- * After a successful exchange the stashed return route (if any) is restored.
+ * Restores the stashed return route after exchange or an authenticated
+ * same-origin return (which shares storage and needs no code).
  */
 export function handleAuthCodeFromURL(): Promise<AuthUser | null> {
     if (typeof window === 'undefined' || !window.location) return Promise.resolve(null);
@@ -861,17 +863,24 @@ export function handleAuthCodeFromURL(): Promise<AuthUser | null> {
         // Hash-embedded: '#/route?auth_code=x&…'
         const hash = window.location.hash || '';
         const qIndex = hash.indexOf('?');
-        if (qIndex === -1) return Promise.resolve(null);
+        if (qIndex === -1) {
+            completeHostedReturn(takeHostedReturn());
+            return Promise.resolve(null);
+        }
         const hashParams = new URLSearchParams(hash.slice(qIndex + 1));
         code = hashParams.get(AUTH_CODE_PARAM);
-        if (!code) return Promise.resolve(null);
+        if (!code) {
+            completeHostedReturn(takeHostedReturn());
+            return Promise.resolve(null);
+        }
         hashParams.delete(AUTH_CODE_PARAM);
         const rest = hashParams.toString();
         scrubUrl(params, hash.slice(0, qIndex) + (rest ? `?${rest}` : ''));
     }
 
-    return exchangeAuthCode(code).then((user) => {
-        if (user) restoreReturnRoute();
+    const returning = takeHostedReturn();
+    return exchangeAuthCode(code, { remember: returning?.persistent }).then((user) => {
+        if (user) completeHostedReturn(returning);
         return user;
     });
 }
@@ -891,6 +900,18 @@ function scrubUrl(params: URLSearchParams, hash: string): void {
 // <redirect>?auth_code=<code>, which handleAuthCodeFromURL() exchanges.
 
 const RETURN_ROUTE_KEY = 'mojo:auth-return-route';
+interface HostedReturn {
+    route: string;
+    returnTo: string;
+    createdAt: number;
+    persistent?: boolean;
+}
+export interface HostedAuthOptions {
+    /** Force a genuine sign-in while preserving the session's storage choice. */
+    forceReauth?: boolean;
+    /** Initiating storage choice; defaults to the current session for step-up. */
+    remember?: boolean;
+}
 
 /**
  * The hosted auth page URL for this deployment, or null under the mock
@@ -898,36 +919,67 @@ const RETURN_ROUTE_KEY = 'mojo:auth-return-route';
  * form of the current URL — the auth page appends `?auth_code=` with plain
  * string concatenation, and a hash in the redirect would swallow it.
  */
-export function hostedAuthUrl(returnTo?: string): string | null {
+export function hostedAuthUrl(returnTo?: string, opts: HostedAuthOptions = {}): string | null {
     const origin = apiOrigin();
     if (!origin || typeof window === 'undefined') return null;
     const target = returnTo ?? window.location.origin + window.location.pathname + window.location.search;
-    return `${origin}/auth?redirect=${encodeURIComponent(target)}`;
+    return `${origin}/auth?redirect=${encodeURIComponent(target)}${opts.forceReauth ? '&force_reauth=1' : ''}`;
 }
 
 /**
  * Send the user to the hosted auth page, remembering the current in-app
  * (hash) route so the post-exchange boot can put them back where they were.
  */
-export function redirectToHostedAuth(): boolean {
-    const url = hostedAuthUrl();
+export function redirectToHostedAuth(opts: HostedAuthOptions = {}): boolean {
+    const url = hostedAuthUrl(undefined, opts);
     if (!url) return false;
     try {
-        const route = window.location.hash;
-        if (route && route !== '#/') sessionStorage.setItem(RETURN_ROUTE_KEY, route);
-    } catch { /* storage denied — land on the default route */ }
+        const returning: HostedReturn = {
+            route: window.location.hash,
+            returnTo: window.location.origin + window.location.pathname + window.location.search,
+            createdAt: Date.now(),
+            ...(opts.forceReauth ? { persistent: opts.remember ?? sessionIsPersistent() } : {}),
+        };
+        sessionStorage.setItem(RETURN_ROUTE_KEY, JSON.stringify(returning));
+    } catch {
+        // Step-up must retain its storage choice. Ordinary login can still
+        // recover on the default route when session storage is unavailable.
+        if (opts.forceReauth) return false;
+    }
     window.location.href = url;
     return true;
 }
 
-function restoreReturnRoute(): void {
+function takeHostedReturn(): HostedReturn | null {
     try {
-        const route = sessionStorage.getItem(RETURN_ROUTE_KEY);
-        if (route) {
-            sessionStorage.removeItem(RETURN_ROUTE_KEY);
-            window.location.hash = route;
-        }
-    } catch { /* storage denied */ }
+        const raw = sessionStorage.getItem(RETURN_ROUTE_KEY);
+        sessionStorage.removeItem(RETURN_ROUTE_KEY);
+        if (!raw) return null;
+        // Accept a route left by an older toolkit before this deployment.
+        if (raw.startsWith('#/')) return { route: raw, returnTo: window.location.origin + window.location.pathname + window.location.search, createdAt: Date.now() };
+        const value = JSON.parse(raw) as HostedReturn;
+        const target = new URL(value.returnTo);
+        if (target.origin !== window.location.origin || target.pathname !== window.location.pathname
+            || target.searchParams.toString() !== new URLSearchParams(window.location.search).toString()
+            || typeof value.route !== 'string' || value.route !== '' && !value.route.startsWith('#/')
+            || typeof value.createdAt !== 'number' || Date.now() < value.createdAt || Date.now() - value.createdAt > 30 * 60_000
+            || value.persistent !== undefined && typeof value.persistent !== 'boolean') return null;
+        return value;
+    } catch { return null; }
+}
+
+function completeHostedReturn(returning: HostedReturn | null): void {
+    if (!returning || !getAuthSnapshot().authenticated) return;
+    // Same-origin hosted login already stored the new pair in localStorage;
+    // code exchange adopts into the requested storage above. Return metadata
+    // and route restoration are never proof of fresh authentication.
+    const access = getAccessToken();
+    const refresh = getRefreshToken();
+    if (returning.persistent !== undefined && access && refresh) {
+        storeTokens(access, refresh, returning.persistent, 'refresh');
+    }
+    const target = new URL(returning.returnTo);
+    window.history.replaceState(window.history.state, '', target.pathname + target.search + returning.route);
 }
 
 // ── Logout + boot wiring ──────────────────────────────────────────────

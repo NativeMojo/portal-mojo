@@ -4,25 +4,23 @@
 // (setFreshAuthHandler), so `withFreshAuth(fn)` call sites anywhere in the
 // app get this modal.
 //
-// The whole point (per the workspec): a mid-session challenge re-prompts
-// credentials WITHOUT losing page state — a native <dialog> OVER the
-// current screen, never a redirect. Only a genuine re-login can satisfy the
-// gate (a refresh carries auth_time forward unchanged), so the modal runs
-// the real login()/loginWithPasskey() flows — including the MFA step — and
-// keeps the session in the storage the user originally chose
-// (sessionIsPersistent() → remember).
+// Hosted mode reuses the deployment's configured sign-in page. The pending
+// action ends before unloading; returning reloads the screen for a deliberate
+// retry. In-app mode keeps the existing inline password/passkey/MFA flows.
+// Refresh carries auth_time unchanged and cannot satisfy either mode's gate.
 //
-// The identity is pinned: the email from the current session's token is
+// For inline confirmation the identity is pinned: the email from the token is
 // shown as a locked chip (step-up means "prove you are still YOU", not
 // "switch accounts"). It falls back to an editable field only when the
 // token carries no email claim.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
     getAuthSnapshot, isPasskeySupported, login, loginWithPasskey,
-    passkeyErrorMessage, sessionIsPersistent, setFreshAuthHandler,
+    passkeyErrorMessage, redirectToHostedAuth, sessionIsPersistent, setFreshAuthHandler,
     type MfaChallenge,
 } from 'portal-mojo/client/runtime';
 import { MfaPanel } from './MfaPanel';
+import { authMode } from './config';
 
 interface Pending {
     resolve: (ok: boolean) => void;
@@ -36,15 +34,16 @@ export function FreshAuthHost() {
     // Mirror for unmount: RequireAuth drops this host on logout — a prompt
     // still open then must resolve false, or withFreshAuth() hangs forever.
     const pendingRef = useRef<Pending | null>(null);
-    pendingRef.current = pending;
 
     useEffect(() => {
         setFreshAuthHandler(() => new Promise<boolean>((resolve) => {
-            setPending({
+            const next = {
                 resolve,
                 email: getAuthSnapshot().email,
                 persistent: sessionIsPersistent(),
-            });
+            };
+            pendingRef.current = next;
+            setPending(next);
         }));
         return () => {
             setFreshAuthHandler(null);
@@ -54,10 +53,10 @@ export function FreshAuthHost() {
     }, []);
 
     const settle = useCallback((ok: boolean) => {
-        setPending((current) => {
-            current?.resolve(ok);
-            return null;
-        });
+        const current = pendingRef.current;
+        pendingRef.current = null;
+        current?.resolve(ok);
+        setPending(null);
     }, []);
 
     if (!pending) return null;
@@ -79,6 +78,17 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
     }, []);
 
     const remember = pending.persistent;
+    const hosted = authMode() === 'hosted';
+
+    const continueToSignIn = () => {
+        if (!redirectToHostedAuth({ forceReauth: true, remember: pending.persistent })) {
+            setError('Could not open sign-in. Allow session storage and try again.');
+            return;
+        }
+        // End the challenge synchronously, before navigation unloads the page.
+        // No mutation closure or confirmation is carried through sign-in.
+        settle(false);
+    };
 
     const submit = async (e: FormEvent) => {
         e.preventDefault();
@@ -137,14 +147,21 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
                             <span className="eyebrow">Security check</span>
                             <h2 className="modal-title">Confirm it&rsquo;s you</h2>
                             <p className="auth-sub">
-                                This action needs a recent sign-in. Re-enter your credentials to
-                                continue — you&rsquo;ll stay right where you are.
+                                {hosted
+                                    ? 'Use this system’s sign-in page to confirm your identity. You’ll return to this screen, then retry the action.'
+                                    : 'This action needs a recent sign-in. Re-enter your credentials to continue — you’ll stay right where you are.'}
                             </p>
                         </div>
 
                         {error && <div className="form-alert" role="alert">{error}</div>}
 
-                        <form className="auth-stack" onSubmit={submit}>
+                        {hosted ? <>
+                            {pending.email && <p className="auth-sub">Sign in as {pending.email} to continue with this account.</p>}
+                            <div className="modal-actions">
+                                <button type="button" className="btn" onClick={() => settle(false)}>Cancel</button>
+                                <button type="button" className="btn btn-primary" onClick={continueToSignIn}>Continue to sign-in</button>
+                            </div>
+                        </> : <form className="auth-stack" onSubmit={submit}>
                             {emailLocked ? (
                                 <div className="fresh-auth-id" title="Step-up re-authenticates the CURRENT account">
                                     <i className="bi bi-person-badge" />
@@ -192,7 +209,7 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
                                     Confirm
                                 </button>
                             </div>
-                        </form>
+                        </form>}
                     </div>
                 )}
             </div>
