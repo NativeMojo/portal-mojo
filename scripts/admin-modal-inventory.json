@@ -3878,6 +3878,20 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:AcmeConsumerKeyButton:openAcmeConsumerKey:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "AcmeConsumerKeyButton",
+      "launcher": "openAcmeConsumerKey",
+      "body": [],
+      "category": "editor",
+      "parent": "AcmeConsumerKeyButton",
+      "target": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:openAcmeConsumerKey",
+      "fingerprint": "510976ded13665b3d1aa",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:openAcmeConsumerKey:modal.open:0",
       "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
       "owner": "openAcmeConsumerKey",
@@ -3991,13 +4005,13 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:openAcmeConsumerKey:import:0",
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "openAcmeConsumerKey",
+      "owner": "<module>",
       "launcher": "import",
       "body": [],
       "category": "dependency",
-      "parent": "openAcmeConsumerKey",
+      "parent": "<module>",
       "target": null,
       "fingerprint": "1cbe5e57d4afa53be177",
       "categories": [

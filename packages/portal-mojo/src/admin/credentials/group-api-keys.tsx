@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useContext, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useContext, useSyncExternalStore } from 'react';
 import {
     GroupContext,
     hasPermission,
@@ -42,9 +42,7 @@ import {
     type GroupApiKeyRow,
 } from './models';
 import { showSecretDialog } from './secret-dialog';
-async function openAcmeConsumerKey(group?: CredentialGroup) {
-    return (await import('./AcmeConsumerKeyDialog')).openAcmeConsumerKey(group);
-}
+const ProtectedKeyButton = lazy(() => import('./AcmeConsumerKeyDialog').then((m) => ({ default: m.AcmeConsumerKeyButton })));
 
 function groupLabel(group: GroupApiKeyRow['group']): string {
     if (group && typeof group === 'object') return group.name;
@@ -351,7 +349,6 @@ function ApiKeyCard({ row, actions }: {
 }
 
 function GroupApiKeysContent({ group, permission }: { group: CredentialGroup; permission: PermSpec }) {
-    const { data: me } = useMe();
     const { data, isPending } = GroupApiKeyModel.useList({ group: group.id, size: 10, sort: '-created' });
     const actions = useGroupApiKeyActions(permission);
     const rows = data?.rows ?? [];
@@ -366,7 +363,7 @@ function GroupApiKeysContent({ group, permission }: { group: CredentialGroup; pe
                     <button className="btn btn-primary btn-compact" onClick={() => void actions.createKey(group)}>
                         <i className="bi bi-key" /> Create Key
                     </button>
-                    {me?.is_superuser === true && <button className="btn btn-compact" onClick={() => void openAcmeConsumerKey(group)}>Create ACME consumer key</button>}
+                    <Suspense fallback={null}><ProtectedKeyButton group={group} /></Suspense>
                 </div>
             )}
             {!isPending && rows.length === 0 && <p className="dim-italic">No API keys yet.</p>}
@@ -487,7 +484,6 @@ const API_KEY_FILTERS: FilterDef[] = [
 ];
 
 export function GroupApiKeysPage() {
-    const { data: me } = useMe();
     const queryClient = useQueryClient();
     const actions = useGroupApiKeyActions(GLOBAL_CREDENTIAL_PERMS);
     const openDetail = (row: GroupApiKeyRow) => {
@@ -495,7 +491,7 @@ export function GroupApiKeysPage() {
         void modal.detail((close) => <GroupApiKeyDetail id={row.id} onClose={() => close(null)} />);
     };
     return (
-        <>{me?.is_superuser === true && <div style={{ padding: 16 }}><button className="btn" onClick={() => void openAcmeConsumerKey()}>Create ACME consumer key</button></div>}<ModelTable<GroupApiKeyRow>
+        <><Suspense fallback={null}><ProtectedKeyButton /></Suspense><ModelTable<GroupApiKeyRow>
             model={GroupApiKeyModel}
             eyebrow="Account"
             title="Group API Keys"

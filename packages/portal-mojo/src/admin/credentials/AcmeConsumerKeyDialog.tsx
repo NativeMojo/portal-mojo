@@ -7,6 +7,12 @@ import { OperatorError, usePrivateOperator, uuid } from '../fleet-configuration/
 import { issueAcmeKey, projectKeyGroup, readAcmeRecipient, readKeyGroup, readRecipientKeyInventory, revealRecipientKey, type AcmeRecipient, type KeyGroup, type KeySummary } from './acme-consumer-key';
 import { GroupApiKeyModel, type CredentialGroup } from './models';
 
+
+export function AcmeConsumerKeyButton({ group }: { group?: CredentialGroup }) {
+    const owner = usePrivateOperator();
+    return owner.allowed ? <button className="btn btn-compact" onClick={() => void openAcmeConsumerKey(group)}>Create ACME consumer key</button> : null;
+}
+
 export function openAcmeConsumerKey(group?: CredentialGroup) {
     let pending = false;
     return modal.open((close) => <AcmeConsumerKeyDialog group={group} close={() => close(null)} onBusy={(busy) => { pending = busy; }} />, { size: 'lg', canDismiss: () => !pending });
