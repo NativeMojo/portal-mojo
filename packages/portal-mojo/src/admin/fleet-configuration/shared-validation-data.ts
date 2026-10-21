@@ -2,10 +2,11 @@
 import { useEffect, useRef } from 'react';
 import { apiOrigin, usingMockTransport } from '../../client/client';
 import { getAuthSessionRevision, getAuthSnapshot, mojoCall, MojoError, useAuthSnapshot, useMe, type Params } from '../../client/runtime';
-import { FLEET_ENDPOINT, FLEET_HEALTH_SCOPE } from './data';
+// This private protocol boundary does not import the generic replaying writer.
+const FLEET_ENDPOINT = '/api/account/admin/fleet';
+const FLEET_HEALTH_SCOPE = 'request_service_jobs_and_dependencies';
 
 export const CONNECTION_ENDPOINT = `${FLEET_ENDPOINT}/shared-validation`;
-export { MANAGED_CONNECTION_KEYS, isManagedConnectionKey } from './data';
 export interface PrivateScope { signal?: AbortSignal; beforeSend?: () => void }
 export class OperatorError extends Error {
     constructor(public kind: 'invalid' | 'recipient' | 'unsupported' | 'denied' | 'fresh' | 'conflict' | 'busy' | 'unavailable' | 'uncertain', public code: string | null = null) {
@@ -36,6 +37,8 @@ export interface ConnectionInput { expected_revision: string | null; expected_ca
 export interface Preview { can_publish: boolean; revision: string | null; catalog_revision: string; profile_id: string | null; expected_identity: Identity | null; identity: Observation; credential_changed: boolean; consequences: string[] }
 export interface Publication { published: true; revision: string; version_id: string | null; pending_restart: true; applied: false }
 export interface ConnectionOperation extends ConnectionReport { operation_id: string; revision: string; job_status?: string }
+/** Private observation stops on terminal operation or failed dispatch, never completed dispatch alone. */
+export const connectionOperationFinished = (operation: ConnectionOperation) => ['healthy', 'failed', 'expired', 'canceled', 'superseded', 'timed_out'].includes(operation.status) || ['failed', 'expired', 'canceled'].includes(operation.job_status ?? '');
 export interface SafeHistory { versions: { version_id: string; current: boolean; published_at: string | null }[]; truncated: boolean }
 const identity = (v: unknown): Identity => { const r = object(v); return { consumer_project_uuid: uuid(r.consumer_project_uuid), consumer_label: label(r.consumer_label) }; };
 export function parseObservation(v: unknown): Observation {

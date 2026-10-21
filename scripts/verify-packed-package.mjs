@@ -44,11 +44,11 @@ try {
     assert.match(artifact.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'package version must be SemVer');
     // Audited #8984 baseline: 549 intended source/docs/style files total
     // 5,730,628 unpacked bytes. #8988 adds five private lazy operator files and
-    // grows eleven existing source/docs files by 74,458 bytes: 554 files,
-    // 5,805,086 bytes (1,566,476 compressed). The per-file diff accounts for
+    // grows twelve existing source/docs files by 75,238 bytes: 554 files,
+    // 5,805,866 bytes (1,566,840 compressed). The per-file diff accounts for
     // credential/connection parsers and forms, role-aware links, central mock
     // and human docs only; no generated, test, script or repository payload.
-    // 5.843 MB leaves 37,914 bytes (0.653%) headroom, comparable to the
+    // 5.843 MB leaves 37,134 bytes (0.640%) headroom, comparable to the
     // reviewed baseline. All content/consumer/style/export assertions below
     // and the separate 530,000-byte eager-runtime cap remain unchanged.
     assert.ok(artifact.unpackedSize <= 5_843_000, `unpacked package exceeds 5.843 MB budget (${artifact.unpackedSize})`);

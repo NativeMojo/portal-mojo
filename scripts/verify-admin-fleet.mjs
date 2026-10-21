@@ -61,7 +61,7 @@ try {
     for (const job_status of ['queued','running','completed']) assert.equal(data.operationFinished({...dispatched,job_status}),false);
     for (const job_status of ['failed','expired','canceled']) assert.equal(data.operationFinished({...dispatched,job_status}),true);
     for (const status of ['healthy','timed_out','superseded']) assert.equal(data.operationFinished({...dispatched,status}),true);
-    const { isManagedConnectionKey } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/shared-validation-data.ts');
+    const { isManagedConnectionKey } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/data.ts');
     for (const key of ['DNSMAN_ACME_HUB_PROFILE_ID','DNSMAN_ACME_HUB_URL','DNSMAN_ACME_HUB_API_KEY']) assert.equal(isManagedConnectionKey(key),true,'Managed DNS tuple routes to the protected topic');
     assert.equal(isManagedConnectionKey('EXAMPLE_WORKER_LIMIT'),false,'Ordinary application schema keeps its generic editor');
     const endpoint = '/api/account/admin/fleet';

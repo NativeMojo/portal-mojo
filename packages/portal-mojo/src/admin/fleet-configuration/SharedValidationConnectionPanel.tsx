@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestFreshAuth } from '../../client/runtime';
 import { FlatRow, fmt, modal } from '../../ui';
-import { operationFinished } from './data';
-import { applyConnection, connectionVerified, nodeVerified, OperatorError, previewConnection, publishConnection, readConnection, readConnectionHistory, readConnectionOperation, usePrivateOperator, type ConnectionInput, type ConnectionOperation, type ConnectionState, type Preview, type SafeHistory } from './shared-validation-data';
+import { applyConnection, connectionOperationFinished as operationFinished, connectionVerified, nodeVerified, OperatorError, previewConnection, publishConnection, readConnection, readConnectionHistory, readConnectionOperation, usePrivateOperator, type ConnectionInput, type ConnectionOperation, type ConnectionState, type Preview, type SafeHistory } from './shared-validation-data';
 import { legacyDestination, readOperatorDestinations, type OperatorDestinations } from './operator-destinations';
 
 const layout = { display: 'grid', gap: 16, minWidth: 0, overflowWrap: 'anywhere' as const };

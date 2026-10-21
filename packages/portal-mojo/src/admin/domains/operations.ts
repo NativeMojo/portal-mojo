@@ -2,23 +2,21 @@ import type { AdminSection } from '../core';
 import { JOBS_VIEW_PERMS, SCHEDULED_TASK_VIEW_PERMS } from '../jobs/models';
 import { SETTINGS_PERMISSIONS } from '../settings/model';
 
+const navigationGroup = 'operations';
+
 export const SETTINGS_ADMIN_SECTION: AdminSection = {
-    id: 'settings', title: 'Settings', icon: 'bi-gear', navigationGroup: 'operations', permissions: SETTINGS_PERMISSIONS,
+    id: 'settings', title: 'Settings', icon: 'bi-gear', navigationGroup, permissions: SETTINGS_PERMISSIONS,
     routes: [{ path: '', loadComponent: () => import('../settings/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })), permissions: SETTINGS_PERMISSIONS }],
 };
 // Empty any-of permissions admit only the existing literal-superuser bypass.
 // A global admin permission alone must not expose this configuration surface.
-const loadFleetConfiguration = () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage }));
 export const FLEET_CONFIGURATION_ADMIN_SECTION: AdminSection = {
     id: 'fleet-configuration', title: 'Fleet Configuration', icon: 'bi-hdd-network',
-    navigationGroup: 'operations', permissions: [],
-    routes: [
-        { path: '', loadComponent: loadFleetConfiguration },
-        { path: 'shared-validation', requireSuperuser: true, loadComponent: loadFleetConfiguration },
-    ],
+    navigationGroup, permissions: [],
+    routes: ['', 'shared-validation'].map((path) => ({ path, requireSuperuser: true, loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage })) })),
 };
 export const JOBS_ADMIN_SECTION: AdminSection = {
-    id: 'jobs', title: 'Jobs', icon: 'bi-cpu', navigationGroup: 'operations', permissions: [...new Set([...JOBS_VIEW_PERMS, ...SCHEDULED_TASK_VIEW_PERMS])],
+    id: 'jobs', title: 'Jobs', icon: 'bi-cpu', navigationGroup, permissions: [...new Set([...JOBS_VIEW_PERMS, ...SCHEDULED_TASK_VIEW_PERMS])],
     routes: [
         { path: '', label: 'Dashboard', loadComponent: () => import('../jobs/JobDashboardPage').then(({ JobDashboardPage }) => ({ default: JobDashboardPage })), permissions: JOBS_VIEW_PERMS },
         { path: 'runners', label: 'Runners', loadComponent: () => import('../jobs/JobRunnersPage').then(({ JobRunnersPage }) => ({ default: JobRunnersPage })), permissions: JOBS_VIEW_PERMS },
