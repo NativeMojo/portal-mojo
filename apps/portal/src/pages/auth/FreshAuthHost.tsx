@@ -13,14 +13,15 @@
 // shown as a locked chip (step-up means "prove you are still YOU", not
 // "switch accounts"). It falls back to an editable field only when the
 // token carries no email claim.
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
     getAuthSnapshot, isPasskeySupported, login, loginWithPasskey,
     passkeyErrorMessage, redirectToHostedAuth, sessionIsPersistent, setFreshAuthHandler,
     type MfaChallenge,
 } from 'portal-mojo/client/runtime';
-import { MfaPanel } from './MfaPanel';
 import { authMode } from './config';
+
+const MfaPanel = lazy(() => import('./MfaPanel').then(module => ({ default: module.MfaPanel })));
 
 interface Pending {
     resolve: (ok: boolean) => void;
@@ -134,13 +135,15 @@ function FreshAuthDialog({ pending, settle }: { pending: Pending; settle: (ok: b
         >
             <div className="modal-pad">
                 {mfa ? (
-                    <MfaPanel
-                        challenge={mfa}
-                        username={username.trim() || undefined}
-                        remember={remember}
-                        onSuccess={() => settle(true)}
-                        onCancel={() => { setMfa(null); setPassword(''); }}
-                    />
+                    <Suspense fallback={<p className="auth-sub" role="status">Loading sign-in…</p>}>
+                        <MfaPanel
+                            challenge={mfa}
+                            username={username.trim() || undefined}
+                            remember={remember}
+                            onSuccess={() => settle(true)}
+                            onCancel={() => { setMfa(null); setPassword(''); }}
+                        />
+                    </Suspense>
                 ) : (
                     <div className="auth-stack">
                         <div>

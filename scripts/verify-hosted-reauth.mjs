@@ -18,7 +18,7 @@ HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const React = await import('react');
 const { createRoot } = await import('react-dom/client');
-const jwt = (uid = 4, authTime = 1) => `e30.${Buffer.from(JSON.stringify({ uid, email: `user${uid}@test.invalid`, auth_time: authTime, exp: Math.floor(Date.now() / 1000) + 7200 })).toString('base64url')}.sig`;
+const jwt = (uid = 4, authTime = 1, email = `user${uid}@test.invalid`) => `e30.${Buffer.from(JSON.stringify({ uid, email, auth_time: authTime, exp: Math.floor(Date.now() / 1000) + 7200 })).toString('base64url')}.sig`;
 const server = await createServer({ root: process.cwd(), configFile: false, envFile: false, appType: 'custom', logLevel: 'silent',
     define: { 'import.meta.env.VITE_MOJO_PACKAGED_ADMIN': JSON.stringify('1') }, server: { middlewareMode: true } });
 const auth = await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');
@@ -106,8 +106,9 @@ try {
 
     await React.act(async () => root.render(null));
     const inapp = await createServer({ root: process.cwd(), configFile: false, envFile: false, appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
+    let inlineAuth;
     try {
-        const inlineAuth = await inapp.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');
+        inlineAuth = await inapp.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');
         const { FreshAuthHost: InlineHost } = await inapp.ssrLoadModule('/apps/portal/src/pages/auth/FreshAuthHost.tsx');
         inlineAuth.setTokens(jwt(), jwt(), false);
         await React.act(async () => root.render(React.createElement(InlineHost)));
@@ -115,8 +116,36 @@ try {
         assert(document.querySelector('input[type="password"]'), 'In-app mode retains the existing inline form');
         assert.equal(button('Continue to sign-in'), undefined, 'Mock mode has no hosted page');
         await React.act(async () => button('Cancel').click()); assert.equal(await pending, false);
+        // The inline second factor loads only when challenged, within the same dialog.
+        inlineAuth.initAuth(); inlineAuth.setTokens(jwt(2), jwt(2), false);
+        const inlineClient = await inapp.ssrLoadModule('/packages/portal-mojo/src/client/client.ts');
+        const mfaUser = (await inlineClient.mojoCall('/api/user/me')).data;
+        inlineAuth.setTokens(jwt(2, 1, mfaUser.email), jwt(2), false);
+        await React.act(async () => { pending = inlineAuth.requestFreshAuth(); });
+        const fill = async (node, value) => React.act(async () => {
+            assert(node, 'Expected the current sign-in input');
+            Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(node, value);
+            node.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        const wait = async (predicate, name) => {
+            for (let tries = 0; tries < 150; tries++) {
+                if (predicate()) return;
+                await React.act(async () => new Promise(resolve => setTimeout(resolve, 20)));
+            }
+            assert.fail(`Timed out: ${name}; ${document.body.textContent}`);
+        };
+        await fill(document.querySelector('input[type="password"]'), 'mojo');
+        await React.act(async () => document.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+        await wait(() => document.querySelector('[data-testid="mfa-panel"]'), 'existing MFA panel loads');
+        assert(document.querySelector('dialog[open] [data-testid="mfa-panel"]'), 'MFA stays in the native confirmation dialog');
+        await fill(document.querySelector('input[autocomplete="one-time-code"]'), '123456');
+        await React.act(async () => document.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+        await wait(() => !document.querySelector('dialog'), 'MFA confirmation completes');
+        assert.equal(await pending, true, 'Existing inline MFA can still complete a fresh sign-in');
+        assert.equal(inlineAuth.sessionIsPersistent(), false, 'Lazy MFA preserves session-only storage');
+        inlineAuth.stopAutoRefresh();
         await React.act(async () => root.render(null));
-    } finally { await inapp.close(); }
+    } finally { inlineAuth?.stopAutoRefresh(); await inapp.close(); }
 
     const hosted = await createServer({ root: process.cwd(), configFile: false, envFile: false, appType: 'custom', logLevel: 'silent',
         define: { 'import.meta.env.VITE_MOJO_API': JSON.stringify('https://auth.test') }, server: { middlewareMode: true } });
@@ -134,7 +163,7 @@ try {
         assert.equal(crossAuth.sessionIsPersistent(), false, 'Separate-origin return remains session-only');
         crossAuth.stopAutoRefresh();
     } finally { await hosted.close(); }
-    console.log('PASS hosted reauth: actual StrictMode host, cancellation/no replay, forced normal sign-in, no-code/code returns, query/hash, both storage modes, account switch, failure/back/stale/storage denial');
+    console.log('PASS hosted reauth: actual StrictMode host, cancellation/no replay, forced normal sign-in, no-code/code returns, query/hash, both storage modes, account switch, failure/back/stale/storage denial, lazy inline MFA completion');
 } finally {
     await React.act(async () => root.unmount()); auth.stopAutoRefresh(); await server.close(); dom.window.close();
 }
