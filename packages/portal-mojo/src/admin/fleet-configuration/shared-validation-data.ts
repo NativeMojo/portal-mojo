@@ -49,10 +49,10 @@ export function parseObservation(v: unknown): Observation {
 export function parseReport(v: unknown): ConnectionReport {
     const r = object(v); const nodes = bounded(r.nodes, 128).map((value): ConnectionNode => {
         const n = object(value), hostname = label(n.hostname, 253); if (!/^[a-z0-9][a-z0-9_.-]*$/.test(hostname)) invalid();
-        return { hostname, revision: uuid(n.revision), published: flag(n.published), installed: flag(n.installed), restart_requested: flag(n.restart_requested), restarted: flag(n.restarted), healthy: flag(n.healthy), status: token(n.status), error_code: n.error_code == null ? null : token(n.error_code), shared_validation: n.shared_validation == null ? null : parseObservation(n.shared_validation) };
+        return { hostname, revision: uuid(n.revision), published: flag(n.published), installed: flag(n.installed), restart_requested: flag(n.restart_requested), restarted: flag(n.restarted), healthy: flag(n.healthy), status: choice(n.status, ['unknown', 'draining', 'healthy', 'restarted', 'restart_requested', 'downloaded', 'pending', 'failed']), error_code: n.error_code == null ? null : token(n.error_code), shared_validation: n.shared_validation == null ? null : parseObservation(n.shared_validation) };
     });
     if (new Set(nodes.map((n) => n.hostname)).size !== nodes.length) invalid();
-    return { status: token(r.status), nodes, healthy_everywhere: flag(r.healthy_everywhere), health_scope: r.health_scope == null ? undefined : token(r.health_scope), observed_at: r.observed_at == null ? undefined : timestamp(r.observed_at), error_code: r.error_code == null ? undefined : token(r.error_code) };
+    return { status: choice(r.status, ['unpublished', 'unconfigured', 'queued', 'dispatched', 'pending', 'healthy', 'unknown', 'failed', 'expired', 'canceled', 'superseded', 'timed_out']), nodes, healthy_everywhere: flag(r.healthy_everywhere), health_scope: r.health_scope == null ? undefined : token(r.health_scope), observed_at: r.observed_at == null ? undefined : timestamp(r.observed_at), error_code: r.error_code == null ? undefined : token(r.error_code) };
 }
 export function parseConnectionState(v: unknown): ConnectionState {
     const r = object(v); if (r.schema_version !== 1) throw new OperatorError('unsupported');
@@ -65,6 +65,7 @@ export function parseConnectionState(v: unknown): ConnectionState {
     if (out.selected_profile_id && (!selected || selected.consumer_project_uuid !== out.expected_identity?.consumer_project_uuid) || out.available && (!out.catalog_revision || !profiles.length || out.unavailable_reasons.length)) invalid();
     return out;
 }
+export const connectionAuthority = (s: ConnectionState) => JSON.stringify([s.available, s.unavailable_reasons, s.revision, s.catalog_revision, s.selected_profile_id, s.expected_identity, s.profiles, s.credential]);
 export function validateInput(v: ConnectionInput): void {
     nullable(v.expected_revision, uuid); catalog(v.expected_catalog_revision); profileId(v.profile_id); choice(v.key_action, ['keep', 'replace', 'clear']);
     if (Object.keys(v).some((k) => !['expected_revision', 'expected_catalog_revision', 'profile_id', 'key_action', 'replacement_key'].includes(k)) || v.replacement_key !== undefined && (v.key_action !== 'replace' || typeof v.replacement_key !== 'string' || v.replacement_key.length > 4096 || /\s/.test(v.replacement_key))) invalid();
@@ -75,9 +76,9 @@ export function parsePreview(v: unknown, input: ConnectionInput, expected: Ident
     return out;
 }
 export function nodeVerified(n: ConnectionNode, report: ConnectionReport, revision: string | null, profile: HubProfile | undefined): boolean {
-    return report.health_scope === FLEET_HEALTH_SCOPE && !!revision && n.revision === revision && n.published && n.installed && n.restarted && n.healthy && !n.error_code && !!profile && n.shared_validation?.state === 'verified' && n.shared_validation.profile_id === profile.id && n.shared_validation.observed_project_uuid === profile.consumer_project_uuid;
+    return report.status === 'healthy' && !report.error_code && n.status === 'healthy' && report.health_scope === FLEET_HEALTH_SCOPE && !!revision && n.revision === revision && n.published && n.installed && n.restarted && n.healthy && !n.error_code && !!profile && n.shared_validation?.state === 'verified' && n.shared_validation.profile_id === profile.id && n.shared_validation.observed_project_uuid === profile.consumer_project_uuid;
 }
-export const connectionVerified = (s: ConnectionState, r = s.fleet) => r.healthy_everywhere && r.nodes.length > 0 && r.nodes.every((n) => nodeVerified(n, r, s.revision, s.profiles.find((p) => p.id === s.selected_profile_id)));
+export const connectionVerified = (s: ConnectionState, r = s.fleet) => r.status === 'healthy' && !r.error_code && !['failed', 'expired', 'canceled'].includes((r as Partial<ConnectionOperation>).job_status ?? '') && r.healthy_everywhere && r.nodes.length > 0 && r.nodes.every((n) => nodeVerified(n, r, s.revision, s.profiles.find((p) => p.id === s.selected_profile_id)));
 export function operatorOrigin(): void { if (!usingMockTransport() && new URL(apiOrigin(), window.location.origin).origin !== window.location.origin) throw new OperatorError('denied'); }
 export async function privateCall(path: string, body: Record<string, unknown> | null, scope: PrivateScope = {}, params?: Params): Promise<unknown> {
     try {
@@ -107,9 +108,9 @@ export async function publishConnection(input: ConnectionInput, scope?: PrivateS
     if (r.published !== true || r.applied !== false || r.pending_restart !== true) invalid();
     return { published: true, revision: uuid(r.revision), version_id: nullable(r.version_id, (v) => label(v, 1024)), pending_restart: true, applied: false };
 }
-export function parseOperation(v: unknown): ConnectionOperation { const r = object(v); return { ...parseReport(r), operation_id: label(r.operation_id, 128), revision: uuid(r.revision), job_status: r.job_status == null ? undefined : token(r.job_status) }; }
-export const applyConnection = async (revision: string, scope?: PrivateScope) => parseOperation(await privateCall(FLEET_ENDPOINT, { action: 'apply', expected_revision: uuid(revision) }, scope));
-export const readConnectionOperation = async (id: string, scope?: PrivateScope) => parseOperation(await privateCall(`${FLEET_ENDPOINT}/operation/${encodeURIComponent(label(id, 128))}`, null, scope));
+export function parseOperation(v: unknown): ConnectionOperation { const r = object(v); return { ...parseReport(r), operation_id: uuid(r.operation_id), revision: uuid(r.revision), job_status: r.job_status == null ? undefined : choice(r.job_status, ['pending', 'running', 'completed', 'failed', 'expired', 'canceled']) }; }
+export const applyConnection = async (revision: string, scope?: PrivateScope) => { const result = parseOperation(await privateCall(FLEET_ENDPOINT, { action: 'apply', expected_revision: uuid(revision) }, scope)); if (result.revision !== revision) invalid(); return result; };
+export const readConnectionOperation = async (id: string, scope?: PrivateScope, revision?: string) => { const result = parseOperation(await privateCall(`${FLEET_ENDPOINT}/operation/${uuid(id)}`, null, scope)); if (result.operation_id !== id || revision !== undefined && result.revision !== revision) invalid(); return result; };
 export async function readConnectionHistory(scope?: PrivateScope): Promise<SafeHistory> { const r = object(await privateCall(`${FLEET_ENDPOINT}/history`, null, scope)); return { versions: bounded(r.versions, 100).map((v) => { const row = object(v); return { version_id: label(row.version_id, 1024), current: flag(row.current), published_at: nullable(row.published_at, timestamp) }; }), truncated: flag(r.truncated) }; }
 
 /** Local owner fence shared only by the two private operator forms. */

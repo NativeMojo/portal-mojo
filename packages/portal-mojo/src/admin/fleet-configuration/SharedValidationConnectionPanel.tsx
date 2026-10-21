@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestFreshAuth } from '../../client/runtime';
 import { FlatRow, fmt, modal } from '../../ui';
-import { applyConnection, connectionOperationFinished as operationFinished, connectionVerified, nodeVerified, OperatorError, previewConnection, publishConnection, readConnection, readConnectionHistory, readConnectionOperation, usePrivateOperator, type ConnectionInput, type ConnectionOperation, type ConnectionState, type Preview, type SafeHistory } from './shared-validation-data';
+import { applyConnection, connectionAuthority, connectionOperationFinished as operationFinished, connectionVerified, nodeVerified, OperatorError, previewConnection, publishConnection, readConnection, readConnectionHistory, readConnectionOperation, usePrivateOperator, type ConnectionInput, type ConnectionOperation, type ConnectionState, type Preview, type SafeHistory } from './shared-validation-data';
 import { legacyDestination, readOperatorDestinations, type OperatorDestinations } from './operator-destinations';
 
 const layout = { display: 'grid', gap: 16, minWidth: 0, overflowWrap: 'anywhere' as const };
@@ -23,8 +23,8 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
     const input = useRef<HTMLInputElement>(null), draft = useRef<ConnectionInput | null>(null);
     const [preview, setPreview] = useState<Preview | null>(null), [operation, setOperation] = useState<ConnectionOperation | null>(null);
     const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false), [blocked, setBlocked] = useState(true), [timedOut, setTimedOut] = useState(false);
-    const flight = useRef(false), generation = useRef(0), ticks = useRef(0);
-    const clearDraft = () => { draft.current = null; setPreview(null); if (input.current) input.current.value = ''; };
+    const flight = useRef(false), generation = useRef(0), ticks = useRef(0), previewEpoch = useRef(0), observationEpoch = useRef(0), authority = useRef<string | null>(null);
+    const clearDraft = () => { previewEpoch.current++; draft.current = null; setPreview(null); if (input.current) input.current.value = ''; };
     useEffect(() => () => { draft.current = null; if (input.current) input.current.value = ''; }, [owner.key]);
     const failure = async (reason: unknown) => {
         const safe = reason instanceof OperatorError ? reason : new OperatorError('unavailable'); setError(safe.message); setBlocked(true); clearDraft();
@@ -32,11 +32,16 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
     };
     const refresh = async (clear = true) => {
         if (!owner.allowed) return false;
-        const fence = owner.fence(), run = ++generation.current; if (clear) clearDraft(); setLoading(true);
+        const fence = owner.fence(), run = ++generation.current, tracked = clear ? operation : null; if (clear) observationEpoch.current++; if (clear) clearDraft(); setLoading(true);
         try {
-            const results = await Promise.allSettled([readConnection(fence), readConnectionHistory(fence), readOperatorDestinations(fence)]);
+            const results = await Promise.allSettled([readConnection(fence), readConnectionHistory(fence), readOperatorDestinations(fence), tracked ? readConnectionOperation(tracked.operation_id, fence, tracked.revision) : Promise.resolve(null)]);
             fence.beforeSend(); if (generation.current !== run) return false;
             const main = results[0]; if (main.status === 'rejected') throw main.reason;
+            if (tracked && results[3].status === 'rejected') throw results[3].reason;
+            const nextAuthority = connectionAuthority(main.value);
+            if (authority.current !== null && authority.current !== nextAuthority) { clearDraft(); setNotice('Configuration authority changed. Preview again before publication.'); }
+            authority.current = nextAuthority;
+            if (clear) { if (tracked) setOperation(main.value.revision === tracked.revision && results[3].status === 'fulfilled' ? results[3].value : null); ticks.current = 0; setTimedOut(false); }
             setState(main.value); setProfileId((old) => main.value.profiles.some((p) => p.id === old) ? old : main.value.selected_profile_id ?? main.value.profiles[0]?.id ?? '');
             setHistory(results[1].status === 'fulfilled' ? results[1].value : null);
             setDestinations(results[2].status === 'fulfilled' ? results[2].value : null);
@@ -49,24 +54,25 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
     useEffect(() => {
         if (!operation || operationFinished(operation) || busy || loading || blocked || !owner.allowed || ticks.current >= pollLimit) return;
         const timer = setTimeout(() => {
-            ticks.current++; const fence = owner.fence();
-            void readConnectionOperation(operation.operation_id, fence).then(async (next) => {
-                fence.beforeSend(); setOperation(next); await refresh(false); if (ticks.current >= pollLimit && !operationFinished(next)) setTimedOut(true);
-            }).catch((reason) => { if (!fence.signal?.aborted) void failure(reason); });
+            ticks.current++; const fence = owner.fence(), epoch = observationEpoch.current;
+            void readConnectionOperation(operation.operation_id, fence, operation.revision).then(async (next) => {
+                fence.beforeSend(); if (observationEpoch.current !== epoch) return; setOperation(next); await refresh(false); if (observationEpoch.current !== epoch) return; if (ticks.current >= pollLimit && !operationFinished(next)) setTimedOut(true);
+            }).catch((reason) => { if (!fence.signal?.aborted && observationEpoch.current === epoch) void failure(reason); });
         }, pollInterval);
         return () => clearTimeout(timer);
     }, [operation, busy, loading, blocked, owner.key, pollInterval, pollLimit]);
     const selected = state?.profiles.find((p) => p.id === profileId);
-    const change = () => { draft.current = null; setPreview(null); setNotice(''); };
+    const change = () => { previewEpoch.current++; draft.current = null; setPreview(null); setNotice(''); };
     const run = async (action: 'preview' | 'publish' | 'apply') => {
         if (flight.current || !owner.allowed || !state?.available || blocked || loading) return;
-        const fence = owner.fence(); const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null; const current = state; flight.current = true; setBusy(true); setError(''); setNotice(''); let attempted = false;
+        const fence = owner.fence(); const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null; const current = state; observationEpoch.current++; flight.current = true; setBusy(true); setError(''); setNotice(''); let attempted = false;
         try {
             fence.beforeSend();
             if (action === 'preview') {
                 if (!current.catalog_revision || !selected) throw new OperatorError('invalid');
                 const candidate: ConnectionInput = { expected_revision: current.revision, expected_catalog_revision: current.catalog_revision, profile_id: selected.id, key_action: keyAction, ...(keyAction === 'replace' ? { replacement_key: input.current?.value ?? '' } : {}) };
-                const result = await previewConnection(candidate, keyAction === 'clear' ? null : selected, fence); fence.beforeSend(); draft.current = candidate; setPreview(result);
+                const epoch = previewEpoch.current, expectedAuthority = authority.current;
+                const result = await previewConnection(candidate, keyAction === 'clear' ? null : selected, fence); fence.beforeSend(); if (previewEpoch.current !== epoch || authority.current !== expectedAuthority) throw new OperatorError('conflict'); draft.current = candidate; setPreview(result);
                 setNotice('Preview checked the candidate identity. Nothing was saved or applied.');
             } else {
                 if (action === 'publish' && (!preview?.can_publish || !draft.current)) return;
@@ -90,7 +96,7 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
     if (!owner.allowed) return <p>Deployment operator access is no longer available.</p>;
     const report = operation?.revision === state?.revision ? operation : state?.fleet;
     const currentReport = !blocked && !loading;
-    return <div style={layout}>
+    return <div className="shared-validation-operator" style={layout}>
         <section className="panel panel-pad" aria-label="Shared validation connection" style={layout}>
             <h2>Protected connection</h2>
             <p>Use a protected ACME consumer key issued for the original hub project. The approved profile fixes the hub origin and project identity.</p>

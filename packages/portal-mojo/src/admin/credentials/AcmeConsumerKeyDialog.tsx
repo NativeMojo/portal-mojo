@@ -78,7 +78,7 @@ export function AcmeConsumerKeyDialog({ group: fixedGroup, close, onBusy }: { gr
         catch (e) { if (!fence.signal?.aborted) await failure(e); } finally { if (!fence.signal?.aborted) pending(false); }
     };
     if (!owner.allowed) return <div className="modal-pad"><h2>Protected key access unavailable</h2><p>A current interactive literal superuser is required.</p><button className="btn" onClick={close}>Close</button></div>;
-    return <div className="modal-pad" style={{ minWidth: 0, overflowWrap: 'anywhere' }}><h2 className="modal-title">Create ACME consumer key</h2><p>Run this form on the approved hub. Choose its original recipient Group by name; a downstream tenant or acting user is not that identity.</p>
+    return <div className="modal-pad shared-validation-operator" style={{ minWidth: 0, overflowWrap: 'anywhere' }}><h2 className="modal-title">Create ACME consumer key</h2><p>Run this form on the approved hub. Choose its original recipient Group by name; a downstream tenant or acting user is not that identity.</p>
         {fixedGroup ? <FlatRow label="Selected hub Group">{group?.name ?? fixedGroup.name}</FlatRow> : <CollectionSelect<KeyGroup> endpoint="/api/group" sanitizeRow={projectKeyGroup} value={group} label="Original hub recipient Group" disabled={busy} onChange={(_id, row) => setGroup(row ?? null)} />}
         {group && <><FlatRow label="Group UUID"><code>{group.uuid ?? 'No valid UUID reported'}</code></FlatRow><button className="btn" disabled={busy} onClick={() => void refresh()}>Resolve recipient and refresh keys</button></>}
         {error && <p className="form-alert" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}

@@ -50,3 +50,12 @@
 .dns-shared-dialog input[type="file"] { max-width: 100%; min-width: 0; color: var(--ink); }
 .dns-shared-dialog input[type="file"]::file-selector-button { color: var(--ink); background: var(--surface2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; margin-right: 8px; cursor: pointer; }
 .dns-shared-confirm { min-width: 0; overflow-wrap: anywhere; }
+
+/* Private connection/key facts also fit narrow embedded Admin content. */
+.shared-validation-operator { container-type: inline-size; }
+.shared-validation-operator .flat-value { min-width: 0; overflow-wrap: anywhere; }
+.shared-validation-operator code { overflow-wrap: anywhere; white-space: normal; }
+@container (max-width: 420px) {
+    .shared-validation-operator .flat-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .shared-validation-operator .flat-action:empty { display: none; }
+}

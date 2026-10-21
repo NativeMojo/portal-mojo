@@ -106,3 +106,17 @@ mock scenarios and operator/ordinary-manager identities. The named
 StrictMode contracts, and is included once by `verify:admin-contracts`. Browser
 proof remains necessary for real native dialogs, keyboard/focus and390px in both
 themes. Mock receipts are fixtures, never live configuration evidence.
+
+The private form uses an inline-size container: fact labels stack above UUIDs and
+revision values below420px of available content, including a narrow embedded
+Admin host. The existing Admin sidebar's Collapse control supplies its normal
+compact host at390px; the topic does not change global navigation behavior.
+
+Every successful authoritative refresh invalidates a preview when revision,
+catalog, profile, identity or credential facts change. Late preview/operation
+responses cannot restore spent consent or overwrite a newer observation. After
+the automatic observation limit, explicit Refresh re-observes the tracked exact
+operation and resets the read budget; it never dispatches another Apply. Only
+known healthy report/node statuses with no top-level or node error can turn the
+combined proof green. Apply/read replies remain bound to their exact operation
+ID and requested/tracked revision.
