@@ -120,16 +120,15 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
         setParticipantLoading(false); setRecipientLoading(false);
     };
     const refreshController = async (selected: Allocation, fence = scope()) => {
-        let nextCaps;
-        try { nextCaps = await getHubCapabilities(fence); }
-        catch (reason) {
-            if (!fence.signal?.aborted && reason instanceof SharedValidationError && ['access', 'reauth', 'unsupported'].includes(reason.kind)) discardControllerFacts();
+        try {
+            const nextCaps = await getHubCapabilities(fence); fence.beforeSend();
+            if (!nextCaps.shared_validation || !nextCaps.can_manage_trust) throw new SharedValidationError('access');
+            const rows = await getParticipants(selected, participantCursor, fence); fence.beforeSend();
+            setCaps(nextCaps); setParticipants(rows); setParticipantError(''); return rows;
+        } catch (reason) {
+            if (!fence.signal?.aborted) discardControllerFacts();
             throw reason;
         }
-        fence.beforeSend();
-        if (!nextCaps.shared_validation || !nextCaps.can_manage_trust) { discardControllerFacts(); throw new SharedValidationError('access'); }
-        const rows = await getParticipants(selected, participantCursor, fence); fence.beforeSend();
-        setCaps(nextCaps); setParticipants(rows); setParticipantError(''); return rows;
     };
     const loadController = async () => {
         if (flight.current || !canManage) return;
@@ -161,7 +160,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
             const exact = normalizeHostname(controllerDomain);
             const page = await getAllocations(exact, cursor, fence); fence.beforeSend();
             setAllocations(page); setAllocation(null); setParticipants(null); setRecipient(null); setParticipantCursor(undefined); setRefreshRequired(false);
-        } catch (reason) { if (!fence.signal?.aborted) await explain(reason); }
+        } catch (reason) { if (!fence.signal?.aborted) { discardControllerFacts(); await explain(reason); } }
         finally { setPending(false); }
     };
     // Participant maintenance is authorized by the selected allocation, independently
@@ -170,7 +169,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
         if (!allocation || mode !== 'controller' || !canManage || !caps?.shared_validation || !caps.can_manage_trust) return;
         const fence = scope(); let active = true; setParticipantLoading(true); setParticipantError(''); setParticipants(null);
         void getParticipants(allocation, participantCursor, fence).then((rows) => { fence.beforeSend(); if (active) setParticipants(rows); }).catch((reason) => {
-            if (active && !fence.signal?.aborted) { setParticipantError(reason instanceof SharedValidationError ? reason.message : new SharedValidationError('unavailable').message); setRefreshRequired(true); }
+            if (active && !fence.signal?.aborted) { discardControllerFacts(); setRefreshRequired(true); void explain(reason); }
         }).finally(() => { if (active) setParticipantLoading(false); });
         return () => { active = false; };
     // selection owns all auth, allocation, request and page fences.

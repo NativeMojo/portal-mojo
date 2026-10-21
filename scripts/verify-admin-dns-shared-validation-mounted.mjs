@@ -32,6 +32,35 @@ try{
  const importFile=async(file)=>{await wait(()=>document.querySelector('input[type="file"]')&&!document.querySelector('input[type="file"]').disabled,'file picker ready');const picker=document.querySelector('input[type="file"]');assert(picker,'native request picker exists');await act(async()=>{Object.defineProperty(picker,'files',{value:file?[file]:[],configurable:true});picker.dispatchEvent(new Event('change',{bubbles:true}));});};
  const selectTarget=async(target)=>{await click('Find allocations');await wait(()=>document.querySelector('input[type="radio"]'),'allocations available');const radio=[...document.querySelectorAll('input[type="radio"]')].find(n=>n.closest('label').textContent.includes(target));assert(radio,'exact existing allocation choice exists');await act(async()=>radio.click());};
  const importDescriptor=async(value)=>{await importFile(new File([JSON.stringify(value)],'request.json',{type:'application/json'}));await wait(()=>document.body.textContent.includes('Imported public request'),'file import parsed');await selectTarget(value.allocation_ref);};
+ const refusalRegression=async()=>{
+  const cases=[...([403,401,440,404,405,503].map(status=>({route:'allocation/list',status,trigger:'Find allocations'}))),{route:'allocation/list',status:403,trigger:'First allocation page'},{route:'allocation/list',status:403,trigger:'Next allocation page'},{route:'allocation/list',status:'invalid',trigger:'Find allocations'},...([403,401,440,404,405,503].map(status=>({route:'trust/list',status,trigger:'Refresh trust'}))),{route:'capabilities',status:503,trigger:'Refresh trust'},{route:'allocation/list',status:403,trigger:'Find allocations',revoked:true}];
+  let prompts=0;auth.setFreshAuthHandler(async()=>{prompts++;return true;});
+  for(const test of cases){
+   mock.setMockSharedValidationScenario(test.revoked?'revoked':'renewal-error');await login('dns.manager@nativemojo.com');const request=(await api.getValidationPlan({domain:8201})).connection_request;await login('dns.platform@nativemojo.com');await mount();await click('Controller review');await click('Check controller access');
+   // Preserve a real selected current-page participant while the unchanged-domain
+   // allocation read, its cursor navigation, or participant refresh is refused.
+   await importFile(new File([JSON.stringify(request)],'request.json'));await wait(()=>document.body.textContent.includes('Imported public request'),'denial setup request');
+   if(test.trigger==='Next allocation page')mock.armMockResponseOnce('POST','/api/dnsman/acme/allocation/list',{mapData:page=>({...page,next_cursor:'20'})});
+   await selectTarget(request.allocation_ref);await wait(()=>button(test.revoked?'Review cleanup retry':'Review grant')&&!button(test.revoked?'Review cleanup retry':'Review grant').disabled,'selected grant and maintenance evidence before refusal');
+   assert(document.body.textContent.includes('Selected allocation’s projects'),'participant facts are present before refusal');
+   const staleActions=['Review grant','Review revoke','Review cleanup retry'].map(name=>button(name)).filter(Boolean);mock.clearMockRequestHistory();
+   if(test.status==='invalid')mock.armMockResponseOnce('POST',`/api/dnsman/acme/${test.route}`,{mapData:()=>({items:'malformed',next_cursor:null})});else mock.armMockSharedValidationReadFailure(test.route,test.status);
+   await click(test.trigger);await wait(()=>document.querySelector('[role="alert"]')&&!button(test.trigger)?.disabled,`${test.route} ${test.status} settles`);
+   // Try previously retained controls, then complete any stale confirmation. A
+   // correct refusal removes them and no delegated React handler can submit.
+   for(const node of staleActions){await act(async()=>node.click());for(const name of ['Allow issuance','Revoke trust','Retry cleanup']){if(button(name)&&!button(name).disabled){await act(async()=>button(name).click());await wait(()=>!document.querySelector('dialog'),`stale ${name} confirmation settles`);}}}
+   assert.equal(posts().length,0,`${test.route} ${test.status} ${test.trigger} must send zero grant/revoke/cleanup after observed read refusal`);
+   assert(!document.querySelector('input[type="file"]'),`${test.route} ${test.status} discards controller capability admission`);
+   assert(!document.body.textContent.includes('Selected allocation’s projects'),`${test.route} ${test.status} discards old privileged participants`);
+   assert(!button('Review grant')&&!button('Review revoke')&&!button('Review cleanup retry'),`${test.route} ${test.status} discards every old mutation control`);
+   await click('Check controller access');await wait(()=>document.querySelector('input[type="file"]'),'explicit fresh admission recovers');assert(!button('Review grant')&&!button('Review revoke')&&!button('Review cleanup retry'),'fresh admission never restores prior selected evidence');checks++;await unmount();
+  }
+  for(const status of [403,503]){
+   mock.setMockSharedValidationScenario('controller-maintenance');await login('dns.platform@nativemojo.com');await mount();await click('Controller review');await click('Check controller access');await wait(()=>document.querySelector('input[aria-label="Exact domain"]'),'participant-page denial setup');await input(document.querySelector('input[aria-label="Exact domain"]'),'maintenance.example');await click('Find allocations');await click('Next allocation page');await wait(()=>document.querySelectorAll('input[type="radio"]').length===1,'participant-page allocation');await act(async()=>document.querySelector('input[type="radio"]').click());await wait(()=>button('Next project page'),'participants before page denial');const staleRevoke=button('Review revoke');mock.clearMockRequestHistory();mock.armMockSharedValidationReadFailure('trust/list',status);await click('Next project page');await wait(()=>!document.querySelector('input[type="file"]'),'participant-page denial clears controller facts');await act(async()=>staleRevoke.click());assert(!button('Review grant')&&!button('Review revoke')&&!button('Review cleanup retry'),'participant-page denial removes all controls');assert(!document.body.textContent.includes('Selected allocation’s projects'),'participant-page denial removes old rows');assert.equal(posts().length,0,'participant-page denial sends zero stale writes');checks++;await unmount();
+  }
+  assert.equal(prompts,2,'allocation and participant 440 each prompt once without automatic replay');auth.setFreshAuthHandler(null);console.log(`PASS same-domain controller read refusal regression: ${cases.length+2} cases; zero stale grant/revoke/cleanup writes`);
+ };
+ if(process.env.DNS_SHARED_REFUSAL_REGRESSION){await refusalRegression();}else{
  const fixed=async()=>model.sanitizeDomainRow((await mock.mockFetch('/api/dnsman/domain/8201',{headers:{Authorization:`Bearer ${auth.getAccessToken()}`}})).data);
  const prepare=async()=>{await input(document.querySelector('input[placeholder="existing-target.acme-hub.example"]'),'shared-acme.acme-hub.example');await click('Inspect plan');await wait(()=>button('Prepare connection'),'preparation eligible');};
  mock.setMockSharedValidationScenario('ready');await login('dns.manager@nativemojo.com');await mount(SharedValidationDialog,{domain:await fixed()});await prepare();mock.clearMockRequestHistory();
@@ -94,5 +123,6 @@ try{
  const reads=()=>mock.getMockRequestHistory().filter(r=>r.path==='/api/dnsman/delegation/plan').length;const atTimeout=reads();await act(async()=>new Promise(r=>setTimeout(r,50)));assert.equal(reads(),atTimeout,'timeout stops read-only polling');assert(atTimeout<=5,`StrictMode/permission initialization plus at most two configured poll ticks (saw ${atTimeout})`);checks+=2;await unmount();
  // Unmount closes an owned confirmation and prevents a subsequent write.
  mock.setMockSharedValidationScenario('ready');await mount(SharedValidationDialog,{domain:await fixed()});await prepare();mock.clearMockRequestHistory();await click('Prepare connection');await unmount();assert.equal(posts().length,0,'unmount before consent produces zero writes');assert(!document.querySelector('dialog'),'owned confirmation removed on unmount');checks++;
- } auth.stopAutoRefresh();console.log(`PASS mounted shared-validation StrictMode contracts: ${checks} groups (actual mock transport, confirmations, role/auth races, reconciliation, no replay, picker isolation)`);
+ await refusalRegression();
+ } } auth.stopAutoRefresh();console.log(`PASS mounted shared-validation StrictMode contracts: ${checks} groups (actual mock transport, confirmations, role/auth races, reconciliation, no replay, picker isolation)`);
 }finally{if(root){await act(async()=>root.unmount());qc?.clear();}await server.close();dom.window.close();}

@@ -6567,6 +6567,7 @@ export type MockSharedValidationScenario = 'ready' | 'missing-trust' | 'revoked'
 let sharedScenario: MockSharedValidationScenario = 'ready';
 let sharedFault: 'ambiguous' | 'reconcile' | 'reauth' | 'revoke-cleanup' | null = null;
 let sharedReadFails = false;
+let sharedReadFailure: { path: 'allocation/list' | 'trust/list' | 'capabilities'; status: 401 | 403 | 440 | 404 | 405 | 503 } | null = null;
 let sharedCounter = 1;
 const SHARED_CONSUMER_UUID = '11111111-1111-4111-8111-111111111111';
 const SHARED_OWNER_UUID = '22222222-2222-4222-8222-222222222222';
@@ -6585,7 +6586,7 @@ function sharedParticipant(request: Record<string, unknown>): MockSharedParticip
 export function setMockSharedValidationScenario(scenario: MockSharedValidationScenario): void {
     const allowed: MockSharedValidationScenario[] = ['ready', 'missing-trust', 'revoked', 'pending-dns', 'changed-alias', 'chained-alias', 'unavailable', 'unconfigured', 'old-api', 'renewal-error', 'malformed', 'disabled', 'controller-maintenance'];
     if (!allowed.includes(scenario)) throw new Error('Unknown shared validation mock scenario');
-    sharedScenario = scenario; sharedFault = null; sharedReadFails = false; sharedConnections.clear(); sharedParticipants.splice(0);
+    sharedScenario = scenario; sharedReadFailure = null; sharedFault = null; sharedReadFails = false; sharedConnections.clear(); sharedParticipants.splice(0);
     sharedAllocations.splice(2);
     if (scenario === 'controller-maintenance') {
         for (let i = 1; i <= 21; i++) {
@@ -6608,6 +6609,7 @@ export function setMockSharedValidationScenario(scenario: MockSharedValidationSc
     }
 }
 export function armMockSharedValidationFault(fault: typeof sharedFault): void { sharedFault = fault; if (fault === null) sharedReadFails = false; }
+export function armMockSharedValidationReadFailure(path: NonNullable<typeof sharedReadFailure>['path'], status: NonNullable<typeof sharedReadFailure>['status']): void { sharedReadFailure = { path, status }; }
 function mockSharedValidation(path: string, opts: MockFetchOpts, method: string): unknown {
     const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
     if (sharedScenario === 'old-api') return { status: false, error: 'Route unavailable', error_code: 404 };
@@ -6625,6 +6627,7 @@ function mockSharedValidation(path: string, opts: MockFetchOpts, method: string)
     }
     if (path.startsWith('/api/dnsman/acme/')) {
         if (method !== 'POST' || !controller) return permissionDenied();
+        if (sharedReadFailure && path.endsWith(`/${sharedReadFailure.path}`)) { const status = sharedReadFailure.status; sharedReadFailure = null; return failure('mock_controller_read_refused', status); }
         if (path.endsWith('/capabilities')) return { status: true, data: { version: 2, shared_validation: sharedScenario !== 'disabled', consumer_project_uuid: null, can_consume: false, can_manage_trust: sharedScenario !== 'disabled', trust_scope: 'apex_and_wildcard' } };
         if (sharedScenario === 'disabled') return failure('acme_not_authorized', 403);
         const page = <T,>(rows: T[]) => { const start = body.cursor == null ? 0 : Number(body.cursor); if (!Number.isSafeInteger(start) || start < 0 || (body.cursor != null && !/^[1-9]\d*$/.test(String(body.cursor)))) return failure('acme_invalid_request', 400); return { status: true, data: { items: rows.slice(start, start + 20), next_cursor: start + 20 < rows.length ? String(start + 20) : null } }; };
