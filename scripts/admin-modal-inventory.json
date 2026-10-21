@@ -3878,6 +3878,133 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:openAcmeConsumerKey:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "openAcmeConsumerKey",
+      "launcher": "modal.open",
+      "body": [
+        "AcmeConsumerKeyDialog"
+      ],
+      "category": "editor",
+      "parent": "openAcmeConsumerKey",
+      "target": null,
+      "fingerprint": "233272f6321ef4b38dd6",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:displaySecret:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "displaySecret",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "SecretBox",
+        "button"
+      ],
+      "category": "action",
+      "parent": "displaySecret",
+      "target": null,
+      "fingerprint": "9df31b0571076bba5228",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:issue:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "issue",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "code",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "issue",
+      "target": null,
+      "fingerprint": "ab7071f4f4802546d230",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:issue:displaySecret:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "issue",
+      "launcher": "displaySecret",
+      "body": [],
+      "category": "action",
+      "parent": "issue",
+      "target": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:displaySecret",
+      "fingerprint": "4adaf97c39e773efeae6",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:reveal:displaySecret:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "reveal",
+      "launcher": "displaySecret",
+      "body": [],
+      "category": "action",
+      "parent": "reveal",
+      "target": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:displaySecret",
+      "fingerprint": "d66c33e5f78be1b0760a",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:AcmeConsumerKeyDialog:issue:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "AcmeConsumerKeyDialog",
+      "launcher": "issue",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "AcmeConsumerKeyDialog",
+      "target": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:issue",
+      "fingerprint": "5712385022e29eee9b6b",
+      "categories": [
+        "action",
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:AcmeConsumerKeyDialog:reveal:0",
+      "file": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx",
+      "owner": "AcmeConsumerKeyDialog",
+      "launcher": "reveal",
+      "body": [],
+      "category": "action",
+      "parent": "AcmeConsumerKeyDialog",
+      "target": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:reveal",
+      "fingerprint": "848d10921c0d02a76f9a",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:openAcmeConsumerKey:import:0",
+      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
+      "owner": "openAcmeConsumerKey",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "openAcmeConsumerKey",
+      "target": null,
+      "fingerprint": "1cbe5e57d4afa53be177",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:modal.open:0",
       "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
       "owner": "createKey",
@@ -4997,6 +5124,68 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "run",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "code",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "run",
+      "target": null,
+      "fingerprint": "ec9b29b62c56fcec7201",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "ConnectionContent",
+      "launcher": "run",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ConnectionContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
+      "fingerprint": "c2c86e23517855915252",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:1",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "ConnectionContent",
+      "launcher": "run",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ConnectionContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
+      "fingerprint": "8cd18e4516df84f2f7e0",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:2",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "ConnectionContent",
+      "launcher": "run",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ConnectionContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
+      "fingerprint": "0aa81526708f0180f808",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx:JobOperationsSection:modal.open:0",
       "file": "packages/portal-mojo/src/admin/jobs/sections/JobOperationsSection.tsx",
       "owner": "JobOperationsSection",
@@ -5559,7 +5748,7 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "e900e0cb36e1a90879ec",
+      "fingerprint": "f4edeae9af5b9108b2b6",
       "categories": [
         "dependency"
       ]
@@ -5573,7 +5762,7 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "800662a3b74191de8e00",
+      "fingerprint": "e900e0cb36e1a90879ec",
       "categories": [
         "dependency"
       ]
@@ -5587,13 +5776,27 @@
       "category": "dependency",
       "parent": "<module>",
       "target": null,
-      "fingerprint": "2ac6a99fb7d422c46da3",
+      "fingerprint": "800662a3b74191de8e00",
       "categories": [
         "dependency"
       ]
     },
     {
       "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:5",
+      "file": "packages/portal-mojo/src/admin/domains/operations.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "2ac6a99fb7d422c46da3",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:6",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",

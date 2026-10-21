@@ -1,5 +1,7 @@
 import type { AssistantSetupState, SetupCheck } from '../admin/assistant/setup';
-import { fleetMock } from './fleet-mock';
+import { fleetMock, configureMockHubRecipient, consumeMockConnectionFault, getMockConnectionScenario, registerMockConsumerKey, setMockConnectionScenario, connectionFail } from './fleet-mock';
+export { setMockConnectionScenario };
+export type { MockConnectionScenario } from './fleet-mock';
 import { describeRenditions, validateRenditionSetting } from './renditions-mock';
 // In-memory django-mojo mock. Speaks the EXACT wire contract the real client
 // uses — envelope {status, data|rows..., message}, start/size paging, sort
@@ -210,6 +212,8 @@ function buildGroups(): MockGroup[] {
     ORG_NAMES.forEach((orgName, oi) => {
         const org = mk({
             name: orgName, kind: 'org',
+            // The guided protected-purpose fixture needs one original active hub identity.
+            ...(oi === 0 ? { uuid: '11111111111111111111111111111111' } : {}),
             created: Math.floor((now - (420 - oi * 40) * 864e5) / 1000),
             metadata: oi % 2 === 0
                 ? { timezone: 'America/Los_Angeles', short_name: orgName.split(' ')[0]!.toLowerCase() }
@@ -10797,9 +10801,34 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         return { status: true, data: { name: domain.name, registrant: transientContact, admin: transientContact, tech: transientContact, privacy: domain.privacy, admin_privacy: domain.privacy, registrant_privacy: domain.privacy, tech_privacy: domain.privacy, auto_renew: domain.auto_renew, nameservers: ['ns-1.example.invalid', 'ns-2.example.invalid'], registrar: 'Amazon Registrar, Inc.', registered_on: domain.registered_on, expires: domain.expires, status_list: ['ok'], privacy_supported: true } };
     }
     // ══ end DNSMan wire ═══════════════════════════════════════════════
+    if (path === '/api/account/admin/bootstrap') {
+        const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
+        if (!caller.is_superuser) return permissionDenied();
+        return { status: true, data: { admin_path: '/admin/', capabilities: { setup: true }, infrastructure: { mode: 'managed' }, features: { platform: { enabled: true, capabilities: { setup: true, view: true, capacity: true } }, settings: { enabled: true, capabilities: { owner_edit: true } } } } };
+    }
+    if (path === '/api/account/admin/fleet/shared-validation/recipient') {
+        const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
+        if (caller.is_superuser !== true) return permissionDenied();
+        const input = method === 'GET' ? opts.params ?? {} : opts.body ?? {};
+        if (method === 'GET' ? Object.keys(input).some((k) => k !== 'consumer_project_uuid') : method !== 'POST' || Object.keys(input).sort().join(',') !== 'consumer_project_uuid,expected_consumer_label,label,purpose' || input.purpose !== 'acme_validation_consumer') return connectionFail('invalid_request', 400);
+        const group = db.groups.find((g) => g.uuid === input.consumer_project_uuid && isEffectivelyActive(g));
+        if (!group) return connectionFail('recipient_unavailable', 404);
+        const scenario = getMockConnectionScenario();
+        if (method === 'GET') return { status: true, data: { purpose: 'acme_validation_consumer', consumer_project_uuid: group.uuid, consumer_label: group.name, permission: 'dnsman_acme_federation', can_issue: scenario !== 'recipient-denied', grant_explanation: 'Protected platform grant required; issuance does not grant allocation trust.' } };
+        if (consumeMockConnectionFault('reauth')) return connectionFail('fresh_auth_required', 440);
+        if (scenario === 'recipient-denied') return permissionDenied();
+        if (scenario === 'recipient-renamed' || input.expected_consumer_label !== group.name) return connectionFail('recipient_changed', 409);
+        if (typeof input.label !== 'string' || !input.label.trim() || input.label.length > 200 || /[\x00-\x1f]/.test(input.label)) return connectionFail('invalid_request', 400);
+        const id = Math.max(0, ...db.groupApiKeys.map((k) => k.id)) + 1, now = Math.floor(Date.now() / 1000), secret = `mock_acme_${mockHex32(mulberry32(id))}`;
+        const row: MockGroupApiKey = { id, group: group.id, user: null, created: now, modified: now, name: input.label.trim(), is_active: true, permissions: { dnsman_acme_federation: true }, limits: {}, last_used: null, expires_at: null, metadata: {}, override_user: false, token: secret };
+        db.groupApiKeys.unshift(row); registerMockConsumerKey(secret, group.uuid!);
+        if (consumeMockConnectionFault('issue-uncertain')) return connectionFail('publication_uncertain', 503);
+        return { status: true, data: { purpose: 'acme_validation_consumer', consumer_project_uuid: group.uuid, consumer_label: group.name, api_key: { id, name: row.name, is_active: true, permission: 'dnsman_acme_federation' }, token: secret } };
+    }
     if (path === '/api/account/admin/fleet' || path.startsWith('/api/account/admin/fleet/')) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
+        const original = db.groups.find((group) => group.id === 1); if (original?.uuid) configureMockHubRecipient(original.uuid, original.name);
         return fleetMock(path, method, opts.body, caller.is_superuser === true);
     }
     // ── Settings — plaintext stays private; secrets serialize masked ─────

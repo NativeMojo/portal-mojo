@@ -154,3 +154,12 @@ validation stops, already-issued certificates remain valid and other consumers
 keep working. Revoked references require a fresh, explicitly prepared request.
 No confirmation is inferred from a copied descriptor. Fresh authentication
 prompts without replay; every submitted result reconciles before another write.
+
+
+The protected connection topic separately confirms Publish and Apply, naming
+profile/project and exact revision consequences. The ACME consumer key form
+confirms the current original Group name/UUID and fixed protected purpose before
+issuance; its token display is transient and the existing audited reveal is
+available for recovery. Every owned nested dialog receives the auth-owner abort
+signal. Session replacement, scope loss and unmount close those dialogs; submitted
+writes may still persist and are never replayed after fresh authentication.

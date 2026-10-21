@@ -61,10 +61,14 @@ try {
     for (const job_status of ['queued','running','completed']) assert.equal(data.operationFinished({...dispatched,job_status}),false);
     for (const job_status of ['failed','expired','canceled']) assert.equal(data.operationFinished({...dispatched,job_status}),true);
     for (const status of ['healthy','timed_out','superseded']) assert.equal(data.operationFinished({...dispatched,status}),true);
+    const { isManagedConnectionKey } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet-configuration/shared-validation-data.ts');
+    for (const key of ['DNSMAN_ACME_HUB_PROFILE_ID','DNSMAN_ACME_HUB_URL','DNSMAN_ACME_HUB_API_KEY']) assert.equal(isManagedConnectionKey(key),true,'Managed DNS tuple routes to the protected topic');
+    assert.equal(isManagedConnectionKey('EXAMPLE_WORKER_LIMIT'),false,'Ordinary application schema keeps its generic editor');
     const endpoint = '/api/account/admin/fleet';
     assert.equal(fleetMock(endpoint,'GET',undefined,false).error_code,403);
     const before = fleetMock(endpoint,'GET',undefined,true).data;
     assert(!JSON.stringify(before).includes('mock-private-value'));
+    assert.equal(fleetMock(endpoint,'POST',{action:'publish',expected_revision:before.revision,changes:{DNSMAN_ACME_HUB_URL:{action:'set',value:'https://arbitrary.invalid'}}},true).error_code,409,'Raw generic publish cannot partially configure the managed tuple');
     const failed = fleetMock(endpoint,'POST',{action:'publish',expected_revision:'stale',changes:{GEOIP_SMART_ENABLED:{action:'set',value:false}}},true);
     assert.equal(failed.error_code,409);
     const published = fleetMock(endpoint,'POST',{action:'publish',expected_revision:before.revision,changes:{GEOIP_SMART_ENABLED:{action:'set',value:false}}},true).data;

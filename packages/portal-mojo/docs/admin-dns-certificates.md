@@ -266,3 +266,11 @@ reset mock shared state; identity changes preserve it. Leaving the demo restores
 its default mock identity and scenario. `verify:admin-dns-shared-validation`
 runs API/projection and React StrictMode mounted contracts. Real browser proof
 remains required for focus, native-dialog stacking, clipboard and both themes.
+
+
+Shared setup prerequisites now link literal deployment operators to the actual
+mount-aware Fleet shared-validation connection topic. It owns named approved
+profiles, write-only protected keys, expected/observed identity and revision-bound
+Preview/Publish/Apply. Ordinary DNS managers receive a concrete domain, next
+action and checked-time handoff with no private inputs or private API background
+calls. This route does not perform the protected hub activation ceremony.

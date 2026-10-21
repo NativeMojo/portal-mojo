@@ -1,4 +1,7 @@
 import { Badge, Eyebrow, FlatRow, fmt } from '../../ui';
+import { Link, useInRouterContext, useLocation } from 'react-router-dom';
+import { useMe } from '../../client/runtime';
+import { fleetConnectionRoute } from '../fleet-configuration/operator-destinations';
 import { useValidationPlan } from './shared-validation-api';
 import type { Readiness } from './shared-validation-data';
 import type { DomainRow } from './models';
@@ -23,12 +26,20 @@ const nextCopy: Record<string, string> = {
     unsupported_domain_scope: 'Shared setup requires a group-managed domain in this rollout. Existing direct-provider operation remains available.',
     none: 'No setup action is currently required.',
 };
+function OperatorLink() {
+    const location = useLocation();
+    return <Link className="btn" to={fleetConnectionRoute(location.pathname)} target="_blank" rel="noopener">Open deployment connection setup</Link>;
+}
+function OperatorHandoff({ readiness: r }: { readiness: Readiness }) {
+    const { data: me } = useMe(); const routed = useInRouterContext();
+    return <div className="dns-blocked"><strong>Deployment operator repair</strong><p>{r.domain.name} · hub {r.hub.state} · {r.next_action.code.replaceAll('_', ' ')} · observed {fmt.datetime(r.checked_at)}.</p>{me?.is_superuser === true && routed ? <><OperatorLink /><p>The protected Fleet form opens in a separate tab. It provides approved profiles, write-only key entry and node verification. Existing release holds and hub activation remain separate.</p></> : <p>Ask this deployment’s operator to open Fleet Configuration → Shared validation connection, review these facts and use its permitted Setup/deployment destinations. This session cannot edit protected credentials. Refresh after repair to see authoritative status.</p>}</div>;
+}
 export function ValidationFacts({ readiness: r }: { readiness: Readiness }) {
     const certificate = r.certificate;
     return <div className="dns-shared-facts">
         <Eyebrow>Shared validation</Eyebrow>
         <p className="dns-provider-note">{nextCopy[r.next_action.code]}</p>
-        {['unconfigured', 'misconfigured'].includes(r.hub.state) && <div className="dns-blocked"><strong>Server deployment setup</strong><p>Use the deployment’s existing configuration delivery to set <code>DNSMAN_ACME_HUB_URL</code> to the already-used Maestro hub and <code>DNSMAN_ACME_HUB_API_KEY</code> to the already-provisioned protected project key in server Django settings, normally <code>VAR_ROOT/django.conf</code>. Restart application and worker processes, then Refresh Portal.</p><p>No key is entered in Portal. See the backend DNSMan AcmeFederation deployment guide.</p></div>}
+        {r.next_action.actor === 'deployment_operator' && <OperatorHandoff readiness={r} />}
         <FlatRow label="Hub"><Badge tone={r.hub.state === 'ready' ? 'success' : 'warning'}>{r.hub.state}</Badge></FlatRow>
         <FlatRow label="Trust"><Badge tone={r.trust.state === 'active' ? 'success' : r.trust.state === 'revoked' ? 'danger' : 'warning'}>{r.trust.state.replaceAll('_', ' ')}</Badge></FlatRow>
         <FlatRow label="Local connection">{r.connection ? `${r.connection.mode} · ${r.connection.state}` : 'Not prepared'}</FlatRow>

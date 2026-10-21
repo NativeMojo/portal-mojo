@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useMe } from '../../client/runtime';
 import { modal } from '../../ui';
 import {
@@ -7,6 +8,7 @@ import {
     readFleet, readFleetHistory, readFleetOperation, writeFleet,
     type FleetChanges, type FleetEntry, type FleetOperation, type FleetPublication, type FleetReport, type FleetState,
 } from './data';
+import { isManagedConnectionKey } from './shared-validation-data';
 
 function SettingInput({ entry, disabled }: { entry: FleetEntry; disabled: boolean }) {
     const [mode, setMode] = useState('keep');
@@ -41,13 +43,14 @@ function SettingInput({ entry, disabled }: { entry: FleetEntry; disabled: boolea
 function FleetEditor({ state, busy, onPublish }: { state: FleetState; busy: boolean; onPublish: (changes: FleetChanges) => Promise<void> }) {
     const form = useRef<HTMLFormElement>(null);
     const [error, setError] = useState('');
-    const sections = [...new Set(state.entries.map((entry) => entry.section))];
+    const editable = state.entries.filter((entry) => !isManagedConnectionKey(entry.key));
+    const sections = [...new Set(editable.map((entry) => entry.section))];
     const submit = async (event: React.FormEvent) => {
         event.preventDefault(); setError('');
         try {
             const fields = new FormData(form.current!);
             const changes: FleetChanges = {};
-            for (const entry of state.entries) {
+            for (const entry of editable) {
                 const change = fleetChange(entry, String(fields.get(`${entry.key}:mode`) ?? 'keep'), String(fields.get(`${entry.key}:value`) ?? ''));
                 if (change) changes[entry.key] = change;
             }
@@ -59,11 +62,11 @@ function FleetEditor({ state, busy, onPublish }: { state: FleetState; busy: bool
         <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             {sections.map((section) => <section key={section} style={{ marginBottom: 20 }}><h2>{section}</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 12 }}>
-                    {state.entries.filter((entry) => entry.section === section).map((entry) => <SettingInput key={entry.key} entry={entry} disabled={busy} />)}
+                    {editable.filter((entry) => entry.section === section).map((entry) => <SettingInput key={entry.key} entry={entry} disabled={busy} />)}
                 </div></section>)}
-            {!state.entries.length && <p>No settings have been registered and delegated for this application.</p>}
+            {!editable.length && <p>No ordinary settings have been registered and delegated for this application.</p>}
             {error && <p className="form-alert" role="alert">{error}</p>}
-            <button className="btn btn-primary" type="submit" disabled={busy || !state.publish_configured || !state.entries.length}>Publish</button>
+            <button className="btn btn-primary" type="submit" disabled={busy || !state.publish_configured || !editable.length}>Publish</button>
         </fieldset>
     </form>;
 }
@@ -132,7 +135,7 @@ function FleetContent({ userId }: { userId: number }) {
             setOperationId(null); setEditorEpoch((value) => value + 1); setNotice('Previous version published as a new revision. Node application and health are still pending.'); await refresh();
         });
     };
-    if (!state) return <div className="panel panel-pad"><h1>Fleet Configuration</h1><p role="alert">{stateQuery.error?.message ?? 'Loading configuration…'}</p>
+    if (!state) return <div className="panel panel-pad"><h1>Fleet Configuration</h1><p><Link className="btn" to="shared-validation">Shared validation connection</Link></p><p role="alert">{stateQuery.error?.message ?? 'Loading configuration…'}</p>
         {stateQuery.error && <button className="btn" onClick={() => void refresh()}>Retry</button>}</div>;
     const tracked = operationId && operation.data?.revision === state.revision ? operation.data : null;
     const evidence = tracked && (!operationFinished(tracked) || Date.parse(tracked.observed_at ?? '') > Date.parse(state.fleet.observed_at ?? '')) ? tracked : state.fleet;
@@ -140,6 +143,7 @@ function FleetContent({ userId }: { userId: number }) {
         nodes: evidence.nodes.map((node) => ({ ...node, healthy: false })) } : evidence;
     return <div className="page" style={{ minWidth: 0, overflowWrap: 'anywhere' }}><header className="page-header"><div><h1>Fleet Configuration</h1>
         <p className="dim">Publish registered application settings and track their application across your nodes.</p></div></header>
+        <section className="panel panel-pad" style={{ marginBottom: 20 }}><h2>Shared validation connection</h2><p>The approved hub profile, origin and protected key form one managed bundle. Use its dedicated identity preview and publication flow.</p><Link className="btn" to="shared-validation">Open shared validation connection</Link></section>
         <div className="panel panel-pad" style={{ marginBottom: 20 }}><p style={{ overflowWrap: 'anywhere' }}><b>Published to S3:</b> {state.published ? state.revision : 'Not yet published'}</p>
             <p className="dim">This request’s node loaded revision: {state.loaded_revision ?? 'Not reported'}</p>
             {!state.publish_configured && <p className="form-alert">Publishing is unavailable until the fleet configuration location, encryption and delegated settings are configured.</p>}

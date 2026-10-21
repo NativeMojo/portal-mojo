@@ -11,7 +11,10 @@ export const SETTINGS_ADMIN_SECTION: AdminSection = {
 export const FLEET_CONFIGURATION_ADMIN_SECTION: AdminSection = {
     id: 'fleet-configuration', title: 'Fleet Configuration', icon: 'bi-hdd-network',
     navigationGroup: 'operations', permissions: [],
-    routes: [{ path: '', loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage })) }],
+    routes: [
+        { path: '', loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage })) },
+        { path: 'shared-validation', requireSuperuser: true, loadComponent: () => import('../fleet-configuration/SharedValidationConnectionPanel').then(({ SharedValidationConnectionPage }) => ({ default: SharedValidationConnectionPage })) },
+    ],
 };
 export const JOBS_ADMIN_SECTION: AdminSection = {
     id: 'jobs', title: 'Jobs', icon: 'bi-cpu', navigationGroup: 'operations', permissions: [...new Set([...JOBS_VIEW_PERMS, ...SCHEDULED_TASK_VIEW_PERMS])],

@@ -1,6 +1,9 @@
 // MERGE-WIRE: orchestrator should import AdminCredentialsDemo in
 // ComponentsPage.tsx and register it under a new/existing Admin group.
 // This leaf deliberately owns no shared showcase registry edits.
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { login, setMockConnectionScenario } from 'portal-mojo/client';
 import {
     ApiKeyLimitsSummary, GroupApiKeyDetail, GroupApiKeysSection,
     WebhookSubscriptionsSection,
@@ -15,11 +18,15 @@ const DEMO_GROUP: CredentialGroup = {
 };
 
 export function AdminCredentialsDemo() {
+    const [persona, setPersona] = useState('dns.platform@nativemojo.com'), [ready, setReady] = useState(false); const qc = useQueryClient();
+    useEffect(() => { let active = true; setReady(false); setMockConnectionScenario('ready'); void login(persona, 'mojo').then(async () => { await qc.invalidateQueries(); if (active) setReady(true); }); return () => { active = false; }; }, [persona, qc]);
+    useEffect(() => () => { setMockConnectionScenario('ready'); void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
     const openKey = (id: number) => {
         void modal.detail((close) => <GroupApiKeyDetail id={id} onClose={() => close(null)} />);
     };
     return (
-        <div style={{ display: 'grid', gap: 18 }}>
+        <div className="dns-shared-showcase" style={{ display: 'grid', gap: 18 }}>
+            <label className="field"><span className="field-label">Credential identity</span><select className="input" value={persona} onChange={e => setPersona(e.target.value)}><option value="dns.platform@nativemojo.com">Deployment operator</option><option value="showcase.operator@nativemojo.com">Ordinary credential manager</option></select></label>
             <div className="panel">
                 <div className="panel-head">
                     <div>
@@ -29,7 +36,7 @@ export function AdminCredentialsDemo() {
                     <span className="chip chip-info">secret-safe create</span>
                 </div>
                 <div className="panel-body">
-                    <GroupApiKeysSection group={DEMO_GROUP} />
+                    {ready ? <GroupApiKeysSection group={DEMO_GROUP} /> : <p>Preparing fixture…</p>}
                 </div>
             </div>
 
@@ -78,7 +85,7 @@ export function AdminCredentialsDemo() {
 
             <p className="dim" style={{ margin: 0 }}>
                 Both examples are the same package components used by GroupDetail.
-                API-key token reads and webhook-secret reads occur only after an explicit click.
+                API-key token reads and webhook-secret reads occur only after an explicit click. A deployment operator can use Create ACME consumer key to resolve the original hub Group UUID and issue the fixed protected purpose without editing permission names.
             </p>
         </div>
     );

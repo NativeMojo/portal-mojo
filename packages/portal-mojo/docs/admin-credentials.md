@@ -206,3 +206,30 @@ See [Admin modal policy](admin-modals.md) for header actions, content-only
 sections, supported lifecycle fields and retained irreversible exceptions.
 Group API keys and webhook subscriptions deactivate/reactivate; their built-in
 Delete controls are removed. Reveal, secret rotation and cache boundaries remain.
+
+## Protected ACME consumer purpose
+
+Literal deployment operators can open **Create ACME consumer key** from the
+existing fixed-Group or cross-Group API-key inventory. This lazy form resolves
+the selected original hub Group through the private shared-validation recipient
+endpoint. It displays the actual active Group name/UUID, the named ACME validation
+consumer purpose and the fixed `dnsman_acme_federation` consequence. A tenant or
+acting user cannot substitute for the original recipient. It has no freeform
+permission or JSON input. The server rechecks Group activity, expected label and
+protected grant at issuance and rejects key-backed sessions.
+
+Issue is separately confirmed, single-flight and session-bound. Its response is
+split before presentation: safe key metadata may be displayed; the transient
+token stays outside Query/Mutation caches, URL/history and storage. Closing the
+native token dialog drops that display. The existing explicit, audited
+`/api/group/apikey/<id>?graph=token` reveal remains the recovery route. A timeout
+may follow successful issuance: inspect the exact Group's recent inventory and
+use audited reveal before creating another successor. The form blocks automatic
+reissue and never retries after fresh authentication.
+
+Create a replacement, enter it normally in the receiving deployment's protected
+connection form, Preview/Publish, Apply and verify every expected node. Only then
+explicitly review/deactivate the old hub key using existing key controls. This
+form neither rotates nor retires keys, grants allocation trust, activates hub
+sharing or asserts cross-deployment verification. Existing in-place key rotation
+semantics remain unchanged and can invalidate the previous token immediately.

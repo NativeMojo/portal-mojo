@@ -26,6 +26,11 @@ try {
         readApiKeyRateLimits, validateApiKeyRateLimitInput,
     } = models;
 
+    const protectedKey = await server.ssrLoadModule('/packages/portal-mojo/src/admin/credentials/acme-consumer-key.ts');
+    const exact='1'.repeat(32);
+    const recipient={purpose:'acme_validation_consumer',consumer_project_uuid:exact,consumer_label:'Original active project',permission:'dnsman_acme_federation',can_issue:true,grant_explanation:'Protected platform grant required'};
+    assert.equal(protectedKey.parseAcmeRecipient(recipient,exact).consumer_project_uuid,exact,'Named purpose binds the exact original recipient');
+    for (const bad of [{...recipient,purpose:'ordinary'},{...recipient,permission:'admin'},{...recipient,can_issue:'true'},{...recipient,consumer_project_uuid:'2'.repeat(32)}]) assert.throws(()=>protectedKey.parseAcmeRecipient(bad,exact),undefined,'Malformed protected recipient cannot enable issuance');
     const permissionNames = getGroupApiKeyPermissions().map((permission) => permission.name);
     assert(permissionNames.includes('send_sms'), 'the guided API-key editor must expose send_sms');
     assert(permissionNames.includes('comms'), 'the guided API-key editor must expose comms');

@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { login, setMockConnectionScenario, type MockConnectionScenario } from 'portal-mojo/client';
+import { SharedValidationConnectionPage } from '../../../../../packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel';
 import {
     SettingsPage,
-    FleetNodeStatus,
     buildSettingPayload,
     type SettingRow,
 } from 'portal-mojo/admin/operations';
@@ -58,9 +61,11 @@ export function AdminSettingsDemo() {
 }
 
 export function FleetConfigurationDemo() {
-    return <FleetNodeStatus revision={'a'.repeat(32)} report={{ status: 'pending', healthy_everywhere: false, health_scope: 'request_service_jobs_and_dependencies',
-        nodes: [{ hostname: 'node-a', revision: 'a'.repeat(32), published: true, installed: true,
-            restart_requested: true, restarted: true, healthy: true, status: 'healthy' },
-        { hostname: 'node-b', revision: 'a'.repeat(32), published: true, installed: false,
-            restart_requested: false, restarted: false, healthy: false, status: 'unknown', error_code: 'node_did_not_reply' }] }} />;
+    const [scenario, setScenario] = useState<MockConnectionScenario>('ready');
+    const [persona, setPersona] = useState('dns.platform@nativemojo.com');
+    const [narrow, setNarrow] = useState(false), [ready, setReady] = useState(false); const qc = useQueryClient();
+    useEffect(() => { setMockConnectionScenario(scenario); }, [scenario]);
+    useEffect(() => { let active = true; setReady(false); void login(persona, 'mojo').then(async () => { await qc.invalidateQueries(); if (active) setReady(true); }); return () => { active = false; }; }, [persona, qc]);
+    useEffect(() => () => { setMockConnectionScenario('ready'); void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
+    return <div className="dns-shared-showcase" style={{ display: 'grid', gap: 16 }}><h2>Protected shared-validation connection</h2><p>This is the actual Fleet connection page. New keys are issued on the approved hub through Group API Keys; this form accepts a normal write-only replacement. Local fixtures never configure a real hub.</p><div className="dns-shared-demo-controls"><label className="field"><span className="field-label">Connection scenario</span><select className="input" value={scenario} onChange={e => setScenario(e.target.value as MockConnectionScenario)}>{['ready','old-api','unavailable','dnsman-absent','empty-catalog','sharing-disabled','identity-mismatch','busy','catalog-conflict','revision-conflict','publication-uncertain','offline','draining','stale-proof','malformed','recipient-denied','recipient-renamed','issue-uncertain','reauth','disable-ineligible'].map(value => <option value={value} key={value}>{value}</option>)}</select></label><label className="field"><span className="field-label">Connection identity</span><select className="input" value={persona} onChange={e => setPersona(e.target.value)}><option value="dns.platform@nativemojo.com">Deployment operator</option><option value="dns.manager@nativemojo.com">Ordinary DNS manager</option></select></label><label><input type="checkbox" checked={narrow} onChange={e => setNarrow(e.target.checked)} />390px embedded connection</label></div><div style={{ maxWidth: narrow ? 390 : undefined, minWidth: 0 }}>{ready ? <SharedValidationConnectionPage key={`${scenario}:${persona}`} /> : <p>Preparing fixture…</p>}</div></div>;
 }

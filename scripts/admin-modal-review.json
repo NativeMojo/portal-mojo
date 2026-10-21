@@ -461,6 +461,30 @@
       "fingerprint": "2ad558f5a323346fc0a3",
       "category": "action",
       "purpose": "Frozen-scope shared validation setup and explicit prepare/check/request/grant/revoke confirmation; owner abort, no auth replay and authoritative reconciliation are covered by verify-admin-dns-shared-validation-mounted."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:openAcmeConsumerKey:modal.open:0",
+      "fingerprint": "233272f6321ef4b38dd6",
+      "category": "editor",
+      "purpose": "AcmeConsumerKeyDialog: exact active original hub Group resolution, named protected purpose and staged replacement; StrictMode cancel/auth/uncertainty/secret-cache cases in verify-admin-shared-validation-config-mounted.mjs"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:displaySecret:modal.open:0",
+      "fingerprint": "9df31b0571076bba5228",
+      "category": "action",
+      "purpose": "Transient SecretBox after protected issuance or explicit audited reveal; auth-owner signal, no caches/storage and explicit retirement sequence"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/credentials/AcmeConsumerKeyDialog.tsx:issue:modal.open:0",
+      "fingerprint": "ab7071f4f4802546d230",
+      "category": "confirmation",
+      "purpose": "Confirm exact original recipient name/UUID, fixed protected grant, no trust/activation and old-key preservation before one session-bound imperative write"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run:modal.open:0",
+      "fingerprint": "ec9b29b62c56fcec7201",
+      "category": "confirmation",
+      "purpose": "Separate Publish/Apply consent for frozen connection preview/revision and expected original project, process restart, every expected node proof and unchanged holds/activation/key retirement"
     }
   ],
   "lifecycle": [

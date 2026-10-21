@@ -7,8 +7,9 @@ page checks `is_superuser === true` before fetching. Backend authority remains
 mandatory, including rejection of diagnostic/key-backed sessions and fresh auth.
 
 Applications register their schema in django-mojo. The page renders the returned
-section, label, description, default, type and restart requirement; no application
-setting names are hardcoded. Each field defaults to Keep current value. Set value
+section, label, description, default, type and restart requirement; application schemas remain server-owned. The three managed shared-validation
+connection fields route to the dedicated topic below, rather than appearing as
+independently editable generic fields. Each field defaults to Keep current value. Set value
 and Remove published override are explicit actions. Clearing falls back to base
 configuration/default; it does not promise erasure of a bootstrap secret.
 
@@ -48,3 +49,60 @@ example. Mock Portal uses representative registered settings and an offline node
 Django receives this page only after a canonical Portal artifact is built and
 vendored; follow `docs/admin-artifact.md` and the Django vendor tool. Ordinary
 Vite build output is not the canonical artifact.
+
+## Shared validation connection
+
+Operations → Fleet Configuration → Shared validation connection is a private, lazy
+route. It requires a current literal superuser; the server additionally requires
+an active interactive session, same-origin writes and fresh authentication.
+Key-backed sessions are rejected by the server even when their user is an owner.
+
+The panel consumes the private `/api/account/admin/fleet/shared-validation`
+contract. Choose a named approved hub profile, inspect its exact origin and
+original project UUID, then Keep, Replace or Disable the connection. Replacement
+is a normal write-only password field; blank preserves the existing credential.
+The approved catalog fixes the origin. Arbitrary URLs and raw JSON are not inputs.
+
+Preview probes the candidate without saving it. Publication has a separate
+confirmation, frozen against the preview and auth session. Publishing revalidates
+the catalog and expected revision; it does not Apply. Apply has another
+confirmation and targets the exact current revision. Every expected node must
+report installed, restarted and combined request-service/job-engine/scheduler
+health at that revision and the expected topic profile/project identity. Offline,
+draining, stale, partial and missing-node results remain unconfirmed. The UI
+polls at most120 observations and offers deliberate Refresh afterward. Verified
+connection identity with `sharing_ready=false` still needs the separate protected
+hub activation ceremony; this form never performs it.
+
+Create the replacement on the approved hub with the named **ACME validation
+consumer** key form. Preview/Publish, Apply, verify every expected node, then
+explicitly review and deactivate the old key in the hub inventory. Issuance,
+publication and successful dispatch never retire keys. Disable masks the whole
+connection tuple and base credential without deleting base settings or revoking
+remote trust; retained/shared identities can make disabling ineligible.
+
+Secrets remain in an uncontrolled mounted password input and a short-lived
+imperative request draft. They never enter Query/Mutation caches, URL/history,
+storage, receipts or logs. These new writes call `requestFreshAuth` without
+replaying the attempted action; the existing generic Fleet helpers keep their
+prior behavior. Auth/session change or unmount invalidates drafts and closes
+owned confirmations. Double activation is single-flight. A409 revision/catalog
+conflict or `configuration_busy` requires Refresh and a deliberate retry. An
+uncertain publication or issuance may have persisted; read authoritative status
+or exact Group inventory before another attempt.
+
+Unavailable APIs, missing DNSMan/publisher/delegation/schema/enrollment or an empty
+approved catalog render a concrete blocked state. Bootstrap supplies `admin_path`
+and permission facts for existing legacy System Setup, Deployments, topology and
+Fleet Scaling links. Links are same-origin and capability-gated. The backend's
+semantic `capacity` hint maps to the actual registered `#/fleet` route. These
+legacy destinations retain their protected confirmations, policy, release holds
+and IaC restrictions. This React topic creates no deployment, topology or root
+authority API.
+
+The Runtime settings showcase mounts the actual connection panel with central
+mock scenarios and operator/ordinary-manager identities. The named
+`verify:admin-shared-validation-config` gate includes private DTO/API and mounted
+StrictMode contracts, and is included once by `verify:admin-contracts`. Browser
+proof remains necessary for real native dialogs, keyboard/focus and390px in both
+themes. Mock receipts are fixtures, never live configuration evidence.
