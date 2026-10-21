@@ -137,15 +137,20 @@ resource is added. The flow never reads certificate material.
 3. **Prepare connection** and confirm the displayed domain/profile/target.
    Preparation pauses direct local validation and renewal until authorization
    and checking finish. Existing valid certificate material remains available.
-4. **Copy connection request**. Send that public JSON to the allocation's
-   controller using your normal coordination channel. The request has exactly
-   `version:1`, `consumer_project_uuid`, `client_ref`, `domain`, `allocation_ref`.
-   It contains no key, token or `scope` field. Knowing a target is insufficient
-   authority to issue certificates.
-5. The controller opens the same dialog's **Controller review**, checks access,
-   pastes the request, and resolves the exact existing allocation and active
-   recipient. They review the apex/wildcard authority, recipient UUID and local
-   reference, then confirm **Allow issuance**. No allocation is created.
+4. **Download request** saves `shared-validation-request.json`. Send it to the
+   allocation controller using your normal coordination channel. **Share request**
+   uses native file sharing when supported; **Copy request** is optional. Download
+   stays available after copy/share denial or cancellation. The canonical file is
+   at most 2048 UTF-8 bytes and has exactly `version:1`, `consumer_project_uuid`,
+   `client_ref`, `domain`, `allocation_ref`, with no wrapper, key, token or scope.
+5. The controller opens their deployment’s **Domains → Shared validation setup →
+   Controller review**, checks access and uses **Import request**. There is no JSON
+   editor or controller URL. Empty, oversized, malformed, noncanonical or extra-field
+   files are refused before installation. Import alone grants nothing. The named
+   public fields fill the exact domain query; **Find allocations**, page if needed
+   and select the exact existing target. Only a matching request and resolved active
+   exact recipient enable **Review grant**, then **Allow issuance** after consent
+   names both apex and wildcard authority. No allocation is created.
 6. Back in the project, **Refresh**, **Connect approved validation**, then
    **Check validation**. These are separate deliberate actions. Check requires
    the approved existing one-hop `_acme-challenge.<apex>` CNAME.
@@ -186,7 +191,7 @@ refreshed. Ambiguous results require successful Refresh before another write.
 A 440 prompts authentication but never automatically repeats the operation.
 Every explicit session replacement, including the same user signing in again,
 clears controller capabilities, recipients and participant facts. Check controller
-access and resolve the exact request again before a new grant or revoke.
+access and select an authorized allocation again. A new grant also requires a matching imported request and freshly resolved active recipient.
 Closing a view cannot cancel a write already submitted.
 
 Controller POSTs use only the local `/api/dnsman/acme` endpoints:
@@ -229,6 +234,16 @@ expected and bounded observed target and its check time. Ask the domain owner
 to restore the approved one-hop route after checking other consumers. Portal
 does not replace/remove that CNAME or rotate the allocation as a default repair.
 
+Controller maintenance starts cold with **Check controller access**, an **Exact
+ domain** and **Find allocations**. Native choices show target and owner UUID.
+**Next allocation page** / **First allocation page** and **Next project page** /
+**First project page** navigate bounded 20-row pages. Select an allocation to
+inspect participants, role, state, exact scope and revoked time. No request file
+or recipient lookup is needed for this path. An imported inactive consumer can
+fail recipient lookup while participant inspection, revoke and cleanup remain
+available. Owner participants cannot be revoked. **Refresh trust** checks current
+capabilities; an unsuccessful reconciliation blocks mutation until refresh succeeds.
+
 Controller revocation stops future DNS-01 validation for that project. Already-
 issued certificates remain valid until expiry or separate certificate revocation,
 and other trusted projects keep working. A 503 may occur after revocation was
@@ -244,7 +259,7 @@ host installed that certificate. Shared pending/broken/revoked routing never
 permits fallback TXT writes through the direct provider. Private keys stay in
 each deployment.
 
-The mock showcase supports the complete project/controller handshake, viewer,
+The mock showcase includes deterministic controller-maintenance pages and an inactive consumer, plus the complete project/controller handshake, viewer,
 revoked, pending/changed/chained DNS, disconnected/unconfigured/disabled hub,
 older API, failed renewal and 390px embedded-content scenarios. Scenario changes
 reset mock shared state; identity changes preserve it. Leaving the demo restores

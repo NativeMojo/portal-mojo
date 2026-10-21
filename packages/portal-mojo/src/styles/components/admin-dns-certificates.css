@@ -41,3 +41,12 @@
 .dns-shared-dialog .field { min-width: 0; }
 .dns-shared-dialog .modal-actions { position: static; }
 .dns-shared-dialog .dns-shared-facts { border-top: 1px solid var(--line); padding-top: 14px; }
+
+.dns-shared-allocations { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 12px; }
+.dns-shared-allocation { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; min-width: 0; }
+.dns-shared-allocation > span { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.dns-shared-allocation input { flex: 0 0 auto; margin-top: 4px; }
+.dns-shared-allocation small { color: var(--mute); }
+.dns-shared-dialog input[type="file"] { max-width: 100%; min-width: 0; color: var(--ink); }
+.dns-shared-dialog input[type="file"]::file-selector-button { color: var(--ink); background: var(--surface2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; margin-right: 8px; cursor: pointer; }
+.dns-shared-confirm { min-width: 0; overflow-wrap: anywhere; }

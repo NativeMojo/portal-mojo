@@ -49,6 +49,16 @@ export function parseConnectionRequest(value: unknown): ConnectionRequest {
     if (Object.keys(r).sort().join(',') !== 'allocation_ref,client_ref,consumer_project_uuid,domain,version' || r.version !== 1) invalid();
     return { version: 1, consumer_project_uuid: uuid(r.consumer_project_uuid), client_ref: uuid(r.client_ref), domain: hostname(r.domain), allocation_ref: hostname(r.allocation_ref) };
 }
+export const CONNECTION_REQUEST_MAX_BYTES = 2048;
+export function parseConnectionRequestText(value: string): ConnectionRequest {
+    if (!value || new TextEncoder().encode(value).byteLength > CONNECTION_REQUEST_MAX_BYTES) return invalid();
+    try { return parseConnectionRequest(JSON.parse(value)); } catch { return invalid(); }
+}
+export function serializeConnectionRequest(value: ConnectionRequest): string {
+    const result = JSON.stringify(parseConnectionRequest(value));
+    parseConnectionRequestText(result);
+    return result;
+}
 export function parseReadiness(value: unknown, target?: SetupTarget, allocation?: string): Readiness {
     const r = record(value); if (r.version !== 1) throw new SharedValidationError('unsupported');
     const d = record(r.domain), h = record(r.hub), t = record(r.trust), a = record(r.alias), n = record(r.renewal), c = record(r.capabilities), next = record(r.next_action), op = record(r.operation), p = record(r.profile);

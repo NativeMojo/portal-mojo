@@ -6563,7 +6563,7 @@ function accountSelfFetch(path: string, method: string, opts: MockFetchOpts): un
     return { status: false, error: `Method not allowed: ${method} ${path}`, error_code: 405 };
 }
 
-export type MockSharedValidationScenario = 'ready' | 'missing-trust' | 'revoked' | 'pending-dns' | 'changed-alias' | 'chained-alias' | 'unavailable' | 'unconfigured' | 'old-api' | 'renewal-error' | 'malformed' | 'disabled';
+export type MockSharedValidationScenario = 'ready' | 'missing-trust' | 'revoked' | 'pending-dns' | 'changed-alias' | 'chained-alias' | 'unavailable' | 'unconfigured' | 'old-api' | 'renewal-error' | 'malformed' | 'disabled' | 'controller-maintenance';
 let sharedScenario: MockSharedValidationScenario = 'ready';
 let sharedFault: 'ambiguous' | 'reconcile' | 'reauth' | 'revoke-cleanup' | null = null;
 let sharedReadFails = false;
@@ -6583,9 +6583,22 @@ function sharedDescriptor(row: MockSharedConnection) { return { version: 1, cons
 function sharedParticipant(request: Record<string, unknown>): MockSharedParticipant { const domain = String(request.domain); return { allocation_ref: String(request.allocation_ref), participant_ref: sharedUuid(), client_ref: String(request.client_ref), domain, source: `_acme-challenge.${domain}`, target: String(request.allocation_ref), role: 'trusted', trust_state: 'active', scope: [domain, `*.${domain}`], can_publish: false, can_withdraw: false, revoked_at: null, consumer_project_uuid: String(request.consumer_project_uuid), consumer_label: 'Customer project · independent wildcard issuer' }; }
 /** Bounded mock-only controls. No setup draft or protected credential is observed. */
 export function setMockSharedValidationScenario(scenario: MockSharedValidationScenario): void {
-    const allowed: MockSharedValidationScenario[] = ['ready', 'missing-trust', 'revoked', 'pending-dns', 'changed-alias', 'chained-alias', 'unavailable', 'unconfigured', 'old-api', 'renewal-error', 'malformed', 'disabled'];
+    const allowed: MockSharedValidationScenario[] = ['ready', 'missing-trust', 'revoked', 'pending-dns', 'changed-alias', 'chained-alias', 'unavailable', 'unconfigured', 'old-api', 'renewal-error', 'malformed', 'disabled', 'controller-maintenance'];
     if (!allowed.includes(scenario)) throw new Error('Unknown shared validation mock scenario');
     sharedScenario = scenario; sharedFault = null; sharedReadFails = false; sharedConnections.clear(); sharedParticipants.splice(0);
+    sharedAllocations.splice(2);
+    if (scenario === 'controller-maintenance') {
+        for (let i = 1; i <= 21; i++) {
+            const target = `maintenance-${String(i).padStart(2, '0')}.acme-hub.example`;
+            sharedAllocations.push({ allocation_ref: target, domain: 'maintenance.example', source: '_acme-challenge.maintenance.example', target, owner_project_uuid: SHARED_OWNER_UUID, can_manage_trust: true });
+        }
+        for (let i = 0; i < 22; i++) {
+            const participant = sharedParticipant({ domain: 'maintenance.example', allocation_ref: 'maintenance-21.acme-hub.example', client_ref: sharedUuid(), consumer_project_uuid: i === 21 ? SHARED_CONSUMER_UUID : sharedUuid() });
+            participant.consumer_label = i === 21 ? 'Inactive consumer · cleanup remains available' : i === 0 ? 'Allocation owner' : `Trusted project ${i}`;
+            if (i === 0) { participant.role = 'owner'; participant.consumer_project_uuid = SHARED_OWNER_UUID; }
+            sharedParticipants.push(participant);
+        }
+    }
     db.dnsDomains = db.dnsDomains.filter((d) => d.id < 8900);
     db.dnsCertificates = db.dnsCertificates.filter((c) => c.id < 8900);
     if (['missing-trust', 'revoked', 'pending-dns', 'changed-alias', 'chained-alias', 'renewal-error'].includes(scenario)) {
@@ -6614,13 +6627,15 @@ function mockSharedValidation(path: string, opts: MockFetchOpts, method: string)
         if (method !== 'POST' || !controller) return permissionDenied();
         if (path.endsWith('/capabilities')) return { status: true, data: { version: 2, shared_validation: sharedScenario !== 'disabled', consumer_project_uuid: null, can_consume: false, can_manage_trust: sharedScenario !== 'disabled', trust_scope: 'apex_and_wildcard' } };
         if (sharedScenario === 'disabled') return failure('acme_not_authorized', 403);
-        if (path.endsWith('/allocation/list')) return { status: true, data: { items: sharedAllocations.filter((v) => v.domain === body.domain), next_cursor: null } };
+        const page = <T,>(rows: T[]) => { const start = body.cursor == null ? 0 : Number(body.cursor); if (!Number.isSafeInteger(start) || start < 0 || (body.cursor != null && !/^[1-9]\d*$/.test(String(body.cursor)))) return failure('acme_invalid_request', 400); return { status: true, data: { items: rows.slice(start, start + 20), next_cursor: start + 20 < rows.length ? String(start + 20) : null } }; };
+        if (path.endsWith('/allocation/list')) return page(sharedAllocations.filter((v) => v.domain === body.domain));
         const allocation = sharedAllocations.find((v) => v.allocation_ref === body.allocation_ref || v.allocation_ref === (body.connection_request as Record<string, unknown> | undefined)?.allocation_ref);
         if (!allocation) return permissionDenied();
-        if (path.endsWith('/trust/list')) return sharedReadFails ? failure('acme_hub_unavailable', 503) : { status: true, data: { items: sharedParticipants.filter((p) => p.allocation_ref === allocation.allocation_ref), next_cursor: null } };
-        if (path.endsWith('/trust/recipient')) return body.consumer_project_uuid === SHARED_CONSUMER_UUID ? { status: true, data: { consumer_project_uuid: SHARED_CONSUMER_UUID, label: 'Customer project · independent wildcard issuer', active: true } } : permissionDenied();
+        if (path.endsWith('/trust/list')) return sharedReadFails ? failure('acme_hub_unavailable', 503) : page(sharedParticipants.filter((p) => p.allocation_ref === allocation.allocation_ref));
+        if (path.endsWith('/trust/recipient')) return sharedScenario !== 'controller-maintenance' && body.consumer_project_uuid === SHARED_CONSUMER_UUID ? { status: true, data: { consumer_project_uuid: SHARED_CONSUMER_UUID, label: 'Customer project · independent wildcard issuer', active: true } } : permissionDenied();
         if (path.endsWith('/trust/grant')) {
             const request = body.connection_request as Record<string, unknown>;
+            if (sharedScenario === 'controller-maintenance') return permissionDenied();
             if (!request || Object.keys(request).sort().join(',') !== 'allocation_ref,client_ref,consumer_project_uuid,domain,version' || request.version !== 1 || request.domain !== allocation.domain || request.consumer_project_uuid !== SHARED_CONSUMER_UUID || !/^[a-f0-9-]{36}$/.test(String(request.client_ref))) return failure('acme_reference_conflict');
             let participant = sharedParticipants.find((p) => p.client_ref === request.client_ref && p.consumer_project_uuid === request.consumer_project_uuid);
             if (participant && (participant.allocation_ref !== allocation.allocation_ref || participant.trust_state === 'revoked')) return failure('acme_reference_conflict');

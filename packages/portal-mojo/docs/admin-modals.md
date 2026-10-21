@@ -139,7 +139,10 @@ embedded-host cases. Existing ToastHost top-layer visibility work remains separa
 ## Shared validation confirmations
 
 The DNS shared-validation editor freezes the target group/domain, existing
-allocation, recipient UUID and client reference while an operation is pending.
+allocation and session while an operation is pending. Grant additionally freezes
+the imported request, active exact recipient UUID and client reference. Participant
+revoke/cleanup freezes the selected current-page participant independently of any
+request or recipient lookup; cleanup retry leaves the reference revoked.
 Its owner AbortSignal closes only its confirmation on unmount, scope loss or
 auth/session replacement; submitted writes can still persist. Escape/backdrop
 and Close are unavailable while the outer operation is pending.

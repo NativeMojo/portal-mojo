@@ -4,7 +4,7 @@ import { getAuthSessionRevision, getAuthSnapshot, hasPermission, requestFreshAut
 import { CollectionSelect, FlatRow, modal, toast } from '../../ui';
 import { DNS_MANAGE_PERMISSIONS, DomainModel, sanitizeDomainRow, type DnsGroupChoice, type DomainRow } from './models';
 import { checkValidation, connectValidation, getAllocations, getHubCapabilities, getParticipants, getRecipient, grantValidation, invalidateValidation, requestWildcard, revokeValidation, sanitizeSetupGroup, SETUP_GROUP_ENDPOINT, useValidationPlan } from './shared-validation-api';
-import { normalizeHostname, parseConnectionRequest, SharedValidationError, type Allocation, type ConnectionRequest, type HubCapabilities, type Page, type Participant, type Recipient, type SetupTarget } from './shared-validation-data';
+import { CONNECTION_REQUEST_MAX_BYTES, normalizeHostname, parseConnectionRequestText, serializeConnectionRequest, SharedValidationError, type Allocation, type ConnectionRequest, type HubCapabilities, type Page, type Participant, type Recipient, type SetupTarget } from './shared-validation-data';
 import { ValidationFacts } from './SharedValidationPanel';
 
 export function confirmShared(options: { title: string; message: ReactNode; confirmText: string; danger?: boolean; signal?: AbortSignal }) {
@@ -24,7 +24,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
     const [targetKind, setTargetKind] = useState<'existing' | 'new'>('existing');
     const [domain, setDomain] = useState<DomainRow | null>(fixedDomain ?? null);
     const [group, setGroup] = useState<DnsGroupChoice | null>(null);
-    const nameRef = useRef<HTMLInputElement>(null), allocationRef = useRef<HTMLInputElement>(null), descriptorRef = useRef<HTMLTextAreaElement>(null);
+    const nameRef = useRef<HTMLInputElement>(null), allocationRef = useRef<HTMLInputElement>(null);
     const [inspected, setInspected] = useState<{ target: SetupTarget; allocation?: string } | null>(fixedDomain ? { target: { domain: fixedDomain.id } } : null);
     const plan = useValidationPlan(mode === 'project' ? inspected?.target ?? null : null, inspected?.allocation);
     const controllerIdentity = JSON.stringify([auth.uid, revision, canManage]);
@@ -33,6 +33,15 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
     // including the render before the cleanup effect clears its selected facts.
     const caps = controllerAuthority?.identity === controllerIdentity ? controllerAuthority.caps : null;
     const setCaps = (value: HubCapabilities | null) => setControllerAuthority(value ? { identity: controllerIdentity, caps: value } : null);
+    const [controllerDomain, setControllerDomain] = useState('');
+    const [participantCursor, setParticipantCursor] = useState<string | undefined>();
+    const [participantLoading, setParticipantLoading] = useState(false);
+    const [participantError, setParticipantError] = useState('');
+    const [recipientLoading, setRecipientLoading] = useState(false);
+    const [recipientError, setRecipientError] = useState('');
+    const fileGeneration = useRef(0);
+    const downloadUrls = useRef(new Set<string>());
+    useEffect(() => () => { fileGeneration.current++; downloadUrls.current.forEach((url) => URL.revokeObjectURL(url)); downloadUrls.current.clear(); }, []);
     const [descriptor, setDescriptor] = useState<ConnectionRequest | null>(null);
     const [allocations, setAllocations] = useState<Page<Allocation> | null>(null);
     const [allocation, setAllocation] = useState<Allocation | null>(null);
@@ -41,7 +50,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
     const [error, setError] = useState(''); const [notice, setNotice] = useState('');
     const [busy, setBusy] = useState(false); const flight = useRef(false);
     const [refreshRequired, setRefreshRequired] = useState(false);
-    const selection = JSON.stringify([fixedDomain?.id, fixedDomain?.name, fixedDomain?.group, mode, targetKind, domain?.id, group?.id, inspected, descriptor, allocation?.allocation_ref, auth.uid, revision, canManage]);
+    const selection = JSON.stringify([fixedDomain?.id, fixedDomain?.name, fixedDomain?.group, mode, targetKind, domain?.id, group?.id, inspected, controllerDomain, descriptor, allocation?.allocation_ref, participantCursor, auth.uid, revision, canManage]);
     const latest = useRef(selection); latest.current = selection;
     const owner = useRef<AbortController | null>(null);
     const livePermission = useRef(canManage); livePermission.current = canManage;
@@ -54,7 +63,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
     useEffect(() => () => { onBusy?.(false); }, [onBusy]);
     useEffect(() => {
         setControllerAuthority(null); setDescriptor(null); setAllocations(null); setAllocation(null); setRecipient(null); setParticipants(null);
-        if (descriptorRef.current) descriptorRef.current.value = '';
+        fileGeneration.current++; setControllerDomain(''); setParticipantCursor(undefined); setParticipantError(''); setRecipientError('');
     }, [auth.authenticated, canManage, auth.uid, revision]);
     const scope = () => {
         const selected = selection, uid = auth.uid, rev = revision;
@@ -65,7 +74,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
         return { signal, beforeSend };
     };
     useEffect(() => { if (fixedDomain) { setDomain(fixedDomain); setInspected({ target: { domain: fixedDomain.id } }); setError(''); setNotice(''); setRefreshRequired(false); } }, [fixedDomain?.id]);
-    const resetSelection = () => { setInspected(null); setDescriptor(null); setAllocations(null); setAllocation(null); setRecipient(null); setParticipants(null); setError(''); setNotice(''); setRefreshRequired(false); };
+    const resetSelection = () => { fileGeneration.current++; setControllerDomain(''); setParticipantCursor(undefined); setParticipantError(''); setRecipientError(''); setInspected(null); setDescriptor(null); setAllocations(null); setAllocation(null); setRecipient(null); setParticipants(null); setError(''); setNotice(''); setRefreshRequired(false); };
     const inspect = () => {
         try {
             const target: SetupTarget = targetKind === 'existing' && domain ? { domain: domain.id } : group ? { group: group.id, name: normalizeHostname(nameRef.current?.value ?? '') } : (() => { throw new SharedValidationError('invalid'); })();
@@ -84,7 +93,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
         if (!(action === 'restart' ? r.capabilities.can_restart : action === 'check' ? r.capabilities.can_check : action === 'request' ? r.capabilities.can_request : r.capabilities.can_connect)) return;
         const target = inspected.target; const targetAllocation = r.alias.target;
         if (!targetAllocation) return;
-        const fence = scope(); setPending(true); setError(''); setNotice('');
+        const fence = scope(), trigger = document.activeElement as HTMLElement | null; setPending(true); setError(''); setNotice('');
         let submitted = false;
         try {
             const confirmed = await confirmShared({
@@ -103,79 +112,122 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
                 await invalidateValidation(qc);
                 if (!fence.signal?.aborted) { const fresh = await plan.refresh(); setRefreshRequired(!fresh); if (!fresh) setError('The operation may have persisted. Refresh successfully before another action.'); }
             }
-            setPending(false);
+            setPending(false); restoreFocus(trigger, fence);
         }
     };
+    const discardControllerFacts = () => {
+        setCaps(null); setAllocations(null); setAllocation(null); setParticipants(null); setRecipient(null); setDescriptor(null);
+        setParticipantLoading(false); setRecipientLoading(false);
+    };
     const refreshController = async (selected: Allocation, fence = scope()) => {
-        const [nextCaps, rows] = await Promise.all([getHubCapabilities(fence), getParticipants(selected, undefined, fence)]);
+        let nextCaps;
+        try { nextCaps = await getHubCapabilities(fence); }
+        catch (reason) {
+            if (!fence.signal?.aborted && reason instanceof SharedValidationError && ['access', 'reauth', 'unsupported'].includes(reason.kind)) discardControllerFacts();
+            throw reason;
+        }
         fence.beforeSend();
-        if (!nextCaps.shared_validation || !nextCaps.can_manage_trust) throw new SharedValidationError('access');
-        setCaps(nextCaps); setParticipants(rows); return rows;
+        if (!nextCaps.shared_validation || !nextCaps.can_manage_trust) { discardControllerFacts(); throw new SharedValidationError('access'); }
+        const rows = await getParticipants(selected, participantCursor, fence); fence.beforeSend();
+        setCaps(nextCaps); setParticipants(rows); setParticipantError(''); return rows;
     };
     const loadController = async () => {
         if (flight.current || !canManage) return;
         const fence = scope(); setPending(true); setError('');
-        try { const nextCaps = await getHubCapabilities(fence); fence.beforeSend(); setCaps(nextCaps); if (!nextCaps.shared_validation || !nextCaps.can_manage_trust) setError('This session cannot manage shared validation trust. Ask the allocation controller.'); }
-        catch (reason) { if (!fence.signal?.aborted) await explain(reason); }
+        try { const nextCaps = await getHubCapabilities(fence); fence.beforeSend(); setCaps(nextCaps); if (!nextCaps.shared_validation || !nextCaps.can_manage_trust) { discardControllerFacts(); setError('This session cannot manage shared validation trust. Ask the allocation controller.'); } }
+        catch (reason) { if (!fence.signal?.aborted) { discardControllerFacts(); await explain(reason); } }
         finally { setPending(false); }
     };
-    const reviewDescriptor = async () => {
-        if (flight.current || !canManage || !caps?.shared_validation || !caps.can_manage_trust) return;
-        let request: ConnectionRequest;
-        try { const input = descriptorRef.current?.value ?? ''; if (input.length > 2048) throw new Error(); request = parseConnectionRequest(JSON.parse(input)); }
-        catch { setError('Paste only the public five-field connection request exported by the project.'); return; }
-        finally { if (descriptorRef.current) descriptorRef.current.value = ''; }
-        // Scope changes synchronously clear previous controller facts. Resolve only
-        // the pasted exact domain; no directory or allocation creation is used.
-        setDescriptor(request); setAllocation(null); setAllocations(null); setParticipants(null); setRecipient(null); setRefreshRequired(false); setError('');
+    const clearControllerSelection = () => {
+        setAllocations(null); setAllocation(null); setParticipants(null); setRecipient(null); setParticipantCursor(undefined);
+        setParticipantError(''); setRecipientError(''); setRefreshRequired(false); setError(''); setNotice('');
     };
+    const importRequest = async (file?: File) => {
+        if (!file || flight.current || !canManage || !caps?.shared_validation || !caps.can_manage_trust) return;
+        const fence = scope(), generation = ++fileGeneration.current;
+        setPending(true); setError('');
+        try {
+            if (!file.size || file.size > CONNECTION_REQUEST_MAX_BYTES) throw new SharedValidationError('invalid');
+            const request = parseConnectionRequestText(await file.text());
+            fence.beforeSend(); if (generation !== fileGeneration.current) return;
+            clearControllerSelection(); setDescriptor(request); setControllerDomain(request.domain);
+        } catch { if (!fence.signal?.aborted && generation === fileGeneration.current) setError('Choose a public five-field v1 request file, between 1 and 2048 UTF-8 bytes.'); }
+        finally { setPending(false); }
+    };
+    const findAllocations = async (cursor?: string) => {
+        if (flight.current || !canManage || !caps?.shared_validation || !caps.can_manage_trust) return;
+        const fence = scope(); setPending(true); setError('');
+        try {
+            const exact = normalizeHostname(controllerDomain);
+            const page = await getAllocations(exact, cursor, fence); fence.beforeSend();
+            setAllocations(page); setAllocation(null); setParticipants(null); setRecipient(null); setParticipantCursor(undefined); setRefreshRequired(false);
+        } catch (reason) { if (!fence.signal?.aborted) await explain(reason); }
+        finally { setPending(false); }
+    };
+    // Participant maintenance is authorized by the selected allocation, independently
+    // of an imported request or active recipient. Each read has its own error state.
     useEffect(() => {
-        if (!descriptor || mode !== 'controller' || !caps?.can_manage_trust || !caps.shared_validation || !canManage) return;
-        const fence = scope(); let active = true; setPending(true);
-        void (async () => {
-            try {
-                const page = await getAllocations(descriptor.domain, undefined, fence); fence.beforeSend();
-                if (!active) return; setAllocations(page);
-                const selected = page.items.find((row) => row.allocation_ref === descriptor.allocation_ref && row.can_manage_trust);
-                if (!selected && !page.next_cursor) throw new SharedValidationError('access');
-                if (selected) setAllocation(selected);
-            } catch (reason) { if (active && !fence.signal?.aborted) void explain(reason); }
-            finally { if (active) setPending(false); }
-        })();
+        if (!allocation || mode !== 'controller' || !canManage || !caps?.shared_validation || !caps.can_manage_trust) return;
+        const fence = scope(); let active = true; setParticipantLoading(true); setParticipantError(''); setParticipants(null);
+        void getParticipants(allocation, participantCursor, fence).then((rows) => { fence.beforeSend(); if (active) setParticipants(rows); }).catch((reason) => {
+            if (active && !fence.signal?.aborted) { setParticipantError(reason instanceof SharedValidationError ? reason.message : new SharedValidationError('unavailable').message); setRefreshRequired(true); }
+        }).finally(() => { if (active) setParticipantLoading(false); });
         return () => { active = false; };
-    // descriptor identity and controller eligibility own this resolution.
+    // selection owns all auth, allocation, request and page fences.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [descriptor, mode, caps?.can_manage_trust, caps?.shared_validation, canManage]);
+    }, [selection, caps?.shared_validation, caps?.can_manage_trust]);
+    const requestMatches = !!descriptor && !!allocation && descriptor.domain === allocation.domain && descriptor.allocation_ref === allocation.allocation_ref;
     useEffect(() => {
-        if (!allocation || !descriptor || !canManage || !caps?.can_manage_trust) return;
-        const fence = scope(); let active = true; setPending(true);
-        void Promise.all([getRecipient(allocation, descriptor.consumer_project_uuid, fence), getParticipants(allocation, undefined, fence)]).then(([person, rows]) => { fence.beforeSend(); if (active) { setRecipient(person); setParticipants(rows); } }).catch((reason) => { if (active && !fence.signal?.aborted) void explain(reason); }).finally(() => { if (active) setPending(false); });
+        setRecipient(null); setRecipientError(''); setRecipientLoading(false);
+        if (!descriptor || !allocation || !requestMatches || !canManage || !caps?.shared_validation || !caps.can_manage_trust) return;
+        const fence = scope(); let active = true; setRecipientLoading(true);
+        void getRecipient(allocation, descriptor.consumer_project_uuid, fence).then((person) => { fence.beforeSend(); if (active) setRecipient(person); }).catch((reason) => {
+            if (active && !fence.signal?.aborted) setRecipientError(reason instanceof SharedValidationError ? reason.message : new SharedValidationError('unavailable').message);
+        }).finally(() => { if (active) setRecipientLoading(false); });
         return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [allocation, descriptor, canManage, caps?.can_manage_trust]);
-    const moreAllocations = async () => {
-        if (!descriptor || !allocations?.next_cursor || flight.current) return;
-        const fence = scope(); setPending(true);
-        try { const page = await getAllocations(descriptor.domain, allocations.next_cursor, fence); fence.beforeSend(); setAllocations(page); const selected = page.items.find((row) => row.allocation_ref === descriptor.allocation_ref && row.can_manage_trust); if (selected) setAllocation(selected); else if (!page.next_cursor) setError(new SharedValidationError('access').message); }
-        catch (reason) { if (!fence.signal?.aborted) await explain(reason); } finally { setPending(false); }
+    }, [selection, caps?.shared_validation, caps?.can_manage_trust]);
+    const exportRequest = async (action: 'download' | 'copy' | 'share') => {
+        const request = plan.data?.connection_request;
+        if (!request || flight.current || !canManage || plan.error || plan.loading) return;
+        const fence = scope(); setPending(true); setError('');
+        try {
+            fence.beforeSend(); const contents = serializeConnectionRequest(request);
+            if (action === 'copy') { await navigator.clipboard.writeText(contents); fence.beforeSend(); toast.success('Public connection request copied'); }
+            else {
+                const file = new File([contents], 'shared-validation-request.json', { type: 'application/json' });
+                if (action === 'share') {
+                    if (!navigator.canShare?.({ files: [file] }) || !navigator.share) throw new Error();
+                    await navigator.share({ files: [file] }); fence.beforeSend();
+                } else {
+                    const url = URL.createObjectURL(file); downloadUrls.current.add(url);
+                    const link = document.createElement('a'); link.href = url; link.download = file.name;
+                    document.body.append(link); link.click(); link.remove();
+                    setTimeout(() => { URL.revokeObjectURL(url); downloadUrls.current.delete(url); }, 0);
+                }
+            }
+        } catch (reason) {
+            if (!fence.signal?.aborted && !(reason instanceof DOMException && reason.name === 'AbortError')) setError('This handoff was unavailable. Use Download request to save the same public request file.');
+        } finally { setPending(false); }
     };
     const controllerAction = async (participant?: Participant) => {
-        if (flight.current || refreshRequired || !canManage || !caps?.shared_validation || !caps.can_manage_trust || !allocation?.can_manage_trust || !recipient || !descriptor || !participants) return;
+        if (flight.current || refreshRequired || !canManage || !caps?.shared_validation || !caps.can_manage_trust || !allocation?.can_manage_trust || !participants || participantLoading) return;
         const selected = allocation, request = descriptor, person = recipient;
-        const existing = participants.items.find((p) => p.client_ref === request.client_ref && p.consumer_project_uuid === request.consumer_project_uuid);
+        if (!participant && (!requestMatches || !request || !person?.active || person.consumer_project_uuid !== request.consumer_project_uuid || recipientLoading)) return;
+        const existing = participants.items.find((p) => p.client_ref === request?.client_ref && p.consumer_project_uuid === request?.consumer_project_uuid);
         if (!participant && existing?.trust_state === 'revoked') { setError('This reference was revoked. Ask the project to prepare a fresh request.'); return; }
-        if (participant && (participant.role !== 'trusted' || participant.allocation_ref !== selected.allocation_ref)) return;
-        const fence = scope(); setPending(true); setError(''); setNotice(''); let submitted = false;
+        if (participant && (participant.role !== 'trusted' || participant.allocation_ref !== selected.allocation_ref || !participants.items.includes(participant))) return;
+        const fence = scope(), trigger = document.activeElement as HTMLElement | null; setPending(true); setError(''); setNotice(''); let submitted = false;
         try {
             const confirmed = await confirmShared({
-                title: participant ? 'Revoke project trust' : 'Grant certificate issuance authority', danger: !!participant,
-                message: <div className="dns-shared-confirm"><p><strong>{participant?.consumer_label ?? person.label}</strong></p><p>Project: <code>{participant?.consumer_project_uuid ?? person.consumer_project_uuid}</code></p><p>Domain: <code>{selected.domain}</code><br />Target: <code>{selected.target}</code><br />Reference: <code>{participant?.client_ref ?? request.client_ref}</code></p><p>{participant ? 'Stop future DNS-01 validation for this project. Certificates already issued remain valid until expiry or separate revocation. Other trusted projects keep working.' : `Allow this project to issue certificates for ${selected.domain} and *.${selected.domain} using this validation target. Each deployment keeps its own certificate and private key.`}</p></div>,
-                confirmText: participant ? 'Revoke trust' : 'Allow issuance', signal: fence.signal,
+                title: participant ? participant.trust_state === 'revoked' ? 'Retry revoked project cleanup' : 'Revoke project trust' : 'Grant certificate issuance authority', danger: !!participant,
+                message: <div className="dns-shared-confirm"><p><strong>{participant?.consumer_label ?? person!.label}</strong></p><p>Project: <code>{participant?.consumer_project_uuid ?? person!.consumer_project_uuid}</code></p>{participant && <p>Participant: <code>{participant.participant_ref}</code></p>}<p>Domain: <code>{selected.domain}</code><br />Target: <code>{selected.target}</code><br />Reference: <code>{participant?.client_ref ?? request!.client_ref}</code></p><p>{participant?.trust_state === 'revoked' ? 'Retry DNS cleanup for this already-revoked reference. It remains revoked; this never restores issuance authority. Other trusted projects keep working.' : participant ? 'Stop future DNS-01 validation for this project. Certificates already issued remain valid until expiry or separate revocation. Other trusted projects keep working.' : `Allow this project to issue certificates for ${selected.domain} and *.${selected.domain} using this validation target. Each deployment keeps its own certificate and private key.`}</p></div>,
+                confirmText: participant ? participant.trust_state === 'revoked' ? 'Retry cleanup' : 'Revoke trust' : 'Allow issuance', signal: fence.signal,
             });
             if (!confirmed) return;
             fence.beforeSend(); if (!liveCaps.current?.can_manage_trust) throw new SharedValidationError('access');
             submitted = true;
-            if (participant) await revokeValidation(selected, participant.participant_ref, fence); else await grantValidation(selected, request, fence);
+            if (participant) await revokeValidation(selected, participant.participant_ref, fence); else await grantValidation(selected, request!, fence);
             fence.beforeSend(); setNotice(participant ? 'Trust revoked. Other consumers remain unaffected.' : 'Exact connection authorized. The project can reconnect using its original request.');
         } catch (reason) { if (!fence.signal?.aborted) { await explain(reason); if (participant && submitted) setNotice('Revocation may have persisted; cleanup is unconfirmed. Review refreshed trust before continuing.'); } }
         finally {
@@ -183,7 +235,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
                 await invalidateValidation(qc);
                 if (!fence.signal?.aborted) { try { await refreshController(selected, fence); setRefreshRequired(false); } catch { setRefreshRequired(true); setError('The operation may have persisted. Refresh successfully before another action.'); } }
             }
-            setPending(false);
+            setPending(false); restoreFocus(trigger, fence);
         }
     };
     const refresh = async () => {
@@ -207,7 +259,7 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
             <label className="field"><span className="field-label">Existing validation target (optional for inspection)</span><input ref={allocationRef} className="input" maxLength={253} disabled={busy} placeholder="existing-target.acme-hub.example" onChange={() => setInspected(null)} /><span className="field-help">Only the public target hostname supplied by its controller. Knowing it does not grant issuance authority.</span></label>
             <div className="dns-shared-actions"><button className="btn" disabled={busy} onClick={inspect}>Inspect plan</button><button className="btn" disabled={busy || plan.loading || !inspected} onClick={() => void refresh()}>Refresh</button></div>
             {plan.loading && inspected && <p className="dim">Checking validation…</p>}{plan.error && <div className="dns-errors" role="alert">{plan.error.message}{r && ' Displaying the last successful check.'}</div>}
-            {r && <><ValidationFacts readiness={r} />{r.connection_request && canManage && <div className="dns-shared-request"><strong>Public connection request</strong><dl>{Object.entries(r.connection_request).map(([key, value]) => <div key={key}><dt>{key}</dt><dd><code>{String(value)}</code></dd></div>)}</dl><button className="btn" disabled={busy || !!plan.error || plan.loading} onClick={() => { const fence = scope(); void (async () => { try { fence.beforeSend(); await navigator.clipboard.writeText(JSON.stringify(r.connection_request)); fence.beforeSend(); toast.success('Public connection request copied'); } catch { setError('Copy was unavailable. Refresh and try again in a supported browser.'); } })(); }}>Copy connection request</button></div>}
+            {r && <><ValidationFacts readiness={r} />{r.connection_request && canManage && <div className="dns-shared-request"><strong>Public connection request</strong><RequestFacts request={r.connection_request} /><p>Send this file to the allocation controller. They open their deployment’s Domains → Shared validation setup → Controller review and import it.</p><div className="dns-shared-actions"><button className="btn" disabled={busy || !!plan.error || plan.loading} onClick={() => void exportRequest('download')}>Download request</button>{typeof navigator.canShare === 'function' && typeof navigator.share === 'function' && <button className="btn" disabled={busy || !!plan.error || plan.loading} onClick={() => void exportRequest('share')}>Share request</button>}<button className="btn" disabled={busy || !!plan.error || plan.loading} onClick={() => void exportRequest('copy')}>Copy request</button></div></div>}
                 {canManage && <div className="dns-shared-actions">
                     {r.capabilities.can_connect && r.next_action.code !== 'grant_trust' && <button className="btn btn-primary" disabled={busy || !!plan.error || plan.loading || refreshRequired} onClick={() => void localAction('connect')}>{r.connection ? 'Connect approved validation' : 'Prepare connection'}</button>}
                     {r.capabilities.can_restart && r.trust.state === 'revoked' && <button className="btn btn-primary" disabled={busy || !!plan.error || plan.loading || refreshRequired} onClick={() => void localAction('restart')}>Prepare fresh request</button>}
@@ -218,13 +270,30 @@ export function SharedValidationDialog({ domain: fixedDomain, close, onBusy }: {
         </> : <>
             <p className="dim">Only the existing allocation’s authorized controller can grant issuance authority. Ordinary DNS management is insufficient.</p>
             <button className="btn" disabled={busy || !canManage} onClick={() => void loadController()}>Check controller access</button>
-            {caps?.shared_validation && caps.can_manage_trust && <><label className="field"><span className="field-label">Public connection request</span><textarea className="input" ref={descriptorRef} rows={5} maxLength={2048} disabled={busy} placeholder="Paste the project’s five-field JSON request" /></label><button className="btn" disabled={busy} onClick={() => void reviewDescriptor()}>Review exact request</button>
-                {descriptor && <p className="dim">Requested domain: <code>{descriptor.domain}</code> · target <code>{descriptor.allocation_ref}</code></p>}
-                {!allocation && allocations?.next_cursor && <button className="btn" disabled={busy} onClick={() => void moreAllocations()}>Find target on next allocation page</button>}
-                {allocation && recipient && <div className="dns-shared-request"><FlatRow label="Recipient">{recipient.label}</FlatRow><FlatRow label="Project UUID"><code>{recipient.consumer_project_uuid}</code></FlatRow><FlatRow label="Exact target"><code>{allocation.target}</code></FlatRow><FlatRow label="Issuance scope"><code>{allocation.domain}, *.{allocation.domain}</code></FlatRow><p>Allow this project to issue certificates for {allocation.domain} and *.{allocation.domain} using this validation target. Each deployment keeps its own certificate and private key.</p><button className="btn btn-primary" disabled={busy || refreshRequired || !participants} onClick={() => void controllerAction()}>Review grant</button></div>}
-                {allocation && participants && <><h3>Selected allocation’s projects</h3>{participants.items.map((p) => <div className="dns-shared-request" key={p.participant_ref}><strong>{p.consumer_label}</strong><code>{p.consumer_project_uuid}</code><span>{p.role} · {p.trust_state}</span><small>Reference: {p.client_ref}</small>{p.role === 'trusted' && <button className="btn" disabled={busy || refreshRequired} onClick={() => void controllerAction(p)}>{p.trust_state === 'revoked' ? 'Review cleanup retry' : 'Review revoke'}</button>}</div>)}{participants.next_cursor && <button className="btn" disabled={busy} onClick={() => { const fence = scope(); setPending(true); void getParticipants(allocation, participants.next_cursor!, fence).then((page) => { fence.beforeSend(); setParticipants(page); }).catch((reason) => explain(reason)).finally(() => setPending(false)); }}>Next project page</button>}<button className="btn" disabled={busy} onClick={() => void refresh()}>Refresh trust</button></>}
+            {caps?.shared_validation && caps.can_manage_trust && <>
+                <label className="field"><span className="field-label">Exact domain</span><input className="input" aria-label="Exact domain" value={controllerDomain} maxLength={253} disabled={busy} placeholder="acme.example" onChange={(e) => { clearControllerSelection(); setDescriptor(null); setControllerDomain(e.target.value); }} /><span className="field-help">Find an existing allocation to maintain its projects. A request file is needed only for a new grant.</span></label>
+                <div className="dns-shared-actions"><button className="btn" disabled={busy || !controllerDomain.trim()} onClick={() => void findAllocations()}>Find allocations</button><label className="field"><span className="field-label">Import request</span><input type="file" accept=".json,application/json" aria-label="Import request" disabled={busy} onChange={(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; void importRequest(file); }} /></label></div>
+                {descriptor && <div className="dns-shared-request"><strong>Imported public request</strong><RequestFacts request={descriptor} /><button className="btn" disabled={busy} onClick={() => setDescriptor(null)}>Clear imported request</button><p className="dim">Importing grants no authority. Find and select this exact existing target before reviewing a grant.</p></div>}
+                {allocations && <fieldset className="dns-shared-allocations"><legend>Existing allocations</legend>{allocations.items.length === 0 && <p>No accessible allocation for this exact domain.</p>}{allocations.items.map((row) => <label className="dns-shared-allocation" key={row.allocation_ref}><input type="radio" name="shared-allocation" disabled={busy || !row.can_manage_trust} checked={allocation?.allocation_ref === row.allocation_ref} onChange={() => { if (descriptor && (descriptor.domain !== row.domain || descriptor.allocation_ref !== row.allocation_ref)) setDescriptor(null); setAllocation(row); setParticipants(null); setRecipient(null); setParticipantCursor(undefined); setRefreshRequired(false); }} /><span><strong>{row.target}</strong><small>Owner project: {row.owner_project_uuid}</small>{!row.can_manage_trust && <small>Trust management unavailable</small>}</span></label>)}<div className="dns-shared-actions">{allocations.next_cursor && <button className="btn" disabled={busy} onClick={() => void findAllocations(allocations.next_cursor!)}>Next allocation page</button>}<button className="btn" disabled={busy} onClick={() => void findAllocations()}>First allocation page</button></div></fieldset>}
+                {allocation && <div className="dns-shared-request"><FlatRow label="Selected domain"><code>{allocation.domain}</code></FlatRow><FlatRow label="Validation source"><code>{allocation.source}</code></FlatRow><FlatRow label="Exact target"><code>{allocation.target}</code></FlatRow><FlatRow label="Issuance scope"><code>{allocation.domain}, *.{allocation.domain}</code></FlatRow></div>}
+                {descriptor && allocation && !requestMatches && <p className="dns-warning">The imported request does not match this selected domain and allocation. A grant is unavailable.</p>}
+                {recipientLoading && <p className="dim">Checking exact grant recipient…</p>}{recipientError && <div className="dns-errors" role="alert">Grant recipient: {recipientError} Existing project maintenance remains available.</div>}
+                {requestMatches && recipient && <div className="dns-shared-request"><FlatRow label="Active recipient">{recipient.label}</FlatRow><FlatRow label="Project UUID"><code>{recipient.consumer_project_uuid}</code></FlatRow><p>Allow this project to issue certificates for {allocation!.domain} and *.{allocation!.domain} using this validation target. Each deployment keeps its own certificate and private key.</p><button className="btn btn-primary" disabled={busy || refreshRequired || !participants || participantLoading || recipientLoading} onClick={() => void controllerAction()}>Review grant</button></div>}
+                {participantLoading && allocation && <p className="dim">Loading selected allocation’s projects…</p>}{participantError && <div className="dns-errors" role="alert">{participantError}</div>}
+                {allocation && participants && <><h3>Selected allocation’s projects</h3>{participants.items.length === 0 && <p>No projects on this page.</p>}{participants.items.map((p) => <div className="dns-shared-request" key={p.participant_ref}><strong>{p.consumer_label}</strong><code>{p.consumer_project_uuid}</code><span>{p.role} · {p.trust_state}</span><small>Reference: {p.client_ref}</small><small>Participant: {p.participant_ref}</small><small>Scope: {p.scope.join(', ')}</small>{p.revoked_at && <small>Revoked: {p.revoked_at}</small>}{p.role === 'trusted' && <button className="btn" disabled={busy || refreshRequired || participantLoading} onClick={() => void controllerAction(p)}>{p.trust_state === 'revoked' ? 'Review cleanup retry' : 'Review revoke'}</button>}</div>)}<div className="dns-shared-actions">{participants.next_cursor && <button className="btn" disabled={busy || participantLoading} onClick={() => setParticipantCursor(participants.next_cursor!)}>Next project page</button>}{participantCursor && <button className="btn" disabled={busy || participantLoading} onClick={() => setParticipantCursor(undefined)}>First project page</button>}</div></>}
+                {allocation && <button className="btn" disabled={busy || participantLoading} onClick={() => void refresh()}>Refresh trust</button>}
             </>}
         </>}
         <div className="modal-actions"><button className="btn" disabled={busy} onClick={close}>{busy ? 'Operation pending…' : 'Close'}</button></div>
     </div>;
+}
+
+function restoreFocus(trigger: HTMLElement | null, fence: { beforeSend: () => void }) {
+    // Native dialog restoration happens while this single-flight trigger is still
+    // disabled. Restore after React enables it, only if the same scope survives.
+    setTimeout(() => { try { fence.beforeSend(); if (trigger?.isConnected) trigger.focus(); } catch { /* Scope no longer owns this focus. */ } }, 0);
+}
+
+function RequestFacts({ request }: { request: ConnectionRequest }) {
+    return <dl>{[['Request version', request.version], ['Project UUID', request.consumer_project_uuid], ['Client reference', request.client_ref], ['Domain', request.domain], ['Validation target', request.allocation_ref], ['Issuance scope', `${request.domain}, *.${request.domain}`]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd><code>{value}</code></dd></div>)}</dl>;
 }
