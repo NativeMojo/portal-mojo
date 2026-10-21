@@ -20,6 +20,7 @@ const ok = (data: unknown) => ({ status: true, data });
 const fail = (error: string, error_code = 400) => ({ status: false, error, error_code });
 export function fleetMock(path: string, method: string, body: Record<string, unknown> | undefined, superuser: boolean): unknown {
     if (!superuser) return fail('Superuser required', 403);
+    if (path === `${endpoint}/shared-validation/hub`) return hubMock(method, body);
     if (path === `${endpoint}/shared-validation`) return connectionMock(method, body);
     if (method === 'GET' && path === endpoint) {
         const state: FleetState = { schema_version: 1, revision, version_id: versions[0].version_id, entries: entries.map(entry => ({ ...entry,
@@ -67,22 +68,39 @@ export function fleetMock(path: string, method: string, body: Record<string, unk
     return ok({ published: true, revision, version_id: versions[0].version_id, pending_restart: true, applied: false });
 }
 
-export const mockConnectionScenarios = ['ready', 'old-api', 'unavailable', 'dnsman-absent', 'empty-catalog', 'sharing-disabled', 'identity-mismatch', 'busy', 'catalog-conflict', 'revision-conflict', 'publication-uncertain', 'offline', 'draining', 'stale-proof', 'malformed', 'recipient-denied', 'recipient-renamed', 'issue-uncertain', 'reauth', 'disable-ineligible'] as const;
+export const mockConnectionScenarios = ['ready', 'old-api', 'unavailable', 'dnsman-absent', 'empty-catalog', 'sharing-disabled', 'identity-mismatch', 'busy', 'catalog-conflict', 'revision-conflict', 'publication-uncertain', 'offline', 'draining', 'stale-proof', 'malformed', 'recipient-denied', 'recipient-renamed', 'issue-uncertain', 'reauth', 'disable-ineligible', 'hub-ready', 'hub-unconfigured', 'hub-no-deployment', 'hub-upgrade-required', 'hub-incomplete', 'hub-conflict', 'hub-reauth', 'hub-uncertain'] as const;
 export type MockConnectionScenario = typeof mockConnectionScenarios[number];
 let scenario: MockConnectionScenario = 'ready', faultUsed = false, connectionPublished = false, connectionApplied = false, applyReads = 0;
 let profile = { id: 'approved_hub', label: 'Approved existing validation hub', origin: 'https://hub.example', consumer_project_uuid: '1'.repeat(32), consumer_label: 'Original recipient' };
 let catalogRevision = 'a'.repeat(64), credential = 'mock_protected_consumer', disabled = false;
+let hubEnabled = true;
+const hubDeployment = '99999999-9999-4999-8999-999999999999';
 const keyIdentities = new Map<string, string>();
 export function setMockConnectionScenario(value: MockConnectionScenario) {
     if (!mockConnectionScenarios.includes(value)) throw new Error('Unknown mock connection scenario');
     scenario = value; faultUsed = false; connectionPublished = false; connectionApplied = false; applyReads = 0; disabled = false; credential = 'mock_protected_consumer'; catalogRevision = 'a'.repeat(64); operation = null;
+    hubEnabled = value !== 'sharing-disabled' && value !== 'empty-catalog' && !value.startsWith('hub-');
 }
 export const getMockConnectionScenario = () => scenario;
 export function configureMockHubRecipient(consumer_project_uuid: string, consumer_label: string) { profile = { ...profile, consumer_project_uuid, consumer_label }; }
 export function registerMockConsumerKey(secret: string, consumer: string) { keyIdentities.set(secret, consumer); }
 export const consumeMockConnectionFault = (value: MockConnectionScenario) => { if (scenario !== value || faultUsed) return false; faultUsed = true; return true; };
 export const connectionFail = (code: string, status: number) => ({ status: false, code: status, error_code: code, error: code });
-const observed = (includeProfile = true) => ({ state: disabled ? 'disabled' : 'verified', ...(includeProfile ? { profile_id: disabled ? null : profile.id } : {}), observed_project_uuid: disabled ? null : profile.consumer_project_uuid, checked_at: new Date().toISOString(), error_code: null, sharing_ready: !disabled && scenario !== 'sharing-disabled' });
+const observed = (includeProfile = true) => ({ state: disabled ? 'disabled' : 'verified', ...(includeProfile ? { profile_id: disabled ? null : profile.id } : {}), observed_project_uuid: disabled ? null : profile.consumer_project_uuid, checked_at: new Date().toISOString(), error_code: null, sharing_ready: !disabled && hubEnabled });
+function hubMock(method: string, body?: Record<string, unknown>) {
+    if (scenario === 'old-api') return connectionFail('not_found', 404);
+    const configured = scenario !== 'hub-unconfigured';
+    const reason = !configured ? 'hub_unconfigured' : scenario === 'hub-no-deployment' ? 'deployment_required' : scenario === 'hub-upgrade-required' ? 'framework_upgrade_required' : scenario === 'hub-incomplete' ? 'deployment_proof_unavailable' : null;
+    if (method === 'POST') {
+        if (!body || Object.keys(body).length !== 1 || typeof body.deployment_uuid !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(body.deployment_uuid)) return connectionFail('invalid_request', 400);
+        if (consumeMockConnectionFault('hub-reauth')) return connectionFail('fresh_auth_required', 440);
+        if (body.deployment_uuid !== hubDeployment || consumeMockConnectionFault('hub-conflict')) return connectionFail('deployment_changed', 409);
+        if (reason) return connectionFail(reason, 409);
+        hubEnabled = true;
+        if (consumeMockConnectionFault('hub-uncertain')) return connectionFail('hub_unavailable', 503);
+    } else if (method !== 'GET') return connectionFail('not_found', 404);
+    return ok({ version: 1, enabled: hubEnabled, configured, deployment_uuid: scenario === 'hub-no-deployment' ? null : hubDeployment, can_enable: !hubEnabled && !reason, reason: hubEnabled ? null : reason });
+}
 function connectionNodes(healthy: boolean) {
     return nodes(revision, healthy).map((n, index) => ({ ...n, ...(scenario === 'offline' && index === 1 ? { installed: false, restarted: false, healthy: false, status: 'unknown', error_code: 'node_did_not_reply' } : {}), ...(scenario === 'draining' ? { healthy: false, status: 'draining', error_code: 'engine_draining' } : {}), shared_validation: n.installed ? { ...observed(), ...(scenario === 'stale-proof' ? { observed_project_uuid: '0'.repeat(32) } : {}) } : null }));
 }
