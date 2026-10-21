@@ -126,7 +126,7 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
 }
 
 const hubMessages: Record<NonNullable<HubStatus['reason']>, string> = {
-    hub_unconfigured: 'This deployment is not configured as a validation hub. Use System Setup to configure hub DNS settings.',
+    hub_unconfigured: 'This deployment is not a validation hub. Configure its connection below; enable sharing on the approved hub.',
     hub_unavailable: 'Hub status is unavailable. Refresh to try again.',
     deployment_required: 'Deploy the compatible framework to every expected node first.',
     deployment_in_progress: 'Wait for the current deployment to finish, then refresh.',
