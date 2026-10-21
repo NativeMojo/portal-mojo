@@ -20,14 +20,14 @@ const DEMO_GROUP: CredentialGroup = {
 export function AdminCredentialsDemo() {
     const [crossGroup, setCrossGroup] = useState(false);
     const [persona, setPersona] = useState('dns.platform@nativemojo.com'), [ready, setReady] = useState(false); const qc = useQueryClient();
-    useEffect(() => { let active = true; setReady(false); setMockConnectionScenario('ready'); void login(persona, 'mojo').then(async () => { await qc.invalidateQueries(); if (active) setReady(true); }); return () => { active = false; }; }, [persona, qc]);
+    useEffect(() => { let active = true; setReady(false); setMockConnectionScenario(persona === 'dns.platform@nativemojo.com' ? 'legacy-project-identity' : 'ready'); void login(persona, 'mojo').then(async () => { await qc.invalidateQueries(); if (active) setReady(true); }); return () => { active = false; }; }, [persona, qc]);
     useEffect(() => () => { setMockConnectionScenario('ready'); void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
     const openKey = (id: number) => {
         void modal.detail((close) => <GroupApiKeyDetail id={id} onClose={() => close(null)} />);
     };
     return (
         <div className="dns-shared-showcase" style={{ display: 'grid', gap: 18 }}>
-            <label className="field"><span className="field-label">Credential identity</span><select className="input" value={persona} onChange={e => setPersona(e.target.value)}><option value="dns.platform@nativemojo.com">Deployment operator</option><option value="showcase.operator@nativemojo.com">Ordinary credential manager</option></select></label>
+            <label className="field"><span className="field-label">Credential identity</span><select className="input" value={persona} onChange={e => setPersona(e.target.value)}><option value="dns.platform@nativemojo.com">Deployment operator · legacy project fixture</option><option value="showcase.operator@nativemojo.com">Ordinary credential manager</option></select></label>
             <label><input type="checkbox" checked={crossGroup} onChange={e => setCrossGroup(e.target.checked)} />Cross-Group key inventory</label>
             <div className="panel">
                 <div className="panel-head">

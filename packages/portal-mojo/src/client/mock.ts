@@ -5435,8 +5435,12 @@ const GROUP_DISABLE_REASONS = new Set(['abuse', 'admin', 'archived']);
 // here because it is a graph EXTRA, not a column (uuid IS savable live).
 const GROUP_NO_SAVE = new Set(['id', 'pk', 'created', 'member_count']);
 
+// A controlled legacy wire fixture; the stored Group identity is never rewritten.
+function acmeProjectIdentity(group: MockGroup) {
+    return getMockConnectionScenario() === 'legacy-project-identity' && group.id === 1 ? '74a3c6699bed4ddf' : group.uuid;
+}
 function serializeGroup(g: MockGroup): Record<string, unknown> {
-    return { ...g };
+    return { ...g, uuid: acmeProjectIdentity(g) };
 }
 
 function saveGroup(group: MockGroup, body: Record<string, unknown>): unknown {
@@ -10811,24 +10815,24 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         if (caller.is_superuser !== true) return permissionDenied();
         const input = method === 'GET' ? opts.params ?? {} : opts.body ?? {};
         if (method === 'GET' ? Object.keys(input).some((k) => k !== 'consumer_project_uuid') : method !== 'POST' || Object.keys(input).sort().join(',') !== 'consumer_project_uuid,expected_consumer_label,label,purpose' || input.purpose !== 'acme_validation_consumer') return connectionFail('invalid_request', 400);
-        const group = db.groups.find((g) => g.uuid === input.consumer_project_uuid && isEffectivelyActive(g));
+        const group = db.groups.find((g) => acmeProjectIdentity(g) === input.consumer_project_uuid && isEffectivelyActive(g));
         if (!group) return connectionFail('recipient_unavailable', 404);
         const scenario = getMockConnectionScenario();
-        if (method === 'GET') return { status: true, data: { purpose: 'acme_validation_consumer', consumer_project_uuid: group.uuid, consumer_label: group.name, permission: 'dnsman_acme_federation', can_issue: scenario !== 'recipient-denied', grant_explanation: 'Protected platform grant required; issuance does not grant allocation trust.' } };
+        if (method === 'GET') return { status: true, data: { purpose: 'acme_validation_consumer', consumer_project_uuid: acmeProjectIdentity(group), consumer_label: group.name, permission: 'dnsman_acme_federation', can_issue: scenario !== 'recipient-denied', grant_explanation: 'Protected platform grant required; issuance does not grant allocation trust.' } };
         if (consumeMockConnectionFault('reauth')) return connectionFail('fresh_auth_required', 440);
         if (scenario === 'recipient-denied') return permissionDenied();
         if (scenario === 'recipient-renamed' || input.expected_consumer_label !== group.name) return connectionFail('recipient_changed', 409);
         if (typeof input.label !== 'string' || !input.label.trim() || input.label.length > 200 || /[\x00-\x1f]/.test(input.label)) return connectionFail('invalid_request', 400);
         const id = Math.max(0, ...db.groupApiKeys.map((k) => k.id)) + 1, now = Math.floor(Date.now() / 1000), secret = `mock_acme_${mockHex32(mulberry32(id))}`;
         const row: MockGroupApiKey = { id, group: group.id, user: null, created: now, modified: now, name: input.label.trim(), is_active: true, permissions: { dnsman_acme_federation: true }, limits: {}, last_used: null, expires_at: null, metadata: {}, override_user: false, token: secret };
-        db.groupApiKeys.unshift(row); registerMockConsumerKey(secret, group.uuid!);
+        db.groupApiKeys.unshift(row); registerMockConsumerKey(secret, acmeProjectIdentity(group)!);
         if (consumeMockConnectionFault('issue-uncertain')) return connectionFail('publication_uncertain', 503);
-        return { status: true, data: { purpose: 'acme_validation_consumer', consumer_project_uuid: group.uuid, consumer_label: group.name, api_key: { id, name: row.name, is_active: true, permission: 'dnsman_acme_federation' }, token: secret } };
+        return { status: true, data: { purpose: 'acme_validation_consumer', consumer_project_uuid: acmeProjectIdentity(group), consumer_label: group.name, api_key: { id, name: row.name, is_active: true, permission: 'dnsman_acme_federation' }, token: secret } };
     }
     if (path === '/api/account/admin/fleet' || path.startsWith('/api/account/admin/fleet/')) {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
-        const original = db.groups.find((group) => group.id === 1); if (original?.uuid) configureMockHubRecipient(original.uuid, original.name);
+        const original = db.groups.find((group) => group.id === 1); if (original?.uuid) configureMockHubRecipient(acmeProjectIdentity(original)!, original.name);
         return fleetMock(path, method, opts.body, caller.is_superuser === true);
     }
     // ── Settings — plaintext stays private; secrets serialize masked ─────
@@ -12002,7 +12006,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             db.groups.push(group);
             return { status: true, data: serializeGroup(group), graph: 'default' };
         }
-        return listRows(visibleGroups as unknown as Record<string, unknown>[], opts.params ?? {}, (g) => String(g.name), 'name');
+        return listRows(visibleGroups.map(serializeGroup), opts.params ?? {}, (g) => String(g.name), 'name');
     }
     // User API keys — /api/account/api_keys (account/rest/user_api_key.py).
     // No DELETE (CAN_DELETE defaults false); the kill switch is the `revoke`

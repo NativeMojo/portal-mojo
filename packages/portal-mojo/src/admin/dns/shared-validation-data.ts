@@ -40,6 +40,8 @@ export function hostname(value: unknown): string {
 }
 export function normalizeHostname(value: string): string { return hostname(value.trim().toLowerCase().replace(/\.+$/, '')); }
 export function uuid(value: unknown): string { const v = text(value, 36); return /^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/.test(v) ? v : invalid(); }
+/** Group project identities may retain the existing 16-character format. */
+export function projectIdentity(value: unknown): string { return typeof value === 'string' && /^[a-f0-9]{16}$/.test(value) ? value : uuid(value); }
 const date = (v: unknown) => { const s = text(v, 40); return Number.isFinite(Date.parse(s)) ? s : invalid(); };
 const token = (v: unknown) => { const s = text(v, 64); return /^[a-z0-9_.-]+$/.test(s) ? s : invalid(); };
 function scope(v: unknown, domain: string): string[] { if (!Array.isArray(v) || v.length !== 2 || v[0] !== domain || v[1] !== `*.${domain}`) invalid(); return [domain, `*.${domain}`]; }
@@ -47,7 +49,7 @@ function names(v: unknown): string[] { if (!Array.isArray(v) || v.length < 1 || 
 export function parseConnectionRequest(value: unknown): ConnectionRequest {
     const r = record(value);
     if (Object.keys(r).sort().join(',') !== 'allocation_ref,client_ref,consumer_project_uuid,domain,version' || r.version !== 1) invalid();
-    return { version: 1, consumer_project_uuid: uuid(r.consumer_project_uuid), client_ref: uuid(r.client_ref), domain: hostname(r.domain), allocation_ref: hostname(r.allocation_ref) };
+    return { version: 1, consumer_project_uuid: projectIdentity(r.consumer_project_uuid), client_ref: uuid(r.client_ref), domain: hostname(r.domain), allocation_ref: hostname(r.allocation_ref) };
 }
 export const CONNECTION_REQUEST_MAX_BYTES = 2048;
 export function parseConnectionRequestText(value: string): ConnectionRequest {
@@ -68,7 +70,7 @@ export function parseReadiness(value: unknown, target?: SetupTarget, allocation?
     const result: Readiness = {
         version: 1, checked_at: date(r.checked_at), domain,
         profile: { name: choice(p.name, ['apex_wildcard']), names: scope(p.names, domain.name) },
-        hub: { state: choice(h.state, ['unconfigured', 'misconfigured', 'unavailable', 'unauthorized', 'unsupported', 'ready']), protocol_version: nullable(h.protocol_version, positive), consumer_project_uuid: nullable(h.consumer_project_uuid, uuid) },
+        hub: { state: choice(h.state, ['unconfigured', 'misconfigured', 'unavailable', 'unauthorized', 'unsupported', 'ready']), protocol_version: nullable(h.protocol_version, positive), consumer_project_uuid: nullable(h.consumer_project_uuid, projectIdentity) },
         connection, trust: { state: choice(t.state, ['unknown', 'not_requested', 'missing', 'active', 'revoked', 'identity_changed']), can_publish: bool(t.can_publish), can_withdraw: bool(t.can_withdraw) },
         alias: { state: choice(a.state, ['unknown', 'match', 'mismatch', 'lookup_failed']), source: text(a.source, 270), target: nullable(a.target, hostname), observed_target: nullable(a.observed_target, hostname), one_hop: nullable(a.one_hop, bool), checked_at: nullable(a.checked_at, date) },
         certificate: r.certificate === null ? null : (() => { const v = record(r.certificate); return { id: positive(v.id), state: choice(v.state, ['pending', 'issuing', 'active', 'failed', 'revoked', 'expired', 'unknown']), names: names(v.names), not_after: nullable(v.not_after, date), renew_after: nullable(v.renew_after, date), serving_valid: nullable(v.serving_valid, bool), material_state: choice(v.material_state, ['available', 'missing', 'unavailable']) }; })(),
@@ -89,16 +91,16 @@ export function parseReadiness(value: unknown, target?: SetupTarget, allocation?
 }
 export function parseHubCapabilities(value: unknown): HubCapabilities {
     const r = record(value); if (r.version !== 2) throw new SharedValidationError('unsupported');
-    return { version: 2, shared_validation: bool(r.shared_validation), consumer_project_uuid: nullable(r.consumer_project_uuid, uuid), can_consume: bool(r.can_consume), can_manage_trust: bool(r.can_manage_trust), trust_scope: choice(r.trust_scope, ['apex_and_wildcard']) };
+    return { version: 2, shared_validation: bool(r.shared_validation), consumer_project_uuid: nullable(r.consumer_project_uuid, projectIdentity), can_consume: bool(r.can_consume), can_manage_trust: bool(r.can_manage_trust), trust_scope: choice(r.trust_scope, ['apex_and_wildcard']) };
 }
 export function parseAllocation(value: unknown, domain: string): Allocation {
-    const r = record(value); const out = { allocation_ref: hostname(r.allocation_ref), domain: hostname(r.domain), source: text(r.source, 270), target: hostname(r.target), owner_project_uuid: uuid(r.owner_project_uuid), can_manage_trust: bool(r.can_manage_trust) };
+    const r = record(value); const out = { allocation_ref: hostname(r.allocation_ref), domain: hostname(r.domain), source: text(r.source, 270), target: hostname(r.target), owner_project_uuid: projectIdentity(r.owner_project_uuid), can_manage_trust: bool(r.can_manage_trust) };
     if (out.domain !== domain || out.source !== `_acme-challenge.${domain}` || out.target !== out.allocation_ref) invalid(); return out;
 }
 export function parseParticipant(value: unknown, allocation: Allocation): Participant {
-    const r = record(value); const base = parseAllocation({ ...r, owner_project_uuid: allocation.owner_project_uuid, can_manage_trust: allocation.can_manage_trust }, allocation.domain); const out: Participant = { allocation_ref: base.allocation_ref, domain: base.domain, source: base.source, target: base.target, participant_ref: uuid(r.participant_ref), client_ref: uuid(r.client_ref), role: choice(r.role, ['owner', 'trusted']), trust_state: choice(r.trust_state, ['active', 'revoked']), scope: scope(r.scope, allocation.domain), can_publish: bool(r.can_publish), can_withdraw: bool(r.can_withdraw), revoked_at: nullable(r.revoked_at, date), consumer_project_uuid: uuid(r.consumer_project_uuid), consumer_label: text(r.consumer_label) };
+    const r = record(value); const base = parseAllocation({ ...r, owner_project_uuid: allocation.owner_project_uuid, can_manage_trust: allocation.can_manage_trust }, allocation.domain); const out: Participant = { allocation_ref: base.allocation_ref, domain: base.domain, source: base.source, target: base.target, participant_ref: uuid(r.participant_ref), client_ref: uuid(r.client_ref), role: choice(r.role, ['owner', 'trusted']), trust_state: choice(r.trust_state, ['active', 'revoked']), scope: scope(r.scope, allocation.domain), can_publish: bool(r.can_publish), can_withdraw: bool(r.can_withdraw), revoked_at: nullable(r.revoked_at, date), consumer_project_uuid: projectIdentity(r.consumer_project_uuid), consumer_label: text(r.consumer_label) };
     if (out.allocation_ref !== allocation.allocation_ref || (out.trust_state === 'revoked') !== (out.revoked_at !== null)) invalid(); return out;
 }
 export function parsePage<T>(value: unknown, parse: (v: unknown) => T): Page<T> { const r = record(value); if (!Array.isArray(r.items) || r.items.length > 20) invalid(); return { items: (r.items as unknown[]).map(parse), next_cursor: nullable(r.next_cursor, (v) => { const s = text(v, 20); return /^[1-9]\d*$/.test(s) ? s : invalid(); }) }; }
-export function parseRecipient(value: unknown, expected: string): Recipient { const r = record(value); const out = { consumer_project_uuid: uuid(r.consumer_project_uuid), label: text(r.label), active: bool(r.active) }; if (out.consumer_project_uuid !== expected || !out.active) invalid(); return out; }
+export function parseRecipient(value: unknown, expected: string): Recipient { const r = record(value); const out = { consumer_project_uuid: projectIdentity(r.consumer_project_uuid), label: text(r.label), active: bool(r.active) }; if (out.consumer_project_uuid !== expected || !out.active) invalid(); return out; }
 export const pendingReadiness = (r: Readiness) => ['queued', 'issuing'].includes(r.renewal.state) || ['pending', 'issuing'].includes(r.certificate?.state ?? '');

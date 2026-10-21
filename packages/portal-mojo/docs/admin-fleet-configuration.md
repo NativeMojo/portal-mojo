@@ -81,6 +81,12 @@ original project UUID, then Keep, Replace or Disable the connection. Replacement
 is a normal write-only password field; blank preserves the existing credential.
 The approved catalog fixes the origin. Arbitrary URLs and raw JSON are not inputs.
 
+Project identity fields also accept existing lowercase16hex Group IDs, preserving
+the exact value through profiles, observations and protected key issuance. Fleet
+revisions/operation IDs remain32hex and deployment IDs remain canonical UUIDs.
+The legacy identity showcase fixture changes wire data only; no Group identity
+is migrated or rewritten.
+
 Preview probes the candidate without saving it. Publication has a separate
 confirmation, frozen against the preview and auth session. Publishing revalidates
 the catalog and expected revision; it does not Apply. Apply has another

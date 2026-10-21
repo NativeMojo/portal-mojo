@@ -267,6 +267,12 @@ its default mock identity and scenario. `verify:admin-dns-shared-validation`
 runs API/projection and React StrictMode mounted contracts. Real browser proof
 remains required for focus, native-dialog stacking, clipboard and both themes.
 
+Owner and consumer project identities preserve existing lowercase16hex Group
+IDs as well as the previously supported32hex and canonical UUID forms. They
+are compared exactly and never padded, regenerated or rewritten. Client and
+participant references retain their strict UUID validation; a short project ID
+cannot stand in for either reference.
+
 
 Shared setup prerequisites now link literal deployment operators to the actual
 mount-aware Fleet shared-validation connection topic. It owns named approved

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { requestFreshAuth } from '../../client/runtime';
 import { CollectionSelect, FlatRow, modal } from '../../ui';
 import { SecretBox } from './secret-dialog';
-import { OperatorError, usePrivateOperator, uuid } from '../fleet-configuration/shared-validation-data';
+import { OperatorError, usePrivateOperator, projectIdentity } from '../fleet-configuration/shared-validation-data';
 import { issueAcmeKey, projectKeyGroup, readAcmeRecipient, readKeyGroup, readRecipientKeyInventory, revealRecipientKey, type AcmeRecipient, type KeyGroup, type KeySummary } from './acme-consumer-key';
 import { GroupApiKeyModel, type CredentialGroup } from './models';
 
@@ -43,7 +43,7 @@ export function AcmeConsumerKeyDialog({ group: fixedGroup, close, onBusy }: { gr
         try {
             const current = await readKeyGroup(id, fence); fence.beforeSend();
             if (selected.current !== id || generation.current !== run) return;
-            if (!current.uuid) throw new OperatorError('invalid'); uuid(current.uuid);
+            if (!current.uuid) throw new OperatorError('invalid'); projectIdentity(current.uuid);
             const [person, keys] = await Promise.all([readAcmeRecipient(current.uuid, fence), readRecipientKeyInventory(id, fence)]); fence.beforeSend();
             if (selected.current !== id || generation.current !== run) return;
             recipientOwner.current = owner.key; setGroup(current); setRecipient(person); setInventory(keys); setBlocked(false);

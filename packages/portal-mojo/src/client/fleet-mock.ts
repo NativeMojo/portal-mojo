@@ -68,7 +68,7 @@ export function fleetMock(path: string, method: string, body: Record<string, unk
     return ok({ published: true, revision, version_id: versions[0].version_id, pending_restart: true, applied: false });
 }
 
-export const mockConnectionScenarios = ['ready', 'old-api', 'unavailable', 'dnsman-absent', 'empty-catalog', 'sharing-disabled', 'identity-mismatch', 'busy', 'catalog-conflict', 'revision-conflict', 'publication-uncertain', 'offline', 'draining', 'stale-proof', 'malformed', 'recipient-denied', 'recipient-renamed', 'issue-uncertain', 'reauth', 'disable-ineligible', 'hub-ready', 'hub-unconfigured', 'hub-no-deployment', 'hub-upgrade-required', 'hub-incomplete', 'hub-conflict', 'hub-reauth', 'hub-uncertain'] as const;
+export const mockConnectionScenarios = ['ready', 'old-api', 'unavailable', 'dnsman-absent', 'empty-catalog', 'sharing-disabled', 'identity-mismatch', 'busy', 'catalog-conflict', 'revision-conflict', 'publication-uncertain', 'offline', 'draining', 'stale-proof', 'malformed', 'recipient-denied', 'recipient-renamed', 'issue-uncertain', 'reauth', 'disable-ineligible', 'hub-ready', 'hub-unconfigured', 'hub-no-deployment', 'hub-upgrade-required', 'hub-incomplete', 'hub-conflict', 'hub-reauth', 'hub-uncertain', 'legacy-project-identity'] as const;
 export type MockConnectionScenario = typeof mockConnectionScenarios[number];
 let scenario: MockConnectionScenario = 'ready', faultUsed = false, connectionPublished = false, connectionApplied = false, applyReads = 0;
 let profile = { id: 'approved_hub', label: 'Approved existing validation hub', origin: 'https://hub.example', consumer_project_uuid: '1'.repeat(32), consumer_label: 'Original recipient' };

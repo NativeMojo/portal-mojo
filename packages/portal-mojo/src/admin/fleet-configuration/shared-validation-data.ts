@@ -20,6 +20,8 @@ export const flag = (v: unknown): boolean => typeof v === 'boolean' ? v : invali
 export const nullable = <T>(v: unknown, parse: (x: unknown) => T): T | null => v === null ? null : parse(v);
 export const choice = <T extends string>(v: unknown, values: readonly T[]): T => values.includes(v as T) ? v as T : invalid();
 export const uuid = (v: unknown): string => typeof v === 'string' && /^[a-f0-9]{32}$/.test(v) ? v : invalid();
+/** Only project identities accept legacy Group IDs; revision/operation UUIDs stay strict. */
+export const projectIdentity = (v: unknown): string => typeof v === 'string' && /^[a-f0-9]{16}$/.test(v) ? v : uuid(v);
 const profileId = (v: unknown): string => typeof v === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(v) ? v : invalid();
 export const token = (v: unknown): string => typeof v === 'string' && /^[a-z0-9_.-]{1,80}$/.test(v) ? v : invalid();
 const catalog = (v: unknown): string => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v) ? v : invalid();
@@ -40,9 +42,9 @@ export interface ConnectionOperation extends ConnectionReport { operation_id: st
 /** Private observation stops on terminal operation or failed dispatch, never completed dispatch alone. */
 export const connectionOperationFinished = (operation: ConnectionOperation) => ['healthy', 'failed', 'expired', 'canceled', 'superseded', 'timed_out'].includes(operation.status) || ['failed', 'expired', 'canceled'].includes(operation.job_status ?? '');
 export interface SafeHistory { versions: { version_id: string; current: boolean; published_at: string | null }[]; truncated: boolean }
-const identity = (v: unknown): Identity => { const r = object(v); return { consumer_project_uuid: uuid(r.consumer_project_uuid), consumer_label: label(r.consumer_label) }; };
+const identity = (v: unknown): Identity => { const r = object(v); return { consumer_project_uuid: projectIdentity(r.consumer_project_uuid), consumer_label: label(r.consumer_label) }; };
 export function parseObservation(v: unknown): Observation {
-    const r = object(v); const out: Observation = { state: choice(r.state, ['disabled', 'verified', 'unavailable']), profile_id: r.profile_id == null ? null : profileId(r.profile_id), observed_project_uuid: nullable(r.observed_project_uuid, uuid), checked_at: r.checked_at == null ? null : timestamp(r.checked_at), error_code: r.error_code == null ? null : token(r.error_code), sharing_ready: flag(r.sharing_ready) };
+    const r = object(v); const out: Observation = { state: choice(r.state, ['disabled', 'verified', 'unavailable']), profile_id: r.profile_id == null ? null : profileId(r.profile_id), observed_project_uuid: nullable(r.observed_project_uuid, projectIdentity), checked_at: r.checked_at == null ? null : timestamp(r.checked_at), error_code: r.error_code == null ? null : token(r.error_code), sharing_ready: flag(r.sharing_ready) };
     if (out.state === 'verified' && (!out.observed_project_uuid || !out.checked_at || out.error_code) || out.state === 'disabled' && (out.observed_project_uuid || out.sharing_ready)) invalid();
     return out;
 }
