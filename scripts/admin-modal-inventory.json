@@ -4019,20 +4019,6 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:confirmDeactivateKey:import:0",
-      "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
-      "owner": "confirmDeactivateKey",
-      "launcher": "import",
-      "body": [],
-      "category": "dependency",
-      "parent": "confirmDeactivateKey",
-      "target": null,
-      "fingerprint": "dbec374e3fd21deb87f8",
-      "categories": [
-        "dependency"
-      ]
-    },
-    {
       "id": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx:createKey:modal.open:0",
       "file": "packages/portal-mojo/src/admin/credentials/group-api-keys.tsx",
       "owner": "createKey",
@@ -5066,6 +5052,82 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "run",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "code",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "run",
+      "target": null,
+      "fingerprint": "ec9b29b62c56fcec7201",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "ConnectionContent",
+      "launcher": "run",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ConnectionContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
+      "fingerprint": "c2c86e23517855915252",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:1",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "ConnectionContent",
+      "launcher": "run",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ConnectionContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
+      "fingerprint": "8cd18e4516df84f2f7e0",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:2",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "ConnectionContent",
+      "launcher": "run",
+      "body": [],
+      "category": "confirmation",
+      "parent": "ConnectionContent",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
+      "fingerprint": "0aa81526708f0180f808",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:<module>:import:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "881658725262562f55fe",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:publish:modal.confirm:0",
       "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
       "owner": "publish",
@@ -5147,68 +5209,6 @@
       "parent": "onPublish",
       "target": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:publish",
       "fingerprint": "af0f7d975c46f3edceb8",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
-      "owner": "run",
-      "launcher": "modal.open",
-      "body": [
-        "div",
-        "h2",
-        "p",
-        "code",
-        "button"
-      ],
-      "category": "confirmation",
-      "parent": "run",
-      "target": null,
-      "fingerprint": "ec9b29b62c56fcec7201",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:0",
-      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
-      "owner": "ConnectionContent",
-      "launcher": "run",
-      "body": [],
-      "category": "confirmation",
-      "parent": "ConnectionContent",
-      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
-      "fingerprint": "c2c86e23517855915252",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:1",
-      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
-      "owner": "ConnectionContent",
-      "launcher": "run",
-      "body": [],
-      "category": "confirmation",
-      "parent": "ConnectionContent",
-      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
-      "fingerprint": "8cd18e4516df84f2f7e0",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:ConnectionContent:run:2",
-      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
-      "owner": "ConnectionContent",
-      "launcher": "run",
-      "body": [],
-      "category": "confirmation",
-      "parent": "ConnectionContent",
-      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:run",
-      "fingerprint": "0aa81526708f0180f808",
       "categories": [
         "confirmation"
       ]
@@ -5754,13 +5754,13 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:1",
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:loadFleetConfiguration:import:0",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
-      "owner": "<module>",
+      "owner": "loadFleetConfiguration",
       "launcher": "import",
       "body": [],
       "category": "dependency",
-      "parent": "<module>",
+      "parent": "loadFleetConfiguration",
       "target": null,
       "fingerprint": "26947e6af1eff9ecbe86",
       "categories": [
@@ -5768,21 +5768,7 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:2",
-      "file": "packages/portal-mojo/src/admin/domains/operations.ts",
-      "owner": "<module>",
-      "launcher": "import",
-      "body": [],
-      "category": "dependency",
-      "parent": "<module>",
-      "target": null,
-      "fingerprint": "f4edeae9af5b9108b2b6",
-      "categories": [
-        "dependency"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:3",
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:1",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",
@@ -5796,7 +5782,7 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:4",
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:2",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",
@@ -5810,7 +5796,7 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:5",
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:3",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",
@@ -5824,7 +5810,7 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:6",
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:4",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
       "launcher": "import",

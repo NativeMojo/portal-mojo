@@ -5,8 +5,7 @@ import { getAuthSessionRevision, getAuthSnapshot, mojoCall, MojoError, useAuthSn
 import { FLEET_ENDPOINT, FLEET_HEALTH_SCOPE } from './data';
 
 export const CONNECTION_ENDPOINT = `${FLEET_ENDPOINT}/shared-validation`;
-export const MANAGED_CONNECTION_KEYS = ['DNSMAN_ACME_HUB_PROFILE_ID', 'DNSMAN_ACME_HUB_URL', 'DNSMAN_ACME_HUB_API_KEY'] as const;
-export const isManagedConnectionKey = (key: string) => (MANAGED_CONNECTION_KEYS as readonly string[]).includes(key);
+export { MANAGED_CONNECTION_KEYS, isManagedConnectionKey } from './data';
 export interface PrivateScope { signal?: AbortSignal; beforeSend?: () => void }
 export class OperatorError extends Error {
     constructor(public kind: 'invalid' | 'recipient' | 'unsupported' | 'denied' | 'fresh' | 'conflict' | 'busy' | 'unavailable' | 'uncertain', public code: string | null = null) {

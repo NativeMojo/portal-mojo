@@ -1,14 +1,14 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useMe } from '../../client/runtime';
 import { modal } from '../../ui';
 import {
-    FLEET_ENDPOINT, FLEET_HEALTH_SCOPE, displayFleetValue, fleetChange, fleetIsHealthy, operationFinished,
+    FLEET_ENDPOINT, FLEET_HEALTH_SCOPE, isManagedConnectionKey, displayFleetValue, fleetChange, fleetIsHealthy, operationFinished,
     readFleet, readFleetHistory, readFleetOperation, writeFleet,
     type FleetChanges, type FleetEntry, type FleetOperation, type FleetPublication, type FleetReport, type FleetState,
 } from './data';
-import { isManagedConnectionKey } from './shared-validation-data';
+const ConnectionPage = lazy(() => import('./SharedValidationConnectionPanel').then(({ SharedValidationConnectionPage }) => ({ default: SharedValidationConnectionPage })));
 
 function SettingInput({ entry, disabled }: { entry: FleetEntry; disabled: boolean }) {
     const [mode, setMode] = useState('keep');
@@ -168,8 +168,10 @@ function FleetContent({ userId }: { userId: number }) {
 }
 
 export function FleetConfigurationPage() {
+    const location = useLocation();
     const { data: me, isLoading } = useMe();
     if (isLoading) return <p>Checking access…</p>;
     if (me?.is_superuser !== true) return <div className="panel panel-pad">Fleet Configuration requires a superuser account.</div>;
+    if (location.pathname.endsWith('/shared-validation')) return <Suspense fallback={<p>Loading protected connection…</p>}><ConnectionPage /></Suspense>;
     return <FleetContent key={me.id} userId={me.id} />;
 }

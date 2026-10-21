@@ -87,3 +87,7 @@ export async function readFleetOperation(id: string): Promise<FleetOperation> {
 export async function writeFleet<T>(body: Record<string, unknown>): Promise<T> {
     return withFreshAuth(async () => (await mojoCall(FLEET_ENDPOINT, { method: 'POST', body })).data as T);
 }
+
+/** Managed bundle fields are edited together in their dedicated operator topic. */
+export const MANAGED_CONNECTION_KEYS = ['DNSMAN_ACME_HUB_PROFILE_ID', 'DNSMAN_ACME_HUB_URL', 'DNSMAN_ACME_HUB_API_KEY'] as const;
+export const isManagedConnectionKey = (key: string) => (MANAGED_CONNECTION_KEYS as readonly string[]).includes(key);

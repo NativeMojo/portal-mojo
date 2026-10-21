@@ -8,12 +8,13 @@ export const SETTINGS_ADMIN_SECTION: AdminSection = {
 };
 // Empty any-of permissions admit only the existing literal-superuser bypass.
 // A global admin permission alone must not expose this configuration surface.
+const loadFleetConfiguration = () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage }));
 export const FLEET_CONFIGURATION_ADMIN_SECTION: AdminSection = {
     id: 'fleet-configuration', title: 'Fleet Configuration', icon: 'bi-hdd-network',
     navigationGroup: 'operations', permissions: [],
     routes: [
-        { path: '', loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(({ FleetConfigurationPage }) => ({ default: FleetConfigurationPage })) },
-        { path: 'shared-validation', requireSuperuser: true, loadComponent: () => import('../fleet-configuration/SharedValidationConnectionPanel').then(({ SharedValidationConnectionPage }) => ({ default: SharedValidationConnectionPage })) },
+        { path: '', loadComponent: loadFleetConfiguration },
+        { path: 'shared-validation', requireSuperuser: true, loadComponent: loadFleetConfiguration },
     ],
 };
 export const JOBS_ADMIN_SECTION: AdminSection = {
