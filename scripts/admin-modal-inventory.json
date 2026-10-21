@@ -5114,6 +5114,40 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:enable:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "enable",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "code",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "enable",
+      "target": null,
+      "fingerprint": "777836408687c363845d",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:HubSharing:enable:0",
+      "file": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx",
+      "owner": "HubSharing",
+      "launcher": "enable",
+      "body": [],
+      "category": "confirmation",
+      "parent": "HubSharing",
+      "target": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:enable",
+      "fingerprint": "10f1f22ae8b668b24766",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/fleet-configuration/FleetConfigurationPage.tsx",
       "owner": "<module>",

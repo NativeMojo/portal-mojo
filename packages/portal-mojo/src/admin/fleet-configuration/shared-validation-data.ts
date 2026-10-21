@@ -102,6 +102,22 @@ export async function privateCall(path: string, body: Record<string, unknown> | 
     }
 }
 export const readConnection = async (scope?: PrivateScope) => parseConnectionState(await privateCall(CONNECTION_ENDPOINT, null, scope));
+const HUB_ENDPOINT = `${CONNECTION_ENDPOINT}/hub`;
+const hubReasons = ['hub_unconfigured', 'hub_unavailable', 'deployment_required', 'deployment_in_progress', 'deployment_not_converged', 'deployment_proof_unavailable', 'framework_upgrade_required'] as const;
+export interface HubStatus { version: 1; enabled: boolean; configured: boolean; deployment_uuid: string | null; can_enable: boolean; reason: typeof hubReasons[number] | null }
+const deploymentId = (v: unknown): string => typeof v === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v) ? v : invalid();
+export function parseHubStatus(value: unknown): HubStatus {
+    const r = object(value); if (r.version !== 1) throw new OperatorError('unsupported');
+    const result: HubStatus = { version: 1, enabled: flag(r.enabled), configured: flag(r.configured), deployment_uuid: nullable(r.deployment_uuid, deploymentId), can_enable: flag(r.can_enable), reason: nullable(r.reason, v => choice(v, hubReasons)) };
+    if (result.enabled ? result.can_enable || result.reason !== null : result.can_enable ? !result.configured || !result.deployment_uuid || result.reason !== null : result.reason === null) invalid();
+    return result;
+}
+export const readHubStatus = async (scope?: PrivateScope) => parseHubStatus(await privateCall(HUB_ENDPOINT, null, scope));
+export async function enableHub(deployment: string, scope?: PrivateScope) {
+    const result = parseHubStatus(await privateCall(HUB_ENDPOINT, { deployment_uuid: deploymentId(deployment) }, scope));
+    if (!result.enabled || result.deployment_uuid !== deployment) invalid();
+    return result;
+}
 export const previewConnection = async (input: ConnectionInput, expected: Identity | null, scope?: PrivateScope) => { validateInput(input); return parsePreview(await privateCall(CONNECTION_ENDPOINT, { action: 'preview', ...input }, scope), input, expected); };
 export async function publishConnection(input: ConnectionInput, scope?: PrivateScope): Promise<Publication> {
     validateInput(input); const r = object(await privateCall(CONNECTION_ENDPOINT, { action: 'publish', ...input }, scope));

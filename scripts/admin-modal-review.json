@@ -485,6 +485,12 @@
       "fingerprint": "ec9b29b62c56fcec7201",
       "category": "confirmation",
       "purpose": "Separate Publish/Apply consent for frozen connection preview/revision and expected original project, process restart, every expected node proof and unchanged holds/activation/key retirement"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet-configuration/SharedValidationConnectionPanel.tsx:enable:modal.open:0",
+      "fingerprint": "777836408687c363845d",
+      "category": "confirmation",
+      "purpose": "Enable hub sharing for the exact verified ordinary deployment, preserving independent issuer certificates and keys; existing operator session, cancel/no replay and backend revalidation"
     }
   ],
   "lifecycle": [

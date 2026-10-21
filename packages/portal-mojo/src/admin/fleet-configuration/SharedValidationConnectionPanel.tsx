@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestFreshAuth } from '../../client/runtime';
 import { FlatRow, fmt, modal } from '../../ui';
-import { applyConnection, connectionAuthority, connectionOperationFinished as operationFinished, connectionVerified, nodeVerified, OperatorError, previewConnection, publishConnection, readConnection, readConnectionHistory, readConnectionOperation, usePrivateOperator, type ConnectionInput, type ConnectionOperation, type ConnectionState, type Preview, type SafeHistory } from './shared-validation-data';
+import { applyConnection, connectionAuthority, connectionOperationFinished as operationFinished, connectionVerified, enableHub, nodeVerified, OperatorError, previewConnection, publishConnection, readConnection, readConnectionHistory, readConnectionOperation, readHubStatus, usePrivateOperator, type ConnectionInput, type ConnectionOperation, type ConnectionState, type HubStatus, type Preview, type SafeHistory } from './shared-validation-data';
 import { legacyDestination, readOperatorDestinations, type OperatorDestinations } from './operator-destinations';
 
 const layout = { display: 'grid', gap: 16, minWidth: 0, overflowWrap: 'anywhere' as const };
 export function SharedValidationConnectionPage() {
     const owner = usePrivateOperator();
     if (!owner.allowed) return <div className="panel panel-pad">Shared validation connection requires an interactive deployment operator.</div>;
-    return <div className="page" style={layout}><header><div className="eyebrow">Operations · Fleet Configuration</div><h1>Shared validation connection</h1><p className="dim">Configure a protected connection. Publication, node activation and hub sharing readiness are separate.</p></header><SharedValidationConnectionPanel key={owner.key} /></div>;
+    return <div className="page" style={layout}><header><div className="eyebrow">Operations · Fleet Configuration</div><h1>Shared validation</h1><p className="dim">Share DNS validation while each issuer keeps its own certificates and private keys.</p></header><SharedValidationConnectionPanel key={owner.key} /></div>;
 }
 export function SharedValidationConnectionPanel({ pollInterval = 3000, pollLimit = 120 }: { pollInterval?: number; pollLimit?: number }) {
     const owner = usePrivateOperator();
@@ -97,13 +97,14 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
     const report = operation?.revision === state?.revision ? operation : state?.fleet;
     const currentReport = !blocked && !loading;
     return <div className="shared-validation-operator" style={layout}>
+        <HubSharing key={owner.key} />
         <section className="panel panel-pad" aria-label="Shared validation connection" style={layout}>
             <h2>Protected connection</h2>
             <p>Use a protected ACME consumer key issued for the original hub project. The approved profile fixes the hub origin and project identity.</p>
             <div><button className="btn" disabled={busy || loading} onClick={() => void refresh()}>Refresh connection status</button>{loading && <span role="status"> Checking current state…</span>}</div>
             {error && <p className="form-alert" role="alert">{error}{state && ' Earlier observations are not current confirmation.'}</p>}{notice && <p role="status">{notice}</p>}
             {state && <><FlatRow label="Published revision"><code>{state.revision ?? 'Not published'}</code></FlatRow><FlatRow label="This process loaded"><code>{state.loaded_revision ?? 'Not reported'}</code></FlatRow><FlatRow label="Credential">{state.credential.configured ? 'Configured (hidden)' : 'Not configured'} · {state.credential.source}</FlatRow><FlatRow label="Loaded identity">{state.loaded_identity?.state ?? 'Unavailable'} · <code>{state.loaded_identity?.observed_project_uuid ?? 'Not observed'}</code></FlatRow><FlatRow label="Identity checked">{state.loaded_identity?.checked_at ? fmt.datetime(state.loaded_identity.checked_at) : 'Not observed'}</FlatRow>
-                {state.loaded_identity?.state === 'verified' && !state.loaded_identity.sharing_ready && <p className="dns-warning">Connection identity is configured; hub sharing activation is still required. This form does not perform that ceremony.</p>}
+                {state.loaded_identity?.state === 'verified' && !state.loaded_identity.sharing_ready && <p className="dns-warning">The connection identity is verified. Enable sharing on the approved hub, then refresh this connection.</p>}
                 {!state.available && <div className="dns-blocked"><strong>Connection setup unavailable</strong><ul>{state.unavailable_reasons.map((reason) => <li key={reason}>{reason.replaceAll('_', ' ')}</li>)}</ul><p>Use the permitted System Setup destination below to inspect publisher, schema, delegation and node enrollment. An empty profile catalog cannot be filled in this form.</p></div>}
                 <fieldset disabled={busy || loading || blocked || !state.available} style={{ border: 0, padding: 0, ...layout }}>
                     <label className="field"><span className="field-label">Approved hub profile</span><select className="input" value={profileId} onChange={(e) => { change(); setProfileId(e.target.value); }}><option value="">Choose an approved profile</option>{state.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.label}</option>)}</select></label>
@@ -118,8 +119,48 @@ function ConnectionContent({ pollInterval, pollLimit }: { pollInterval: number; 
             </>}
         </section>
         {state && report && <section className="panel panel-pad" aria-label="Every expected node" style={layout}><h2>Every expected node</h2><p role="status" className={currentReport && connectionVerified(state, report) ? 'text-ok' : 'text-warn'}>{currentReport && connectionVerified(state, report) ? 'Connection applied and verified on every expected node' : 'Not confirmed on every expected node'} · {report.status}</p><p className="dim">Combined proof covers the request service where enabled, job engine and scheduler at the target revision. Worker-only exemption is server-owned. Offline nodes stay in the denominator; a completed dispatch job is not process proof.</p>{!report.nodes.length && <p>No expected-node evidence is available.</p>}{report.nodes.map((node) => <article className="dns-shared-request" key={node.hostname}><h3>{node.hostname}</h3><FlatRow label="Revision"><code>{node.revision}</code></FlatRow><FlatRow label="Publication / installation">{node.published ? 'Published' : 'Unconfirmed'} · {node.installed ? 'Installed' : 'Not installed'}</FlatRow><FlatRow label="Restart">{node.restarted ? 'Reported restarted' : node.restart_requested ? 'Requested' : 'Unconfirmed'}</FlatRow><FlatRow label="Request + engine + scheduler proof">{currentReport && nodeVerified(node, report, state.revision, state.profiles.find((p) => p.id === state.selected_profile_id)) ? 'Confirmed at target revision and identity' : 'Unconfirmed'}</FlatRow><FlatRow label="Observed hub project"><code>{node.shared_validation?.observed_project_uuid ?? 'Unavailable'}</code></FlatRow><FlatRow label="Identity check">{node.shared_validation?.checked_at ? fmt.datetime(node.shared_validation.checked_at) : 'Unavailable'} · {node.shared_validation?.sharing_ready ? 'Sharing ready' : 'Sharing readiness not established'}</FlatRow><p>{node.error_code ?? node.status}</p></article>)}{timedOut && <p className="text-warn">Automatic observations reached their limit. Refresh explicitly for current status.</p>}</section>}
-        <section className="panel panel-pad" style={layout}><h2>Existing deployment controls</h2><p>Opening these protected controls does not apply a change or lift a release hold. Framework update/resume can change policy; review its own confirmation. Configuration does not enroll retained floors or activate hub sharing.</p>{destinationError && <p role="alert">{destinationError}</p>}{destinations?.external && <p>External infrastructure mode: existing controls retain their IaC restrictions.</p>}<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{(['setup', 'deployments', 'topology', 'capacity'] as const).map((kind) => { const href = destinations && legacyDestination(destinations, kind); return href ? <a key={kind} className="btn" href={href}>{({ setup: 'Open System Setup', deployments: 'Open Deployments and framework policy', topology: 'Open expected topology', capacity: 'Open Fleet Scaling' })[kind]}</a> : <span key={kind} className="dim">{kind}: destination unavailable</span>; })}</div></section>
+        <section className="panel panel-pad" style={layout}><h2>Existing deployment controls</h2><p>Update every expected node through the existing deployment controls before enabling sharing. Each control keeps its own confirmation and release permissions.</p>{destinationError && <p role="alert">{destinationError}</p>}{destinations?.external && <p>External infrastructure mode: existing controls retain their IaC restrictions.</p>}<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{(['setup', 'deployments', 'topology', 'capacity'] as const).map((kind) => { const href = destinations && legacyDestination(destinations, kind); return href ? <a key={kind} className="btn" href={href}>{({ setup: 'Open System Setup', deployments: 'Open Deployments and framework policy', topology: 'Open expected topology', capacity: 'Open Fleet Scaling' })[kind]}</a> : <span key={kind} className="dim">{kind}: destination unavailable</span>; })}</div></section>
         <section className="panel panel-pad" style={layout}><h2>Replace first, retire later</h2><p>On the approved hub, use Group API Keys → Create ACME consumer key for the exact original project. Enter the replacement here, Preview and Publish, then Apply and verify every expected node. Only then explicitly review/deactivate the old key in the hub inventory. No key is retired automatically.</p><p>Existing audited Token reveal can recover an issued key. In-place rotation invalidates the previous token immediately and is not this staged rollout.</p><Link className="btn" to="../../api-keys" relative="path">Open this deployment’s Group API Keys</Link><p className="dim">This local inventory is not a claim that this deployment is the approved hub or that it observed another deployment’s nodes.</p></section>
         <section className="panel panel-pad"><h2>Version history</h2>{history ? <>{history.versions.map((version) => <p key={version.version_id}><code>{version.version_id}</code> · {version.published_at ? fmt.datetime(version.published_at) : 'Time unavailable'}{version.current ? ' · current' : ''}</p>)}{history.truncated && <p>Only recent versions are shown.</p>}</> : <p>History unavailable. Use Refresh; secrets are never displayed here.</p>}</section>
     </div>;
+}
+
+const hubMessages: Record<NonNullable<HubStatus['reason']>, string> = {
+    hub_unconfigured: 'This deployment is not a validation hub. Configure its connection below; enable sharing on the approved hub.',
+    hub_unavailable: 'Hub status is unavailable. Refresh to try again.',
+    deployment_required: 'Deploy the compatible framework to every expected node first.',
+    deployment_in_progress: 'Wait for the current deployment to finish, then refresh.',
+    deployment_not_converged: 'Finish the deployment on every expected node, then refresh.',
+    deployment_proof_unavailable: 'Some nodes have not confirmed the deployed framework. Check Deployments, then refresh.',
+    framework_upgrade_required: 'Update every expected node to a compatible framework release, then refresh.',
+};
+function HubSharing() {
+    const owner = usePrivateOperator();
+    const [state, setState] = useState<HubStatus | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
+    const flight = useRef(false), generation = useRef(0);
+    const refresh = async () => {
+        const fence = owner.fence(), current = ++generation.current; setLoading(true);
+        try { const next = await readHubStatus(fence); fence.beforeSend(); if (current === generation.current) { setState(next); setError(''); } }
+        catch (reason) { if (!fence.signal?.aborted && current === generation.current) setError((reason instanceof OperatorError ? reason : new OperatorError('unavailable')).message); }
+        finally { if (!fence.signal?.aborted && current === generation.current) setLoading(false); }
+    };
+    useEffect(() => { void refresh(); return () => { generation.current++; }; }, [owner.key]);
+    const enable = async () => {
+        if (flight.current || loading || error || !state?.can_enable || !state.deployment_uuid) return;
+        const fence = owner.fence(), deployment = state.deployment_uuid, opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        flight.current = true; setBusy(true);
+        try {
+            fence.beforeSend();
+            const confirmed = await modal.open<boolean>(close => <div className="modal-pad"><h2 className="modal-title">Enable shared validation?</h2><div className="modal-message"><p>Enable this hub after the verified deployment <code>{deployment}</code>.</p><p>Trusted projects can share DNS validation. Each issuer keeps its own certificates, accounts and private keys. Allocation trust still requires explicit approval.</p><p>Keep the compatible framework installed on every node after enabling sharing.</p></div><div className="modal-actions"><button className="btn" onClick={() => close(false)}>Cancel</button><button className="btn btn-primary" onClick={() => close(true)}>Enable sharing</button></div></div>, { size: 'md', signal: fence.signal });
+            if (!confirmed) return; fence.beforeSend();
+            const next = await enableHub(deployment, fence); fence.beforeSend(); setState(next); setError('');
+        } catch (reason) {
+            if (!fence.signal?.aborted) {
+                const safe = reason instanceof OperatorError ? reason : new OperatorError('unavailable');
+                await refresh(); try { fence.beforeSend(); } catch { return; } setError(`${safe.message} Refresh hub status before trying again.`);
+                if (safe.kind === 'fresh') await requestFreshAuth();
+            }
+        } finally { flight.current = false; if (!fence.signal?.aborted) { setBusy(false); requestAnimationFrame(() => { try { fence.beforeSend(); if (opener?.isConnected) opener.focus(); } catch { /* The former session no longer owns focus. */ } }); } }
+    };
+    return <section className="panel panel-pad" aria-label="Validation hub" style={layout}><h2>Validation hub</h2><p>Enable sharing once after updating every node through the existing deployment controls. Configured issuers renew automatically.</p><p role="status">{loading ? 'Checking hub status…' : error ? 'Current hub status is unavailable.' : state?.enabled ? 'Sharing is enabled.' : state?.reason ? hubMessages[state.reason] : 'Ready to enable sharing.'}</p>{state?.enabled && !state.configured && <p className="text-warn">Hub DNS configuration is unavailable. Check System Setup, then refresh.</p>}{error && <p className="form-alert" role="alert">{error}</p>}<div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><button className="btn" disabled={busy || loading} onClick={() => void refresh()}>Refresh hub status</button>{!state?.enabled && <button className="btn btn-primary" disabled={busy || loading || !!error || !state?.can_enable} onClick={() => void enable()}>Enable shared validation</button>}</div></section>;
 }

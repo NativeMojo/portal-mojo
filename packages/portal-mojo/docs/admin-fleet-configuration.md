@@ -57,6 +57,24 @@ route. It requires a current literal superuser; the server additionally requires
 an active interactive session, same-origin writes and fresh authentication.
 Key-backed sessions are rejected by the server even when their user is an owner.
 
+On the validation hub, update every expected node using the existing Deployments
+controls, then use **Enable shared validation** once. The compact hub section is
+independent of consumer connection configuration and uses the same Portal login,
+fresh authentication and native confirmation as the existing page. No separate
+operator service, login or wizard is required. Missing or incompatible deployment
+proof shows the ordinary prerequisite instead of an enabled action. Each issuer
+keeps its own ACME account, certificates and private keys; allocation trust still
+requires explicit approval in the DNS setup screen. Renewal remains automatic.
+
+`GET /api/account/admin/fleet/shared-validation/hub` returns
+`{version:1, enabled, configured, deployment_uuid, can_enable, reason}`.
+The deployment UUID is canonical lowercase with hyphens, unlike consumer project
+UUIDs. `POST` takes only `{deployment_uuid}` after confirmation. The backend
+rechecks the complete deployed roster and framework version atomically before
+enabling. A stale deployment, failed read or fresh-auth refusal requires Refresh
+and another deliberate review; mutations are never replayed. Keep the compatible
+framework on every node after enabling sharing.
+
 The panel consumes the private `/api/account/admin/fleet/shared-validation`
 contract. Choose a named approved hub profile, inspect its exact origin and
 original project UUID, then Keep, Replace or Disable the connection. Replacement
@@ -71,8 +89,8 @@ report installed, restarted and combined request-service/job-engine/scheduler
 health at that revision and the expected topic profile/project identity. Offline,
 draining, stale, partial and missing-node results remain unconfirmed. The UI
 polls at most120 observations and offers deliberate Refresh afterward. Verified
-connection identity with `sharing_ready=false` still needs the separate protected
-hub activation ceremony; this form never performs it.
+connection identity with `sharing_ready=false` still needs sharing enabled on the
+approved hub. Refresh the connection after enabling it there.
 
 Create the replacement on the approved hub with the named **ACME validation
 consumer** key form. Preview/Publish, Apply, verify every expected node, then
@@ -97,8 +115,8 @@ and permission facts for existing legacy System Setup, Deployments, topology and
 Fleet Scaling links. Links are same-origin and capability-gated. The backend's
 semantic `capacity` hint maps to the actual registered `#/fleet` route. These
 legacy destinations retain their protected confirmations, policy, release holds
-and IaC restrictions. This React topic creates no deployment, topology or root
-authority API.
+and IaC restrictions. This React topic reuses those controls without a new
+deployment or root authority service.
 
 The Runtime settings showcase mounts the actual connection panel with central
 mock scenarios and operator/ordinary-manager identities. The named
