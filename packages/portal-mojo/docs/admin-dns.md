@@ -84,3 +84,19 @@ See [Admin modal policy](admin-modals.md) for header actions, content-only
 sections, supported lifecycle fields and retained irreversible exceptions.
 Provider credentials retire/reactivate through `is_active`, keeping history;
 rotation remains write-only and imperative. Built-in credential Delete is absent.
+
+## Shared wildcard validation
+
+The existing Domains header offers **Shared validation setup** to global DNS
+managers even when server setup needs an operator. Domain detail includes
+read-only **Validation**; its header action and Certificate Delegation compose
+the same focused flow. See [the human walkthrough and exact
+contracts](admin-dns-certificates.md#shared-validation-setup).
+
+Shared setup uses independent Readiness v1/hub v2 adapters. It never changes the
+strict legacy `/config` response contract. A controller grant is explicit
+apex/wildcard certificate issuance authority; local DNS management alone cannot
+supply it. Only public five-field connection requests are copied. No private
+key, PEM, DNS credential or protected hub key is requested, read, persisted or
+logged. Deployment operators deliver static hub settings server-side and restart
+API/workers. Validation CNAME routing remains separate from traffic routing.

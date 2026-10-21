@@ -23,6 +23,7 @@ try {
     const data = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/certificate-data.ts');
     const poller = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/CertificateLifecyclePoller.tsx');
     const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
+    const sharedData = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/shared-validation-data.ts');
 
     assert.deepEqual(dns.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials']);
     assert.deepEqual(dns.getDnsDomainLinks().map((link) => link.key), ['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials']);
@@ -106,6 +107,20 @@ try {
     const requested = await mock.mockFetch('/api/dnsman/certificate/request', { method: 'POST', headers: manager, body: { domain: 8204 } });
     assert.equal(requested.data.status, 'pending');
     assert.deepEqual(requested.data.sans, ['cert-only.example', '*.cert-only.example']);
+
+    mock.setMockSharedValidationScenario('ready');
+    const sharedPrepared = await mock.mockFetch('/api/dnsman/delegation/connect', { method: 'POST', headers: manager, body: { domain: 8201, allocation_ref: 'shared-acme.acme-hub.example' } });
+    const safeShared = sharedData.parseReadiness(sharedPrepared.data, { domain: 8201 });
+    assert.equal(safeShared.connection.mode, 'shared', 'explicit preparation creates a shared routing guard');
+    assert.equal(safeShared.capabilities.can_request, false, 'pending shared trust never permits wildcard issuance');
+    const blockedFallback = await mock.mockFetch('/api/dnsman/certificate/request', { method: 'POST', headers: manager, body: { domain: 8201, names: ['api.acme.example'] } });
+    assert.equal(blockedFallback.error_code, 409, 'legacy request cannot bypass pending explicit shared routing with custom SANs');
+    mock.setMockSharedValidationScenario('old-api');
+    const oldPlan = await mock.mockFetch('/api/dnsman/delegation/plan', { headers: manager, params: { domain: 8201 } });
+    assert.equal(oldPlan.error_code, 404, 'older shared endpoint is independently unavailable');
+    const oldConfig = await mock.mockFetch('/api/dnsman/config', { headers: manager });
+    assert.equal(oldConfig.status, true, 'older shared API does not poison legacy DNS config');
+    mock.setMockSharedValidationScenario('ready');
 
     mock.setMockDnsAcmeMode('unconfigured');
     const unavailable = await mock.mockFetch('/api/dnsman/certificate/request', { method: 'POST', headers: manager, body: { domain: 8201 } });

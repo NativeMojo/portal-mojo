@@ -135,3 +135,19 @@ browser interactions for all family bodies, both themes, desktop/narrow,
 keyboard navigation and console checks. The lazy Showcase **Admin modal audit**
 demo supplies long-title, rich/zero/dot badges, nested editor, lifecycle-cancel and
 embedded-host cases. Existing ToastHost top-layer visibility work remains separate.
+
+## Shared validation confirmations
+
+The DNS shared-validation editor freezes the target group/domain, existing
+allocation, recipient UUID and client reference while an operation is pending.
+Its owner AbortSignal closes only its confirmation on unmount, scope loss or
+auth/session replacement; submitted writes can still persist. Escape/backdrop
+and Close are unavailable while the outer operation is pending.
+
+Prepare explains the pause of direct validation/renewal while valid material
+remains available. Grant names the exact project and apex/wildcard issuance
+authority and independent private-key custody. Revoke explains that future
+validation stops, already-issued certificates remain valid and other consumers
+keep working. Revoked references require a fresh, explicitly prepared request.
+No confirmation is inferred from a copied descriptor. Fresh authentication
+prompts without replay; every submitted result reconciles before another write.

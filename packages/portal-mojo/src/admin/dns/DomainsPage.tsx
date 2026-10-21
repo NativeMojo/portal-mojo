@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Badge, ModelTable, fmt, modal, type Column, type FilterDef } from '../../ui';
 import { DomainDetail } from './DomainDetail';
-import { DomainModel, type DomainRow } from './models';
+import { hasPermission, useMe } from '../../client/runtime';
+import { openSharedValidation } from './SharedValidationDialog';
+import { DomainModel, DNS_MANAGE_PERMISSIONS, type DomainRow } from './models';
 import { providerLabel } from './data';
 
 const columns: Column<DomainRow>[] = [
@@ -19,9 +21,11 @@ const filters: FilterDef[] = [
 
 export function DomainsPage() {
     const queryClient = useQueryClient();
+    const { data: me } = useMe();
+    const canManage = hasPermission(me ?? null, DNS_MANAGE_PERMISSIONS, null);
     const open = async (row: DomainRow) => {
         await DomainModel.fetchOne(queryClient, row.id);
         await modal.detail((close) => <DomainDetail id={row.id} onClose={() => close(null)} />);
     };
-    return <ModelTable<DomainRow> model={DomainModel} eyebrow="Infrastructure · DNS" title="Domains" searchable searchPlaceholder="Search domain names" columns={columns} filters={filters} defaultParams={{ sort: 'name' }} columnChooser persistState persistKey="admin:dns:domains" onRowClick={(row) => void open(row)} />;
+    return <ModelTable<DomainRow> model={DomainModel} eyebrow="Infrastructure · DNS" title="Domains" searchable searchPlaceholder="Search domain names" columns={columns} filters={filters} defaultParams={{ sort: 'name' }} columnChooser persistState persistKey="admin:dns:domains" onRowClick={(row) => void open(row)} {...(canManage ? { onAdd: () => void openSharedValidation(), addLabel: 'Shared validation setup' } : {})} />;
 }

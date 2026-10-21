@@ -449,6 +449,18 @@
       "fingerprint": "2b8f3d83a6799d51a51a",
       "category": "action",
       "purpose": "CDN provider-operation report: status and findings with Close; an action result, matching the existing CORS report."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:confirmShared:modal.open:0",
+      "fingerprint": "7359402254c54bdf669d",
+      "category": "action",
+      "purpose": "Frozen-scope shared validation setup and explicit prepare/check/request/grant/revoke confirmation; owner abort, no auth replay and authoritative reconciliation are covered by verify-admin-dns-shared-validation-mounted."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:openSharedValidation:modal.open:0",
+      "fingerprint": "2ad558f5a323346fc0a3",
+      "category": "action",
+      "purpose": "Frozen-scope shared validation setup and explicit prepare/check/request/grant/revoke confirmation; owner abort, no auth replay and authoritative reconciliation are covered by verify-admin-dns-shared-validation-mounted."
     }
   ],
   "lifecycle": [

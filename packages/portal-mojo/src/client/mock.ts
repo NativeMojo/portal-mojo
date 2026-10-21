@@ -6563,6 +6563,163 @@ function accountSelfFetch(path: string, method: string, opts: MockFetchOpts): un
     return { status: false, error: `Method not allowed: ${method} ${path}`, error_code: 405 };
 }
 
+export type MockSharedValidationScenario = 'ready' | 'missing-trust' | 'revoked' | 'pending-dns' | 'changed-alias' | 'chained-alias' | 'unavailable' | 'unconfigured' | 'old-api' | 'renewal-error' | 'malformed' | 'disabled';
+let sharedScenario: MockSharedValidationScenario = 'ready';
+let sharedFault: 'ambiguous' | 'reconcile' | 'reauth' | 'revoke-cleanup' | null = null;
+let sharedReadFails = false;
+let sharedCounter = 1;
+const SHARED_CONSUMER_UUID = '11111111-1111-4111-8111-111111111111';
+const SHARED_OWNER_UUID = '22222222-2222-4222-8222-222222222222';
+interface MockSharedConnection { id: number; domain: string; domainId: number | null; group: number; allocation: string; client: string; participant: string | null; state: string; verified: string | null; reads: number }
+interface MockSharedParticipant { allocation_ref: string; participant_ref: string; client_ref: string; domain: string; source: string; target: string; role: string; trust_state: string; scope: string[]; can_publish: boolean; can_withdraw: boolean; revoked_at: string | null; consumer_project_uuid: string; consumer_label: string }
+const sharedConnections = new Map<string, MockSharedConnection>();
+const sharedParticipants: MockSharedParticipant[] = [];
+const sharedAllocations = [
+    { allocation_ref: 'shared-acme.acme-hub.example', domain: 'acme.example' },
+    { allocation_ref: 'shared-customer.acme-hub.example', domain: 'customer.example' },
+].map((v) => ({ ...v, source: `_acme-challenge.${v.domain}`, target: v.allocation_ref, owner_project_uuid: SHARED_OWNER_UUID, can_manage_trust: true }));
+const sharedUuid = () => `33333333-3333-4333-8333-${String(sharedCounter++).padStart(12, '0')}`;
+function sharedDescriptor(row: MockSharedConnection) { return { version: 1, consumer_project_uuid: SHARED_CONSUMER_UUID, client_ref: row.client, domain: row.domain, allocation_ref: row.allocation }; }
+function sharedParticipant(request: Record<string, unknown>): MockSharedParticipant { const domain = String(request.domain); return { allocation_ref: String(request.allocation_ref), participant_ref: sharedUuid(), client_ref: String(request.client_ref), domain, source: `_acme-challenge.${domain}`, target: String(request.allocation_ref), role: 'trusted', trust_state: 'active', scope: [domain, `*.${domain}`], can_publish: false, can_withdraw: false, revoked_at: null, consumer_project_uuid: String(request.consumer_project_uuid), consumer_label: 'Customer project · independent wildcard issuer' }; }
+/** Bounded mock-only controls. No setup draft or protected credential is observed. */
+export function setMockSharedValidationScenario(scenario: MockSharedValidationScenario): void {
+    const allowed: MockSharedValidationScenario[] = ['ready', 'missing-trust', 'revoked', 'pending-dns', 'changed-alias', 'chained-alias', 'unavailable', 'unconfigured', 'old-api', 'renewal-error', 'malformed', 'disabled'];
+    if (!allowed.includes(scenario)) throw new Error('Unknown shared validation mock scenario');
+    sharedScenario = scenario; sharedFault = null; sharedReadFails = false; sharedConnections.clear(); sharedParticipants.splice(0);
+    db.dnsDomains = db.dnsDomains.filter((d) => d.id < 8900);
+    db.dnsCertificates = db.dnsCertificates.filter((c) => c.id < 8900);
+    if (['missing-trust', 'revoked', 'pending-dns', 'changed-alias', 'chained-alias', 'renewal-error'].includes(scenario)) {
+        const row: MockSharedConnection = { id: 8901, domain: 'acme.example', domainId: 8201, group: 1, allocation: 'shared-acme.acme-hub.example', client: sharedUuid(), participant: null, state: 'pending', verified: null, reads: 0 };
+        if (scenario !== 'missing-trust') { const participant = sharedParticipant(sharedDescriptor(row)); if (scenario === 'revoked') { participant.trust_state = 'revoked'; participant.revoked_at = new Date().toISOString(); } sharedParticipants.push(participant); row.participant = participant.participant_ref; row.state = 'verified'; row.verified = new Date().toISOString(); }
+        sharedConnections.set(row.domain, row);
+    }
+}
+export function armMockSharedValidationFault(fault: typeof sharedFault): void { sharedFault = fault; if (fault === null) sharedReadFails = false; }
+function mockSharedValidation(path: string, opts: MockFetchOpts, method: string): unknown {
+    const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
+    if (sharedScenario === 'old-api') return { status: false, error: 'Route unavailable', error_code: 404 };
+    const body = opts.body ?? {}, params = opts.params ?? {};
+    const failure = (code: string, status = 409, data?: unknown) => ({ status: false, code: status, error: code, error_code: code, ...(data ? { data } : {}) });
+    const manage = hasGlobalPermission(caller, DNS_MANAGE_GRANTS);
+    const controller = caller.is_superuser === true;
+    const iso = (value: number | null) => value == null ? null : new Date(value * 1000).toISOString();
+    const at = new Date().toISOString();
+    if (path === '/api/dnsman/delegation/group-choice') {
+        if (method !== 'GET' || !manage) return permissionDenied();
+        const rows = db.groups.filter((g) => g.is_active && dnsMemberCan(caller, g.id, true) && (params.id == null || g.id === Number(params.id)) && (!params.search || g.name.toLowerCase().includes(String(params.search).toLowerCase())));
+        const start = Math.max(0, Number(params.start ?? 0)); const size = Math.min(50, Math.max(1, Number(params.size ?? 25)));
+        return { status: true, data: rows.slice(start, start + size).map((g) => ({ id: g.id, name: g.name })), count: rows.length, start, size };
+    }
+    if (path.startsWith('/api/dnsman/acme/')) {
+        if (method !== 'POST' || !controller) return permissionDenied();
+        if (path.endsWith('/capabilities')) return { status: true, data: { version: 2, shared_validation: sharedScenario !== 'disabled', consumer_project_uuid: null, can_consume: false, can_manage_trust: sharedScenario !== 'disabled', trust_scope: 'apex_and_wildcard' } };
+        if (sharedScenario === 'disabled') return failure('acme_not_authorized', 403);
+        if (path.endsWith('/allocation/list')) return { status: true, data: { items: sharedAllocations.filter((v) => v.domain === body.domain), next_cursor: null } };
+        const allocation = sharedAllocations.find((v) => v.allocation_ref === body.allocation_ref || v.allocation_ref === (body.connection_request as Record<string, unknown> | undefined)?.allocation_ref);
+        if (!allocation) return permissionDenied();
+        if (path.endsWith('/trust/list')) return sharedReadFails ? failure('acme_hub_unavailable', 503) : { status: true, data: { items: sharedParticipants.filter((p) => p.allocation_ref === allocation.allocation_ref), next_cursor: null } };
+        if (path.endsWith('/trust/recipient')) return body.consumer_project_uuid === SHARED_CONSUMER_UUID ? { status: true, data: { consumer_project_uuid: SHARED_CONSUMER_UUID, label: 'Customer project · independent wildcard issuer', active: true } } : permissionDenied();
+        if (path.endsWith('/trust/grant')) {
+            const request = body.connection_request as Record<string, unknown>;
+            if (!request || Object.keys(request).sort().join(',') !== 'allocation_ref,client_ref,consumer_project_uuid,domain,version' || request.version !== 1 || request.domain !== allocation.domain || request.consumer_project_uuid !== SHARED_CONSUMER_UUID || !/^[a-f0-9-]{36}$/.test(String(request.client_ref))) return failure('acme_reference_conflict');
+            let participant = sharedParticipants.find((p) => p.client_ref === request.client_ref && p.consumer_project_uuid === request.consumer_project_uuid);
+            if (participant && (participant.allocation_ref !== allocation.allocation_ref || participant.trust_state === 'revoked')) return failure('acme_reference_conflict');
+            if (['changed-alias', 'chained-alias', 'pending-dns'].includes(sharedScenario)) return failure('acme_dns_mismatch');
+            if (!participant) { participant = sharedParticipant(request); sharedParticipants.push(participant); }
+            if (sharedFault === 'ambiguous') { sharedFault = null; return failure('acme_hub_unavailable', 503); }
+            return { status: true, data: { ...participant } };
+        }
+        if (path.endsWith('/trust/revoke')) {
+            const participant = sharedParticipants.find((p) => p.allocation_ref === allocation.allocation_ref && p.participant_ref === body.participant_ref);
+            if (!participant || participant.role === 'owner') return permissionDenied();
+            participant.trust_state = 'revoked'; participant.revoked_at ??= at;
+            if (sharedFault === 'revoke-cleanup' || sharedFault === 'ambiguous') { sharedFault = null; return failure('acme_hub_unavailable', 503); }
+            return { status: true, data: { ...participant } };
+        }
+        return failure('acme_invalid_request', 400);
+    }
+    const write = method === 'POST';
+    if (sharedFault === 'reauth' && write) { sharedFault = null; return { status: false, code: 440, error: 'reauth_required', error_code: 440 }; }
+    let row = body.delegation == null ? null : [...sharedConnections.values()].find((v) => v.id === Number(body.delegation)) ?? null;
+    const requested = write ? body : params;
+    let domain = db.dnsDomains.find((d) => requested.domain != null ? d.id === Number(requested.domain) : d.name === (row?.domain ?? requested.name));
+    const name = row?.domain ?? domain?.name ?? String(requested.name ?? '');
+    const groupId = row?.group ?? domain?.group ?? Number(requested.group ?? 0);
+    if (!name || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(name) || (!domain && !db.groups.some((g) => g.id === groupId && g.is_active))) return failure('invalid_target', 400);
+    if (domain && requested.group != null && domain.group !== Number(requested.group)) return permissionDenied();
+    if (!hasGlobalPermission(caller, DNS_VIEW_GRANTS) || (groupId && !dnsMemberCan(caller, groupId, write))) return permissionDenied();
+    if (write && (!manage || !groupId)) return permissionDenied();
+    row ??= sharedConnections.get(name) ?? null;
+    const allocation = row?.allocation ?? (typeof requested.allocation_ref === 'string' ? requested.allocation_ref : null);
+    const plan = () => {
+        if (sharedReadFails) return failure('hub_unavailable', 503);
+        const participant = row ? sharedParticipants.find((p) => p.client_ref === row!.client) : null;
+        const trust = !row ? 'not_requested' : participant?.trust_state ?? 'missing';
+        const hub = sharedScenario === 'unconfigured' ? 'unconfigured' : sharedScenario === 'unavailable' ? 'unavailable' : sharedScenario === 'disabled' ? 'unsupported' : 'ready';
+        const aliasState = ['changed-alias', 'chained-alias'].includes(sharedScenario) ? 'mismatch' : sharedScenario === 'pending-dns' ? 'lookup_failed' : row?.participant ? 'match' : 'unknown';
+        let cert = db.dnsCertificates.find((c) => c.domain === domain?.id && c.sans.length === 2 && c.sans.includes(name) && c.sans.includes(`*.${name}`));
+        if (cert?.id && cert.id >= 8900 && cert.status === 'pending' && row && ++row.reads >= 3) { cert.status = 'active'; cert.not_after = Math.floor(Date.now() / 1000) + 90 * 86400; cert.renew_after = Math.floor(Date.now() / 1000) + 60 * 86400; cert.material_present = true; cert.attempts = 1; }
+        const valid = !!cert && cert.status === 'active' && (cert.not_after ?? 0) > Date.now() / 1000;
+        const renewal = sharedScenario === 'renewal-error' ? 'failed' : cert?.status === 'pending' ? 'queued' : valid ? (trust === 'active' && aliasState === 'match' ? 'scheduled' : row ? 'blocked' : 'scheduled') : cert ? 'failed' : 'not_requested';
+        let next = 'none', actor = 'project_operator';
+        if (!groupId) { next = 'unsupported_domain_scope'; actor = 'deployment_operator'; }
+        else if (hub !== 'ready') { next = hub === 'unconfigured' ? 'configure_hub' : hub === 'unsupported' ? 'upgrade_hub' : 'retry_hub'; actor = 'deployment_operator'; }
+        else if (!row) next = allocation ? 'prepare_connection' : 'choose_allocation';
+        else if (trust === 'revoked') next = 'restart_connection';
+        else if (trust === 'missing') { next = 'grant_trust'; actor = 'allocation_controller'; }
+        else if (!row.participant) next = 'connect';
+        else if (aliasState !== 'match') { next = 'repair_alias'; actor = 'domain_owner'; }
+        else if (row.state !== 'verified') next = 'check';
+        else if (renewal === 'queued') next = 'wait_for_job';
+        else if (renewal === 'failed') next = 'inspect_failure';
+        else if (!cert) next = 'request';
+        else actor = 'none';
+        const allowed = manage && !!groupId;
+        return { status: true, data: {
+            version: sharedScenario === 'malformed' ? 99 : 1, checked_at: at,
+            domain: { id: domain?.id ?? null, name, provider: domain?.provider ?? null, group: groupId ? { id: groupId, name: db.groups.find((g) => g.id === groupId)?.name ?? 'Customer' } : null },
+            profile: { name: 'apex_wildcard', names: [name, `*.${name}`] }, hub: { state: hub, protocol_version: hub === 'ready' ? 2 : null, consumer_project_uuid: hub === 'ready' ? SHARED_CONSUMER_UUID : null },
+            connection: row ? { id: row.id, mode: 'shared', state: row.state, client_ref: row.client, allocation_ref: row.allocation, participant_ref: row.participant, verified_at: row.verified } : null,
+            trust: { state: trust, can_publish: trust === 'active', can_withdraw: !!participant },
+            alias: { state: aliasState, source: `_acme-challenge.${name}`, target: allocation, observed_target: aliasState === 'unknown' || aliasState === 'lookup_failed' ? null : sharedScenario === 'changed-alias' ? 'changed.acme-hub.example' : allocation, one_hop: aliasState === 'unknown' || aliasState === 'lookup_failed' ? null : sharedScenario !== 'chained-alias', checked_at: aliasState === 'unknown' ? null : at },
+            certificate: cert ? { id: cert.id, state: cert.status, names: cert.sans, not_after: iso(cert.not_after), renew_after: iso(cert.renew_after), serving_valid: valid, material_state: cert.material_present ? 'available' : 'missing' } : null,
+            renewal: { state: renewal, next_attempt_at: cert ? iso(cert.renew_after) : null, attempts: cert?.attempts ?? 0, error_code: renewal === 'failed' ? 'trust_missing' : null, cleanup_pending: false, job: renewal === 'queued' ? { id: 'mock-shared-job', state: 'pending' } : null, worker_version: null },
+            capabilities: { group_choices: allowed, can_connect: allowed && hub === 'ready' && !!allocation && trust !== 'revoked', can_restart: allowed && !!row && (trust === 'revoked' || (!row.participant && row.state === 'pending')), can_check: allowed && !!row?.participant && trust === 'active', can_request: allowed && row?.state === 'verified' && trust === 'active' && aliasState === 'match' && sharedScenario !== 'chained-alias' },
+            next_action: { code: next, actor }, connection_request: row && allowed ? sharedDescriptor(row) : null, operation: { action: 'plan', outcome: 'observed', changed: false },
+        } };
+    };
+    if (!write) return plan();
+    if (sharedScenario === 'unconfigured' || sharedScenario === 'unavailable' || sharedScenario === 'disabled') return failure('hub_unavailable', 503);
+    let sharedOutcome = 'queued';
+    if (path.endsWith('/connect')) {
+        if (!allocation || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(allocation)) return failure('allocation_conflict');
+        if (row && row.allocation !== allocation) return failure('allocation_conflict');
+        const existing = row ? sharedParticipants.find((p) => p.client_ref === row!.client) : null;
+        if (existing?.trust_state === 'revoked' && body.restart !== true) return failure('trust_revoked', 409, (plan() as { data: unknown }).data);
+        if (body.restart === true && row && existing?.trust_state === 'active') return failure('stale_connection');
+        if (!row || body.restart === true) { row = { id: 8900 + sharedCounter, domain: name, domainId: domain?.id ?? null, group: groupId, allocation, client: sharedUuid(), participant: null, state: 'pending', verified: null, reads: 0 }; sharedConnections.set(name, row); }
+        const participant = sharedParticipants.find((p) => p.client_ref === row!.client && p.trust_state === 'active');
+        if (participant) row.participant = participant.participant_ref;
+    } else if (path.endsWith('/check')) {
+        if (!row || !row.participant) return failure('connection_not_verified');
+        const participant = sharedParticipants.find((p) => p.participant_ref === row!.participant);
+        if (participant?.trust_state !== 'active') return failure('trust_revoked');
+        if (['pending-dns', 'changed-alias', 'chained-alias'].includes(sharedScenario)) { row.state = 'broken'; return failure('alias_mismatch', 409, (plan() as { data: unknown }).data); }
+        if (!domain) { domain = { ...buildDnsDomains()[0]!, id: 8900 + sharedCounter++, name, group: groupId, provider: 'mojo', credential: null, hosted_zone_id: null }; db.dnsDomains.push(domain); row.domainId = domain.id; }
+        row.state = 'verified'; row.verified = at;
+    } else if (path.endsWith('/request')) {
+        const current = plan() as { data: { capabilities: { can_request: boolean } } };
+        if (!row || !domain || !current.data?.capabilities.can_request) return failure('connection_not_verified');
+        let cert = db.dnsCertificates.find((c) => c.domain === domain!.id && c.sans.length === 2 && c.sans.includes(name) && c.status !== 'revoked');
+        sharedOutcome = cert?.status === 'active' ? 'already_current' : cert ? 'already_queued' : 'queued';
+        if (!cert) { const now = Math.floor(Date.now() / 1000); cert = { id: 8900 + sharedCounter++, created: now, modified: now, domain: domain.id, common_name: name, sans: [name, `*.${name}`], status: 'pending', issuer: null, serial: null, not_before: null, not_after: null, renew_after: null, last_error: null, attempts: 0, material_present: false }; db.dnsCertificates.push(cert); }
+    } else return failure('invalid_action', 400);
+    const result = plan() as { data: { operation: unknown } };
+    result.data.operation = { action: path.split('/').pop(), outcome: path.endsWith('/connect') ? row?.participant ? 'connected' : 'awaiting_trust' : path.endsWith('/check') ? 'verified' : sharedOutcome, changed: path.endsWith('/request') ? sharedOutcome === 'queued' : true };
+    if (sharedFault === 'ambiguous' || sharedFault === 'reconcile') { sharedReadFails = sharedFault === 'reconcile'; sharedFault = null; return failure('hub_unavailable', 503); }
+    return result;
+}
+
 let dnsConfigMalformed = false;
 let dnsAcmeMode: 'production' | 'staging' | 'unconfigured' = 'staging';
 let dnsRegistrarMode: 'ready' | 'disabled' | 'contact-missing' = 'ready';
@@ -10106,6 +10263,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
     }
     // ══ end network security wire ════════════════════════════════════
     // ══ DNSMan — capabilities, safe models and custom operations ════════
+    if (path.startsWith('/api/dnsman/delegation/') || path.startsWith('/api/dnsman/acme/')) return mockSharedValidation(path, opts, method);
     if (path === '/api/dnsman/config') {
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
@@ -10428,6 +10586,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             const domain = db.dnsDomains.find((candidate) => candidate.id === Number(body.domain));
             if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
             if (domain.group == null ? !hasGlobalPermission(caller, DNS_MANAGE_GRANTS) : !dnsMemberCan(caller, domain.group, true)) return permissionDenied();
+            if (sharedConnections.has(domain.name)) return { status: false, error: 'Shared validation forbids direct fallback', error_code: 409 };
             if (dnsAcmeMode === 'unconfigured') return { status: false, error: 'ACME is not configured', error_code: 400 };
             if (domain.status !== 'active') return { status: false, error: 'Certificates require an active domain', error_code: 400 };
             const sticky = db.acmeDelegations.find((candidate) => candidate.domain === domain.id && candidate.verified_at != null && candidate.state !== 'retired');
