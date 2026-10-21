@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { login, setMockConnectionScenario } from 'portal-mojo/client';
 import {
-    ApiKeyLimitsSummary, GroupApiKeyDetail, GroupApiKeysSection,
+    ApiKeyLimitsSummary, GroupApiKeyDetail, GroupApiKeysPage, GroupApiKeysSection,
     WebhookSubscriptionsSection,
     type CredentialGroup,
 } from 'portal-mojo/admin/identity';
@@ -18,6 +18,7 @@ const DEMO_GROUP: CredentialGroup = {
 };
 
 export function AdminCredentialsDemo() {
+    const [crossGroup, setCrossGroup] = useState(false);
     const [persona, setPersona] = useState('dns.platform@nativemojo.com'), [ready, setReady] = useState(false); const qc = useQueryClient();
     useEffect(() => { let active = true; setReady(false); setMockConnectionScenario('ready'); void login(persona, 'mojo').then(async () => { await qc.invalidateQueries(); if (active) setReady(true); }); return () => { active = false; }; }, [persona, qc]);
     useEffect(() => () => { setMockConnectionScenario('ready'); void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
@@ -27,6 +28,7 @@ export function AdminCredentialsDemo() {
     return (
         <div className="dns-shared-showcase" style={{ display: 'grid', gap: 18 }}>
             <label className="field"><span className="field-label">Credential identity</span><select className="input" value={persona} onChange={e => setPersona(e.target.value)}><option value="dns.platform@nativemojo.com">Deployment operator</option><option value="showcase.operator@nativemojo.com">Ordinary credential manager</option></select></label>
+            <label><input type="checkbox" checked={crossGroup} onChange={e => setCrossGroup(e.target.checked)} />Cross-Group key inventory</label>
             <div className="panel">
                 <div className="panel-head">
                     <div>
@@ -36,7 +38,7 @@ export function AdminCredentialsDemo() {
                     <span className="chip chip-info">secret-safe create</span>
                 </div>
                 <div className="panel-body">
-                    {ready ? <GroupApiKeysSection group={DEMO_GROUP} /> : <p>Preparing fixture…</p>}
+                    {ready ? crossGroup ? <GroupApiKeysPage /> : <GroupApiKeysSection group={DEMO_GROUP} /> : <p>Preparing fixture…</p>}
                 </div>
             </div>
 
