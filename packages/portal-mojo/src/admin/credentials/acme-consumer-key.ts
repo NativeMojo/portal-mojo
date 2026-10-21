@@ -1,7 +1,7 @@
 import { choice, flag, label, nullable, object, OperatorError, positive, privateCall, uuid, type PrivateScope } from '../fleet-configuration/shared-validation-data';
 import { GroupApiKeyModel } from './models';
 export const ACME_RECIPIENT_ENDPOINT = '/api/account/admin/fleet/shared-validation/recipient';
-export interface KeyGroup { id: number; name: string; uuid: string | null }
+export type KeyGroup = { id: number; name: string; uuid: string | null };
 export interface AcmeRecipient { purpose: 'acme_validation_consumer'; consumer_project_uuid: string; consumer_label: string; permission: 'dnsman_acme_federation'; can_issue: boolean; grant_explanation: string }
 export interface KeySummary { id: number; name: string; is_active: boolean }
 export function projectKeyGroup(v: unknown): KeyGroup { const r = object(v); return { id: positive(r.id), name: label(r.name), uuid: r.uuid == null ? null : label(r.uuid, 36) }; }
