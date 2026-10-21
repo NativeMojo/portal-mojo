@@ -42,14 +42,16 @@ try {
     const artifact = packed[0];
     assert.equal(artifact.name, 'portal-mojo', 'packed package name must be portal-mojo');
     assert.match(artifact.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'package version must be SemVer');
-    // Audited shared-validation source: 549 intended source/docs/style files
-    // total 5,730,628 unpacked bytes. Baseline 1af3716 holds 545 files and
-    // 5,620,226 bytes. Four DNS setup modules plus their existing entry points,
-    // typed mock, styles and reference docs account for all 110,402 added bytes;
-    // no baseline files disappeared and no generated repository files entered.
-    // 5.77 MB leaves 39,372 bytes (0.69%) headroom. All file/content/consumer
-    // assertions below and the independent runtime bundle budgets stay intact.
-    assert.ok(artifact.unpackedSize <= 5_770_000, `unpacked package exceeds 5.77 MB budget (${artifact.unpackedSize})`);
+    // Audited #8984 baseline: 549 intended source/docs/style files total
+    // 5,730,628 unpacked bytes. #8988 adds five private lazy operator files and
+    // grows eleven existing source/docs files by 74,458 bytes: 554 files,
+    // 5,805,086 bytes (1,566,476 compressed). The per-file diff accounts for
+    // credential/connection parsers and forms, role-aware links, central mock
+    // and human docs only; no generated, test, script or repository payload.
+    // 5.843 MB leaves 37,914 bytes (0.653%) headroom, comparable to the
+    // reviewed baseline. All content/consumer/style/export assertions below
+    // and the separate 530,000-byte eager-runtime cap remain unchanged.
+    assert.ok(artifact.unpackedSize <= 5_843_000, `unpacked package exceeds 5.843 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).
