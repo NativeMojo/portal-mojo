@@ -696,9 +696,6 @@ function buildDnsCredentials(): MockDnsCredential[] {
         { id: 8101, created: now - 180 * 86400, modified: now - 7 * 86400, group: 1, name: 'Acme registrar', provider: 'godaddy', is_active: true, verified: true, verified_at: now - 7 * 86400, domain_count: 12, last_error: null, api_key_masked: '********A1B2', api_secret_masked: '********C3D4' },
         { id: 8102, created: now - 90 * 86400, modified: now - 3600, group: 2, name: 'Engineering legacy', provider: 'godaddy', is_active: true, verified: false, verified_at: now - 30 * 86400, domain_count: 4, last_error: 'Provider verification failed', api_key_masked: '********E5F6', api_secret_masked: '********G7H8' },
         { id: 8103, created: now - 30 * 86400, modified: now - 3 * 86400, group: 4, name: 'Support retired', provider: 'godaddy', is_active: false, verified: true, verified_at: now - 30 * 86400, domain_count: 2, last_error: null, api_key_masked: '********J1K2', api_secret_masked: '********L3M4' },
-        { id: 8104, created: now, modified: now, group: 2, name: 'Engineering verified', provider: 'godaddy', is_active: true, verified: true, verified_at: now, domain_count: 1, last_error: null, api_key_masked: '********P4Q5', api_secret_masked: '********R6S7' },
-        { id: 8105, created: now, modified: now, group: 1, name: 'Unsupported registrar credential', provider: 'route53', is_active: true, verified: true, verified_at: now, domain_count: 0, last_error: null, api_key_masked: '', api_secret_masked: '' },
-        { id: 8106, created: now, modified: now, group: 1, name: 'Inactive GoDaddy credential', provider: 'godaddy', is_active: false, verified: true, verified_at: now, domain_count: 0, last_error: null, api_key_masked: '********T8U9', api_secret_masked: '********V1W2' },
     ];
 }
 
@@ -4118,7 +4115,7 @@ const deviceRows = buildDevices();
 const geoIpRows = buildGeoIps();
 const loginEventRows = linkLoginDevices(buildLoginEvents(users), deviceRows);
 const members = buildMembers(users, groups);
-members.push({ id: 191, created: groups[0]!.created, modified: groups[0]!.modified, is_active: true, permissions: { manage_webapp: true, manage_dns: true }, metadata: {}, user: 56, group: 1 });
+members.push({ id: 192, created: groups[0]!.created, modified: groups[0]!.modified, is_active: true, permissions: { manage_webapp: true, manage_dns: true }, metadata: {}, user: 56, group: 1 });
 members.push({
     id: 190, created: groups[0]!.created, modified: groups[0]!.modified,
     is_active: true, permissions: { view_dns: true }, metadata: {},
@@ -10449,6 +10446,8 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
 
     const credentialMatch = path.match(/^\/api\/dnsman\/credential(?:\/(\d+))?$/);
     if (credentialMatch) {
+        const { prepareMockDomainCredentials } = await import('./domain-operations-mock');
+        prepareMockDomainCredentials(db.dnsCredentials);
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
         const id = credentialMatch[1] ? Number(credentialMatch[1]) : null;
@@ -10769,7 +10768,8 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             return { status: true, data: { purchase: purchase.id, domain: domain.id, name: domain.name, status: domain.status, operation_id: null, privacy: true, privacy_downgraded: false } };
         }
         if (action === 'register-existing') {
-            const { mockDomainRegistrationName } = await import('./domain-operations-mock');
+            const { mockDomainRegistrationName, prepareMockDomainCredentials } = await import('./domain-operations-mock');
+            prepareMockDomainCredentials(db.dnsCredentials);
             const name = mockDomainRegistrationName(body.domain);
             const credential = db.dnsCredentials.find((candidate) => candidate.id === Number(body.credential));
             if (method !== 'POST' || !name || !credential || credential.provider !== 'godaddy' || !credential.is_active || !credential.verified || credential.group !== Number(body.group)) return { status: false, error: 'A same-group verified GoDaddy credential and exact domain are required', error_code: 400 };
