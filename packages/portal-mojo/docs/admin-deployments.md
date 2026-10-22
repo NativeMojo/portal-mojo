@@ -138,3 +138,13 @@ requires a subsequent deliberate reselect/upload/deploy action. It neither erase
 an earlier attempt nor silently replays it. The mock follows the backend's narrow
 reuse rule: current release plus an active/live attempt, not permanent reuse for
 every release ID.
+
+
+Owner lifetimes survive React development StrictMode's setup/cleanup/setup replay.
+Query closures keep a stable identity/scope handle whose live signal is renewed
+before read effects resume; they do not retain an aborted first-render controller.
+Actual unmount, actor/session replacement and authority or active-state changes
+abort the old lifetime and discard late results. The mounted harness places
+StrictMode above the providers/router so React 19 actually replays initial effects,
+and verifies cold authorized bootstrap/platform reads through an asynchronous
+transport gate as well as real owner cancellation.
