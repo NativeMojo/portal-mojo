@@ -10,3 +10,19 @@
 .admin-deployments .deployment-record { padding: 16px 20px; }
 
 .deployment-attempt-summary { flex-shrink: 0; text-align: right; }
+
+/* Deployment tasks share compact, native dialogs; secondary evidence stays on request. */
+.deployment-dialog-header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1.25rem;min-width:0}
+.deployment-dialog-heading{min-width:0}.deployment-dialog-header .modal-title{margin:0}.deployment-dialog-header p{margin:.4rem 0 0;overflow-wrap:anywhere}
+.deployment-actions,.deployment-row-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.deployment-stack,.deployment-tab-content{display:grid;gap:1rem;min-width:0}.deployment-tab-content{padding-top:1rem}
+.deployment-dialog .deployment-toolbar{margin-block:.75rem}.deployment-dialog .deployment-facts{margin-block:.5rem}
+.deployment-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-block:1rem}
+.deployment-summary-grid>div,.deployment-evidence{padding:1rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-width:0;overflow-wrap:anywhere}
+.deployment-evidence>strong{margin-right:.75rem}.deployment-evidence p{margin-block:.5rem 0}.deployment-empty{padding:1.25rem;color:var(--mute)}
+.deployment-fields{border:0;padding:0;margin:0;min-width:0}.deployment-fields legend{padding:0;font-weight:650}.deployment-instructions{padding-left:1.4rem;display:grid;gap:.75rem}
+.deployment-key-setup{border-top:1px solid var(--line);padding-top:1rem;margin-top:1rem}.deployment-key-setup p{margin-block:.5rem 1rem}
+.deployment-setup-progress{display:flex;gap:.5rem;flex-wrap:wrap;padding:0;list-style:none;margin:1rem 0 1.5rem}.deployment-setup-progress li{display:flex;align-items:center;gap:.35rem;color:var(--mute);padding:.5rem .65rem;border-radius:6px;border:1px solid var(--line)}.deployment-setup-progress [aria-current="step"]{color:var(--accent);border-color:var(--accent);font-weight:650}
+.deployment-pagination{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-block:1rem}
+.admin-deployments input[type="checkbox"],.admin-deployments input[type="radio"]{width:auto;padding:0;accent-color:var(--accent)}.admin-deployments label:has(>input[type="checkbox"]),.admin-deployments label:has(>input[type="radio"]){display:flex;align-items:flex-start;gap:.65rem}
+@container(max-width:560px){.deployment-dialog-header{flex-direction:column}.deployment-summary-grid{grid-template-columns:minmax(0,1fr)}.deployment-attempt-summary{text-align:left}.deployment-dialog .modal-actions{display:flex;flex-wrap:wrap;gap:.65rem}.deployment-dialog .modal-actions>*{margin:0}.deployment-dialog .deployment-facts>div{grid-template-columns:minmax(0,1fr);gap:.25rem}}

@@ -25,13 +25,19 @@ try{
 
  // Cold authorized page reads must survive StrictMode setup→cleanup→setup, including an async auth/transport gate.
  fixture.beforeTransport=async()=>{await Promise.resolve();};fixture.calls=[];
- await mount(DeploymentsPage);assert(button('New WebApp'),'StrictMode cold mount must finish bootstrap and admit New WebApp without manual refresh');
+ await mount(DeploymentsPage);assert(!button('New WebApp'),'API lane must not advertise WebApp creation');assert(!fixture.calls.some(c=>c.path==='/api/account/admin/bootstrap'),'API lane does not issue bootstrap reads for an inactive WebApps task');
  assert(!document.body.textContent.includes('API observation unavailable'),'StrictMode must not leave the initial platform query poisoned by an aborted owner');
  assert(document.querySelector('.deployment-current strong')?.getAttribute('title') === 'a'.repeat(40),'Last-converged serving evidence loads on the first mount');
  assert.equal(qc.getQueryCache().getAll().filter(q=>q.queryKey[0]==='deployments'&&q.state.status==='error').length,0);
- await unmount();fixture.beforeTransport=null;
+ await click('WebApps');await flush();assert(button('New WebApp'),'StrictMode WebApps lane finishes bootstrap and admits creation without manual refresh');await unmount();fixture.beforeTransport=null;
  // Resting app rows keep desired content distinct from the latest attempt's outcome.
- mock.setDeploymentMockScenario('mixed-webapp');await mount(DeploymentsPage);await click('WebApps');await flush();const attemptSummary=document.querySelector('.deployment-attempt-summary');assert(attemptSummary?.textContent.includes('Latest attempt'),'Outcome explicitly names the latest attempt, not the release pointer');assert(document.body.textContent.includes('Release pointer:'));await unmount();mock.setDeploymentMockScenario('failed-newer');
+ mock.setDeploymentMockScenario('mixed-webapp');await mount(DeploymentsPage);await click('WebApps');await flush();const attemptSummary=document.querySelector('.deployment-attempt-summary');assert(attemptSummary?.textContent.includes('Latest attempt'),'Outcome explicitly names the latest attempt, not the release pointer');assert(document.body.textContent.includes('Desired version:'));await unmount();mock.setDeploymentMockScenario('failed-newer');
+ // UI task boundaries: a sole lane needs no tab strip; unavailable HTTP200 evidence is not empty history.
+ fixture.user={id:7,permissions:{view_platform:true}};fixture.calls=[];await mount(DeploymentsPage);assert.equal(document.querySelectorAll('[role="tablist"]').length,0);assert(!fixture.calls.some(c=>c.path.includes('webapp')||c.path.includes('bootstrap')));await unmount();
+ fixture.user={id:7,is_superuser:true,permissions:{}};mock.setDeploymentMockScenario('collector-unavailable');await mount(DeploymentsPage);assert(document.body.textContent.includes('Deployment observation unavailable'));assert(!document.body.textContent.includes('No deployment attempts recorded'));await unmount();mock.setDeploymentMockScenario('failed-newer');
+ const {ApiDeploymentDetail}=await server.ssrLoadModule(prefix+'ApiDeploymentDetail.tsx');
+ await mount(ApiDeploymentDetail,{id:'11111111-1111-4111-8111-111111111111',onClose(){}});assert(!button('Verify nodes'));assert(!button('Retry same commit'));assert(!button('Converge fleet'));assert.equal(document.querySelectorAll('details').length,0);await unmount();
+ await mount(ApiDeploymentDetail,{id:'22222222-2222-4222-8222-222222222222',onClose(){}});assert(button('Verify nodes'));assert(button('Retry same commit'));await click('Nodes');assert(document.body.textContent.includes('node-a'));await click('Activity');assert(document.body.textContent.includes('Failure diagnosis'));assert(document.body.textContent.includes('Process failed before restart proof'));await unmount();
  // The stable handle survives artificial replay, but real disposal/session/authority changes still revoke it.
  const permissions=await server.ssrLoadModule(prefix+'permissions.ts'),api=await server.ssrLoadModule(prefix+'api.ts');let capturedScope;
  function OwnerProbe(){capturedScope=obs.useDeploymentOwner();return React.createElement('output',null,capturedScope.key);}
