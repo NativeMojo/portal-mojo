@@ -56,7 +56,7 @@ export function MaintenancePage({
     const access = maintenanceAccess(auth.authenticated && String(me?.id) === auth.uid ? me : null);
     const location = useLocation(), route = useAdminRouteContext();
     const queryClient = useQueryClient();
-    const deploymentLink = deploymentsHref ?? (route ? route.paths.includes('deployments') ? `#${route.mount}/deployments` : undefined : maintenanceDeploymentsHref(location.pathname));
+    const deploymentLink = deploymentsHref ?? (route ? route.paths.includes(`${route.mount.replace(/\/$/, '')}/deployments`) ? `#${route.mount}/deployments` : undefined : maintenanceDeploymentsHref(location.pathname));
     const [policy, setPolicy] = useState<Framework | null>(null), [progress, setProgress] = useState<string | null>(null);
     const [aws, setAWS] = useState<Evidence<Report>>({}),
         [framework, setFramework] = useState<Evidence<Framework>>({}),
@@ -115,7 +115,7 @@ export function MaintenancePage({
                               if (active()) {
                                   setFramework({ value });
                                   reconcilePolicy(value);
-                                  if (refresh) refreshRefusedMaintenanceAttempt('framework');
+                                  if (refresh) { refreshRefusedMaintenanceAttempt('framework'); refreshRefusedMaintenanceAttempt('framework-policy'); }
                               }
                           } catch (e) {
                               if (active()) setFramework({ error: message(e) });
@@ -173,12 +173,12 @@ export function MaintenancePage({
         // Registry revision schedules the next bounded observation after the previous response.
     }, [attemptRevision, access.aws, pollInterval, pollLimit, revision]);
     const canWrite = mode.value === 'managed' && !mode.loading && access.manage;
-    const canPolicy = canWrite && me?.is_superuser === true && access.framework;
+    const canPolicy = canWrite && me?.is_active === true && me?.is_superuser === true && access.framework;
     useEffect(() => { if (!canPolicy) setPolicy(null); }, [canPolicy]);
     const submitPolicy = async (value: string) => {
         const c = controller.current; if (!c || inFlight.current || !canPolicy) return;
         inFlight.current = true; setBusy(true); setError('');
-        const fence = maintenanceFence({ signal: c.signal, beforeSend: () => { const st = current.current; if (!st.access.manage || !st.access.framework || st.mode.value !== 'managed' || st.mode.loading || currentUser.current?.is_superuser !== true) throw new MaintenanceError('denied'); } });
+        const fence = maintenanceFence({ signal: c.signal, beforeSend: () => { const st = current.current; if (!st.access.manage || !st.access.framework || st.mode.value !== 'managed' || st.mode.loading || (currentUser.current?.is_superuser !== true || currentUser.current?.is_active !== true)) throw new MaintenanceError('denied'); } });
         try {
             await requestPolicy(value, fence);
             const fresh = await readFramework(fence, true); fence.beforeSend?.(); setFramework({ value: fresh }); reconcilePolicy(fresh);
@@ -200,7 +200,7 @@ export function MaintenancePage({
                     ? !state.access.aws ||
                       !state.aws.value?.findings.some((f) => JSON.stringify(f) === consent.fingerprint)
                     : !state.access.framework ||
-                      consent.framework.pin.mode !== 'latest' && currentUser.current?.is_superuser !== true ||
+                      consent.framework.pin.mode !== 'latest' && (currentUser.current?.is_superuser !== true || currentUser.current?.is_active !== true) ||
                       JSON.stringify(state.framework.value) !== consent.fingerprint)
             )
                 throw new MaintenanceError('denied');

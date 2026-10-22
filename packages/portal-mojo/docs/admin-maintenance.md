@@ -125,7 +125,7 @@ Resource rows keep the offered version, provider state and upgrade action visibl
 
 Database, Cache and Django-MOJO are separate tabs. Scan metadata is collapsed; scan errors, incomplete evidence and scanning-off warnings stay above the tabs. Submitted operations remain visible independently of the selected category. See [visual QA](admin-presentation.md).
 
-Support deadlines within30 days or overdue remain visible on resource rows;
+Standard support deadlines within 30 days or overdue remain visible on resource rows;
 standard and extended support stay separate. Missing support dates are not
 interpreted as supported. Framework status distinguishes current, policy-paused
 published versions, and unavailable/latest-unknown evidence, with source details

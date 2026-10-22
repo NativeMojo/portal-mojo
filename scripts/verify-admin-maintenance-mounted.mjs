@@ -75,6 +75,7 @@ try {
     const { MaintenancePage: Page, maintenanceDeploymentsHref } = await server.ssrLoadModule(
         '/packages/portal-mojo/src/admin/maintenance/MaintenancePage.tsx',
     );
+    const { AdminRouteContext } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/core/route-context.ts');
     const ops = await server.ssrLoadModule('/packages/portal-mojo/src/admin/maintenance/operations.ts');
     globalThis.__maintenanceFixture = { persona: { is_superuser: true }, posts: 0 };
     const fixture = globalThis.__maintenanceFixture;
@@ -97,7 +98,7 @@ try {
                         React.createElement(
                             React.StrictMode,
                             null,
-                            React.createElement(Page, { pollInterval: 8, pollLimit: 6, ...props }),
+                            React.createElement(AdminRouteContext.Provider, {value: props.route ?? null}, React.createElement(Page, { pollInterval: 8, pollLimit: 6, ...props})),
                         ),
                     ),
                 ),
@@ -397,6 +398,25 @@ try {
     mock.setMockMaintenanceScenario('findings'); await login('dns.manager@nativemojo.com'); await mount(); await ready(); await click('Django-MOJO');
     assert(!button('Update policy'),'advanced/platform grants do not bypass literal superuser owner');checks++;
     await unmount();
+    // A definite policy refusal requires fresh explicit review; renewal must not replay it.
+    fixture.persona={is_superuser:true,is_active:true};fixture.posts=0;
+    mock.setMockMaintenanceScenario('reauth');await login('assistant.operator@nativemojo.com');await mount();await ready();await click('Django-MOJO');
+    let policyFresh=0;auth.setFreshAuthHandler(async()=>{policyFresh++;await auth.login('assistant.operator@nativemojo.com','mojo');auth.stopAutoRefresh();return true;});
+    await choosePolicy('Hold');await click('Save policy');await wait(()=>policyFresh===1&&!document.querySelector('dialog'),'policy 440 spends consent');
+    assert.equal(fixture.posts,1);assert(!button('Update policy'));
+    mock.setMockMaintenanceScenario('findings');await click('Refresh Maintenance');await ready();await click('Django-MOJO');
+    await wait(()=>button('Update policy'),'successful explicit policy refresh permits new review');assert.equal(fixture.posts,1);
+    auth.setFreshAuthHandler(null);checks+=3;await unmount();
+    // Same-session active-status loss dismisses unsent policy consent.
+    await mount();await ready();await click('Django-MOJO');await click('Update policy');
+    fixture.persona={is_superuser:true,is_active:false};await act(async()=>{await qc.invalidateQueries();});
+    await wait(()=>!document.querySelector('dialog'),'inactive owner loses policy consent');assert.equal(fixture.posts,1);checks++;await unmount();
+    fixture.persona={is_superuser:true,is_active:true};mock.setMockMaintenanceScenario('findings');
+    await mount({route:{mount:'/product/custom/admin',paths:['/product/custom/admin/maintenance','/product/custom/admin/deployments']}});await ready();
+    await click('Django-MOJO');await choosePolicy('Hold');await click('Save policy');await wait(()=>!document.querySelector('dialog'),'policy receipt for mounted navigation');
+    assert(document.querySelector('a[href="#/product/custom/admin/deployments"]'),'registered absolute route is linked');checks++;await unmount();
+    await mount({route:{mount:'/product/custom/admin',paths:['/product/custom/admin/maintenance']}});await ready();
+    assert(!document.querySelector('a[href="#/product/custom/admin/deployments"]'),'unregistered destination is suppressed');checks++;await unmount();
     console.log(`Maintenance mounted: ${checks} assertions passed`);
 } finally {
     await act(async () => root?.unmount());
