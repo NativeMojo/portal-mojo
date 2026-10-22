@@ -15,10 +15,14 @@ export function DomainPurchaseWizard(props: WizardProps) {
     const { data: me } = useMe(); const auth = useAuthSnapshot();
     const revision = useSyncExternalStore(subscribeAuth, getAuthSessionRevision, getAuthSessionRevision);
     const canManage = auth.authenticated && hasPermission(me ?? null, DNS_MANAGE_PERMISSIONS, null);
+    const [attempt, setAttempt] = useState<{ uid: string | null; revision: number; id: number } | null>(null);
+    useEffect(() => { setAttempt(value => value?.uid === auth.uid ? value : null); }, [auth.uid]);
+    const recordAttempt = useCallback((id: number) => setAttempt({ uid: auth.uid, revision, id }), [auth.uid, revision]);
     if (!canManage) return <p className="dim" role="status">DNS management permission is required to buy a domain.</p>;
-    return <PurchaseWizard key={`${auth.uid}:${revision}`} {...props} uid={auth.uid} revision={revision} />;
+    if (attempt?.uid === auth.uid && attempt.revision !== revision) return <PurchaseRecovery key={`${auth.uid}:${revision}`} id={attempt.id} onDone={props.onDone} />;
+    return <PurchaseWizard key={`${auth.uid}:${revision}`} {...props} uid={auth.uid} revision={revision} onAttempt={recordAttempt} />;
 }
-function PurchaseWizard({ onDone, onBusyChange, uid, revision }: WizardProps & { uid: string | null; revision: number }) {
+function PurchaseWizard({ onDone, onBusyChange, uid, revision, onAttempt }: WizardProps & { uid: string | null; revision: number; onAttempt: (id: number) => void }) {
     const queryClient = useQueryClient();
     const [group, setGroup] = useState<DnsGroupChoice | null>(null);
     const [base, setBase] = useState(''); const [tlds, setTlds] = useState('com, net, org');
@@ -99,9 +103,9 @@ function PurchaseWizard({ onDone, onBusyChange, uid, revision }: WizardProps & {
                 if (!transient || !group || !selected || selected.price == null || !selected.currency) throw new Error('The quote is missing or expired. Go back for a new quote.');
                 if (!quoteMatches(transient.identity, { group: group.id, domain: selected.name, years: 1, price: selected.price, currency: selected.currency })) { clearQuote(); throw new Error('The quote expired or its inputs changed. Go back for a new quote.'); }
                 if (typedDomain.trim().toLowerCase() !== transient.identity.domain) throw new Error(`Type ${transient.identity.domain} exactly`);
-                attempted.current = true; const accepted = ++generation.current; const token = transient.token; quoteRef.current = null; setPurchaseId(transient.identity.purchase);
+                attempted.current = true; const accepted = ++generation.current; const token = transient.token; quoteRef.current = null; setPurchaseId(transient.identity.purchase); onAttempt(transient.identity.purchase);
                 try {
-                    const acknowledgement = await purchaseDomain({ group: transient.identity.group, purchase: transient.identity.purchase, confirm_token: token, confirm_domain: transient.identity.domain, confirm_price: transient.identity.price });
+                    const acknowledgement = await purchaseDomain({ group: transient.identity.group, purchase: transient.identity.purchase, confirm_token: token, confirm_domain: transient.identity.domain, confirm_price: transient.identity.price }, () => { if (!isCurrent(accepted)) throw new Error('The purchasing session changed. Review the exact purchase before continuing.'); });
                     if (!isCurrent(accepted)) return;
                     if (acknowledgement.purchase !== transient.identity.purchase || acknowledgement.name !== transient.identity.domain) throw new Error('The acknowledgement did not match this purchase');
                     setKnownDomainId(acknowledgement.domain); setPrivacyDowngraded(acknowledgement.privacy_downgraded);
@@ -120,4 +124,18 @@ function PurchaseWizard({ onDone, onBusyChange, uid, revision }: WizardProps & {
         },
     ], [base, busy, contactNotice, group, knownDomainId, missingContact, onDone, privacyDowngraded, purchaseId, queryClient, quoted, receipt, refreshing, results, selected, terminalMessage, tlds, typedDomain]);
     return <FormWizard mode="wizard" resetKey={contactRevision} sections={sections} onBusyChange={handleBusy} onCancel={onDone} onFinish={() => undefined} nextText="Continue" />;
+}
+
+/** Only the attempted ID survives same-user session replacement; tokens and drafts do not. */
+function PurchaseRecovery({ id, onDone }: { id: number; onDone?: () => void }) {
+    const [row, setRow] = useState<DomainPurchaseRow | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+    const flight = useRef(false); const owner = useRef<AbortController | null>(null);
+    useEffect(() => { const controller = new AbortController(); owner.current = controller; return () => controller.abort(); }, []);
+    const refresh = async () => {
+        if (flight.current) return; const signal = owner.current?.signal; flight.current = true; setBusy(true); setError('');
+        try { const value = await fetchPurchaseDetail(id); if (signal?.aborted) return; if (value.id !== id) throw new Error('The ledger response did not match this purchase'); setRow(value); }
+        catch (reason) { if (!signal?.aborted) setError(redactRegistrarError(reason)); }
+        finally { if (!signal?.aborted) { flight.current = false; setBusy(false); } }
+    };
+    return <div className="dns-purchase-receipt"><h3>Check purchase #{id}</h3><p className="form-alert" role="alert">Your session changed. Review this purchase before starting another.</p>{row && <p><code>{row.domain_name}</code> · {row.status}</p>}{error && <p className="form-alert" role="alert">{error}</p>}<div className="modal-actions"><button className="btn" disabled={busy} onClick={() => void refresh()}>{busy ? 'Refreshing…' : 'Refresh'}</button><button className="btn" onClick={() => void modal.open(close => <DomainPurchaseDetail id={id} close={() => close(null)} />, { size: 'md', signal: owner.current?.signal })}>View purchase</button><button className="btn btn-primary" onClick={onDone}>Close</button></div></div>;
 }
