@@ -94,3 +94,4 @@
 @media (max-width: 700px) { .edge-vhost-editor .mojo-tab, .edge-hostname-detail .mojo-tab { font-size: 13px; padding-left: 8px; padding-right: 8px; } }
 
 .edge-vhost-editor .edge-route-row { align-items: end; }
+.edge-hostname-detail .edge-route-actions .btn { white-space: nowrap; }
