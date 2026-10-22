@@ -1,0 +1,25 @@
+.geo-admin { display: grid; gap: 20px; min-width: 0; overflow-wrap: anywhere; container-type: inline-size; }
+.geo-admin .page-header { margin: 0; align-items: start; flex-wrap: wrap; gap: 12px; }
+.geo-admin-setup, .geo-admin-status { min-width: 0; }
+.geo-admin-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 18px; }
+.geo-admin .input { width: 100%; box-sizing: border-box; min-width: 0; }
+.geo-admin [hidden] { display: none !important; }
+.geo-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.geo-admin-actions .btn { white-space: normal; }
+.geo-admin-key { display: grid; gap: 10px; padding: 16px; background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.geo-admin-key p { margin: 0; }
+.geo-admin-advanced { border-top: 1px solid var(--line); padding-top: 16px; }
+.geo-admin-advanced summary { cursor: pointer; font-weight: 650; color: var(--ink-strong); padding: 4px 0; }
+.geo-admin-advanced[open] > .geo-admin-fields { padding-top: 18px; }
+.geo-admin-provider-list { padding: 0; margin: 0; list-style-position: inside; display: grid; gap: 8px; }
+.geo-admin-provider-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.geo-admin-status dl { display: grid; gap: 8px; }
+.geo-admin-status dl > div { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr); gap: 12px; }
+.geo-admin-status dt { color: var(--mute); }
+.geo-admin-status dd { margin: 0; min-width: 0; }
+.geo-admin-notice { border: 1px solid var(--line); background: var(--accent-soft); border-radius: 8px; padding: 12px; margin: 0; }
+@container (max-width: 420px) {
+    .geo-admin-status dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .geo-admin-key { padding: 12px; }
+    .geo-admin-actions { gap: 6px; }
+}
