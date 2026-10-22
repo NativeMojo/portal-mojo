@@ -2,10 +2,38 @@ import { useCallback, useEffect, useMemo, useRef, useLayoutEffect, useState } fr
 import { getAuthSessionRevision, useAuthSnapshot, useMe } from '../../client/runtime';
 import { backendGlobalCan } from '../fleet/access';
 import { assertOwner, deploymentOwner, ownerKey, type DeploymentOwner } from './permissions';
-export function useDeploymentOwner() { const auth = useAuthSnapshot(), me = useMe(), revision = getAuthSessionRevision(); const base = useMemo(() => deploymentOwner(), [auth.uid, auth.authenticated, revision]); const authority = ['view_platform', 'manage_platform', 'admin', 'view_dns', 'manage_dns', 'security', 'manage_webapp', 'view_admin', 'manage_users', 'manage_settings'].map(p => backendGlobalCan(me.data, p)).join(':'); const key = `${ownerKey(base)}:${authority}`; const [epoch, setEpoch] = useState(0); const controller = useMemo(() => new AbortController(), [key, epoch]); useLayoutEffect(() => { if (controller.signal.aborted)
-    setEpoch(n => n + 1); return () => controller.abort(); }, [controller]); const owner = useMemo(() => ({ ...base, signal: controller.signal }), [base, controller]); return {
-    owner, signal: controller.signal, key
-}; }
+/** One identity/scope lifetime, including React's development-only effect replay. */
+export function useDeploymentOwner() {
+    const auth = useAuthSnapshot(), me = useMe(), revision = getAuthSessionRevision();
+    const base = useMemo(() => deploymentOwner(), [auth.uid, auth.authenticated, revision]);
+    const authority = [me.data?.is_active !== false, ...[
+        'view_platform', 'manage_platform', 'admin', 'view_dns', 'manage_dns',
+        'security', 'manage_webapp', 'view_admin', 'manage_users', 'manage_settings',
+    ].map(permission => backendGlobalCan(me.data, permission))].join(':');
+    const key = `${ownerKey(base)}:${authority}`;
+    const lifetime = useMemo(() => ({ controller: new AbortController() }), [key]);
+    const [, renderLiveSignal] = useState(0);
+    useLayoutEffect(() => {
+        // StrictMode replays setup after cleanup without replacing query keys.
+        // Renew this same scope before its read effects resume, and publish the
+        // new signal to consumers that capture a concrete signal during render.
+        if (lifetime.controller.signal.aborted) {
+            lifetime.controller = new AbortController();
+            renderLiveSignal(generation => generation + 1);
+        }
+        const mountedController = lifetime.controller;
+        return () => mountedController.abort();
+    }, [lifetime]);
+    // Query callbacks from the first render must see the controller belonging
+    // to the current setup, rather than a permanently aborted render snapshot.
+    // A genuine unmount has no following setup; its lifetime remains aborted.
+    // A different actor/session/authority receives a separate lifetime object.
+    const owner = useMemo<DeploymentOwner>(() => ({
+        ...base,
+        get signal() { return lifetime.controller.signal; },
+    }), [base, lifetime]);
+    return { owner, signal: lifetime.controller.signal, key };
+}
 export interface Observation<T> {
     value: T | null;
     state: 'idle' | 'observing' | 'stopped' | 'terminal' | 'error';
