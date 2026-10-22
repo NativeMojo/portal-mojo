@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getAuthSessionRevision, requestFreshAuth, useAuthSnapshot, useMe } from '../../client/runtime';
+import { date, datetime } from '../../ui/format';
 import { MaintenanceDialog } from './MaintenanceDialogs';
 import {
     frameworkActionLabel,
@@ -26,6 +27,9 @@ import {
     resourceKey,
     subscribeMaintenanceAttempts,
 } from './operations';
+function ObservedTime({ value, dateOnly = false }: { value: string | number | null | undefined; dateOnly?: boolean }) {
+    return value != null ? <time dateTime={String(value)} title={String(value)}>{dateOnly ? date(value) : datetime(value)}</time> : <>unknown / unpublished</>;
+}
 interface Evidence<T> {
     value?: T;
     error?: string;
@@ -231,29 +235,21 @@ export function MaintenancePage({
                 <div>
                     <h3>{f.resource_id}</h3>
                     <p>
-                        {f.kind} · {f.engine} ·{' '}
+                        {f.engine} ·{' '}
                         <span className="mono">
                             {f.current_version} → {f.available_major}
                         </span>
                     </p>
-                    <p>
-                        Live: {f.status ?? 'unknown'} · Pending: {f.pending_version ?? 'unknown'} · Settled:{' '}
-                        {f.settled === null ? 'unknown' : String(f.settled)}
-                    </p>
-                    {f.engine_versions && (
-                        <p>
-                            Member versions: {f.engine_versions.join(', ') || 'unknown'}
-                            {f.members === undefined ? '' : ` · ${f.members} members`}
-                        </p>
-                    )}
-                    <p>Standard support deadline: {f.deadline ?? 'unknown / unpublished'}</p>
-                    <p>Extended support deadline: {f.extended_deadline ?? 'unknown / unpublished'}</p>
-                    {f.note && <p>{f.note}</p>}
-                    {f.release_notes_url && (
-                        <a href={f.release_notes_url} target="_blank" rel="noopener noreferrer">
-                            Release notes
-                        </a>
-                    )}
+                    <p className="maintenance-resource-status">Offered upgrade · {f.status ?? 'Provider status unknown'}{f.pending_version ? ` · pending ${f.pending_version}` : ''}</p>
+                    <details className="maintenance-details"><summary>Support &amp; upgrade details</summary>
+                        <p>Resource: {f.kind} · Live: {f.status ?? 'unknown'} · Pending: {f.pending_version ?? 'not reported'} · {f.settled === null ? 'Settlement unknown' : f.settled ? 'Settled' : 'Still changing'}</p>
+                        {f.engine_versions && <p>Member versions: {f.engine_versions.join(', ') || 'unknown'}{f.members === undefined ? '' : ` · ${f.members} members`}</p>}
+                        <p>Standard support deadline: <ObservedTime value={f.deadline} dateOnly /></p>
+                        <p>Extended support deadline: <ObservedTime value={f.extended_deadline} dateOnly /></p>
+                        {f.note && <p>{f.note}</p>}
+                        <p>Review compatibility and snapshot-based recovery before a major upgrade. The confirmation explains restart and outage impact.</p>
+                        {f.release_notes_url && <a href={f.release_notes_url} target="_blank" rel="noopener noreferrer">Release notes</a>}
+                    </details>
                     {attempt && <p role="status">{attempt.message}</p>}
                 </div>
                 {canWrite && access.aws && !attempt && aws.value?.status === 'ok' && (
@@ -301,10 +297,8 @@ export function MaintenancePage({
                             <>
                                 <p>
                                     Region: {aws.value.region ?? 'unknown'} · Scan time:{' '}
-                                    {aws.value.generated_at ?? 'unknown'}
-                                </p>
-                                <p>
-                                    Scheduled scanning:{' '}
+                                    <ObservedTime value={aws.value.generated_at} />
+                                    {' · '}Scheduled scanning:{' '}
                                     {aws.value.scheduled
                                         ? 'on'
                                         : 'off — this page only reflects the current scan'}
@@ -357,25 +351,14 @@ export function MaintenancePage({
                     )}
                     {fw && (
                         <>
-                            <dl>
-                                <dt>Installed</dt>
-                                <dd>{fw.installed ?? 'unknown'}</dd>
-                                <dt>Latest published</dt>
-                                <dd>{fw.latest ?? 'unknown'}</dd>
-                                <dt>Checked</dt>
-                                <dd>{fw.checked_at ?? 'unknown'}</dd>
-                                <dt>Source</dt>
-                                <dd>{fw.source}</dd>
-                                <dt>Pin policy</dt>
-                                <dd>
-                                    {fw.pin.mode} {fw.pin.value}
-                                </dd>
-                                <dt>Update available</dt>
-                                <dd>{String(fw.update_available)}</dd>
-                                <dt>Can update</dt>
-                                <dd>{String(fw.can_update)}</dd>
+                            <dl className="maintenance-framework-summary">
+                                <div><dt>Installed</dt><dd>{fw.installed ?? 'unknown'}</dd></div>
+                                <div><dt>Latest published</dt><dd>{fw.latest ?? 'unknown'}</dd></div>
+                                <div><dt>Update policy</dt><dd>{fw.pin.mode === 'latest' ? 'Automatic updates' : fw.pin.mode === 'hold' ? 'Updates paused' : `Pinned to ${fw.pin.value ?? 'unknown version'}`}</dd></div>
                             </dl>
-                            {fw.blocked_reason && <p>Blocked: {fw.blocked_reason.replaceAll('_', ' ')}</p>}
+                            <p>{fw.update_available ? 'A newer framework version is available.' : 'No newer framework version reported.'} {fw.can_update ? 'Ready for a reviewed update.' : 'Update is unavailable.'}</p>
+                            {fw.blocked_reason && <p className="maintenance-warning">{fw.blocked_reason.replaceAll('_', ' ')}</p>}
+                            <details className="maintenance-details"><summary>Framework evidence</summary><p>Checked: <ObservedTime value={fw.checked_at} /> · Source: {fw.source}</p><p>Pin policy: {fw.pin.mode} {fw.pin.value}</p><p>An accepted framework update clears the pin and requests redeployment. Follow Deployments for fleet evidence.</p></details>
                             {canWrite && fw.can_update && !getMaintenanceAttempt('framework') && (
                                 <button
                                     className="btn"

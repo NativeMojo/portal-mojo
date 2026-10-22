@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAuthSessionRevision, getAuthSnapshot, useAuthSnapshot, useMe } from '../../client/runtime';
 import { Badge } from '../../ui';
+import { datetime } from '../../ui/format';
 import { backendGlobalCan, FLEET_DASHBOARD_GRANTS } from '../fleet/access';
 import { readHostingReadiness, readServingBootstrap, type HostingReadiness, type ServingBootstrap } from './serving-data';
 
@@ -43,21 +44,19 @@ export function ServingReadiness({ refreshRevision = 0 }: { refreshRevision?: nu
     const edge = visible.bootstrap?.edge, report = visible.report, selected = report?.sections.find(section => section.code === 'hosting_vhosts');
     const unavailable = !bootstrapAllowed ? 'Node posture and hosting readiness are unavailable to this session. A global Admin bootstrap grant is required; the Serving table remains available.' : visible.error;
     return <section className="edge-serving-evidence" aria-label="Serving evidence">
-        <header className="edge-serving-heading"><p className="dim">Enabled records express configuration intent. Readiness is observed separately.</p><button type="button" className="btn btn-compact" disabled={visible.busy} onClick={() => setRefresh(value => value + 1)}>{visible.busy ? 'Refreshing…' : 'Refresh serving evidence'}</button></header>
+        <header className="edge-serving-heading"><p className="dim">Enabled records express configuration intent; readiness is separate.</p><button type="button" className="btn btn-compact" disabled={visible.busy} onClick={() => setRefresh(value => value + 1)}>{visible.busy ? 'Refreshing…' : 'Refresh serving evidence'}</button></header>
         <div className="edge-serving-evidence-grid">
             <section className="panel panel-pad"><h3>Certificate serving posture</h3>
                 <p>Public HTTP vhosts on this node: <b>{edge?.available && edge.http_enabled !== null ? edge.http_enabled ? 'enabled' : 'disabled' : 'unknown'}</b></p>
                 <p>DNSMAN issuance: {edge?.available && edge.dnsman_issuance === 'dns-01' ? 'DNS-01' : 'unknown'}</p>
-                <p className="dim">HTTP is a file rendering setting, not an observed listener. DNS-01 describes the issuance method, not successful issuance or serving.</p>
+                <details><summary>About this observation</summary><p className="dim">HTTP is a file rendering setting, not an observed listener. DNS-01 describes the issuance method, not successful issuance or serving.</p></details>
                 {unavailable && <p role="status">Unavailable: {unavailable}</p>}
             </section>
             <section className="panel panel-pad"><h3>Hosting readiness</h3>
-                {selected && report ? <><Badge tone={selected.status === 'pass' ? 'info' : selected.status === 'fail' ? 'danger' : 'muted'}>{selected.status}</Badge><p className="dim">Generated {report.generated_at}</p>
-                    <p className="dim">Report status: {report.overall} · {report.summary.pass} pass · {report.summary.warn} warn · {report.summary.fail} fail · {report.summary.pending} pending</p>
+                {selected && report ? <><Badge tone={selected.status === 'pass' ? 'info' : selected.status === 'fail' ? 'danger' : 'muted'}>{selected.status}</Badge><p className="dim">Generated <time dateTime={report.generated_at} title={report.generated_at}>{datetime(report.generated_at)}</time></p>
                     <p>Coverage: {selected.coverage.returned} of {selected.coverage.total} checks · {selected.coverage.omitted} omitted{report.truncated || report.coverage.checks.omitted || report.coverage.sections.omitted ? ' · truncated report' : ''}</p>
-                    <details><summary>Readiness details</summary>{selected.checks.map((check, index) => <div key={`${check.code}:${index}`} className="edge-serving-check"><b>{check.status} · {check.code}</b><p>{check.explanation}</p><p>{check.remediation}</p>{check.details && Object.entries(check.details).map(([key, value]) => <p key={key}>{key}: {String(value)}</p>)}</div>)}</details>
+                    <p className="dim">Domain and certificate configuration checks; fleet convergence is unverified.</p><details><summary>Readiness details</summary><p className="dim">Report status: {report.overall} · {report.summary.pass} pass · {report.summary.warn} warn · {report.summary.fail} fail · {report.summary.pending} pending</p>{selected.checks.map((check, index) => <div key={`${check.code}:${index}`} className="edge-serving-check"><b>{check.status} · {check.code}</b><p>{check.explanation}</p><p>{check.remediation}</p>{check.details && Object.entries(check.details).map(([key, value]) => <p key={key}>{key}: {String(value)}</p>)}</div>)}                <p className="dim">Checks enabled hostnames’ domain and certificate status only. A pass does not prove expiry, coverage, installed certificate material, fleet nodes or running generation. A hostname absent from this bounded report has no individual verdict.</p></details>
                 </> : <p role="status">{visible.busy ? 'Loading observation…' : `Unavailable: ${visible.reportError ?? unavailable ?? 'Requires a literal superuser and successful same-identity bootstrap with setup capability.'}`}</p>}
-                <p className="dim">Checks enabled hostnames’ domain and certificate status only. A pass does not prove expiry, coverage, installed certificate material, fleet nodes or running generation. A hostname absent from this bounded report has no individual verdict.</p>
             </section>
         </div>
     </section>;

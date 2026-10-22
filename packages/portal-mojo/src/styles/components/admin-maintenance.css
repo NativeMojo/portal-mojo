@@ -3,7 +3,7 @@
     gap: 1.25rem;
     max-width: 80rem;
     margin: auto;
-    padding: 1.5rem;
+    padding: 0;
     overflow-wrap: anywhere;
 }
 .admin-maintenance header,
@@ -94,7 +94,7 @@
 }
 @media (max-width: 600px) {
     .admin-maintenance {
-        padding: 0.75rem;
+        padding: 0;
     }
     .admin-maintenance header,
     .maintenance-resource {
@@ -109,3 +109,5 @@
 }
 
 .admin-maintenance h1{font-size:26px;font-weight:750;line-height:1.2;letter-spacing:-.025em;color:var(--ink-strong)}.admin-maintenance h2,.maintenance-dialog h2{font-size:18px;font-weight:700;line-height:1.35;color:var(--ink-strong)}.admin-maintenance h3{font-size:16px;font-weight:650;line-height:1.4;color:var(--ink-strong)}
+
+.maintenance-resource>div{min-width:0}.maintenance-resource>button{flex-shrink:0}.maintenance-resource-status{color:var(--mute)}.maintenance-details{margin-block:.65rem}.maintenance-details>summary{font-size:13px;font-weight:600;cursor:pointer;color:var(--mute)}.maintenance-details[open]>summary{margin-bottom:.65rem}.admin-maintenance .maintenance-framework-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.maintenance-framework-summary>div{min-width:0}.maintenance-framework-summary dt{font-size:12px;color:var(--mute);margin-bottom:4px}.maintenance-framework-summary dd{font-size:16px;font-weight:600;overflow-wrap:anywhere}.admin-maintenance .maintenance-resource h3{margin-bottom:.25rem}.admin-maintenance .maintenance-resource p{margin:.25rem 0}.admin-maintenance .maintenance-details p{margin:.5rem 0}@media(max-width:600px){.admin-maintenance .maintenance-framework-summary{grid-template-columns:1fr}.maintenance-resource>button{align-self:flex-start}}

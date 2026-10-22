@@ -84,3 +84,5 @@ Register `verify-admin-maintenance.mjs` and `verify-admin-maintenance-mounted.mj
 once each; the harness is an imported test adapter, not a command. Public index
 exports are MaintenancePage, maintenanceDeploymentsHref, maintenanceAccess,
 frameworkActionLabel, MAINTENANCE_ENDPOINTS and maintenanceCompleted.
+
+Resource rows keep the offered version, provider state and upgrade action visible. Support deadlines, member evidence and recovery notes remain under each row’s disclosure. Dates use compact local presentation and preserve the original wire value in their title. Framework policy uses readable labels; missing or refused evidence remains explicit.
