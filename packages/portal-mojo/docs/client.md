@@ -458,3 +458,10 @@ now **rejects** a flat HTTP-200 refusal (top-level `success:false`) with
 - `err.errorCode` carries the refusal code and `err.data` the full reply, so
   the server's reason is no longer lost.
 - `defineModel` actions and `mojoAction` behave as before.
+
+`mojoCall` accepts optional `idempotencyKey` for a reviewed operation receipt. The
+transport validates 1–128 ASCII receipt characters (`A-Z`, `a-z`, `0-9`, `.`, `_`,
+`:`, `-`) and emits only the `Idempotency-Key` header. It does not expose arbitrary
+custom headers or record the key with sensitive bodies. Preserve the same receipt
+for a deliberate retry of the same operation; observe uncertain outcomes before
+creating another operation.

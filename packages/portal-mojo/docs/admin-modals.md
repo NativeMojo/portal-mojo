@@ -70,6 +70,7 @@ the inventory using `node scripts/verify-admin-modals.mjs --write-inventory`.
 | Storage/shortlinks | Bucket, FileManager, File, shortlink; owner/backend/test/CORS/upload/rendition/share | FileManager/shortlink/share active state; no File disable promise; bucket empty only |
 | Email/support | Domain, mailbox, sent message, template, contact; credentials/onboarding/audit/reconcile/test/template/status | Preserve evidence; separate mailbox directions and support status |
 | Phone/Push | Number, SMS, config, device, delivery, template; lookup/test/config editors | Config/template lifecycle; number/SMS/device/delivery evidence retained |
+| Operations | Fleet capacity planning, Maintenance exact resource/window confirmation, GeoLocation local key-removal confirmation, API/WebApp detail and focused onboarding/recovery/upload/credential flows | No generic deployment/release edits or deletion; staged intent, observed receipts and transient secrets remain distinct |
 | Edge | Vhost with nested routes; shape-first wizard, route editor, upstream declare/retire, blocklist entry editor | Vhost and upstream enabled state; upstreams retire and are never deleted; vhost, route and blocklist deletion are retained operations |
 | Assistant/settings | Conversation, Skill, Setting; feed continuation, scoped memory, typed settings editor | Owner-only continuation; Skill active selection; memory is scoped editing |
 

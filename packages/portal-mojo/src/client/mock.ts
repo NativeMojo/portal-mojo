@@ -696,6 +696,9 @@ function buildDnsCredentials(): MockDnsCredential[] {
         { id: 8101, created: now - 180 * 86400, modified: now - 7 * 86400, group: 1, name: 'Acme registrar', provider: 'godaddy', is_active: true, verified: true, verified_at: now - 7 * 86400, domain_count: 12, last_error: null, api_key_masked: '********A1B2', api_secret_masked: '********C3D4' },
         { id: 8102, created: now - 90 * 86400, modified: now - 3600, group: 2, name: 'Engineering legacy', provider: 'godaddy', is_active: true, verified: false, verified_at: now - 30 * 86400, domain_count: 4, last_error: 'Provider verification failed', api_key_masked: '********E5F6', api_secret_masked: '********G7H8' },
         { id: 8103, created: now - 30 * 86400, modified: now - 3 * 86400, group: 4, name: 'Support retired', provider: 'godaddy', is_active: false, verified: true, verified_at: now - 30 * 86400, domain_count: 2, last_error: null, api_key_masked: '********J1K2', api_secret_masked: '********L3M4' },
+        { id: 8104, created: now, modified: now, group: 2, name: 'Engineering verified', provider: 'godaddy', is_active: true, verified: true, verified_at: now, domain_count: 1, last_error: null, api_key_masked: '********P4Q5', api_secret_masked: '********R6S7' },
+        { id: 8105, created: now, modified: now, group: 1, name: 'Unsupported registrar credential', provider: 'route53', is_active: true, verified: true, verified_at: now, domain_count: 0, last_error: null, api_key_masked: '', api_secret_masked: '' },
+        { id: 8106, created: now, modified: now, group: 1, name: 'Inactive GoDaddy credential', provider: 'godaddy', is_active: false, verified: true, verified_at: now, domain_count: 0, last_error: null, api_key_masked: '********T8U9', api_secret_masked: '********V1W2' },
     ];
 }
 
@@ -2894,6 +2897,12 @@ function decorateUsers(users: MockUser[], groups: MockGroup[]): void {
     dnsPlatform.email = 'dns.platform@nativemojo.com';
     dnsPlatform.display_name = 'DNS Platform Operator';
     dnsPlatform.permissions = {};
+    for (const [offset, role, grants] of [
+        [53, 'viewer', { view_platform: true, view_dns: true }],
+        [54, 'platform', { view_admin: true, manage_platform: true }],
+        [55, 'webapp', { view_admin: true, manage_webapp: true, manage_dns: true, manage_groups: true }],
+        [56, 'group', {}], [57, 'denied', {}],
+    ] as const) Object.assign(at(offset), { is_active: true, is_superuser: false, username: `deployments.${role}`, email: `deployments.${role}@nativemojo.com`, display_name: `Deployments ${role}`, permissions: { ...grants } });
     const dnsTenant = at(23);
     dnsTenant.is_active = true;
     dnsTenant.is_superuser = false;
@@ -4109,6 +4118,7 @@ const deviceRows = buildDevices();
 const geoIpRows = buildGeoIps();
 const loginEventRows = linkLoginDevices(buildLoginEvents(users), deviceRows);
 const members = buildMembers(users, groups);
+members.push({ id: 191, created: groups[0]!.created, modified: groups[0]!.modified, is_active: true, permissions: { manage_webapp: true, manage_dns: true }, metadata: {}, user: 56, group: 1 });
 members.push({
     id: 190, created: groups[0]!.created, modified: groups[0]!.modified,
     is_active: true, permissions: { view_dns: true }, metadata: {},
@@ -6767,6 +6777,7 @@ let dnsConfigMalformed = false;
 let dnsAcmeMode: 'production' | 'staging' | 'unconfigured' = 'staging';
 let dnsRegistrarMode: 'ready' | 'disabled' | 'contact-missing' = 'ready';
 let dnsRegistrarFault: 'failed' | 'ambiguous' | null = null;
+let domainRegistrarSaveFault: 'warning' | 'ambiguous' | null = null;
 let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
 let dnsFailNextRead = false;
 const mockRegistrantScopeState = new Map<string, 'saved' | 'cleared'>();
@@ -6895,6 +6906,7 @@ export function setMockDnsRegistrarMode(value: 'ready' | 'disabled' | 'contact-m
 
 /** Verifier-only one-shot result after a confirmation token is consumed. */
 export function armMockRegistrarPurchaseFault(value: 'failed' | 'ambiguous'): void { dnsRegistrarFault = value; }
+export function armMockDomainRegistrarSaveFault(value: 'warning' | 'ambiguous'): void { domainRegistrarSaveFault = value; }
 
 /** Verifier-only one-shot DNS transport outcomes; all state still lives in db.dnsRecords. */
 export function armMockDnsWriteFault(mode: 'reject' | 'ambiguous' | 'reconcile'): void {
@@ -9917,10 +9929,13 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
     if (path === '/api/account/admin/bootstrap' || path === '/api/account/admin/settings'
-        || path === '/api/account/admin/dashboard' || path.startsWith('/api/aws/capacity')) {
+        || path === '/api/account/admin/dashboard' || path.startsWith('/api/aws/capacity')
+        || path.startsWith('/api/aws/maintenance/') || path.startsWith('/api/account/admin/platform') || path === '/api/account/admin/setup/readiness'
+        || path.startsWith('/api/edge/webapp') || path.startsWith('/api/edge/release') || path === '/api/edge/deployment') {
         const { operationsMock } = await import('./operations-mock');
         const claims = decodeMockJwt((opts.headers?.Authorization ?? '').replace(/^Bearer /, ''));
-        return operationsMock(path, opts, { user: userFromBearer(opts.headers), credentialKind: claims?.credential_kind ?? claims?.token_type, authTime: authTimeFromBearer(opts.headers), origin: opts.headers?.Origin });
+        const operationsResult = await operationsMock(path, opts, { user: userFromBearer(opts.headers), credentialKind: claims?.credential_kind ?? claims?.token_type, authTime: authTimeFromBearer(opts.headers), origin: opts.headers?.Origin });
+        if (operationsResult !== undefined) return operationsResult;
     }
     const pushResult = await pushFetch(path, opts);
     if (pushResult !== undefined) return pushResult;
@@ -10483,6 +10498,11 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
                 if ('privacy' in opts.body) row.privacy = Boolean(opts.body.privacy);
                 if ('credential' in opts.body) row.credential = opts.body.credential == null ? null : Number(opts.body.credential);
                 row.modified = Math.floor(Date.now() / 1000);
+                if (row.provider === 'route53' && domainRegistrarSaveFault) {
+                    const fault = domainRegistrarSaveFault; domainRegistrarSaveFault = null;
+                    row.last_error = 'Registrar update was not confirmed. Inspect the registrar before changing this setting again.';
+                    if (fault === 'ambiguous') return { status: false, error: 'Registrar update acknowledgement unavailable', error_code: 503 };
+                }
             }
             return { status: true, data: serializeDnsDomain(row), graph: 'default' };
         }
@@ -10678,7 +10698,13 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         const action = path.slice('/api/dnsman/registrar/'.length);
         const body = opts.body ?? {};
         const houseAction = ['discover', 'adopt', 'assign-group'].includes(action);
-        if (houseAction && !caller.is_superuser) return permissionDenied();
+        if (houseAction && caller.is_superuser !== true) return permissionDenied();
+        if (houseAction || action === 'purchase') {
+            const { mockRegistrarSession } = await import('./domain-operations-mock');
+            const refusal = mockRegistrarSession(decodeMockJwt((opts.headers?.Authorization ?? '').replace(/^Bearer /, '')), action === 'purchase');
+            if (caller.is_active !== true || refusal === 'denied') return permissionDenied();
+            if (refusal === 'stale') return { status: false, error: 'reauth_required', error_code: 440 };
+        }
         if (!houseAction) {
             const groupId = Number(body.group ?? opts.params?.group ?? 0);
             if (groupId > 0 ? !dnsMemberCan(caller, groupId, action !== 'search' && action !== 'suggest')
@@ -10722,14 +10748,16 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             const now = Math.floor(Date.now() / 1000);
             const id = Math.max(8300, ...db.domainPurchases.map((candidate) => candidate.id)) + 1;
             const token = `mock-once-${id}-${Math.random().toString(36).slice(2)}`;
-            const purchase: MockDomainPurchase = { id, created: now, modified: now, group: groupId, user: caller.id, domain_name: String(body.domain).toLowerCase(), kind: 'register', status: 'quoted', price: '12.00', cost: '12.00', currency: 'USD', years, quote_expires: now + 900, operation_id: null, error: null, metadata: { confirm_digest: mockTokenDigest(token) } };
+            const purchase: MockDomainPurchase = { id, created: now, modified: now, group: groupId, user: caller.id, domain_name: answer.name, kind: 'register', status: 'quoted', price: '12.00', cost: '12.00', currency: 'USD', years, quote_expires: now + 900, operation_id: null, error: null, metadata: { confirm_digest: mockTokenDigest(token) } };
             db.domainPurchases.unshift(purchase);
             return { status: true, data: { purchase: id, name: purchase.domain_name, price: purchase.price, currency: purchase.currency, years: purchase.years, token, expires: purchase.quote_expires, privacy_supported: true } };
         }
         if (action === 'purchase') {
+            if (method !== 'POST') return { status: false, error: 'Method not allowed', error_code: 405 };
+            const { validMockPurchaseTuple } = await import('./domain-operations-mock');
             const purchase = db.domainPurchases.find((candidate) => candidate.id === Number(body.purchase));
             const digest = typeof purchase?.metadata.confirm_digest === 'string' ? purchase.metadata.confirm_digest : '';
-            if (!purchase || mockTokenDigest(String(body.confirm_token ?? '')) !== digest || purchase.status !== 'quoted' || (purchase.quote_expires ?? 0) <= Date.now() / 1000) return { status: false, error: 'That purchase confirmation is not valid. Request a new quote and try again.', error_code: 400 };
+            if (!purchase || !validMockPurchaseTuple(purchase, body, caller.id) || mockTokenDigest(String(body.confirm_token ?? '')) !== digest || purchase.status !== 'quoted' || (purchase.quote_expires ?? 0) <= Date.now() / 1000) return { status: false, error: 'That purchase confirmation is not valid. Request a new quote and try again.', error_code: 400 };
             delete purchase.metadata.confirm_digest;
             purchase.status = dnsRegistrarFault === 'failed' ? 'failed' : 'submitted'; purchase.error = dnsRegistrarFault === 'failed' ? 'Registrar rejected the operation after durable intent' : null; purchase.lifecycle_reads = dnsRegistrarFault === 'failed' ? undefined : 0; purchase.modified = Math.floor(Date.now() / 1000);
             const now = purchase.modified;
@@ -10741,10 +10769,14 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             return { status: true, data: { purchase: purchase.id, domain: domain.id, name: domain.name, status: domain.status, operation_id: null, privacy: true, privacy_downgraded: false } };
         }
         if (action === 'register-existing') {
+            const { mockDomainRegistrationName } = await import('./domain-operations-mock');
+            const name = mockDomainRegistrationName(body.domain);
             const credential = db.dnsCredentials.find((candidate) => candidate.id === Number(body.credential));
-            if (!credential || !credential.is_active || !credential.verified || credential.group !== Number(body.group)) return { status: false, error: 'A verified credential is required', error_code: 400 };
+            if (method !== 'POST' || !name || !credential || credential.provider !== 'godaddy' || !credential.is_active || !credential.verified || credential.group !== Number(body.group)) return { status: false, error: 'A same-group verified GoDaddy credential and exact domain are required', error_code: 400 };
+            if (db.dnsDomains.some(row => row.name === name)) return { status: false, error: 'Domain is already registered', error_code: 400 };
+            if (name.includes('provider-failure')) return { status: false, error: 'Provider ownership could not be verified', error_code: 400 };
             const now = Math.floor(Date.now() / 1000);
-            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: credential.group, user: caller.id, name: String(body.domain).toLowerCase(), provider: credential.provider, credential: credential.id, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} };
+            const domain: MockDnsDomain = { id: Math.max(8200, ...db.dnsDomains.map((candidate) => candidate.id)) + 1, created: now, modified: now, group: credential.group, user: caller.id, name, provider: credential.provider, credential: credential.id, status: 'active', hosted_zone_id: null, auto_renew: false, privacy: false, verified: true, registered_on: null, expires: null, last_error: null, metadata: {} };
             db.dnsDomains.push(domain); db.dnsRecords.set(domain.id, []);
             return { status: true, data: serializeDnsDomain(domain) };
         }

@@ -24,8 +24,18 @@ export const JOBS_ADMIN_SECTION: AdminSection = {
         { path: 'scheduled-tasks', label: 'Scheduled Tasks', loadComponent: () => import('../jobs/ScheduledTasksPage').then(({ ScheduledTasksPage }) => ({ default: ScheduledTasksPage })), permissions: SCHEDULED_TASK_VIEW_PERMS },
     ],
 };
+export const DEPLOYMENTS_ADMIN_SECTION: AdminSection = {
+    id: 'deployments', title: 'Deployments', icon: 'bi-rocket', navigationGroup,
+    permissions: ['sys.view_platform', 'sys.manage_platform', 'sys.admin', 'sys.view_dns', 'sys.manage_dns', 'sys.security'],
+    routes: [{ path: '', label: 'Deployments', loadComponent: () => import('../deployments/DeploymentsPage').then(({ DeploymentsPage }) => ({ default: DeploymentsPage })) }],
+};
+export const MAINTENANCE_ADMIN_SECTION: AdminSection = {
+    id: 'maintenance', title: 'Maintenance', icon: 'bi-tools', navigationGroup,
+    permissions: ['sys.manage_aws', 'sys.view_platform', 'sys.manage_platform', 'sys.admin'],
+    routes: [{ path: '', label: 'Maintenance', loadComponent: () => import('../maintenance/MaintenancePage').then(({ MaintenancePage }) => ({ default: MaintenancePage })) }],
+};
 export const GEOLOCATION_ADMIN_SECTION: AdminSection = {
     id: 'geolocation', title: 'GeoLocation', icon: 'bi-geo-alt', navigationGroup, permissions: [],
     routes: [{ path: '', label: 'GeoLocation', requireSuperuser: true, loadComponent: () => import('../geolocation/GeoLocationPage').then(({ GeoLocationPage }) => ({ default: GeoLocationPage })) }],
 };
-export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, FLEET_CONFIGURATION_ADMIN_SECTION, JOBS_ADMIN_SECTION, GEOLOCATION_ADMIN_SECTION] as const;
+export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, FLEET_CONFIGURATION_ADMIN_SECTION, JOBS_ADMIN_SECTION, MAINTENANCE_ADMIN_SECTION, DEPLOYMENTS_ADMIN_SECTION, GEOLOCATION_ADMIN_SECTION] as const;

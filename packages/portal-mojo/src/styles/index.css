@@ -25,6 +25,9 @@
 @import "./components/admin-security.css" layer(portal-mojo);
 @import "./components/admin-dashboard.css" layer(portal-mojo);
 @import "./components/admin-operational-fleet.css" layer(portal-mojo);
+@import "./components/admin-maintenance.css" layer(portal-mojo);
+@import "./components/admin-deployments.css" layer(portal-mojo);
+@import "./components/admin-domains.css" layer(portal-mojo);
 @import "./admin-geolocation.css" layer(portal-mojo);
 @import "./components/admin-cloudwatch.css" layer(portal-mojo);
 @import "./components/admin-monitoring.css" layer(portal-mojo);

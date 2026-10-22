@@ -206,9 +206,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/dns/DomainOnboardingDialog.tsx:showDomainOnboarding:modal.open:0",
-      "fingerprint": "c3cecb9980f7544d5435",
-      "category": "action",
-      "purpose": "DomainOnboardingDialog: focused lifecycle, verification or operation result"
+      "fingerprint": "a500e868356ddd9f2174",
+      "category": "editor",
+      "purpose": "Register an existing owned name or choose the preserved adoption and purchase workflows"
     },
     {
       "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor:modal.open:0",
@@ -362,9 +362,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard:modal.open:0",
-      "fingerprint": "835efa4d14dc52953b88",
+      "fingerprint": "a7af7da6605ca262ea69",
       "category": "editor",
-      "purpose": "VhostWizard: collect and save fields"
+      "purpose": "Configure hostname and shape with retained Advanced values, guarded staged writes and uncertain-outcome reconciliation"
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:openDeclareUpstream:modal.open:0",
@@ -503,6 +503,54 @@
       "fingerprint": "b9170da4ccaf90279e96",
       "category": "confirmation",
       "purpose": "Confirm local intent to remove the stored Mojo GeoIP credential on the next explicit Save"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx:openRecovery:modal.open:0",
+      "fingerprint": "fc529513535ae357daf9",
+      "category": "action",
+      "purpose": "Confirm exact observed API attempt recovery and follow the returned identity"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:loadUpload:modal.open:0",
+      "fingerprint": "1ffe3acd949398053ae6",
+      "category": "action",
+      "purpose": "Register an immutable manifest, upload checksum-bound files, and observe the exact deployment"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchRollback:modal.open:0",
+      "fingerprint": "305b2c916cfd5ded0c85",
+      "category": "action",
+      "purpose": "Review verified release and exact app/version confirmation before rollback and bounded observation"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchKey:modal.open:0",
+      "fingerprint": "be4fb5f67b759ea06eb9",
+      "category": "action",
+      "purpose": "Review deployment credential lifecycle and reveal one transient secret outside caches"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:resume:modal.open:0",
+      "fingerprint": "0658dcb889a1ca04811f",
+      "category": "action",
+      "purpose": "Resume the matching durable onboarding operation using observed cursor and revision"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:newApp:modal.open:0",
+      "fingerprint": "6ad851c4eb21414d0cca",
+      "category": "editor",
+      "purpose": "Choose eligible workspace, app identity and public address for durable server onboarding"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx:MaintenanceDialog:dialog:0",
+      "fingerprint": "51881aa00bff7faea778",
+      "category": "confirmation",
+      "purpose": "Confirm exact resource or framework version and explicit outage window before a guarded update"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx:showDomainRegistrarSettings:modal.open:0",
+      "fingerprint": "bcb835928b55d1fd8f8b",
+      "category": "editor",
+      "purpose": "Save changed Route53 registrar booleans and observe authoritative domain warnings"
     }
   ],
   "lifecycle": [
@@ -528,7 +576,7 @@
       "file": "packages/portal-mojo/src/admin/dns/api.ts",
       "symbol": "deleteDnsRecordSet",
       "expression": "deleteDnsRecordSet",
-      "fingerprint": "d40cabeae6b261e659a6",
+      "fingerprint": "65314f579e7428e478b5",
       "permission": "DNS record mutation authority, live capability and coordinated zone revision",
       "rationale": "Compatibility alias only; low-level API remains exported and does not add a built-in UI affordance.",
       "runtimeCase": "dns-record-delete-coordinator"

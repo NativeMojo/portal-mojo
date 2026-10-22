@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { registerNonFilterParams, useMe } from '../../client/runtime';
 import { Tabs } from '../../ui/Tabs';
 import { modal } from '../../ui/modal';
+import { backendGlobalCan } from '../fleet/access';
+import { useAdminRouteContext } from '../core/route-context';
 import { canOnboard, canReadApi, canReadBootstrap, canReadWebApps, isInteractive, assertOwner } from './permissions';
 import { getBootstrap, getPlatform, getWebApps } from './api';
 import { useDeploymentOwner } from './useDeploymentObservation';
@@ -14,6 +16,14 @@ export function DeploymentsPage({ destinations }: {
     destinations?: DeploymentsDestinations;
 } = {}) {
     const me = useMe(), scope = useDeploymentOwner(), [params, setParams] = useSearchParams();
+    const registered = useAdminRouteContext();
+    const mount = registered?.mount === '/' ? '' : registered?.mount;
+    const candidates = destinations ?? (mount !== undefined ? { domains: `${mount}/dns/domains`, serving: `${mount}/edge/vhosts` } : {});
+    const admittedDestinations: DeploymentsDestinations = {};
+    if (backendGlobalCan(me.data, ['view_dns', 'manage_dns', 'security'])) for (const key of ['domains', 'serving'] as const) {
+        const path = candidates[key];
+        if (path && (!registered || registered.paths.includes(path))) admittedDestinations[key] = path;
+    }
     const interactive = isInteractive(), api = interactive && canReadApi(me.data), web = interactive && canReadWebApps(me.data);
     const bootstrap = useQuery({
         queryKey: ['deployments', scope.key, 'bootstrap'], queryFn: ({ signal }) => getBootstrap(scope.owner, signal), enabled: interactive && canReadBootstrap(me.data), retry: false
@@ -27,7 +37,7 @@ export function DeploymentsPage({ destinations }: {
     const items = [...(api ? [{
                 key: 'api', label: 'API', panel: <ApiLane key={scope.key}/>
             }] : []), ...(web ? [{
-                key: 'webapps', label: 'WebApps', panel: <WebAppsLane key={scope.key} destinations={destinations}/>
+                key: 'webapps', label: 'WebApps', panel: <WebAppsLane key={scope.key} destinations={admittedDestinations}/>
             }] : [])];
     return <div className="admin-deployments"><header className="page-header"><div><h1>Deployments</h1><p className="dim">What serves now, what changed, and the next recovery step.</p></div>{web && canOnboard(bootstrap.data) && <button className="btn btn-primary" onClick={() => void newApp()}>New WebApp</button>}</header>{web && !canOnboard(bootstrap.data) && <p className="dim">New WebApp setup requires the separately admitted Admin bootstrap and an eligible workspace. Existing app reads remain available.</p>}<Tabs items={items} activeKey={params.get('deployment_lane') ?? items[0]!.key} onActiveKeyChange={select}/></div>;
 }

@@ -19,6 +19,9 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-monitoring.md](admin-monitoring.md) | Monitoring Admin registration, logs, and exact Redis-backed metrics-permission mutations |
 | [admin-metrics-explorer.md](admin-metrics-explorer.md) | Read-only recorded-metrics discovery, full-slug adapters, KPI/fan-out/scalar contracts, and cache identity |
 | [admin-settings.md](admin-settings.md) | Runtime settings admin — direction-aware atomic writes, write-only secrets, and global/group scope |
+| [admin-deployments.md](admin-deployments.md) | API serving/attempt evidence, WebApp release recovery, durable onboarding, transient CI keys and real uploads |
+| [admin-dns-domains.md](admin-dns-domains.md) | Simple domain inventory, exact-name registration/adoption/purchase, focused registrar settings and DNS links |
+| [admin-maintenance.md](admin-maintenance.md) | Independent AWS upgrade scans and framework policy, exact confirmation, observation and uncertain operation guards |
 | [admin-geolocation.md](admin-geolocation.md) | Owner-only GeoIP provider setup, ordered fallbacks, transient credential verification and publishing |
 | [admin-operational-fleet.md](admin-operational-fleet.md) | Operational health matrix, exact backend grants, reviewed stored capacity plans and bounded batch observation |
 | [admin-fleet-configuration.md](admin-fleet-configuration.md) | Superuser structured configuration publishing, version restore and per-node application evidence |
@@ -38,7 +41,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-dns-registrar.md](admin-dns-registrar.md) | Domain search/quote/purchase, one-use token custody, durable-ledger reconciliation, scoped registrant PII, and manual House adoption |
 | [admin-storage.md](admin-storage.md) | Global S3 buckets, masked storage backends, explicit policy-backed File uploads, capability-safe FileView/shares, and finite rendition convergence |
 | [admin-media-rendering.md](admin-media-rendering.md) | Storage → Media rendering: the three FILEMAN_RENDITIONS_* settings as a descriptor-driven form — delta-from-defaults writes, inline 400 routing, reset by writing `{}` |
-| [admin-edge.md](admin-edge.md) | Edge vhosts by template kind with a shape-first wizard, `site_api` routes and their create order, declared upstreams, and the fleet blocklist with log-first modes. |
+| [admin-edge.md](admin-edge.md) | Serving hostname configuration with a shape-first wizard, independently admitted node posture and bounded hosting readiness, `site_api` routes and their create order, declared upstreams, and the fleet blocklist with log-first modes. |
 | [admin-shortlinks.md](admin-shortlinks.md) | Global shortlink operations, destination-free caches, bounded click history, and reconciled one-shot mutations |
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
 | [admin-phonehub.md](admin-phonehub.md) | Global Phone Hub: evidence-backed lookup, sanitized SMS audits, and write-only provider configuration |

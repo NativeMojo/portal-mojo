@@ -97,7 +97,16 @@
         "verify:admin-operational-fleet": "node scripts/verify-admin-operational-fleet.mjs",
         "verify:admin-operational-fleet-mounted": "node scripts/verify-admin-operational-fleet-mounted.mjs",
         "verify:admin-operations-mounted": "node scripts/verify-admin-operations-mounted.mjs",
-        "verify:admin-operations": "node scripts/verify-admin-operations.mjs"
+        "verify:admin-operations": "node scripts/verify-admin-operations.mjs",
+        "verify:admin-maintenance": "node scripts/verify-admin-maintenance.mjs",
+        "verify:admin-maintenance-mounted": "node scripts/verify-admin-maintenance-mounted.mjs",
+        "verify:admin-deployments": "node scripts/verify-admin-deployments.mjs",
+        "verify:admin-domains": "node scripts/verify-admin-domains.mjs",
+        "verify:admin-domains-mounted": "node scripts/verify-admin-domains-mounted.mjs",
+        "verify:admin-serving-mounted": "node scripts/verify-admin-serving-mounted.mjs",
+        "verify:admin-serving-mounted-evidence": "node scripts/verify-admin-serving-mounted-evidence.mjs",
+        "verify:admin-operational-fleet-partial": "node scripts/verify-admin-operational-fleet-partial.mjs",
+        "verify:admin-operational-fleet-unsent": "node scripts/verify-admin-operational-fleet-unsent.mjs"
     },
     "devDependencies": {
         "jsdom": "^26.1.0"

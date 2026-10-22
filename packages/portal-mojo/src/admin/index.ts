@@ -30,3 +30,7 @@ export * from './fleet';
 export * from './geolocation';
 export { FLEET_ADMIN_SECTION } from './domains/infrastructure';
 export { GEOLOCATION_ADMIN_SECTION } from './domains/operations';
+export * from './maintenance';
+export { MAINTENANCE_ADMIN_SECTION } from './domains/operations';
+export * from './deployments';
+export { DEPLOYMENTS_ADMIN_SECTION } from './domains/operations';

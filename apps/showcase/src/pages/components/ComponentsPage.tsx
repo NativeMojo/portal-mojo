@@ -86,6 +86,9 @@ const AdminMetricsExplorerDemo = lazyDemo(() => import('./demos-admin-metrics-ex
 const AdminDashboardDemo = lazyDemo(() => import('./demos-admin-dashboard'), 'AdminDashboardDemo');
 const AdminCloudWatchDemo = lazyDemo(() => import('./demos-admin-cloudwatch'), 'AdminCloudWatchDemo');
 const AdminOperationalFleetDemo = lazyDemo(() => import('./demos-admin-operational-fleet'), 'AdminOperationalFleetDemo');
+const AdminMaintenanceDemo = lazyDemo(() => import('./demos-admin-maintenance'), 'AdminMaintenanceDemo');
+const AdminDeploymentsDemo = lazyDemo(() => import('../../demos/AdminDeploymentsDemo'), 'AdminDeploymentsDemo');
+const AdminDomainsDemo = lazyDemo(() => import('./demos-admin-domains'), 'AdminDomainsDemo');
 const AdminGeoLocationDemo = lazyDemo(() => import('./demos-admin-geolocation'), 'AdminGeoLocationDemo');
 const FleetConfigurationDemo = lazyDemo(() => import('./demos-admin-settings'), 'FleetConfigurationDemo');
 const AdminSettingsDemo = lazyDemo(() => import('./demos-admin-settings'), 'AdminSettingsDemo');
@@ -475,7 +478,7 @@ const GROUPS: DemoGroup[] = [
                 render: () => <AdminMediaRenderingDemo />,
             },
             {
-                key: 'admin-edge', title: 'Edge', icon: 'bi-hdd-network',
+                key: 'admin-edge', title: 'Serving & Edge', icon: 'bi-hdd-network',
                 blurb: 'Vhosts by shape with a guided wizard, proxied path routes, declared upstreams, and the fleet blocklist with its log-first modes.',
                 render: () => <AdminEdgeDemo />,
             },
@@ -513,6 +516,21 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-operational-fleet', title: 'Operational Fleet', icon: 'bi-cloud',
                 blurb: 'Authoritative fleet health, independent source grants, and reviewed capacity plans with exact observation.',
                 render: () => <AdminOperationalFleetDemo />,
+            },
+            {
+                key: 'admin-maintenance', title: 'Maintenance', icon: 'bi-tools',
+                blurb: 'Independent AWS and framework evidence, exact resource/window confirmation, and durable unknown-outcome guards.',
+                render: () => <AdminMaintenanceDemo />,
+            },
+            {
+                key: 'admin-deployments', title: 'Deployments', icon: 'bi-rocket',
+                blurb: 'Serving versions, exact attempt recovery, WebApp onboarding, transient keys and checksum-bound uploads.',
+                render: () => <AdminDeploymentsDemo />,
+            },
+            {
+                key: 'admin-domains', title: 'Domains', icon: 'bi-globe2',
+                blurb: 'Register an owned name, adopt a Platform zone, buy with an exact quote, and inspect registrar evidence.',
+                render: () => <AdminDomainsDemo />,
             },
             {
                 key: 'admin-geolocation', title: 'GeoLocation', icon: 'bi-geo-alt',

@@ -65,6 +65,14 @@ try {
         'shipped Admin record details must not register child routes');
     const metricsRoutes = admin.MONITORING_ADMIN_SECTION.routes.filter((route) => route.path.startsWith('metrics/'));
     assert.equal(admin.ADMIN_SECTIONS[0].id, 'dashboard');
+    const packagedMenu = admin.adminSectionsMenu(admin.ADMIN_SECTIONS, { mount: '/system', grouped: true });
+    const operations = packagedMenu.items.find(item => item.id === 'admin:operations');
+    assert.deepEqual(operations.children.slice(0, 4).map(item => item.label), ['Fleet', 'Maintenance', 'Deployments', 'GeoLocation']);
+    const infrastructure = packagedMenu.items.find(item => item.id === 'admin:infrastructure');
+    assert(infrastructure.children.some(item => item.label === 'Domains' && item.route === '/system/dns/domains'));
+    assert(infrastructure.children.some(item => item.label === 'Serving' && item.route === '/system/edge/vhosts'));
+    assert(infrastructure.children.some(item => item.route === '/system/dns/records'));
+    assert(infrastructure.children.some(item => item.route === '/system/edge/upstreams'));
     assert(admin.ADMIN_SECTIONS.includes(admin.CLOUDWATCH_ADMIN_SECTION));
     assert(admin.ADMIN_SECTIONS.includes(admin.ASSISTANT_ADMIN_SECTION));
     assert(admin.adminSectionRoutes([admin.CLOUDWATCH_ADMIN_SECTION], { mount: '/system' })
