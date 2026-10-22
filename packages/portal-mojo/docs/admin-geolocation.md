@@ -105,3 +105,5 @@ interactive-superuser/ordinary-manager fixture identities. Run
 StrictMode evidence; central integration also runs settings/fleet/devices/nav,
 typecheck, release/build and both-theme 390px browser verification. JSDOM checks
 behavior only and does not replace browser layout, focus or native-dialog proof.
+
+The owned component stylesheet is `styles/components/admin-geolocation.css`; it is included by `portal-mojo/styles.css` with the other Admin component styles.
