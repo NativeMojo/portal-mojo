@@ -62,9 +62,13 @@ try {
     // No generated files or dependencies added. Bound audited source growth
     // at 6.480 MB, with the eager-runtime cap independently enforced.
     // Shared Dashboard/coordinator source remains unchanged.
+    // Integrated main5930903 adds its separately reviewed dropdown sources;
+    // measured combined package: 6,483,104 bytes. Deployments contributes
+    // 45,998 bytes against that main baseline (6,437,106 bytes).
+    // Bound the combined source payload at 6.485 MB; no generated files added.
     // Content/consumer/style/export checks and the separate 530,000-byte
     // eager-runtime cap remain unchanged.
-    assert.ok(artifact.unpackedSize <= 6_480_000, `unpacked package exceeds 6.480 MB budget (${artifact.unpackedSize})`);
+    assert.ok(artifact.unpackedSize <= 6_485_000, `unpacked package exceeds 6.485 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).
