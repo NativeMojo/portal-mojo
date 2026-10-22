@@ -86,10 +86,10 @@
 .edge-hostname-detail .form-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
 .edge-action-menu { padding: 8px; }
 .edge-route-dialog .edge-form-grid { margin-top: 20px; }
-.edge-check-summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-.edge-check-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.edge-check-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.edge-check-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .edge-check-status > .bi { color: var(--accent); }
-.edge-serving-evidence { min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 16px 20px; display: grid; gap: 8px; }
+.edge-serving-evidence { min-width: 0; margin-top: 12px; display: grid; gap: 4px; font-size: 13px; }
 .edge-serving-evidence > small { font-size: 12px; }
 .edge-check-dialog { max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
 .edge-check-body { overflow: auto; min-height: 0; }
@@ -107,10 +107,19 @@
     .edge-editor-panel { max-height: calc(100dvh - 285px); }
     .edge-route-row > .collection-select { min-width: 0; }
     .edge-check-summary { align-items: flex-start; }
-    .edge-serving-evidence { padding: 16px; }
+    .edge-serving-evidence { width: 100%; }
 }
 @media (max-width: 700px) {
     .edge-vhost-editor .mojo-tab, .edge-hostname-detail .mojo-tab { font-size: 13px; padding-left: 8px; padding-right: 8px; }
 }
 .edge-vhost-editor .edge-route-row { align-items: end; }
 .edge-hostname-detail .edge-route-actions .btn { white-space: nowrap; }
+
+.edge-serving-heading.page-header { align-items: flex-start; }
+.edge-serving-heading.page-header > div { min-width: 0; }
+.edge-serving-evidence .edge-row-actions { align-items: center; gap: 6px; }
+.edge-serving-evidence .btn-compact { font-size: 12px; padding: 4px 8px; }
+.edge-serving-evidence .btn-icon { width: 28px; height: 28px; }
+
+.edge-certificate-summary { display: grid; gap: 8px; min-width: 0; }
+.edge-certificate-summary > .btn { justify-self: start; }
