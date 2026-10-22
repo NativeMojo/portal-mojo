@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { requestFreshAuth, useMe } from '../../client/runtime';
 import { modal } from '../../ui';
@@ -28,6 +28,10 @@ function GeoLocationContent({ fleetConfigurationPath }: { fleetConfigurationPath
     const [verdict, setVerdict] = useState<GeoVerdict | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState('');
     const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [blocked, setBlocked] = useState(true);
     const input = useRef<HTMLInputElement>(null), tabButtons = useRef<(HTMLButtonElement | null)[]>([]), flight = useRef(false), generation = useRef(0), draftEpoch = useRef(0);
+    const keyRef = useCallback((node: HTMLInputElement | null) => {
+        if (input.current && input.current !== node) input.current.value = '';
+        input.current = node;
+    }, []);
     const clearKey = () => { if (input.current) input.current.value = ''; setKeyMode('untouched'); setKeyChanged(false); };
     const invalidate = () => { draftEpoch.current++; setVerdict(null); setNotice(''); };
     useEffect(() => () => { generation.current++; draftEpoch.current++; if (input.current) input.current.value = ''; }, [owner.key]);
@@ -142,7 +146,7 @@ function GeoLocationContent({ fleetConfigurationPath }: { fleetConfigurationPath
                     <p className="dim">{state.geoip.GEOIP_API_KEY_MOJO_CONFIGURED ? <>Key set{state.geoip.GEOIP_API_KEY_MOJO_HINT && <> · <span aria-label="Stored key suffix">••••{state.geoip.GEOIP_API_KEY_MOJO_HINT}</span></>}</> : 'No stored key'}</p>
                     <div className="geo-admin-actions"><button className="btn" aria-pressed={keyMode === 'replace'} onClick={() => void chooseKeyMode('replace')}>{state.geoip.GEOIP_API_KEY_MOJO_CONFIGURED ? 'Replace key' : 'Add key'}</button>{state.geoip.GEOIP_API_KEY_MOJO_CONFIGURED && <button className="btn" onClick={() => void chooseKeyMode('clear')}>Remove key</button>}<button className="btn" disabled={disabled || !!diagnosticBlock || keyMode === 'clear'} onClick={() => void run('test')}>Test key</button>{keyMode !== 'untouched' && <button className="btn" onClick={() => void chooseKeyMode('untouched')}>Cancel key change</button>}</div>
                     {/* Retained across tabs; the raw value lives only in this uncontrolled DOM input. */}
-                    <label className="field" hidden={keyMode !== 'replace'}><span className="field-label">{state.geoip.GEOIP_API_KEY_MOJO_CONFIGURED ? 'Replacement key' : 'New key'}</span><input className="input" ref={input} type="password" aria-label="MojoVerify API key" autoComplete="new-password" spellCheck={false} maxLength={4096} onChange={event => { invalidate(); setKeyChanged(event.currentTarget.value !== ''); }} /><span className="field-help">Leave blank to keep the stored key.</span></label>
+                    <label className="field" hidden={keyMode !== 'replace'}><span className="field-label">{state.geoip.GEOIP_API_KEY_MOJO_CONFIGURED ? 'Replacement key' : 'New key'}</span><input className="input" ref={keyRef} type="password" aria-label="MojoVerify API key" autoComplete="new-password" spellCheck={false} maxLength={4096} onChange={event => { invalidate(); setKeyChanged(event.currentTarget.value !== ''); }} /><span className="field-help">Leave blank to keep the stored key.</span></label>
                     {keyMode === 'clear' && <p className="text-warn">Save changes to remove the stored key. Key removal is not a connection test.</p>}
                     {draft.GEOIP_MOJO_PROVIDER_URL.replace(/\/$/, '') !== state.geoip.GEOIP_MOJO_PROVIDER_URL.replace(/\/$/, '') && <p className="text-warn">Switching to MojoVerify requires a replacement key. The stored key will not be sent to a different service.</p>}
                 </div>

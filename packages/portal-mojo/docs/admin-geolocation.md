@@ -58,7 +58,8 @@ Secrets stay only in the password DOM and short-lived request objects, whose
 raw key is deleted in `finally`. They never enter React/Query/Mutation state,
 URLs, storage, logs or mock observations. Tabs retain the element and candidate;
 Save attempts, explicit discard, fresh-auth refusal, session change and unmount
-clear it. Writes are single-flight. A 440 invokes fresh authentication without
+clear it. A stable ref callback wipes the password element before detachment;
+removing the DOM node alone is insufficient. Writes are single-flight. A 440 invokes fresh authentication without
 replaying; Refresh and a deliberate retry are required. Stale revisions
 (400 “changed; reload before publishing”, or 409), unreadable state and uncertain
 saves require authoritative Refresh before another write.
