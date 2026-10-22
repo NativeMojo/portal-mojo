@@ -59,15 +59,16 @@ belong in inspection. The Domain picker writes URL filter state; search supports
 label/type/pool, not derived full hostnames. Persisted key remains
 `admin:edge:vhosts`; public `Vhost*` exports and `/edge/vhosts` remain compatible.
 
-- **Add hostname:** Address → Routing → Certificate → Review. Compact type choice,
+- **Add hostname:** Hostname → Certificate → Review. Name, type and destination
+  belong to one Hostname task. Compact type choice,
   only relevant destination controls, visible action footer. Other settings holds
   pool/body/static/quiet paths without an accordion. Success opens the saved row.
-- **Edit:** Address / Routing / Certificate / Settings share one controlled draft.
+- **Edit:** Hostname / Certificate / Settings share one controlled draft.
   Validation selects the relevant tab and focuses the invalid input. Saving retains
   the active panel. Domain is immutable. Info-icon popovers carry secondary help.
-- **Inspect:** Overview / Routes / Certificate / Settings; Routes only for Site + API.
-  Overview shows actual redirect/API destination first. Certificate shows stored
-  status/expiry and Change certificate. Settings holds other knobs, timestamps and
+- **Inspect:** Overview / Routes / Settings; Routes only for Site + API.
+  Overview shows actual redirect/API destination first, followed by the certificate
+  name, stored status/expiry and direct Change certificate action. Settings holds other knobs, timestamps and
   read-only platform policy. Header owns enable/disable, Edit and Delete.
 - **Routes:** paginated local table, focused Add/Edit dialogs and explicit removal
   confirmation. Before rename/removal, inspect current quiet paths and complete
@@ -159,13 +160,15 @@ both Me and bootstrap. Server still refuses key-backed/noninteractive sessions;
 client invents no provenance flag. Schema 1 validates status/time/count/coverage,
 keeps the selected section only, caps checks at 64 and scalar details at 16 keys.
 
-The compact summary keeps timestamp and partial-report warning visible; Check
+The unboxed summary sits within the page header and keeps timestamp and
+partial-report warning visible. DNS-only sessions that cannot request bootstrap
+see no global checks summary; admitted observation failures remain visible. Check
 details holds technical evidence. HTTP is a file-rendering setting; DNS-01 is an
 issuance method. Checks cover enabled rows' domain/certificate status, **not** live
 serving, expiry/coverage/material installation, fleet convergence/nodes/generation.
 An omitted hostname has no individual verdict. Enabled/saved is configuration intent.
 
-Errors, denied reads, old-backend 404s and malformed responses show Unavailable or
+Errors, denied attempted reads, old-backend 404s and malformed responses show Unavailable or
 Unknown. Failed refresh clears old evidence. UID/session revision fence reads;
 same-session loss of admission/bootstrap/superuser/setup authority disposes report
 modals. Reads occur only while mounted/admitted, without polling; configuration

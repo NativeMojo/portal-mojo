@@ -1,9 +1,13 @@
 # Admin presentation and visual QA
 
 Use intuitive, simple screens with clean spacing. Keep only important data and
-short action-oriented copy on the primary surface. Use tabs for distinct jobs,
-modals for record inspection/confirmation, and keyboard-accessible help popovers
-for explanations. On pages that already scroll, use modals/popovers rather
+short action-oriented copy on the primary surface. Use tabs, modals and help
+popovers only when they improve the task. Tabs separate
+distinct jobs; do not split a few related fields across tiny panels or render
+a one-item tab strip. Use focused modals for substantial inspection/confirmation
+and keyboard-accessible info popovers for secondary explanations. Keep navigation
+directly discoverable rather than hiding destination links inside help. On pages
+that already scroll, use modals/popovers rather
 than collapsible detail sections. Compact disclosures such as Maintenance are
 fine; this is contextual. Preserve Admin Dashboard as-is unless Ian explicitly
 requests a change; separate Fleet work must not alter it. Keep action-specific errors, unknown outcomes and concrete

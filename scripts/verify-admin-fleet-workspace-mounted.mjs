@@ -146,6 +146,11 @@ try {
     // Deliberately return different authoritative params than the local draft.
     // This is presentation evidence only: it never consents to or applies the plan.
     await reset();
+    await click('Operations');
+    const jobsSource = [...document.querySelectorAll('.fp-source')].find(row => row.querySelector('strong')?.textContent === 'Jobs');
+    assert.equal(jobsSource?.querySelector('strong a')?.getAttribute('href'), '/embedded/control/jobs/list', 'Authorized source destinations are directly available without opening help');
+    assert.equal(document.querySelector('.ops-help-content a'), null, 'Evidence help is not the navigation entry point'); checks += 2;
+    await click('Infrastructure');
     transformPlan = plan => ({ ...plan, steps: plan.steps.map((step, index) => ({
         ...step,
         description: `Authoritative step ${index + 1}`,
@@ -156,9 +161,9 @@ try {
     await openEditor();
     const sourceChoices = [...input('Healthy source').options].filter(option => option.value).map(option => ({ id: option.value, label: option.textContent }));
     await stageNode();
-    await click('Placement');
+    await click('Change subnet');
     await field('Subnet override', 'subnet-9244');
-    await click('Use placement');
+    await click('Use subnet');
     await click('Database');
     await field('Size for db-reader-b', 'medium');
     await click('Redis');
@@ -223,12 +228,12 @@ try {
     assert(button(/^Review changes/).disabled, 'App additions require an explicit healthy source');
     assert.equal(plans().length, 0, 'Drafting does not auto-request a server plan');
     await field('Healthy source', 'i-mockb');
-    await click('Placement');
+    await click('Change subnet');
     await field('Subnet override', 'invalid-placement');
-    await click('Use placement');
+    await click('Use subnet');
     assert(text().includes('Enter a subnet-'), 'Invalid placement stays in its focused editor');
     await field('Subnet override', 'subnet-9244');
-    await click('Use placement');
+    await click('Use subnet');
     await click('Database');
     await field('Size for db-reader-b', 'medium');
     await click('Redis');

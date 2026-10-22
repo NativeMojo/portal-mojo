@@ -13,11 +13,11 @@ owned dialogs, and rechecks authority before sending and accepting responses.
 
 ## Tasks
 
-**Provider** contains primary provider, MojoVerify key and threat sharing.
-**Failover** contains fallback and ordered additional providers, with add,
-remove and move controls. One retained draft spans both tabs. Page-local hidden
-panels preserve the same uncontrolled password element; shared Tabs is unchanged.
-Arrow/Home/End navigation and `aria-controls` connect task tabs to their panels.
+Primary, fallback and ordered additional providers form one visible configuration task,
+with add, remove and move controls. MojoVerify credentials and threat sharing sit
+below the chain. One retained draft and Save/Discard footer cover the form; there
+is no tab navigation for parts of the same task. The uncontrolled password element
+stays mounted while editing, and shared Tabs is unchanged.
 
 MojoVerify always uses `https://api.mojoverify.com`; no URL control is shown.
 Older origins remain readable, but this page stages the hosted URL and warns
@@ -30,8 +30,10 @@ The server's values are authoritative: setup defaults differ from runtime defaul
 No key shows **Add key**; a configured key shows **Replace key** and **Remove
 key**. Test key sits with the credential. Blank replacement preserves the stored
 key; confirmed removal is staged until Save changes and does not revoke remotely.
-Save/Discard reflect actual draft changes. Refresh confirms before discarding an
-unsaved draft. Info popovers hold secondary explanations; Configuration information
+Save/Discard reflect actual draft changes. Refresh and the page-owned Open Fleet Configuration link confirm before discarding an
+unsaved draft. Keep editing preserves both provider selections and the entered key;
+explicit departure wipes the key before navigation. An in-flight operation cannot
+be interrupted through that link. Info popovers hold secondary explanations; Configuration information
 opens a focused native dialog for revision and publication facts. No disclosure
 sections or sidebar modal are used.
 
@@ -56,7 +58,7 @@ fragment or alternate port (443 allowed); keys are at most 4096 characters.
 
 Secrets stay only in the password DOM and short-lived request objects, whose
 raw key is deleted in `finally`. They never enter React/Query/Mutation state,
-URLs, storage, logs or mock observations. Tabs retain the element and candidate;
+URLs, storage, logs or mock observations. Editing retains the element and candidate;
 Save attempts, explicit discard, fresh-auth refusal, session change and unmount
 clear it. A stable ref callback wipes the password element before detachment;
 removing the DOM node alone is insufficient. Writes are single-flight. A 440 invokes fresh authentication without

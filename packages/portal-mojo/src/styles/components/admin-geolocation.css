@@ -3,11 +3,8 @@
 .geo-admin h1 { font-size: 26px; font-weight: 750; line-height: 1.2; letter-spacing: -.025em; color: var(--ink-strong); margin: 4px 0 8px; }
 .geo-admin h2 { font-size: 16px; font-weight: 700; line-height: 1.35; color: var(--ink-strong); margin: 0; }
 .geo-admin-setup, .geo-admin-status { min-width: 0; }
-.geo-admin-tabs { display: flex; gap: 24px; padding: 0 24px; border-bottom: 1px solid var(--line); }
-.geo-admin-tabs [role=tab] { appearance: none; border: 0; border-bottom: 2px solid transparent; background: none; padding: 17px 0 14px; color: var(--mute); font: inherit; font-weight: 600; cursor: pointer; }
-.geo-admin-tabs [aria-selected=true] { color: var(--ink-strong); border-bottom-color: var(--accent); }
-.geo-admin-tabs [role=tab]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 2px; }
-.geo-admin-tabpanel { padding: 24px; }
+.geo-admin-form { padding: 24px; }
+.geo-admin-provider-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .geo-admin-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 22px; }
 .geo-admin .field { display: grid; gap: 8px; min-width: 0; }
 .geo-admin .field-label, .geo-admin-key-heading, .geo-admin-sharing { display: flex; gap: 8px; align-items: center; }
@@ -32,8 +29,8 @@
 .geo-admin-dialog dt { color: var(--mute); font-size: 12px; margin-bottom: 4px; }
 .geo-admin-dialog dd { margin: 0; overflow-wrap: anywhere; }
 @container (max-width: 420px) {
-    .geo-admin-tabs { padding-inline: 18px; }
-    .geo-admin-tabpanel, .geo-admin-status { padding: 18px; }
+    .geo-admin-provider-fields { grid-template-columns: 1fr; }
+    .geo-admin-form, .geo-admin-status { padding: 18px; }
     .geo-admin-key { padding: 12px; }
     .geo-admin-provider-list li { flex-wrap: wrap; }
     .geo-admin-actions { gap: 6px; }
