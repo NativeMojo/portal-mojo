@@ -40,7 +40,7 @@ const PRIORITIES: ComboOption[] = [
     { value: 1, label: 'Low', description: 'Fix eventually' },
     { value: 2, label: 'Medium', description: 'Fix this sprint' },
     { value: 3, label: 'High', description: 'Fix this week' },
-    { value: 4, label: 'Critical', description: 'Fix now' },
+    { value: 4, label: 'Critical', description: 'Unavailable for this example', disabled: true },
 ];
 
 const show = (v: ComboValue | null) => (v === null || v === '' ? '(empty)' : `${JSON.stringify(v)} (${typeof v})`);
@@ -142,11 +142,13 @@ export function ComboBoxDemo() {
                         allowCustom={false}
                         onChange={(v) => setPrio(v)}
                         placeholder="Priority…"
+                        aria-label="Priority"
                     />
                 </div>
                 <p className="dim" style={{ margin: '10px 0 0' }}>
                     Option values stay <code>number</code> through selection — web-mojo matched stringified DOM
                     attributes with <code>===</code> and numeric options could never re-select.
+                    Critical is visible but disabled; keyboard navigation skips it.
                     committed: <code>{show(prio)}</code>
                 </p>
             </div>

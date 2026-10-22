@@ -1,3 +1,4 @@
+import { ComboBox } from '../ComboBox';
 // TimePicker — HH:MM time input with the stepper panel and optional IANA
 // timezone. Ported from web-mojo src/core/forms/inputs/TimePicker.js (648
 // lines, read in full) + the `.mojo-time-*` block of calendar.css.
@@ -25,7 +26,7 @@
 //
 // Timezone-picker SEAM: this component owns every bit of the zone's value and
 // serialization logic but renders the picker through `renderTimezoneSelect`.
-// Without that prop it falls back to a plain token-styled <select> built from
+// Without that prop it falls back to a searchable ComboBox built from
 // Intl.supportedValuesOf('timeZone'), so the feature is complete standalone.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
@@ -92,7 +93,7 @@ export interface TimePickerProps {
     timezones?: string[] | null;
     /** Default 'iso'. Unknown values warn + fall back. */
     outputFormat?: TimeOutputFormat;
-    /** Zone-picker slot. Absent → the built-in fallback <select>. */
+    /** Zone-picker slot. Absent → the built-in ComboBox. */
     renderTimezoneSelect?: (props: TimezoneSelectSlotProps) => ReactNode;
     /** Fires on COMMIT only, and only when the serialized value changed. */
     onChange?: (event: TimeChangeEvent) => void;
@@ -252,18 +253,7 @@ function FallbackTimezoneSelect({ value, onChange, timezones, disabled }: Timezo
     }, [known, value]);
 
     return (
-        <select
-            className="input mojo-time-tz-select"
-            aria-label="Timezone"
-            value={value ?? ''}
-            disabled={disabled}
-            onChange={(e) => onChange(e.currentTarget.value || null)}
-        >
-            <option value="">(no timezone)</option>
-            {/* A value the list doesn't carry still shows — never render nothing. */}
-            {!known && value ? <option value={value}>{value}</option> : null}
-            {zones.map((z) => <option key={z} value={z}>{z}</option>)}
-        </select>
+        <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} className="mojo-time-tz-select" aria-label="Timezone" value={String(value ?? '')} disabled={disabled} onChange={(selectedValue) => onChange(String(selectedValue) || null)} options={[({ value: "", label: "(no timezone)" }), ...(!known && value ? [({ value: String(value), label: String(value) })] : []), ...(zones.map((z) => ({ value: String(z), label: String(z) })) ?? [])]} />
     );
 }
 

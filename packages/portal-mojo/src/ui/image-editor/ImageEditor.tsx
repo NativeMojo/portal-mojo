@@ -1,3 +1,4 @@
+import { ComboBox } from '../ComboBox';
 import {
     useCallback, useEffect, useMemo, useRef, useState,
     type PointerEvent as ReactPointerEvent,
@@ -403,14 +404,12 @@ export function ImageEditor(props: ImageEditorProps) {
                     <span className="image-editor-value">{Math.round(cropBox.width)} × {Math.round(cropBox.height)} px{cropOptions.cropAndScale ? ` → ${cropOptions.cropAndScale.width} × ${cropOptions.cropAndScale.height}` : ''}</span>
                 </>}
                 {mode === 'filters' && <label className="image-editor-preset">Effect
-                    <select className="select" value={preset} disabled={disabled} onChange={(event) => {
-                        const next = event.target.value;
+                    <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} value={String(preset)} disabled={disabled} onChange={(selectedValue) => {
+                        const next = String(selectedValue);
                         if (next in FILTER_PRESETS) setPreset(next as FilterPresetName);
                         else { console.warn(`ImageEditor: unknown filter preset ${JSON.stringify(next)} — falling back to Original.`); setPreset('none'); }
                         setDirty(true);
-                    }}>
-                        {Object.entries(FILTER_PRESETS).map(([key, value]) => <option key={key} value={key}>{value.name}</option>)}
-                    </select>
+                    }} options={[...(Object.entries(FILTER_PRESETS).map(([key, value]) => ({ value: String(key), label: String(value.name) })) ?? [])]} />
                 </label>}
                 <button type="button" className="btn btn-primary btn-compact image-editor-apply" disabled={disabled || (mode !== 'crop' && !dirty && !transformDirty(transform) && !filterDirty(filters, preset))} onClick={() => commit(mode, mode === 'crop')}>Apply</button>
             </div>

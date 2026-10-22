@@ -18,7 +18,7 @@
 //   (web-mojo strict-equalled `data-value` strings against numbers).
 // - Popover is the sole outside-click/Escape owner. ComboBox owns only the
 //   meaning of each dismissal (settle outside, revert on Escape).
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode, type Ref } from 'react';
 import { Popover } from './Popover';
 
 export type ComboValue = string | number;
@@ -28,11 +28,13 @@ export interface ComboOption {
     label: string;
     /** Muted second line in the dropdown (rendered while `showDescription`). */
     description?: string;
+    /** Visible but unavailable; cannot be committed by pointer, typing or keyboard. */
+    disabled?: boolean;
     /** Opaque payload handed back through onSelect — rule-builder hook. */
     meta?: Record<string, unknown>;
 }
 
-export interface ComboBoxProps {
+export interface ComboBoxProps extends Pick<InputHTMLAttributes<HTMLInputElement>, 'aria-label' | 'aria-labelledby' | 'aria-describedby' | 'aria-invalid' | 'title' | 'autoFocus' | 'name'> {
     /** Committed value. The input DISPLAYS the matching option's label. */
     value?: ComboValue | null;
     /** Bare strings normalize to { value: s, label: s }. */
@@ -54,6 +56,7 @@ export interface ComboBoxProps {
     required?: boolean;
     id?: string;
     className?: string;
+    inputRef?: Ref<HTMLInputElement>;
 }
 
 function normalizeOptions(input: ReadonlyArray<ComboOption | string>): ComboOption[] {
@@ -66,6 +69,7 @@ function normalizeOptions(input: ReadonlyArray<ComboOption | string>): ComboOpti
         const opt: ComboOption = { value: raw.value, label: raw.label || String(raw.value) };
         if (raw.description) opt.description = raw.description;
         if (raw.meta) opt.meta = raw.meta;
+        if (raw.disabled) opt.disabled = true;
         out.push(opt);
     }
     return out;
@@ -115,6 +119,8 @@ export function ComboBox({
     required = false,
     id,
     className,
+    inputRef: externalInputRef,
+    ...inputAttributes
 }: ComboBoxProps) {
     // `draft` is the uncommitted typed text; null = not editing, display the
     // committed value's label. This split IS the one-pipeline fix.
@@ -123,6 +129,11 @@ export function ComboBox({
     const [highlight, setHighlight] = useState(-1);
     const wrapRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const setInputRef = useCallback((node: HTMLInputElement | null) => {
+        inputRef.current = node;
+        if (typeof externalInputRef === 'function') return externalInputRef(node);
+        if (externalInputRef) externalInputRef.current = node;
+    }, [externalInputRef]);
     // Mirror of `draft`, nulled synchronously on commit/revert so the
     // mousedown-outside + blur pair can both call settle() without
     // double-committing (blur fires before React re-renders).
@@ -152,6 +163,9 @@ export function ComboBox({
     }
 
     const canOpen = !disabled && !readOnly;
+    useEffect(() => {
+        if (!canOpen) { draftRef.current = null; setDraft(null); setOpen(false); setHighlight(-1); }
+    }, [canOpen]);
     const displayValue = draft ?? (selected ? selected.label : value == null ? '' : String(value));
 
     const setDraftBoth = (d: string | null) => { draftRef.current = d; setDraft(d); };
@@ -159,12 +173,15 @@ export function ComboBox({
 
     // ── the ONE committed pipeline ───────────────────────────────────────
     const commitOption = (opt: ComboOption) => {
+        if (!canOpen || inputRef.current?.matches(':disabled')) return;
         setDraftBoth(null);
         close();
+        if (opt.disabled) return;
         if (opt.value !== value) onChange?.(opt.value, opt);
         onSelect?.(opt);
     };
     const commitCustom = (text: string) => {
+        if (!canOpen || inputRef.current?.matches(':disabled')) return;
         setDraftBoth(null);
         close();
         if (text !== (value == null ? '' : String(value))) onChange?.(text);
@@ -193,18 +210,27 @@ export function ComboBox({
         document.getElementById(`combo-opt-${uid}-${highlight}`)?.scrollIntoView({ block: 'nearest' });
     }, [highlight, uid]);
 
+    const moveHighlight = (direction: 1 | -1) => setHighlight((current) => {
+        let next = current < 0 && direction === -1 ? 0 : current;
+        for (let count = 0; count < visible.length; count++) {
+            next = (next + direction + visible.length) % visible.length;
+            if (!visible[next].disabled) return next;
+        }
+        return -1;
+    });
+
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         switch (e.key) {
             case 'ArrowDown':
                 if (!canOpen) break;
                 e.preventDefault();
                 if (!open) setOpen(true);
-                else if (visible.length > 0) setHighlight((h) => (h + 1) % visible.length);
+                else moveHighlight(1);
                 break;
             case 'ArrowUp':
                 if (!open) break;
                 e.preventDefault();
-                if (visible.length > 0) setHighlight((h) => (h <= 0 ? visible.length - 1 : h - 1));
+                moveHighlight(-1);
                 break;
             case 'Enter':
                 if (open && highlight >= 0 && highlight < visible.length) {
@@ -251,7 +277,8 @@ export function ComboBox({
         <div className={`combo${className ? ` ${className}` : ''}`} ref={wrapRef}>
             <div className="combo-input-wrap">
                 <input
-                    ref={inputRef}
+                    {...inputAttributes}
+                    ref={setInputRef}
                     id={id}
                     type="text"
                     className="input combo-input"
@@ -267,6 +294,7 @@ export function ComboBox({
                     readOnly={readOnly}
                     required={required}
                     onFocus={() => { if (canOpen) setOpen(true); }}
+                    onClick={() => { if (canOpen) setOpen(true); }}
                     onBlur={(e) => {
                         if (wrapRef.current && e.relatedTarget && wrapRef.current.contains(e.relatedTarget as Node)) return;
                         settle();
@@ -287,7 +315,8 @@ export function ComboBox({
                         type="button"
                         className="combo-toggle"
                         tabIndex={-1}
-                        aria-label="Toggle dropdown"
+                        aria-hidden="true"
+                        title="Show options"
                         onMouseDown={(e) => e.preventDefault() /* keep input focus */}
                         onClick={onToggle}
                     >
@@ -297,7 +326,7 @@ export function ComboBox({
             </div>
             <Popover
                 anchorRef={wrapRef}
-                open={open}
+                open={open && canOpen}
                 onClose={(reason) => reason === 'escape' ? revert() : settle()}
                 id={listId}
                 className="combo-pop"
@@ -316,9 +345,11 @@ export function ComboBox({
                                 id={optionId(i)}
                                 role="option"
                                 aria-selected={isSelected}
+                                data-value={opt.value}
+                                aria-disabled={opt.disabled || undefined}
                                 className={`combo-option${i === highlight ? ' combo-hot' : ''}${isSelected ? ' combo-selected' : ''}`}
                                 onMouseDown={(e) => e.preventDefault() /* option click must not blur-settle first */}
-                                onClick={() => commitOption(opt)}
+                                onClick={() => { if (!opt.disabled) commitOption(opt); }}
                             >
                                 <div className="combo-option-main">
                                     <div className="combo-option-label">{highlightLabel(opt.label, (draft ?? '').trim())}</div>

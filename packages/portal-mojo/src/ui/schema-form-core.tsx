@@ -1,3 +1,4 @@
+import { ComboBox } from './ComboBox';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { Field, FieldValue, FormData } from '../client/types';
 import { declaredFieldPatch, getPath, resolveShowWhen, validateFieldValue } from './form-autosave';
@@ -220,7 +221,7 @@ export function SchemaSelect({ field, value, invalid, disabled, id, describedBy,
     disabled?: boolean;
     id?: string;
     describedBy?: string;
-    focusTarget?: (node: HTMLSelectElement | null) => void;
+    focusTarget?: (node: HTMLInputElement | null) => void;
     onChange: (value: string) => void;
 }) {
     const options = field.options ?? [];
@@ -234,10 +235,7 @@ export function SchemaSelect({ field, value, invalid, disabled, id, describedBy,
     }
     const shown = known ? value : '';
     return (
-        <select ref={focusTarget} id={id} aria-invalid={invalid || undefined} aria-describedby={describedBy} disabled={disabled || field.disabled} className={`input${invalid ? ' input-invalid' : ''}`} value={shown} onChange={(event) => onChange(event.target.value)}>
-            {shown === '' && <option value="" disabled>{field.placeholder ?? 'Select…'}</option>}
-            {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} inputRef={focusTarget} id={id} aria-invalid={invalid || undefined} aria-describedby={describedBy} disabled={disabled || field.disabled} value={String(shown)} onChange={(selectedValue) => onChange(String(selectedValue))} options={[...(shown === '' ? [({ value: "", label: String(field.placeholder ?? 'Select…'), disabled: true })] : []), ...(options.map((option) => ({ value: String(option.value), label: String(option.label) })) ?? [])]} />
     );
 }
 

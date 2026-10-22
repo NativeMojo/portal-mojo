@@ -1,3 +1,4 @@
+import { ComboBox } from './ComboBox';
 // FilterBar — web-mojo's filter UX: an "Add filter" menu listing every
 // available filter with a per-type icon and a check on the active ones, each
 // opening a type-appropriate dialog; applied filters become editable pills.
@@ -126,13 +127,10 @@ function FilterForm({ def, current, onDone }: {
                     ))}
                 </div>
             ) : def.type === 'select' || def.type === 'boolean' ? (
-                <select className="input" value={text} onChange={(e) => setText(e.target.value)} autoFocus>
-                    <option value="">Select…</option>
-                    {(def.type === 'boolean'
+                <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} value={String(text)} onChange={(selectedValue) => setText(String(selectedValue))} autoFocus options={[({ value: "", label: "Select…" }), ...((def.type === 'boolean'
                         ? [{ value: 'true', label: def.trueLabel ?? 'True' }, { value: 'false', label: def.falseLabel ?? 'False' }]
                         : def.options ?? []
-                    ).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                    ).map((o) => ({ value: String(o.value), label: String(o.label) })) ?? [])]} />
             ) : (
                 <input
                     className="input"

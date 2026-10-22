@@ -1,7 +1,6 @@
 /* ComboBox — styles for portal-mojo <ComboBox> (packages/portal-mojo/src/ui/ComboBox.tsx).
    Tokens only; reads correctly under data-theme="light" AND "dark".
-   NOT imported yet — the orchestrator adds `@import "./theme/combobox.css";`
-   to theme.css at merge. */
+   */
 
 .combo { position: relative; width: 100%; }
 .combo-input-wrap { position: relative; }
@@ -30,6 +29,8 @@
 /* Keyboard highlight (.combo-hot) and hover share one look — there is only
    one "pointed at" state. */
 .combo-option:hover, .combo-option.combo-hot { background: var(--surface2); color: var(--ink-strong); }
+.combo-option[aria-disabled="true"] { opacity: .5; cursor: not-allowed; background: transparent; }
+.combo-input[aria-invalid="true"] { border-color: var(--bad); }
 .combo-option-main { flex: 1; min-width: 0; }
 .combo-option-label { font-weight: 550; }
 .combo-option-desc { font-size: 12px; color: var(--mute); margin-top: 1px; }
@@ -40,3 +41,12 @@
 /* The <mark> around the matched substring — override the UA's yellow/black
    so it stays legible on both themes. */
 .combo-mark { background: var(--warn-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+.page-size .combo { width: 78px; }
+.combo { min-width: 0; }
+.combo-input { width: 100%; min-width: 0; }
+.combo-pop { max-height: min(300px, calc(100dvh - 16px)); min-width: min(260px, calc(100vw - 16px)); }
+
+.page-size .combo-input { min-height: 30px; padding: 5px 30px 5px 9px; font-size: 12px; }
+.combo.gran-select { width: 110px; }
+.gran-select .combo-input { min-height: 30px; padding: 5px 30px 5px 9px; font-size: 12px; }

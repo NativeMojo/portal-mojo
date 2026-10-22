@@ -1,3 +1,4 @@
+import { ComboBox } from '../ui/ComboBox';
 // MetricsMiniWidget — the compact metrics card: icon + title + computed
 // subtitle, windowed trending chip, embedded MiniChart sparkline, and the
 // stats / view-data / refresh / settings action row. Ported from web-mojo
@@ -154,24 +155,11 @@ function SettingsDialog({ title, initial, showDateRange, onDone }: {
             <div className="mmw-settings">
                 <label className="field">
                     <span className="field-label">Granularity</span>
-                    <select
-                        className="input"
-                        value={values.granularity}
-                        onChange={(e) => setValues((v) => ({ ...v, granularity: e.target.value }))}
-                    >
-                        {GRANULARITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
+                    <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} value={String(values.granularity)} onChange={(selectedValue) => setValues((v) => ({ ...v, granularity: String(selectedValue) }))} options={[...(GRANULARITY_OPTIONS.map((o) => ({ value: String(o.value), label: String(o.label) })) ?? [])]} />
                 </label>
                 <label className="field">
                     <span className="field-label">Chart type</span>
-                    <select
-                        className="input"
-                        value={values.chartType}
-                        onChange={(e) => setValues((v) => ({ ...v, chartType: e.target.value === 'bar' ? 'bar' : 'line' }))}
-                    >
-                        <option value="line">Line</option>
-                        <option value="bar">Bar</option>
-                    </select>
+                    <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} value={String(values.chartType)} onChange={(selectedValue) => setValues((v) => ({ ...v, chartType: String(selectedValue) === 'bar' ? 'bar' : 'line' }))} options={[({ value: "line", label: "Line" }), ({ value: "bar", label: "Bar" })]} />
                 </label>
                 {showDateRange && (
                     <div className="field">
