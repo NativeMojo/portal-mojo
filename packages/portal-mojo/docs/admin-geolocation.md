@@ -3,7 +3,7 @@
 `GeoLocationPage` (`portal-mojo/admin/operations`) is the global Operations →
 GeoLocation surface. GeoIP Cache inspects IPs; Fleet Configuration applies
 published settings. Dashboard is unchanged. Hosts may override the mount-derived Fleet link with
-`fleetConfigurationPath`; Showcase targets its Runtime settings demo.
+`fleetConfigurationPath`; Showcase opens the actual Fleet Configuration page with a return link.
 
 Admission requires literal `is_superuser === true` and a current interactive
 session. The backend also rejects key-backed sessions, requires same-origin

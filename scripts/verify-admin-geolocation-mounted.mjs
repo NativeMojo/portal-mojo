@@ -19,10 +19,10 @@ try {
     const ui = await h.server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
     const { GeoLocationPage } = await h.server.ssrLoadModule('/packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx');
     const login = async (email = 'dns.platform@nativemojo.com') => act(async () => { await auth.login(email, 'mojo'); auth.stopAutoRefresh(); });
-    const mount = async () => {
+    const mount = async (Page = GeoLocationPage, initialEntry = '/custom/system/geolocation') => {
         qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
         root = createRoot(document.getElementById('root'));
-        await act(async () => root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(MemoryRouter, { initialEntries: ['/custom/system/geolocation'] }, React.createElement(React.StrictMode, null, React.createElement(GeoLocationPage), React.createElement(ui.ModalHost))))));
+        await act(async () => root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(MemoryRouter, { initialEntries: [initialEntry] }, React.createElement(React.StrictMode, null, React.createElement(Page), React.createElement(ui.ModalHost))))));
     };
     const unmount = async () => { await act(async () => { root?.unmount(); root = null; ui.modal.closeAll(); }); qc?.clear(); };
     const ready = async () => wait(() => enabled('Test key'), 'Initial authoritative provider read');
@@ -122,5 +122,13 @@ try {
     h.reset('ready'); await mount(); await ready(); await click('Remove key'); await login('dns.manager@nativemojo.com'); await wait(() => !document.querySelector('dialog'), 'Session change closes owned native confirmation'); assert.equal(h.fixture.posts.length, 0, 'Session loss before confirmation prevents write'); checks++; await unmount(); await login();
     h.reset('ready'); await mount(); await ready(); await click('Replace key'); await field('MojoVerify API key', secret); h.fixture.delay = 120; await click('Test key'); await login('dns.manager@nativemojo.com'); await act(async () => new Promise(resolve => setTimeout(resolve, 160))); assert(!draft(), 'Late previous-session test cannot restore verdict'); assert(!document.body.textContent.includes(secret)); checks++; await unmount(); await login();
     h.reset('ready'); await mount(); await ready(); h.fixture.delay = 100; await field('Primary provider', 'ipinfo'); await click('Save changes'); await unmount(); await act(async () => new Promise(resolve => setTimeout(resolve, 130))); assert.equal(document.getElementById('root').textContent, '', 'Unmounted write response cannot restore form state'); checks++;
+    const { AdminGeoLocationDemo } = await h.server.ssrLoadModule('/apps/showcase/src/pages/components/demos-admin-geolocation.tsx');
+    h.reset('ready'); await mount(AdminGeoLocationDemo, '/?demo=admin-geolocation'); await ready();
+    const handoff = [...document.querySelectorAll('a')].find(a => a.textContent === 'Open Fleet Configuration');
+    await act(async () => handoff.click());
+    await wait(() => [...document.querySelectorAll('h1')].some(h => h.textContent === 'Fleet Configuration'), 'Demo handoff opens actual Fleet Configuration, not shared validation or Runtime settings');
+    await wait(() => button('Apply now'), 'Demo handoff exposes the existing apply workflow after its authoritative read');
+    await act(async () => [...document.querySelectorAll('a')].find(a => a.textContent === 'Back to GeoLocation').click()); await ready();
+    assert.equal(h.fixture.posts.length, 0, 'Navigating to Fleet and back does not publish or apply'); checks += 2; await unmount(); await login();
     console.log(`GeoLocation mounted: ${checks} permission, ordered draft, stored/draft isolation, secret-cache, clear, single-flight, stale/uncertain, fresh-auth and session/unmount checks passed`);
 } finally { if (root) await act(async () => root.unmount()); qc?.clear(); await h.close(); }
