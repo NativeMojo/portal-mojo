@@ -1,11 +1,15 @@
 import { Tabs } from '../../ui/Tabs';
+import { useQueryClient } from '@tanstack/react-query';
+import { SettingModel } from '../settings/model';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getAuthSessionRevision, requestFreshAuth, useAuthSnapshot, useMe } from '../../client/runtime';
 import { date, datetime } from '../../ui/format';
-import { MaintenanceDialog } from './MaintenanceDialogs';
+import { MaintenanceDialog, MaintenancePolicyDialog, MaintenanceProgressDialog } from './MaintenanceDialogs';
+import { FleetHelp as MaintenanceHelp } from '../fleet/FleetHelp';
+import { useAdminRouteContext } from '../core/route-context';
 import {
-    frameworkActionLabel,
+    frameworkActionLabel, frameworkStatusLabel, supportUrgency,
     maintenanceAccess,
     maintenanceFence,
     MaintenanceError,
@@ -26,7 +30,7 @@ import {
     requestFramework,
     requestMaintenance,
     resourceKey,
-    subscribeMaintenanceAttempts,
+    subscribeMaintenanceAttempts, canRequestMaintenance, requestPolicy, reconcilePolicy, observeFramework, type MaintenanceAttempt,
 } from './operations';
 function ObservedTime({ value, dateOnly = false }: { value: string | number | null | undefined; dateOnly?: boolean }) {
     return value != null ? <time dateTime={String(value)} title={String(value)}>{dateOnly ? date(value) : datetime(value)}</time> : <>unknown / unpublished</>;
@@ -50,7 +54,10 @@ export function MaintenancePage({
         auth = useAuthSnapshot(),
         revision = getAuthSessionRevision();
     const access = maintenanceAccess(auth.authenticated && String(me?.id) === auth.uid ? me : null);
-    const location = useLocation();
+    const location = useLocation(), route = useAdminRouteContext();
+    const queryClient = useQueryClient();
+    const deploymentLink = deploymentsHref ?? (route ? route.paths.includes('deployments') ? `#${route.mount}/deployments` : undefined : maintenanceDeploymentsHref(location.pathname));
+    const [policy, setPolicy] = useState<Framework | null>(null), [progress, setProgress] = useState<string | null>(null);
     const [aws, setAWS] = useState<Evidence<Report>>({}),
         [framework, setFramework] = useState<Evidence<Framework>>({}),
         [mode, setMode] = useState<Evidence<'managed' | 'external'>>({});
@@ -60,6 +67,7 @@ export function MaintenancePage({
     const controller = useRef<AbortController | null>(null),
         inFlight = useRef(false),
         readGeneration = useRef(0);
+    const currentUser = useRef(me); currentUser.current = me;
     const current = useRef({ access, mode, aws, framework, review });
     current.current = { access, mode, aws, framework, review };
     const attemptRevision = useSyncExternalStore(
@@ -67,7 +75,8 @@ export function MaintenancePage({
         maintenanceAttemptsRevision,
         maintenanceAttemptsRevision,
     );
-    const attempts = getMaintenanceAttempts();
+    const attempts = getMaintenanceAttempts().filter(a => 'kind' in a.input ? access.aws : access.framework);
+    const readScope = (a: MaintenanceAttempt, signal?: AbortSignal) => maintenanceFence({ signal, beforeSend: () => { const grants = current.current.access; if ('kind' in a.input ? !grants.aws : !grants.framework) throw new MaintenanceError('denied'); } });
     const load = useCallback(
         async (refresh = false) => {
             const c = controller.current;
@@ -105,6 +114,7 @@ export function MaintenancePage({
                               const value = await readFramework(fence, refresh);
                               if (active()) {
                                   setFramework({ value });
+                                  reconcilePolicy(value);
                                   if (refresh) refreshRefusedMaintenanceAttempt('framework');
                               }
                           } catch (e) {
@@ -132,7 +142,7 @@ export function MaintenancePage({
     useEffect(() => {
         const c = new AbortController();
         controller.current = c;
-        setReview(null);
+        setReview(null); setPolicy(null); setProgress(null);
         setAWS({});
         setFramework({});
         setMode({});
@@ -147,21 +157,35 @@ export function MaintenancePage({
     }, [load, access.aws, access.framework, access.bootstrap]);
     useEffect(() => {
         const c = controller.current;
-        if (!access.aws || !c || c.signal.aborted) return;
+        if (!c || c.signal.aborted) return;
         const pending = attempts.filter(
-            (a) => 'kind' in a.input && ['waiting', 'uncertain'].includes(a.state),
+            (a) => ('kind' in a.input || 'version' in a.input && !!a.deployment) && ['waiting', 'uncertain', 'accepted'].includes(a.state),
         );
         if (!pending.length) return;
         const timer = setTimeout(() => {
             for (const a of pending) {
                 if (a.observations >= pollLimit) maintenanceObservationLimit(a);
-                else void observeMaintenance(a, maintenanceFence({ signal: c.signal }));
+                else if ('kind' in a.input) void observeMaintenance(a, readScope(a, c.signal));
+                else void observeFramework(a, readScope(a, c.signal));
             }
         }, pollInterval);
         return () => clearTimeout(timer);
         // Registry revision schedules the next bounded observation after the previous response.
     }, [attemptRevision, access.aws, pollInterval, pollLimit, revision]);
     const canWrite = mode.value === 'managed' && !mode.loading && access.manage;
+    const canPolicy = canWrite && me?.is_superuser === true && access.framework;
+    useEffect(() => { if (!canPolicy) setPolicy(null); }, [canPolicy]);
+    const submitPolicy = async (value: string) => {
+        const c = controller.current; if (!c || inFlight.current || !canPolicy) return;
+        inFlight.current = true; setBusy(true); setError('');
+        const fence = maintenanceFence({ signal: c.signal, beforeSend: () => { const st = current.current; if (!st.access.manage || !st.access.framework || st.mode.value !== 'managed' || st.mode.loading || currentUser.current?.is_superuser !== true) throw new MaintenanceError('denied'); } });
+        try {
+            await requestPolicy(value, fence);
+            const fresh = await readFramework(fence, true); fence.beforeSend?.(); setFramework({ value: fresh }); reconcilePolicy(fresh);
+        } catch (reason) {
+            if (!c.signal.aborted) { setError(message(reason)); if (reason instanceof MaintenanceError && reason.code === 'fresh_auth_required') await requestFreshAuth(); else if (getMaintenanceAttempt('framework-policy')?.state !== 'refused') setProgress('framework-policy'); }
+        } finally { void queryClient.invalidateQueries({queryKey:SettingModel.keys.root}); if (!c.signal.aborted) { setPolicy(null); setBusy(false); inFlight.current = false; } }
+    };
     const submit = async (immediate: boolean) => {
         const consent = current.current.review,
             c = controller.current;
@@ -176,6 +200,7 @@ export function MaintenancePage({
                     ? !state.access.aws ||
                       !state.aws.value?.findings.some((f) => JSON.stringify(f) === consent.fingerprint)
                     : !state.access.framework ||
+                      consent.framework.pin.mode !== 'latest' && currentUser.current?.is_superuser !== true ||
                       JSON.stringify(state.framework.value) !== consent.fingerprint)
             )
                 throw new MaintenanceError('denied');
@@ -221,16 +246,23 @@ export function MaintenancePage({
             }
         }
     };
+    const observeOne = async (a: MaintenanceAttempt) => {
+        const c = controller.current; if (!c || inFlight.current) return;
+        inFlight.current = true; setBusy(true); setReview(null);
+        try {
+            const fence = readScope(a, c.signal);
+            if ('kind' in a.input) await observeMaintenance(a, fence);
+            else if ('version' in a.input) await observeFramework(a, fence);
+            else { const value = await readFramework(fence, true); fence.beforeSend?.(); setFramework({ value }); reconcilePolicy(value); void queryClient.invalidateQueries({queryKey:SettingModel.keys.root}); }
+        } catch (reason) { if (!c.signal.aborted) setError(message(reason)); }
+        finally { if (!c.signal.aborted) { inFlight.current = false; setBusy(false); } }
+    };
     const refreshStatus = async () => {
-        const c = controller.current;
-        if (!c) return;
-        setReview(null);
-        for (const a of getMaintenanceAttempts())
-            if ('kind' in a.input && !['sending', 'refused', 'complete'].includes(a.state))
-                await observeMaintenance(a, maintenanceFence({ signal: c.signal }));
+        for (const a of attempts) if (!['sending','refused','complete'].includes(a.state)) await observeOne(a);
     };
     const row = (f: Finding) => {
         const attempt = getMaintenanceAttempt(resourceKey({ kind: f.kind, resource: f.resource_id }));
+        const live = attempt?.observation, currentVersion = live?.engine_version ?? f.current_version, urgency = supportUrgency(f);
         return (
             <article className="maintenance-resource" key={`${f.kind}:${f.resource_id}`}>
                 <div>
@@ -238,10 +270,11 @@ export function MaintenancePage({
                     <p>
                         {f.engine} ·{' '}
                         <span className="mono">
-                            {f.current_version} → {f.available_major}
+                            {currentVersion}{currentVersion !== f.available_major ? ` → ${f.available_major}` : ''}
                         </span>
                     </p>
-                    <p className="maintenance-resource-status">Offered upgrade · {f.status ?? 'Provider status unknown'}{f.pending_version ? ` · pending ${f.pending_version}` : ''}</p>
+                    <p className="maintenance-resource-status">{live?.status ?? f.status ?? 'Provider status unknown'}{(live?.pending_version ?? f.pending_version) ? ` · pending ${live?.pending_version ?? f.pending_version}` : ''}</p>
+                    {urgency && <p className={f.days_remaining! <= 0 ? 'text-bad' : 'maintenance-warning'}>{urgency}</p>}
                     <details className="maintenance-details"><summary>Support &amp; upgrade details</summary>
                         <p>Resource: {f.kind} · Live: {f.status ?? 'unknown'} · Pending: {f.pending_version ?? 'not reported'} · {f.settled === null ? 'Settlement unknown' : f.settled ? 'Settled' : 'Still changing'}</p>
                         {f.engine_versions && <p>Member versions: {f.engine_versions.join(', ') || 'unknown'}{f.members === undefined ? '' : ` · ${f.members} members`}</p>}
@@ -251,9 +284,9 @@ export function MaintenancePage({
                         <p>Review compatibility and snapshot-based recovery before a major upgrade. The confirmation explains restart and outage impact.</p>
                         {f.release_notes_url && <a href={f.release_notes_url} target="_blank" rel="noopener noreferrer">Release notes</a>}
                     </details>
-                    {attempt && <p role="status">{attempt.message}</p>}
+                    {attempt && <p role="status">{attempt.state === 'complete' ? 'Upgrade observed' : 'Update submitted · '+attempt.state}</p>}
                 </div>
-                {canWrite && access.aws && !attempt && aws.value?.status === 'ok' && (
+                {canWrite && access.aws && !busy && canRequestMaintenance(resourceKey({ kind: f.kind, resource: f.resource_id }), { kind: f.kind, resource: f.resource_id, target_version: f.available_major, confirm_resource: f.resource_id, apply_immediately: true }) && aws.value?.status === 'ok' && (
                     <button
                         className="btn" aria-label={`Upgrade ${f.resource_id}`}
                         onClick={() => setReview({ finding: f, fingerprint: JSON.stringify(f) })}
@@ -299,21 +332,22 @@ export function MaintenancePage({
                             <dl className="maintenance-framework-summary">
                                 <div><dt>Installed</dt><dd>{fw.installed ?? 'unknown'}</dd></div>
                                 <div><dt>Latest published</dt><dd>{fw.latest ?? 'unknown'}</dd></div>
-                                <div><dt>Update policy</dt><dd>{fw.pin.mode === 'latest' ? 'Automatic updates' : fw.pin.mode === 'hold' ? 'Updates paused' : `Pinned to ${fw.pin.value ?? 'unknown version'}`}</dd></div>
+                                <div><dt>Update policy <MaintenanceHelp label="policy permissions"><p>Policy changes require an active superuser and recent authentication. External infrastructure stays read-only here. Saving policy does not deploy it.</p></MaintenanceHelp></dt><dd>{fw.pin.mode === 'latest' ? 'Automatic updates' : fw.pin.mode === 'hold' ? 'Updates paused' : `Pinned to ${fw.pin.value ?? 'unknown version'}`}</dd></div>
                             </dl>
-                            {!fw.update_available && <p className="dim">No newer framework version reported.</p>}
+                            <p className={fw.source === 'unavailable' || fw.pin.mode !== 'latest' ? 'maintenance-warning' : 'dim'}>{frameworkStatusLabel(fw)} <MaintenanceHelp label="framework versions"><p>Installed is this responding node. Latest published comes from {fw.source === 'cache' ? 'cached PyPI evidence' : fw.source === 'pypi' ? 'PyPI' : 'an unavailable source'}. A paused policy can suppress the update-available flag.</p><p>Use deployment node evidence to verify the fleet.</p></MaintenanceHelp></p>
                             {fw.blocked_reason && <p className="maintenance-warning">{fw.blocked_reason.replaceAll('_', ' ')}</p>}
                             <details className="maintenance-details"><summary>Framework evidence</summary><p>Checked: <ObservedTime value={fw.checked_at} /> · Source: {fw.source}</p><p>Pin policy: {fw.pin.mode} {fw.pin.value}</p><p>An accepted framework update clears the pin and requests redeployment. Follow Deployments for fleet evidence.</p></details>
-                            {canWrite && fw.can_update && !getMaintenanceAttempt('framework') && (
+                            <div className="maintenance-actions">{canPolicy && canRequestMaintenance('framework-policy') && <button className="btn" disabled={busy} onClick={() => setPolicy(fw)}>Update policy</button>}
+                            {canWrite && fw.can_update && canRequestMaintenance('framework', { version: fw.latest ?? '' }) && (
                                 <button
-                                    className="btn"
+                                    className="btn btn-primary" disabled={busy}
                                     onClick={() =>
                                         setReview({ framework: fw, fingerprint: JSON.stringify(fw) })
                                     }
                                 >
                                     {frameworkActionLabel(fw)}
                                 </button>
-                            )}
+                            )}</div>
                         </>
                     )}
                 </section>) }] : [])];
@@ -371,53 +405,25 @@ export function MaintenancePage({
 
                 </>
             )}
-<Tabs items={tabs} ariaLabel="Maintenance category" />
+<Tabs items={tabs} defaultActiveKey={new URLSearchParams(location.search).get('tab')} ariaLabel="Maintenance category" />
             {attempts.length > 0 && (
                 <section aria-label="Submitted operations">
                     <h2>Submitted operations</h2>
-                    <details className="ops-details"><summary>About submitted operations</summary><p>
-                        Requests stay guarded across refresh, navigation and authentication renewal. Unknown
-                        outcomes require provider/window reconciliation; refreshing an old version does not
-                        authorize another request.
-                    </p></details>
-                    {attempts.map((a) => (
-                        <article key={a.key}>
-                            <h3>{a.key}</h3>
-                            <p role="status">{a.message}</p>
-                            {'kind' in a.input ? (
-                                <p>
-                                    Target: {a.input.target_version} · Window:{' '}
-                                    {a.input.apply_immediately ? 'immediately' : 'next maintenance window'} ·
-                                    Observations: {a.observations}
-                                </p>
-                            ) : (
-                                <>
-                                    <p>
-                                        Policy clearing and deployment submission are separate steps.
-                                        Automatic policy does not prove a deployment was accepted.
-                                    </p>
-                                    {a.deployment && (
-                                        <p>
-                                            Deployment {a.deployment.id} · SHA {a.deployment.sha} ·{' '}
-                                            {a.deployment.status}
-                                        </p>
-                                    )}
-                                </>
-                            )}
-                        </article>
-                    ))}
-                    {access.aws && (
+                    {attempts.map(a => <article key={a.key} className="maintenance-attempt-row"><div><strong>{'kind' in a.input ? a.input.resource : 'policy' in a.input ? 'Framework policy' : 'Django-MOJO'}</strong><p role="status">{a.state === 'complete' ? a.frameworkObservation ? `Deployment ${a.frameworkObservation.status}` : 'policy' in a.input ? 'Policy observed' : 'Upgrade observed' : a.state === 'uncertain' ? 'Outcome unknown' : a.state === 'accepted' ? 'Deployment submitted' : a.state === 'timeout' ? 'Observation paused' : a.state === 'refused' ? 'Request refused' : 'Update in progress'}</p></div><button className="btn" disabled={busy} onClick={() => setProgress(a.key)}>View progress</button></article>)}
+                    {attempts.some(a => !['sending','refused','complete'].includes(a.state) && (!('version' in a.input) || !!a.deployment)) && (
                         <button className="btn" disabled={busy} onClick={() => void refreshStatus()}>
-                            Refresh submitted resource status
+                            Refresh progress
                         </button>
                     )}
-                    {access.framework && (
-                        <a href={deploymentsHref ?? maintenanceDeploymentsHref(location.pathname)}>
+                    {access.framework && deploymentLink && (
+                        <a href={deploymentLink}>
                             Open Deployments
                         </a>
                     )}
                 </section>
             )}
+            {policy && <MaintenancePolicyDialog framework={policy} busy={busy} error={error} onSave={value => void submitPolicy(value)} onClose={() => { if (!inFlight.current) setPolicy(null); }} />}
+            {progress && attempts.find(a => a.key === progress) && <MaintenanceProgressDialog attempt={attempts.find(a => a.key === progress)!} busy={busy} deploymentsHref={deploymentLink} onClose={() => { if (!inFlight.current) setProgress(null); }} onObserve={() => { const a = attempts.find(a => a.key === progress); if (a) void observeOne(a); }} />}
             {review && (
                 <MaintenanceDialog
                     {...('finding' in review ? { finding: review.finding } : { framework: review.framework })}

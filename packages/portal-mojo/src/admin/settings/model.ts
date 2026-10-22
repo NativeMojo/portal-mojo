@@ -77,6 +77,7 @@ export function buildSettingPayload(draft: SettingDraft, original: SettingRow | 
     const changes: Record<string, unknown> = {};
     const key = draft.key.trim();
     if (!key) throw new Error('Key is required');
+    if (key === 'EDGE_FRAMEWORK_VERSION' || original?.key === 'EDGE_FRAMEWORK_VERSION') throw new Error('Framework update policy is managed in Maintenance → Django-MOJO, through its dedicated owner writer.');
 
     if (original == null) {
         if (draft.is_secret && draft.value === '') throw new Error('Enter a secret value');

@@ -204,7 +204,7 @@ try {
     await configure({ is_superuser: true }, 'framework-held');
     await ready();
     await click('Django-MOJO');
-    await click('Resume automatic updates and redeploy');
+    await click('Resume and update');
     assert(document.querySelector('dialog').textContent.includes('last converged application SHA'));
     await click('Cancel');
     assert.equal(fixture.posts, 0);
@@ -218,7 +218,7 @@ try {
         button('Apply upgrade').click();
     });
     await wait(
-        () => document.body.textContent.includes('AWS reports every member settled'),
+        () => ops.getMaintenanceAttempt('rds-instance:orders-db')?.state === 'complete',
         'target and settled completion',
     );
     assert.equal(fixture.posts, 1, 'double activation single POST');
@@ -234,7 +234,7 @@ try {
     await review('analytics-cluster', 'Next maintenance window');
     await click('Apply upgrade');
     await wait(
-        () => document.body.textContent.includes('Automatic observations reached their limit'),
+        () => ops.getMaintenanceAttempt('rds-cluster:analytics-cluster')?.state === 'timeout',
         'bounded next-window observation',
     );
     assert.equal(fixture.lastImmediate, false);
@@ -243,7 +243,7 @@ try {
     await mount();
     await ready();
     assert(!button('Upgrade analytics-cluster'), 'timeout guard survives remount');
-    await click('Refresh submitted resource status');
+    await click('Refresh progress');
     assert.equal(fixture.posts, 1, 'manual status never reapplies');
     checks += 4;
     await unmount();
@@ -290,18 +290,18 @@ try {
     );
     await click('Refresh Maintenance');
     await ready();
-    await click('Refresh submitted resource status');
+    await click('Refresh progress');
     assert.equal(fixture.posts, 1, 'old version report/status cannot unlock uncertainty');
     checks += 3;
     await unmount();
     await configure({ is_superuser: true }, 'framework-pin-cleared-503');
     await ready();
     await click('Django-MOJO');
-    await click('Update to 4.1.0');
+    await click('Resume and update');
     await field('4.1.0');
     await click('Confirm framework update');
     await wait(
-        () => document.body.textContent.includes('pin may already be cleared'),
+        () => ops.getMaintenanceAttempt('framework')?.state === 'uncertain',
         'separate policy/deployment uncertainty',
     );
     assert.equal(fixture.posts, 1);
@@ -316,7 +316,10 @@ try {
         !button('Update to 4.1.0'),
         'same actor renewed session cannot duplicate unknown framework operation',
     );
-    assert(document.body.textContent.includes('deployment acceptance is unknown'));
+    const frameworkProgress = [...document.querySelectorAll('.maintenance-attempt-row')].find(row => row.querySelector('strong')?.textContent === 'Django-MOJO');
+    await act(async()=>frameworkProgress.querySelector('button').click());
+    assert(document.querySelector('dialog').textContent.includes('deployment acceptance is unknown'));
+    await click('Close');
     assert(
         !JSON.stringify(qc.getMutationCache().getAll()).includes('version'),
         'imperative writes leave Mutation cache empty',
@@ -356,6 +359,43 @@ try {
     await wait(() => !document.querySelector('dialog'), 'session replacement dismisses owned consent');
     assert.equal(fixture.posts, 1, 'unsent old consent cannot create a request');
     checks++;
+    await unmount();
+    // Policy uses its dedicated writer and never deploys as a side effect.
+    fixture.persona = { is_superuser: true }; fixture.posts = 0;
+    mock.setMockMaintenanceScenario('framework-held');
+    await login('dns.manager@nativemojo.com'); await mount(); await ready(); await click('Django-MOJO');
+    assert(document.body.textContent.includes('Published version differs · policy paused'));
+    assert(!document.body.textContent.includes('No newer framework version'));
+    const choosePolicy = async (label, version) => {
+        await click('Update policy');
+        await act(async()=>[...document.querySelectorAll('dialog label')].find(l=>l.textContent.trim()===label).querySelector('input').click());
+        if(version!==undefined) await field(version);
+    };
+    await choosePolicy('Exact version','v1.2.3');
+    assert(button('Save policy').disabled,'invalid exact-version syntax cannot save');
+    await field('4.0.1');
+    await act(async()=>{button('Save policy').click();button('Save policy').click();});
+    await wait(()=>!document.querySelector('dialog'),'policy save readback');
+    assert.equal(fixture.posts,1,'double activation sends one policy POST');
+    assert.equal((await ops.getMaintenanceAttempt('framework-policy')).state,'complete');
+    assert(document.body.textContent.includes('Pinned to 4.0.1'));
+    await choosePolicy('Hold'); await click('Save policy'); await wait(()=>!document.querySelector('dialog'),'hold saved');
+    await choosePolicy('Automatic'); await click('Save policy'); await wait(()=>!document.querySelector('dialog'),'automatic saved');
+    assert.equal(fixture.posts,3,'policy switches never submit a deployment');
+    mock.setMockMaintenanceScenario('policy-lost-response');
+    await choosePolicy('Hold'); await click('Save policy');
+    await wait(()=>document.querySelector('dialog')?.textContent.includes('Update progress'),'unknown policy progress');
+    assert.equal(ops.getMaintenanceAttempt('framework-policy').state,'uncertain');
+    await click('Refresh status');
+    await wait(()=>ops.getMaintenanceAttempt('framework-policy').message.includes('Requested policy is now observed'),'current desired policy readback');
+    assert.equal(ops.getMaintenanceAttempt('framework-policy').state,'uncertain','matching desired policy does not prove an unknown save finished');
+    assert.equal(fixture.posts,4,'unknown policy readback never replays save');
+    assert(document.querySelector('dialog').textContent.includes('Readback cannot prove that request finished'));
+    await click('Close'); await unmount();
+    checks += 9;
+    fixture.persona={is_superuser:false,permissions:{manage_platform:true,view_platform:true,manage_settings:true,manage_advanced:true}};
+    mock.setMockMaintenanceScenario('findings'); await login('dns.manager@nativemojo.com'); await mount(); await ready(); await click('Django-MOJO');
+    assert(!button('Update policy'),'advanced/platform grants do not bypass literal superuser owner');checks++;
     await unmount();
     console.log(`Maintenance mounted: ${checks} assertions passed`);
 } finally {

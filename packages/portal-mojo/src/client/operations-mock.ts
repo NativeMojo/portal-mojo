@@ -19,7 +19,8 @@ export async function operationsMock(path: string, options: OperationsMockOption
         || /^\/api\/edge\/webapp\/\d+$/.test(path) || /^\/api\/edge\/release\/deployment\/\d+$/.test(path)
         || path === '/api/edge/release' && (method === 'POST' || options.params?.webapp !== undefined)
         || path === '/api/edge/release/complete' || path === '/api/edge/deployment' && options.params?.webapp !== undefined;
-    const owned = deploymentOwned || ['/api/account/admin/bootstrap', '/api/account/admin/settings', '/api/account/admin/dashboard', '/api/account/admin/setup/readiness', '/api/aws/capacity', '/api/aws/capacity/status', '/api/aws/capacity/plan', '/api/aws/capacity/plan/apply', '/api/aws/maintenance/versions', '/api/aws/maintenance/status', '/api/aws/maintenance/apply', '/api/account/admin/platform/framework', '/api/account/admin/platform/framework/update'].includes(path);
+    const maintenanceOwned = path === '/api/account/admin/advanced/settings' && Object.hasOwn(options.body ?? {}, 'framework_pin') || path === '/api/account/admin/platform' && options.params?.sections === 'deployments';
+    const owned = maintenanceOwned || deploymentOwned || ['/api/account/admin/bootstrap', '/api/account/admin/settings', '/api/account/admin/dashboard', '/api/account/admin/setup/readiness', '/api/aws/capacity', '/api/aws/capacity/status', '/api/aws/capacity/plan', '/api/aws/capacity/plan/apply', '/api/aws/maintenance/versions', '/api/aws/maintenance/status', '/api/aws/maintenance/apply', '/api/account/admin/platform/framework', '/api/account/admin/platform/framework/update'].includes(path);
     if (!owned) return undefined;
     if (!user || user.is_active !== true) return denied(401);
     // Mock attribution comes from the validated mock bearer. Per-user UserAPIKey
@@ -66,7 +67,7 @@ export async function operationsMock(path: string, options: OperationsMockOption
         const { geoProviderMock } = await import('./geo-provider-mock');
         return geoProviderMock(path, method, options.body, true) ?? { status: false, error: 'Unsupported provider topic', error_code: 400 };
     }
-    if (path.startsWith('/api/aws/maintenance/') || path === '/api/account/admin/platform/framework' || path === '/api/account/admin/platform/framework/update') {
+    if (maintenanceOwned || path.startsWith('/api/aws/maintenance/') || path === '/api/account/admin/platform/framework' || path === '/api/account/admin/platform/framework/update') {
         const { maintenanceMock } = await import('./maintenance-mock');
         const age = typeof context.authTime === 'number' ? Date.now() / 1000 - context.authTime : NaN;
         return maintenanceMock(path, method, options.body, options.params, { user, keyBacked, fresh: Number.isFinite(age) && age >= 0 && age <= 600 });

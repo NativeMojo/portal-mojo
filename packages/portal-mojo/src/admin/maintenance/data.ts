@@ -9,6 +9,8 @@ export const MAINTENANCE_ENDPOINTS = {
     framework: '/api/account/admin/platform/framework',
     update: '/api/account/admin/platform/framework/update',
     bootstrap: '/api/account/admin/bootstrap',
+    policy: '/api/account/admin/advanced/settings',
+    platform: '/api/account/admin/platform',
 } as const;
 export type Kind = 'rds-instance' | 'rds-cluster' | 'elasticache';
 export interface Finding {
@@ -432,4 +434,53 @@ export async function updateFramework(version: string, scope?: Scope) {
     }
 }
 export const frameworkActionLabel = (f: Framework) =>
-    f.update_available ? `Update to ${f.latest}` : 'Resume automatic updates and redeploy';
+    f.pin.mode === 'latest' ? `Update to ${f.latest}` : 'Resume and update';
+
+/** These labels do not interpret policy-suppressed update_available as current. */
+export function frameworkStatusLabel(f: Framework) {
+    if (!f.latest || f.source === 'unavailable') return 'Latest version unknown';
+    if (!f.installed) return 'Installed version unknown';
+    if (f.pin.mode !== 'latest') return f.latest === f.installed ? 'Update policy paused' : 'Published version differs · policy paused';
+    if (f.update_available) return 'Update available';
+    return f.latest === f.installed ? 'Current' : 'Published version differs';
+}
+export function supportUrgency(f: Finding) {
+    const days = f.days_remaining;
+    return days == null ? null : days < 0 ? `Standard support ended ${Math.abs(days)} days ago` : days === 0 ? 'Standard support ends today' : days <= 30 ? `Standard support ends in ${days} days` : null;
+}
+export function normalizePolicy(value: string) {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === '' || normalized === 'hold' || /^[0-9][a-z0-9._!+-]{0,63}$/.test(normalized)) return normalized;
+    throw new MaintenanceError('invalid_framework_version');
+}
+export function policyMatches(pin: Framework['pin'], value: string) {
+    return value === '' ? pin.mode === 'latest' : value === 'hold' ? pin.mode === 'hold' : pin.mode === 'pinned' && pin.value === value;
+}
+export async function saveFrameworkPolicy(value: string, scope?: Scope) {
+    const pin = normalizePolicy(value);
+    const raw = await call(MAINTENANCE_ENDPOINTS.policy, scope, { framework_pin: pin });
+    try { const r = schema(raw); if (r.saved !== true || r.value !== pin) invalid(); return pin; }
+    catch { throw new MaintenanceError('operation_uncertain', 'unknown'); }
+}
+export interface FrameworkObservation {
+    id: string; sha: string; status: string; framework_version: string | null;
+    nodes: { runner: string; state: string; version: string | null }[];
+    terminal: boolean; versionProven: boolean;
+}
+export async function readFrameworkDeployment(target: { id: string; sha: string }, version: string, scope?: Scope): Promise<FrameworkObservation> {
+    const r = schema(await call(MAINTENANCE_ENDPOINTS.platform, scope, undefined, { sections: 'deployments' }));
+    const collector = obj(obj(r.sections).deployments);
+    if (!['ok', 'healthy', 'degraded', 'unhealthy'].includes(String(collector.status))) invalid();
+    const row = array(obj(collector.data).items, 50).map(obj).find(d => d.id === target.id);
+    if (!row || row.sha !== target.sha) throw new MaintenanceError('deployment_evidence_missing');
+    const roster = array(row.frozen_roster, 256).map(v => text(v));
+    const evidence = array(row.node_evidence, 256).map(obj);
+    const nodes = evidence.map(e => ({ runner: text(e.runner), state: text(e.state), version: obj(e.proof ?? {}).django_mojo_version === '' ? null : nullableText(obj(e.proof ?? {}).django_mojo_version) }));
+    const status = text(row.status);
+    const versionProven = status === 'converged' && row.framework_version === version && roster.length > 0 && new Set(roster).size === roster.length && roster.every(runner => {
+        const matches = evidence.filter(e => e.runner === runner); if (matches.length !== 1) return false;
+        const e = matches[0]!, p = obj(e.proof ?? {});
+        return e.state === 'proven' && typeof e.observed_at === 'string' && Number.isFinite(Date.parse(e.observed_at)) && Date.parse(e.observed_at) <= Date.now()+60_000 && typeof e.stale_after === 'string' && Date.parse(e.stale_after) > Date.now() && p.platform_deployment === target.id && typeof p.platform_sha === 'string' && /^[a-f0-9]{40}$/i.test(p.platform_sha) && p.platform_sha === target.sha && p.django_mojo_version === version;
+    });
+    return { id: target.id, sha: target.sha, status, framework_version: row.framework_version === '' ? null : nullableText(row.framework_version), nodes, terminal: ['converged','failed','superseded'].includes(status), versionProven };
+}

@@ -1,14 +1,19 @@
 import { Badge, DetailView, Eyebrow, FlatRow, fmt } from '../../ui';
-import { useCan } from '../../client/runtime';
+import { useCan, useMe } from '../../client/runtime';
+import { backendGlobalCan } from '../fleet/access';
 import {
     SETTINGS_PERMISSIONS, SettingModel, settingGroupLabel, type SettingRow,
 } from './model';
 import { showSettingEditor } from './SettingEditor';
 import { SettingValue } from './SettingValue';
+import { useAdminRouteContext } from '../core/route-context';
 
 export function SettingDetail({ id, onClose }: { id: number; onClose: () => void }) {
     const { data: row, isPending, error } = SettingModel.useOne(id);
     const { can } = useCan(SETTINGS_PERMISSIONS);
+    const route = useAdminRouteContext();
+    const { data: me } = useMe();
+    const maintenanceHref = backendGlobalCan(me, ['view_platform','manage_platform','admin']) && route?.paths.includes('maintenance') ? `#${route.mount}/maintenance?tab=framework` : undefined;
     if (isPending) return <div className="modal-pad dim">Loading setting…</div>;
     if (!row || error) return <div className="modal-pad text-bad">{error?.message ?? 'Setting not found'}</div>;
 
@@ -40,7 +45,7 @@ export function SettingDetail({ id, onClose }: { id: number; onClose: () => void
                                     The stored value is write-only. Editing with a blank replacement preserves it.
                                 </p>
                             )}
-                            {can && (
+                            {row.key === 'EDGE_FRAMEWORK_VERSION' ? <p className="dim">Managed by Maintenance → Django-MOJO. {maintenanceHref && <a href={maintenanceHref} onClick={onClose}>Open framework policy</a>}</p> : can && (
                                 <div style={{ marginTop: 16 }}>
                                     <button className="btn btn-compact" onClick={() => void showSettingEditor(row)}>
                                         <i className="bi bi-pencil" /> Edit setting

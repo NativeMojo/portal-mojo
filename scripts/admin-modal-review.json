@@ -623,6 +623,18 @@
       "fingerprint": "a5c28a6f89f8893f8c8d",
       "category": "action",
       "purpose": "Observe the existing capacity receipt and reconcile its exact batch without offering a mutation or replay"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx:MaintenancePolicyDialog:dialog:0",
+      "fingerprint": "d44f65433b1194b95f68",
+      "category": "editor",
+      "purpose": "Save framework Automatic, Hold or Exact policy through its dedicated owner writer; no deployment side effect"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx:MaintenanceProgressDialog:dialog:0",
+      "fingerprint": "1080fdf32600c97fe26d",
+      "category": "action",
+      "purpose": "Observe a retained exact upgrade or framework deployment operation without resubmitting or clearing uncertainty"
     }
   ],
   "lifecycle": [

@@ -99,7 +99,7 @@
         "verify:admin-fleet-workspace": "node scripts/verify-admin-fleet-workspace.mjs && node scripts/verify-admin-fleet-workspace-mounted.mjs",
         "verify:admin-operations-mounted": "node scripts/verify-admin-operations-mounted.mjs",
         "verify:admin-operations": "node scripts/verify-admin-operations.mjs",
-        "verify:admin-maintenance": "node scripts/verify-admin-maintenance.mjs",
+        "verify:admin-maintenance": "node scripts/verify-admin-maintenance.mjs && node scripts/verify-admin-maintenance-journeys.mjs",
         "verify:admin-maintenance-mounted": "node scripts/verify-admin-maintenance-mounted.mjs",
         "verify:admin-deployments": "node scripts/verify-admin-deployments.mjs",
         "verify:admin-domains": "node scripts/verify-admin-domains.mjs",

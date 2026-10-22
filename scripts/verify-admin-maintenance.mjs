@@ -218,7 +218,7 @@ try {
     mock.setMockMaintenanceScenario('framework-held');
     assert.equal(
         data.frameworkActionLabel(data.parseFramework(mock.maintenanceMockFramework(user))),
-        'Resume automatic updates and redeploy',
+        'Resume and update',
     );
     checks++;
     mock.setMockMaintenanceScenario('framework-pin-cleared-503');

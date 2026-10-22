@@ -73,6 +73,7 @@ function SettingEditor({ row, close }: {
         <form className="modal-pad" onSubmit={submit} noValidate>
             <h2 className="modal-title">{row ? `Edit setting — ${row.key}` : 'Create setting'}</h2>
             {error && <div className="form-alert">{error}</div>}
+            {key.trim() === 'EDGE_FRAMEWORK_VERSION' && <p className="form-alert">Framework update policy is managed in Maintenance → Django-MOJO.</p>}
             <div className="form-grid">
                 <div className="col-12">
                     <label className="field">
@@ -142,7 +143,7 @@ function SettingEditor({ row, close }: {
             </div>
             <div className="modal-actions">
                 <button type="button" className="btn" disabled={busy} onClick={() => close(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={busy || !key.trim()}>
+                <button type="submit" className="btn btn-primary" disabled={busy || !key.trim() || key.trim() === 'EDGE_FRAMEWORK_VERSION'}>
                     {busy ? 'Saving…' : row ? 'Save changes' : 'Create setting'}
                 </button>
             </div>

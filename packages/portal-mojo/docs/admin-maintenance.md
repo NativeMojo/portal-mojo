@@ -46,20 +46,54 @@ dialog closure, navigation/remount, timeout, ordinary token renewal and a new
 session for the same actor. Unmount/session changes abort local observations;
 provider work can continue. An attempted/unknown provider outcome never unlocks
 another apply merely because a refreshed report still offers the old version.
+A completed receipt permits a new, different offered target with new consent;
+switching only the timing never bypasses the same-target guard.
 Reconcile the provider operation and maintenance window. A definitive refusal
 before provider work can be cleared only by a deliberate successful Refresh
 Maintenance and a new confirmation. A 440 requests authentication once and
 never replays the write.
 
 Framework shows installed/latest versions, check time/source, pin policy,
-update availability and the backend blocker. Held/pinned current versions use
-“Resume automatic updates and redeploy”. The operation clears the pin and
+update availability and the backend blocker. Held/pinned versions use
+“Resume and update”. The operation clears the pin and
 redeploys the last converged application SHA. Policy clearing and deployment
 acceptance are separate facts: a 503 or lost response can leave automatic policy
 active with unknown deployment acceptance. That attempt remains guarded across
 remount and reauthentication. Refresh Framework and inspect Deployments even
 when no deployment ID was returned. Acceptance points to Deployments and never
-claims fleet completion. There is no version picker or pin/hold writer here.
+claims fleet completion. The separate Update policy dialog saves Automatic (`""`), Hold (`"hold"`) or an
+exact version through `POST /api/account/admin/advanced/settings` with only
+`framework_pin`. It requires an active literal superuser and fresh authentication;
+this page also keeps external infrastructure read-only. Syntax validation does
+not verify that an exact version is published. Hold resolves the last converged
+framework version. Saving policy never submits a deployment. The framework
+Update action explicitly clears that policy and requests latest; it cannot
+deploy an exact selection while retaining the pin.
+
+A successful policy response followed by matching live policy readback completes
+that policy attempt. A lost/uncertain response remains guarded even if the
+desired value is later observed: current value does not prove request ownership
+or that a delayed writer finished. There is no policy revision or durable receipt
+lookup. Reconcile server audit before further policy writes; there is no reset
+button. Generic Settings directs `EDGE_FRAMEWORK_VERSION` to the mounted
+Maintenance owner, rather than submitting through the rejected generic writer.
+
+Framework submissions with an acknowledged UUID observe that exact deployment
+and SHA through the bounded platform deployments collector. Only `converged`,
+`failed`, and `superseded` release its submission guard for a different target;
+`verified`, `partial`, `unknown`, absence, and errors do not. Deployment terminal
+status is distinct from requested framework-version proof. That requires a
+nonempty unique frozen runner roster, unique matching proof for each runner,
+exact UUID/full SHA/version, and fresh valid observation timestamps. Missing
+version proof remains explicit even when deployment converges. Lost acceptance
+without a UUID cannot be reconciled from the latest same-SHA row.
+
+Submitted operations remain compact rows across categories; View progress opens
+a focused dialog with target, timing, last successful observation, current/pending
+and member versions, or correlated deployment evidence. Manual refresh only reads.
+Aurora settlement proves cluster-level state, not individual database members.
+Module-memory receipts survive navigation and same-actor renewal; a full browser
+reload loses them. Durable reload-safe reconciliation needs backend support.
 
 `maintenanceDeploymentsHref(pathname)` preserves an embedded Admin prefix.
 `MaintenancePage` also accepts an explicit `deploymentsHref`, `pollInterval`
@@ -90,3 +124,9 @@ Resource rows keep the offered version, provider state and upgrade action visibl
 ### KISS presentation
 
 Database, Cache and Django-MOJO are separate tabs. Scan metadata is collapsed; scan errors, incomplete evidence and scanning-off warnings stay above the tabs. Submitted operations remain visible independently of the selected category. See [visual QA](admin-presentation.md).
+
+Support deadlines within30 days or overdue remain visible on resource rows;
+standard and extended support stay separate. Missing support dates are not
+interpreted as supported. Framework status distinguishes current, policy-paused
+published versions, and unavailable/latest-unknown evidence, with source details
+in accessible info popovers.

@@ -4979,6 +4979,7 @@
         "SettingValue",
         "Badge",
         "p",
+        "a",
         "div",
         "button",
         "i"
@@ -4986,7 +4987,7 @@
       "category": "record",
       "parent": "SettingDetail",
       "target": null,
-      "fingerprint": "e823c89adf7b8083e1ce",
+      "fingerprint": "c721f0dc5d808c7db292",
       "categories": [
         "record"
       ]
@@ -6212,6 +6213,38 @@
       "fingerprint": "51881aa00bff7faea778",
       "categories": [
         "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx:MaintenancePolicyDialog:dialog:0",
+      "file": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx",
+      "owner": "MaintenancePolicyDialog",
+      "launcher": "dialog",
+      "body": [
+        "dialog"
+      ],
+      "category": "editor",
+      "parent": "MaintenancePolicyDialog",
+      "target": null,
+      "fingerprint": "d44f65433b1194b95f68",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx:MaintenanceProgressDialog:dialog:0",
+      "file": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx",
+      "owner": "MaintenanceProgressDialog",
+      "launcher": "dialog",
+      "body": [
+        "dialog"
+      ],
+      "category": "action",
+      "parent": "MaintenanceProgressDialog",
+      "target": null,
+      "fingerprint": "1080fdf32600c97fe26d",
+      "categories": [
+        "action"
       ]
     },
     {
@@ -11636,7 +11669,7 @@
       "owner": "SettingDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "a28bbbe80f2eb2feb727"
+      "fingerprint": "8cb5cff707832c04a053"
     },
     {
       "file": "packages/portal-mojo/src/admin/jobs/RunnerDetail.tsx",

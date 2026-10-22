@@ -5,10 +5,12 @@ import {
     applyMaintenance,
     updateFramework,
     readMaintenanceStatus,
+    readFrameworkDeployment, saveFrameworkPolicy, policyMatches, normalizePolicy,
     MaintenanceError,
     type ApplyInput,
     type ResourceStatus,
     type Scope,
+    type Framework, type FrameworkObservation,
 } from './data';
 export type AttemptState =
     | 'sending'
@@ -21,13 +23,15 @@ export type AttemptState =
 export interface MaintenanceAttempt {
     key: string;
     actor: string;
-    input: Readonly<ApplyInput> | { version: string };
+    input: Readonly<ApplyInput> | { version: string } | { policy: string };
     state: AttemptState;
     message: string;
     observations: number;
     observation?: ResourceStatus;
     deployment?: { id: string; sha: string; status: string };
     generation: number;
+    observedAt?: number;
+    frameworkObservation?: FrameworkObservation;
 }
 const attempts = new Map<string, MaintenanceAttempt>();
 const listeners = new Set<() => void>();
@@ -54,7 +58,7 @@ export const maintenanceCompleted = (r: ResourceStatus) =>
     r.found === true && r.settled === true && r.upgraded === true;
 function claim(key: string, input: MaintenanceAttempt['input']): MaintenanceAttempt {
     const id = scopedKey(key);
-    if (attempts.has(id)) throw new MaintenanceError('attempt_requires_reconciliation');
+    if (!canRequestMaintenance(key, input)) throw new MaintenanceError('attempt_requires_reconciliation');
     const attempt: MaintenanceAttempt = {
         key,
         actor: maintenanceActor(),
@@ -67,6 +71,14 @@ function claim(key: string, input: MaintenanceAttempt['input']): MaintenanceAtte
     attempts.set(id, attempt);
     changed();
     return attempt;
+}
+export function canRequestMaintenance(key: string, input?: MaintenanceAttempt['input']) {
+    const a = getMaintenanceAttempt(key);
+    if ((key === 'framework' || key === 'framework-policy') && getMaintenanceAttempts().some(x => (x.key === 'framework' || x.key === 'framework-policy') && x.key !== key && !['complete','refused'].includes(x.state))) return false;
+    if (!a) return true;
+    if (a.state !== 'complete') return false;
+    if (!input) return true;
+    return 'kind' in a.input && 'kind' in input ? a.input.target_version !== input.target_version : 'version' in a.input && 'version' in input ? a.input.version !== input.version : 'policy' in a.input && 'policy' in input && a.input.policy !== input.policy;
 }
 function failed(a: MaintenanceAttempt, e: unknown) {
     a.state = e instanceof MaintenanceError && e.mutationState === 'none' ? 'refused' : 'uncertain';
@@ -108,6 +120,38 @@ export async function requestFramework(version: string, scope?: Scope) {
         throw e;
     }
 }
+export async function requestPolicy(policy: string, scope?: Scope) {
+    policy = normalizePolicy(policy);
+    const a = claim('framework-policy', { policy });
+    try { await saveFrameworkPolicy(policy, scope); a.state = 'waiting'; a.message = 'Policy saved. Reading back current policy; no deployment requested.'; changed(); return a; }
+    catch (error) { failed(a, error); throw error; }
+}
+export function reconcilePolicy(f: Framework) {
+    const a = getMaintenanceAttempt('framework-policy');
+    if (!a || !('policy' in a.input) || a.state === 'sending' || a.state === 'refused' || a.state === 'complete') return;
+    a.observedAt = Date.now();
+    if (policyMatches(f.pin, a.input.policy)) {
+        if (a.state === 'uncertain' || a.state === 'timeout') a.message = 'Requested policy is now observed, but the original save outcome remains unknown. Readback cannot prove that request finished. Reconcile the server audit before any further policy write.';
+        else { a.state = 'complete'; a.message = 'Saved policy is now observed. No deployment was requested; node activation is separate.'; }
+    }
+    else a.message = 'Current policy differs from the submitted choice. Its outcome is unresolved; refresh and reconcile before another write.';
+    changed();
+}
+export async function observeFramework(a: MaintenanceAttempt, scope: Scope = {}) {
+    if (!('version' in a.input) || !a.deployment || ['sending','refused','complete'].includes(a.state)) return;
+    const generation = ++a.generation, actor = maintenanceActor();
+    try {
+        const result = await readFrameworkDeployment(a.deployment, a.input.version, scope); scope.beforeSend?.();
+        if (scope.signal?.aborted || actor !== maintenanceActor() || a.actor !== actor || generation !== a.generation) return;
+        a.frameworkObservation = result; a.observedAt = Date.now(); a.observations++;
+        a.state = result.terminal ? 'complete' : 'accepted';
+        a.message = `Deployment ${result.status}. ${result.versionProven ? 'Requested framework version observed on every deployment target.' : 'Requested framework version remains unverified.'}`;
+        changed();
+    } catch (error) {
+        if (scope.signal?.aborted || actor !== maintenanceActor() || generation !== a.generation) return;
+        a.observations++; a.message = error instanceof MaintenanceError ? error.message : 'Deployment evidence unavailable; the original update remains guarded.'; changed();
+    }
+}
 /** Only a proven pre-provider refusal is releasable by explicit successful refresh. */
 export function refreshRefusedMaintenanceAttempt(key: string) {
     const a = getMaintenanceAttempt(key);
@@ -132,6 +176,7 @@ export async function observeMaintenance(a: MaintenanceAttempt, scope: Scope = {
         )
             return;
         a.observation = result;
+        a.observedAt = Date.now();
         a.observations++;
         a.state = maintenanceCompleted(result)
             ? 'complete'
@@ -140,7 +185,7 @@ export async function observeMaintenance(a: MaintenanceAttempt, scope: Scope = {
               : 'waiting';
         a.message =
             a.state === 'complete'
-                ? `Upgraded to ${a.input.target_version}; AWS reports every member settled.`
+                ? `Upgraded to ${a.input.target_version}; AWS reports ${a.input.kind === 'rds-cluster' ? 'the cluster' : 'every member'} settled.`
                 : `${result.status ?? 'Status unknown'} — waiting/unconfirmed. A version or available state alone does not prove completion.`;
         changed();
     } catch (e) {
@@ -154,7 +199,7 @@ export async function observeMaintenance(a: MaintenanceAttempt, scope: Scope = {
     }
 }
 export function maintenanceObservationLimit(a: MaintenanceAttempt) {
-    if (a.state === 'waiting' || a.state === 'uncertain') {
+    if (a.state === 'waiting' || a.state === 'uncertain' || a.state === 'accepted') {
         a.state = 'timeout';
         a.message =
             'Automatic observations reached their limit. The attempt remains guarded. Refresh status or reconcile the provider operation and maintenance window.';

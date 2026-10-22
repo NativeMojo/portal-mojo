@@ -52,10 +52,14 @@ try {
     // adds seven source/style modules for isolated inspection, editing and
     // progress: 628 intended files, 6,399,725 unpacked bytes (1,724,038 packed).
     // No generated files or dependency payload added; bound source-only growth
-    // at 6.410 MB. Shared Dashboard/coordinator source remains unchanged.
+    // at 6.410 MB. Maintenance9245 extends the existing source modules with
+    // policy editing, exact observations, owner handoff and mock evidence:
+    // measured 628 intended files, 6,429,996 unpacked bytes (1,731,687 packed).
+    // No generated files or dependencies added; bound source growth at 6.440 MB.
+    // Shared Dashboard/coordinator source remains unchanged.
     // Content/consumer/style/export checks and the separate 530,000-byte
     // eager-runtime cap remain unchanged.
-    assert.ok(artifact.unpackedSize <= 6_410_000, `unpacked package exceeds 6.410 MB budget (${artifact.unpackedSize})`);
+    assert.ok(artifact.unpackedSize <= 6_440_000, `unpacked package exceeds 6.440 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).

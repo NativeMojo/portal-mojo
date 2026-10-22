@@ -687,6 +687,7 @@ function buildSettings(): MockSetting[] {
         { id: 404, created: now - 5 * 86400, modified: now - 5 * 86400, key: 'SITE_NAME', value: 'NativeMojo fallback', is_secret: false, group: null, secretValue: null },
         // #7729: one rendition override so Media rendering shows a changed field beside greyed defaults on first load.
         { id: 405, created: now - 3 * 86400, modified: now - 3 * 86400, key: 'FILEMAN_RENDITIONS_VIDEO', value: JSON.stringify({ video_hevc: { crf: 24 } }), is_secret: false, group: null, secretValue: null },
+        { id: 406, created: now - 3 * 86400, modified: now - 3 * 86400, key: 'EDGE_FRAMEWORK_VERSION', value: '', is_secret: false, group: null, secretValue: null },
     ];
 }
 
@@ -9925,7 +9926,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         armedReauth = null;
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
-    if (path === '/api/account/admin/bootstrap' || path === '/api/account/admin/settings'
+    if (path === '/api/account/admin/bootstrap' || path === '/api/account/admin/settings' || path === '/api/account/admin/advanced/settings' && Object.hasOwn(opts.body ?? {}, 'framework_pin')
         || path === '/api/account/admin/dashboard' || path.startsWith('/api/aws/capacity')
         || path.startsWith('/api/aws/maintenance/') || path.startsWith('/api/account/admin/platform') || path === '/api/account/admin/setup/readiness'
         || path.startsWith('/api/edge/webapp') || path.startsWith('/api/edge/release') || path === '/api/edge/deployment') {
@@ -10891,11 +10892,18 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
         if (!hasGlobalPermission(caller, ['manage_settings', 'groups'])) return permissionDenied();
+        if (method === 'GET') {
+            const { maintenanceMockFramework } = await import('./maintenance-mock');
+            const pin = maintenanceMockFramework(caller).pin;
+            const row = db.settings.find(row => row.key === 'EDGE_FRAMEWORK_VERSION');
+            if (row) row.value = pin.mode === 'latest' ? '' : pin.mode === 'hold' ? 'hold' : pin.value ?? '';
+        }
         if (oneSetting) {
             const row = db.settings.find((candidate) => candidate.id === Number(oneSetting[1]));
             if (!row) return { status: false, error: 'Setting not found', error_code: 404 };
             if (opts.method === 'DELETE') return { status: false, error: 'DELETE not allowed: Setting', error_code: 403 };
             if (opts.method === 'POST' && opts.body) {
+                if (row.key === 'EDGE_FRAMEWORK_VERSION' || opts.body.key === 'EDGE_FRAMEWORK_VERSION') return {status:false,error:'Framework policy is protected; use its dedicated owner writer.',error_code:400};
                 if ('value' in opts.body && !row.is_secret) {
                     // Registered validators run before the row mutates (Setting.on_rest_pre_save → config.validate).
                     const refusal = validateRenditionSetting(typeof opts.body.key === 'string' ? opts.body.key : row.key, opts.body.value);
@@ -10914,6 +10922,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             return { status: true, data: serializeSetting(row), graph: 'default' };
         }
         if (opts.method === 'POST' && opts.body) {
+            if (opts.body.key === 'EDGE_FRAMEWORK_VERSION') return {status:false,error:'Framework policy is protected; use its dedicated owner writer.',error_code:400};
             const now = Math.floor(Date.now() / 1000);
             const row: MockSetting = { id: Math.max(0, ...db.settings.map((candidate) => candidate.id)) + 1, created: now, modified: now, key: '', value: '', is_secret: false, group: null, secretValue: null };
             for (const [field, value] of Object.entries(opts.body)) {
