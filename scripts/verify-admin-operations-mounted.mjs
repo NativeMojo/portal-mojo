@@ -26,8 +26,9 @@ try {
     let actor = { id: 1, is_active: true, is_superuser: true, permissions: {} };
     const token = () => `e30.${Buffer.from(JSON.stringify({ uid: actor.id, exp: Date.now() / 1000 + 3600, auth_time: Date.now() / 1000 })).toString('base64url')}.mock`;
     auth.setTokens(token(), token());
+    const requests = [];
     globalThis.fetch = async (input, options = {}) => {
-        const url = new URL(String(input)); assert.equal(url.origin, 'http://operations-mock.invalid');
+        const url = new URL(String(input)); requests.push(url.pathname); assert.equal(url.origin, 'http://operations-mock.invalid');
         const result = url.pathname === '/api/user/me' ? { status: true, data: actor } : fleet.handleOperationalFleetMock(url.pathname, options.method ?? 'GET', undefined, Object.fromEntries(url.searchParams), actor, Date.now() / 1000);
         assert.notEqual(result, undefined, `Unexpected request ${url.pathname}`);
         return new Response(JSON.stringify(result), { status: 200 });
@@ -38,7 +39,7 @@ try {
         memoryRouter = router.createMemoryRouter(adminSectionRoutes(sections, { mount: '/product/control' }), { initialEntries: [dashboard ? '/product/control' : '/product/control/fleet'] });
         root = createRoot(document.getElementById('root'));
         await act(async () => root.render(React.createElement(QueryClientProvider, { client }, React.createElement(React.StrictMode, null, React.createElement(router.RouterProvider, { router: memoryRouter })))));
-        await wait(() => document.querySelector('.fleet-evidence-grid'));
+        await wait(() => document.querySelector(dashboard ? '.admin-dashboard' : '.fleet-evidence-grid'));
     };
     const unmount = async () => { await act(async () => { root.unmount(); modal.closeAll(); }); root = null; memoryRouter.dispose(); client.clear(); };
     const assertNoSourceLinks = async () => { for (const node of [...document.querySelectorAll('.fleet-detail-button')]) { await act(async () => node.click()); assert.equal(document.querySelectorAll('dialog a').length, 0, 'Unregistered sibling destinations are suppressed inside source dialogs'); await act(async () => [...document.querySelectorAll('dialog button')].find(b => b.textContent === 'Close').click()); } };
@@ -54,14 +55,15 @@ try {
     assert(document.querySelector('a[href="/product/control/fleet-configuration"]'), 'Registered owner destination stays available');
     assert.equal(document.querySelectorAll('.operational-fleet a').length, 1, 'Other unregistered destinations remain suppressed');
     await unmount();
-    actor = { id: 1, is_active: true, is_superuser: false, permissions: { view_admin: true, view_platform: true, view_dns: true } };
+    actor = { id: 1, is_active: true, is_superuser: false, permissions: { view_admin: true } };
+    requests.length = 0;
     await mount([], true);
-    await assertNoSourceLinks();
-    assert.equal(document.querySelectorAll('.operational-fleet a').length, 0, 'Embedded Dashboard overview also suppresses absent sibling routes');
+    assert.equal(document.querySelector('.admin-dashboard h1').textContent, 'Dashboard');
+    assert.equal(document.querySelector('.operational-fleet'), null, 'Dashboard no longer contains the separate Fleet overview');
+    assert.equal(document.querySelector('.admin-dashboard-kpis'), null, 'Unadmitted metric panels stay absent');
+    assert.equal(document.querySelector('.dashboard-login-map'), null, 'Unadmitted login panel stays absent');
+    assert.equal(requests.some(path => path.startsWith('/api/account/admin/')), false, 'Dashboard issues no Fleet/capacity requests');
+    assert.equal(requests.some(path => path.startsWith('/api/metrics/')), false, 'Denied metric panels issue no requests');
     await unmount();
-    await mount([{ id: 'dns', title: 'DNS', icon: 'bi-globe', permissions: ['sys.view_dns'], routes: [{ path: 'certificates', loadComponent: async () => ({ default: Empty }) }] }], true);
-    await act(async () => document.querySelector('[aria-label="Details for Certificates"]').click());
-    assert(document.querySelector('a[href="/product/control/dns/certificates"]'), 'Dashboard source links use their matched arbitrary mount');
-    await unmount();
-    console.log('PASS mounted operations integration: partial roster suppresses absent links; admitted sibling links preserve arbitrary embedded mount');
+    console.log('PASS mounted operations integration: partial roster suppresses absent links; admitted sibling links preserve arbitrary embedded mount; original Dashboard excludes Fleet and denied reads');
 } finally { if (root) await act(async () => root.unmount()); client?.clear(); memoryRouter?.dispose(); await server.close(); dom.window.close(); }

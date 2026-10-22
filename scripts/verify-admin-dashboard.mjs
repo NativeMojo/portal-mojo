@@ -72,6 +72,12 @@ try {
     assert.doesNotMatch(sentPage, /status__in/);
     assert.match(showcase, /admin-dashboard/);
     assert.match(docs, /authoritative/i);
+    assert.doesNotMatch(page, /OperationalOverview|FleetOverview|FLEET_DASHBOARD_GRANTS/,
+        'The Admin Dashboard keeps its original metrics, attention and login layout; Fleet has a separate page');
+    assert(page.indexOf('<MetricOverview />') < page.indexOf('<AttentionOverview />'));
+    assert(page.indexOf('<AttentionOverview />') < page.indexOf('<LoginOverview />'));
+    assert.equal(admin.ADMIN_DASHBOARD_PERMISSIONS.includes('sys.view_admin'), false,
+        'Fleet admission must not broaden the original Dashboard route');
 
     for (const slug of [...data.DASHBOARD_SERIES, ...data.DASHBOARD_SCALARS]) assert(mockSource.includes(slug), slug);
     assert.doesNotMatch(mockSource, /slug:\s*'logins'|slug:\s*'errors'/);
