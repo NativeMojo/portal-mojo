@@ -6031,7 +6031,7 @@
       "category": "action",
       "parent": "resume",
       "target": null,
-      "fingerprint": "0658dcb889a1ca04811f",
+      "fingerprint": "c0df87a061beb97c3d22",
       "categories": [
         "action"
       ]
@@ -6131,7 +6131,7 @@
       "category": "editor",
       "parent": "newApp",
       "target": null,
-      "fingerprint": "6ad851c4eb21414d0cca",
+      "fingerprint": "4c01462dfcd12640f40b",
       "categories": [
         "editor"
       ]

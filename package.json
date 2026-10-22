@@ -106,7 +106,8 @@
         "verify:admin-serving-mounted": "node scripts/verify-admin-serving-mounted.mjs",
         "verify:admin-serving-mounted-evidence": "node scripts/verify-admin-serving-mounted-evidence.mjs",
         "verify:admin-operational-fleet-partial": "node scripts/verify-admin-operational-fleet-partial.mjs",
-        "verify:admin-operational-fleet-unsent": "node scripts/verify-admin-operational-fleet-unsent.mjs"
+        "verify:admin-operational-fleet-unsent": "node scripts/verify-admin-operational-fleet-unsent.mjs",
+        "verify:admin-deployments-mounted": "node scripts/verify-admin-deployments-mounted.mjs"
     },
     "devDependencies": {
         "jsdom": "^26.1.0"

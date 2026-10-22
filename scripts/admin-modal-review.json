@@ -530,13 +530,13 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:resume:modal.open:0",
-      "fingerprint": "0658dcb889a1ca04811f",
+      "fingerprint": "c0df87a061beb97c3d22",
       "category": "action",
       "purpose": "Resume the matching durable onboarding operation using observed cursor and revision"
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:newApp:modal.open:0",
-      "fingerprint": "6ad851c4eb21414d0cca",
+      "fingerprint": "4c01462dfcd12640f40b",
       "category": "editor",
       "purpose": "Choose eligible workspace, app identity and public address for durable server onboarding"
     },

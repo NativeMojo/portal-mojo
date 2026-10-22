@@ -29,7 +29,7 @@ export function DeploymentsPage({ destinations }: {
         queryKey: ['deployments', scope.key, 'bootstrap'], queryFn: ({ signal }) => getBootstrap(scope.owner, signal), enabled: interactive && canReadBootstrap(me.data), retry: false
     });
     const select = (lane: string) => { setParams({ ...Object.fromEntries([...params].filter(([name]) => name === 'demo')), deployment_lane: lane }, { replace: true }); };
-    const newApp = async () => { const { WebAppOnboardingDialog } = await import('./WebAppOnboardingDialog'); assertOwner(scope.owner, scope.signal); let busy = false; await modal.open(close => <WebAppOnboardingDialog bootstrap={bootstrap.data!} onClose={() => close(null)} onBusy={value => { busy = value; }}/>, {
+    const newApp = async () => { const { WebAppOnboardingDialog } = await import('./WebAppOnboardingDialog'); assertOwner(scope.owner, scope.signal); let busy = false; await modal.open(close => <WebAppOnboardingDialog destinations={admittedDestinations} bootstrap={bootstrap.data!} onClose={() => close(null)} onBusy={value => { busy = value; }}/>, {
         signal: scope.signal, canDismiss: () => !busy, size: 'lg'
     }); };
     if (!api && !web)
