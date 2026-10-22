@@ -1,92 +1,98 @@
 # Domains
 
-`DomainsPage` is the everyday global DNS inventory at `/dns/domains`, under the
-host Admin mount. Import it from `portal-mojo/admin/infrastructure`. It keeps
-`DomainModel`, the `admin:dns:domains` table persistence key and server search,
-provider/status filters, sorting and paging. Scope comes from each row's group
-or Platform; the active product group is never used.
+Import `DomainsPage` from `portal-mojo/admin/infrastructure`. The global DNS
+inventory lives at the host's `/dns/domains` mount. Server search, filters,
+sort and paging stay on `DomainModel` with `admin:dns:domains` persistence.
+Scope comes from each row, never the active product group. An absent expiry
+means **Unknown**, not Never. Narrow layouts combine provider, scope and status
+under the name so the Records action stays visible.
 
-The header exposes **Register existing**, **Adopt**, and **Buy domain**. Register
-and Buy need global `sys.manage_dns | sys.security`. Adopt also needs literal
-`me.is_superuser === true`; the backend independently refuses noninteractive
-and key-backed authority. Viewer sessions can inspect domains, DNS records and
-certificates without mutation controls.
+## Everyday tasks
 
-## Explicit onboarding
+**Add domain** opens three explicit choices: **Connect GoDaddy domain**,
+**Buy domain**, and literal-superuser **Adopt Route 53 zone**. Purchasing has its
+own read-only ledger shortcut. **More domain actions → Shared validation setup**
+keeps external-domain/controller setup available without an existing domain.
+Viewers get inspection and Purchases; writes require global
+`sys.manage_dns | sys.security`. Platform adoption/assignment additionally require
+literal interactive `is_superuser`; backend gates remain authoritative.
 
-`showDomainOnboarding()` preserves its original menu. An optional
-`{ initialMode: 'menu' | 'register' | 'adopt' | 'purchase' }` opens a workflow
-directly. The page imports the dialog only after a button click.
+A row opens a compact native dialog with Overview, provider-applicable DNS
+records, Certificates, and manager Registration. It has no side rail or nested
+registration disclosure. Only the selected task mounts. The same record panel
+serves the standalone Records page; its type filter is controlled by that page's
+URL or locally when embedded. Serving is an explicit sibling route under the
+observed Admin mount. Extra registered domain links retain their own gates.
 
-Register existing selects one authorized group from bounded
-`/api/dnsman/credential/group-choice`, then an active verified GoDaddy
-credential queried through `DnsCredentialModel` with exact group/provider and
-verification filters. No credential selector mounts before an explicit group.
-The selector remounts by group, clears its selection on group change and rejects
-resolved credentials from another group or unsupported/unusable credentials.
-There is no `/api/group` read, free-form group id, provider-secret input or
-provider-account enumeration. The exact normalized name is probed for ownership
-without spending money. The only body is `{ group, domain, credential }`.
+## Connect, repair and adopt
 
-Adopt takes one normalized existing public zone name, then explicitly reviews
-that name and Platform scope before posting `{ domain }`. It never supplies
-`group` or `create_zone`, discovers inventory or assigns a tenant. Review and
-mutation guard native dialog dismissal; Cancel review performs no mutation.
-Registration/adoption use an immediate single-flight ref. An unknown outcome
-invalidates inventory and requires operator review before starting another flow.
+Connect selects one explicit authorized group through bounded
+`/api/dnsman/credential/group-choice`, then an active, verified GoDaddy
+credential in that exact group. Changing group clears credential state and
+fences late replies. **Link credential** opens the existing write-only credential
+editor locked to that group; a verified return resumes the same domain draft.
+There is no generic group list, free-form group id or provider-account discovery.
+The ownership probe sends exactly `{ group, domain, credential }` and spends no
+money. Domain names are normalized before submission.
 
-Buy preserves the bounded typed-TLD, prerequisite, tri-state search and durable
-ledger flow documented in [the registrar reference](admin-dns-registrar.md).
-The purchase body is exactly `{ group, purchase, confirm_token, confirm_domain,
-confirm_price }`. Name and decimal price come from the immutable validated quote,
-not editable confirmation inputs. The quote token is removed from its mounted
-ref before the operation and kept transient through `withFreshAuth`; only a 440
-may resume the identical body once. Cancelled step-up and other failures never
-replay. An attempted purchase is terminal in that mounted wizard and reconciles
-against the durable ledger, including ambiguous provider outcomes.
+An existing GoDaddy domain with an unusable linked credential offers **Repair
+linked credential**. Rotation verifies the same credential/group, clears raw
+password refs, then refreshes safe credential and domain projections. This does
+not expose an arbitrary credential-FK reassignment: the backend has no same-group
+validation for that generic save. A domain with no linked credential cannot be
+silently attached to a newly linked one.
 
-## Inspection and registrar settings
+Adoption reviews one exact existing public zone name and Platform scope before
+posting `{ domain }`. It never supplies `group`/`create_zone` or discovers the AWS
+account. Native dismissal is guarded during review and mutation. Cancel review
+writes nothing. Unknown onboarding outcomes require inventory/provider review;
+submitted forms never repeat their request.
 
-A row opens the standard `modal.detail` overview. Server-owned name, provider,
-status, scope, registration/expiry dates and redacted failure remain read-only.
-DNS Records is a direct shortcut for Route 53 and GoDaddy; Mojo explains its
-certificate-only limitation. Shortcuts derive their mount from the observed DNS
-route, so root, `/admin` and embedded prefixes work. Serving links explicitly
-navigate to the mount's sibling `/edge/vhosts`; they are outside the registry
-whose routes are relative to `/dns`.
+A Platform domain offers **Assign to group** to literal superusers. Choose the
+destination, review domain/from/to, and type the exact destination name. The UI
+checks current authority, current domain ownership and the exact authorized group
+again before `{ domain, group }`. Already-grouped rows never offer reassignment.
+A lost receipt retains **Refresh owner** and refuses replay, even if the fresh
+read still says Platform; a read cannot prove an older write has finished.
 
-Only Route 53 managers receive **Registrar settings**. Its focused guarded native
-modal sends only changed boolean `auto_renew`/`privacy` fields to the existing
-generic domain save endpoint. It never edits group, credentials, raw metadata,
-protected fields or registrar contacts. Every attempted save authoritatively
-refetches and invalidates DomainModel, including rejection. HTTP success alone
-is not registrar success: a nonempty `last_error` stays visible with a historical
-warning and instructions to inspect the registrar. Uncertain writes keep the
-modal open, disable additional writes and require review. There is no automatic
-retry. GoDaddy registrar/privacy/WHOIS management remains in GoDaddy; Mojo is
-certificate-only. Unknown providers remain labeled and read-only.
+All onboarding writes check their owner at the transport's `beforeSend` boundary,
+after any asynchronous auth refresh. Credential/purchase step-up continuations
+perform that same check. A replacement session never inherits old consent.
 
-## Advanced validation
+## Registration
 
-**Domains → Advanced → Shared validation setup** opens without an existing
-domain, preserving external-domain consumer setup and controller review.
-Domain detail retains Advanced validation, DNS Records and Certificates sections,
-existing registered related links and the permission/readiness-gated setup action.
-Descriptor import/export, TLS paths and shared-validation protocol are unchanged.
+Registration starts with an explicit manager-only **Read registration**. WHOIS
+contacts stay in the mounted dialog, outside Query, URLs, storage and logs.
+Route 53 DNS hosting alone never admits registrar edits: the returned registrar
+must identify Amazon Registrar/Route 53. Hosted-zone-only, unavailable or unknown
+registrations remain read-only. GoDaddy registration tasks hand off to its account;
+Mojo remains certificate-only. No manual Renew action is invented.
 
-## Verification and showcase
+Confirmed Route 53 registration offers focused settings and contacts dialogs.
+Auto-renew uses the existing best-effort boolean save; privacy uses its dedicated
+all-contact action. Fresh owner/registrar/value preflight precedes writes. Only
+live WHOIS readback can establish observed values; an accepted DB save is not
+provider proof. Unknown outcomes lock the submitted editor and never replay.
+An unchanged desired DB value may not re-run a failed model hook; the registrar
+account handoff remains available.
 
-`verify-admin-domains.mjs` exercises the independent strict purchase peer,
-fresh-auth continuation/cancellation and ambiguous no-replay. Its central mock
-contract leg requires missing/mismatched name and decimal-price tuples to leave
-the quote unspent. `verify-admin-domains-mounted.mjs` mounts real wizard, picker,
-page and editor components to prove scope isolation, action authority, deliberate
-adoption, registrar reconciliation and mount-aware navigation. The closing browser
-pass supplies native focus, responsive layout and light/dark evidence.
+Contact inspection groups identity, email/phone and postal address. Identical
+Registrant/Admin/Technical contacts share one view; differing contacts get useful
+role tabs. Editing keeps one draft across Contact/Address tabs. **Replace all
+contacts** explicitly replaces all three roles, matching the backend contract.
+Entering edit mode never submits. Registry extension fields are preserved locally.
+Pending operations guard tab switches, native dismissal and repeated writes.
 
-The focused **Admin → Domains** showcase uses mock manager, platform and viewer
-identities and preserves every earlier DNS showcase.
+## Purchase and QA
 
-### KISS presentation
+Buying is restricted to one quoted year until the backend binds multi-year
+payable totals. Privacy limits and acknowledged downgrades stay visible.
+See [registrar flows](admin-dns-registrar.md) for exact confirmation and recovery.
 
-Domain/provider share one table cell. The page header owns registration/adoption/purchase; technical registrar facts are in Registration details. Provider warnings remain visible. See [visual QA](admin-presentation.md).
+`verify:admin-domains` includes delayed-auth transport fences.
+`verify:admin-domains-mounted` runs onboarding, assignment/filter/credential,
+registration and purchase/contact journey contracts, including StrictMode and
+stale-session/scope cases. JSDOM establishes behavior only. Closing acceptance
+uses actual Portal and built Showcase screenshots and interactions in light/dark,
+desktop and 390px; see [visual QA](admin-presentation.md). No live registrar
+purchase or infrastructure mutation is required for this mock acceptance.

@@ -25,6 +25,12 @@ omit deployment controls, and attempt viewers get a direct overview when there
 is no admitted node evidence. Workflow, integration, setup identity and profile
 editing use focused child dialogs. No shared DetailView default is changed.
 
+Domains uses a compact native task dialog with Overview, applicable DNS records,
+Certificates and manager Registration. Focused assignment, credential, registrar,
+contact and purchase-recovery dialogs guard their own pending operations. Read-only
+contact roles use tabs only when the returned contacts differ. This is scoped to
+Domains; the shared DetailView and Admin Dashboard remain unchanged.
+
 Use `modal-pad`, `modal-title`, `modal-message`, grouped fields and `modal-actions`.
 Cancel precedes the primary button. Pending operations disable repeat submission;
 `canDismiss` also protects native Escape/backdrop dismissal during a write.

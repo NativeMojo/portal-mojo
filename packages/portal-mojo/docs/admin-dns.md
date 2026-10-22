@@ -89,9 +89,8 @@ rotation remains write-only and imperative. Built-in credential Delete is absent
 
 ## Shared wildcard validation
 
-Domains offers **Advanced → Shared validation setup** to global DNS
-managers even when server setup needs an operator. Domain detail includes
-read-only **Advanced validation**; its context action and Certificate Delegation compose
+Domains offers **More domain actions → Shared validation setup** to global DNS
+managers even when server setup needs an operator. Domain Overview offers the focused **Shared validation** action; Certificate Delegation composes
 the same focused flow. See [the human walkthrough and exact
 contracts](admin-dns-certificates.md#shared-validation-setup).
 

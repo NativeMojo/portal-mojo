@@ -1,18 +1,18 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { modal, toast } from '../../ui';
-import { useCan } from '../../client/runtime';
+import { getAuthSessionRevision, subscribeAuth, useAuthSnapshot, useCan } from '../../client/runtime';
 import { deleteDnsRecordSet, fetchDnsCapabilities, useDnsCapabilities, useDnsRecordCoordinator, useDnsRecords } from './api';
 import { domainSession, requireDomainManager } from './domain-authority';
 import { DNS_RECORD_TYPES, diffRecordSet, isSpentAcmeChallenge, recordKey, recordWarnings, relativeRecordName, snapshotRecordOwner } from './dns-data';
 import { DnsRecordEditor } from './DnsRecordEditor';
 import { DNS_MANAGE_PERMISSIONS, DnsCredentialModel, DomainModel, type DnsRecordRow, type DomainRow } from './models';
 
-export interface DnsRecordsPanelProps { domain: DomainRow; recordType?: string; onRecordTypeChange?: (type: string) => void }
+export interface DnsRecordsPanelProps { domain: DomainRow; recordType?: string; onRecordTypeChange?: (type: string) => void; onBusyChange?: (busy: boolean) => void }
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 const groupId = (domain: DomainRow): number | null => typeof domain.group === 'number' ? domain.group : domain.group?.id ?? null;
 
-export function DnsRecordsPanel({ domain, recordType: controlledType, onRecordTypeChange }: DnsRecordsPanelProps) {
+export function DnsRecordsPanel({ domain, recordType: controlledType, onRecordTypeChange, onBusyChange }: DnsRecordsPanelProps) {
     const qc = useQueryClient();
     const [localType, setLocalType] = useState('');
     const recordType = controlledType ?? localType;
@@ -25,21 +25,46 @@ export function DnsRecordsPanel({ domain, recordType: controlledType, onRecordTy
     const capabilities = useDnsCapabilities(groupId(domain), { enabled: eligible });
     const records = useDnsRecords(domain.id, eligible && !capabilities.isError);
     const { can: canManage } = useCan(DNS_MANAGE_PERMISSIONS);
+    const auth = useAuthSnapshot();
+    const revision = useSyncExternalStore(subscribeAuth, getAuthSessionRevision, getAuthSessionRevision);
+    const identity = JSON.stringify([domain.id, domain.name, domain.provider, groupId(domain), credential?.id, auth.uid, revision, canManage]);
+    const latest = useRef(identity); latest.current = identity;
+    const lifetime = useRef<AbortController | null>(null); const launching = useRef(false);
+    const [repairing, setRepairing] = useState(false);
+    const pending = useRef(onBusyChange); pending.current = onBusyChange;
+    useEffect(() => {
+        const owner = new AbortController(); lifetime.current = owner; launching.current = false; setRepairing(false);
+        return () => { owner.abort(); pending.current?.(false); };
+    }, [identity]);
     const coordinate = useDnsRecordCoordinator(domain.id);
     const providerKnown = capabilities.data?.providers.some((provider) => provider.name.toLowerCase() === domain.provider.toLowerCase()) ?? false;
     const rows = records.data?.records ?? [];
     const knownObserved = [...new Set(rows.map((record) => record.type.toUpperCase()))];
     const choices = [...DNS_RECORD_TYPES.filter((type) => capabilities.data?.allowed_record_types.includes(type) || knownObserved.includes(type)), ...knownObserved.filter((type) => !DNS_RECORD_TYPES.includes(type as typeof DNS_RECORD_TYPES[number]))];
     const visible = recordType ? rows.filter((record) => record.type.toUpperCase() === recordType.toUpperCase()) : rows;
+    const repair = async () => {
+        if (launching.current || !credential || !canManage || !lifetime.current) return;
+        const owner = lifetime.current, session = domainSession();
+        const current = () => !owner.signal.aborted && latest.current === identity && domainSession() === session;
+        launching.current = true; setRepairing(true);
+        try {
+            await requireDomainManager(session); if (!current()) return;
+            await DnsCredentialModel.invalidate(qc); if (!current()) return;
+            const [row, caps] = await Promise.all([DnsCredentialModel.fetchOne(qc, credential.id), fetchDnsCapabilities(groupId(domain))]);
+            if (!current()) return;
+            const group = typeof row.group === 'number' ? row.group : row.group?.id;
+            if (group !== groupId(domain) || row.id !== credential.id || row.provider !== 'godaddy') throw new Error('Credential ownership changed. Reopen this domain.');
+            const { showCredentialEditor } = await import('./ProviderCredentialsPage'); if (!current()) return;
+            await showCredentialEditor(caps, row, undefined, { signal: owner.signal, onBusyChange: value => { if (current()) pending.current?.(value); } });
+            if (current()) await DomainModel.invalidate(qc);
+        } catch (error) { if (current()) toast.error(errorMessage(error)); }
+        finally { if (current()) { launching.current = false; setRepairing(false); pending.current?.(false); } }
+    };
 
     if (!active) return <Blocked title="DNS changes are unavailable">This domain is {domain.status}. Live records are available only after activation completes.</Blocked>;
     if (domain.provider === 'mojo') return <Blocked title="Certificate-only domain">Mojo domains mark delegated certificate coverage and do not support general DNS record management.</Blocked>;
     if (!generalProvider) return <Blocked title="Unsupported DNS provider">The {domain.provider || 'unknown'} provider does not expose general DNS through this administration surface.</Blocked>;
-    if (!credentialUsable) return <Blocked title="Provider credential unavailable">This GoDaddy domain needs an active, verified provider credential. {credential?.is_active === false ? 'The linked credential is inactive.' : credential?.verified === false ? 'The linked credential is unverified.' : 'No usable credential is linked.'}{canManage && credential && <button className="btn" type="button" onClick={() => void (async () => {
-        const session = domainSession();
-        try { await requireDomainManager(session); await DnsCredentialModel.invalidate(qc); const [row, caps] = await Promise.all([DnsCredentialModel.fetchOne(qc, credential.id), fetchDnsCapabilities(groupId(domain))]); const owner = typeof row.group === 'number' ? row.group : row.group?.id; if (domainSession() !== session || owner !== groupId(domain) || row.id !== credential.id || row.provider !== 'godaddy') throw new Error('Credential ownership changed. Reopen this domain.'); const { showCredentialEditor } = await import('./ProviderCredentialsPage'); await showCredentialEditor(caps, row); await DomainModel.invalidate(qc); }
-        catch (error) { toast.error(errorMessage(error)); }
-    })()}>Repair linked credential</button>}</Blocked>;
+    if (!credentialUsable) return <Blocked title="Provider credential unavailable">This GoDaddy domain needs an active, verified provider credential. {credential?.is_active === false ? 'The linked credential is inactive.' : credential?.verified === false ? 'The linked credential is unverified.' : 'No usable credential is linked.'}{canManage && credential && <button className="btn" type="button" disabled={repairing} onClick={() => void repair()}>{repairing ? 'Opening credential…' : 'Repair linked credential'}</button>}</Blocked>;
     if (capabilities.isLoading) return <div className="dns-state dim">Loading DNS capabilities…</div>;
     if (capabilities.isError) return <Retry error={capabilities.error} retry={() => void capabilities.refetch()} />;
     if (!providerKnown) return <Blocked title="Provider unavailable">This deployment did not advertise {domain.provider} in its DNS capabilities.</Blocked>;

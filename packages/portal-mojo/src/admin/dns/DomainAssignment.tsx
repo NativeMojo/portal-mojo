@@ -32,7 +32,7 @@ export function DomainAssignment({ domain, close, onBusyChange }: { domain: Doma
             if (current.group != null) { setObserved(current); setAttempted(true); throw new Error('This domain has already been assigned. Reassignment is unavailable.'); }
             if (!target || target.name !== group.name) throw new Error('The destination changed. Close and choose it again.');
             setAttempted(true);
-            const row = await assignHouseDomain({ domain: domain.id, group: group.id });
+            const row = await assignHouseDomain({ domain: domain.id, group: group.id }, () => { if (!mounted.current || domainSession() !== session.current) throw new Error('Session changed. Reopen this task.'); });
             if (domainSession() !== session.current || !mounted.current) return;
             const owner = typeof row.group === 'number' ? row.group : row.group?.id;
             if (row.id !== domain.id || owner !== group.id) throw new Error('The response did not confirm the selected destination.');

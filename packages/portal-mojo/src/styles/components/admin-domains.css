@@ -15,6 +15,7 @@
 .domains-detail>.mojo-tabs>.mojo-tab-list { padding:0 24px; }
 .domains-detail-panel { padding:20px 24px;min-width:0; }
 .domains-detail .flat-row { gap:12px; }
+.domains-detail .flat-value { overflow-wrap:anywhere; }
 .domains-overview-actions { margin-top:22px; }
 .domains-assignment,.domains-registrar-settings { display:grid;gap:16px; }
 .domains-assignment>.dim { margin:0; }

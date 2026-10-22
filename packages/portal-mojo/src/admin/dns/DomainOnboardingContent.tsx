@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { hasPermission, useMe } from '../../client/runtime';
 import { toast } from '../../ui';
@@ -19,6 +19,8 @@ export function DomainOnboardingDialog({ close, setBusyGate, initialMode = 'menu
     const [busy, setBusy] = useState(false); const [attempted, setAttempted] = useState(false); const [error, setError] = useState('');
     const inFlight = useRef(false);
     const session = useRef(domainSession());
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     const canManage = hasPermission(me ?? null, DNS_MANAGE_PERMISSIONS, null);
     const prepareAdoption = () => {
         if (inFlight.current || attempted || me?.is_superuser !== true) return;
@@ -29,7 +31,7 @@ export function DomainOnboardingDialog({ close, setBusyGate, initialMode = 'menu
     const adopt = async () => {
         if (inFlight.current || attempted || !review || me?.is_superuser !== true || !canManage) return;
         inFlight.current = true; setBusy(true); setBusyGate(true); setAttempted(true); setError('');
-        try { await requireDomainManager(session.current, true); const domain = await adoptHouseDomain({ domain: review }); await DomainModel.invalidate(queryClient); if (domainSession() !== session.current) return; toast.success(`${domain.name} adopted at Platform scope`); close(); }
+        try { await requireDomainManager(session.current, true); const domain = await adoptHouseDomain({ domain: review }, () => { if (!mounted.current || domainSession() !== session.current) throw new Error('Session changed. Reopen this task.'); }); await DomainModel.invalidate(queryClient); if (!mounted.current || domainSession() !== session.current) return; toast.success(`${domain.name} adopted at Platform scope`); close(); }
         catch (reason) { await DomainModel.invalidate(queryClient); setError(`${redactRegistrarError(reason)} Review the domain inventory before another adoption.`); }
         finally { inFlight.current = false; setBusy(false); setReview(null); setBusyGate(false); }
     };

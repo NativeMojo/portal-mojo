@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
     Badge,
@@ -46,12 +46,13 @@ function verificationTone(row: DnsCredentialRow): Tone {
     return row.verified ? 'success' : row.last_error ? 'danger' : 'warning';
 }
 
-function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy }: {
+function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy, signal }: {
     row?: DnsCredentialRow;
     caps: DnsCapabilities;
     close: (saved: DnsCredentialRow | null) => void;
     fixedGroup?: DnsGroupChoice;
     onBusy?: (busy: boolean) => void;
+    signal?: AbortSignal;
 }) {
     const queryClient = useQueryClient();
     const providers = linkableProviders(caps);
@@ -64,6 +65,8 @@ function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy }: {
     const [error, setError] = useState('');
     const scopeLabel = row ? groupLabel(row.group) : fixedGroup?.name;
     const flight = useRef(false); const session = useRef(domainSession());
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
     const submit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -77,19 +80,19 @@ function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy }: {
         setError('');
         try {
             await requireDomainManager(session.current);
-            const beforeSend = () => { if (domainSession() !== session.current) throw new Error('Session changed. Reopen credential setup.'); };
+            const beforeSend = () => { if (!mounted.current || signal?.aborted || domainSession() !== session.current) throw new Error('Session changed. Reopen credential setup.'); };
             const saved = row
                 ? await rotateDnsCredential(row, { name, api_key: apiKey, api_secret: apiSecret }, beforeSend)
                 : await linkDnsCredential({
                     group: group!.id, provider, name,
                     api_key: apiKey, api_secret: apiSecret,
                 }, beforeSend);
-            if (domainSession() !== session.current) return;
+            if (!mounted.current || signal?.aborted || domainSession() !== session.current) return;
             queryClient.setQueryData(DnsCredentialModel.keys.one(saved.id), saved);
             toast.success(row ? 'Credential rotated and verified' : 'Credential linked and verified');
             close(saved);
         } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'The provider rejected those credentials');
+            if (mounted.current && !signal?.aborted) setError(reason instanceof Error ? reason.message : 'The provider rejected those credentials');
         } finally {
             if (keyRef.current) keyRef.current.value = '';
             if (secretRef.current) secretRef.current.value = '';
@@ -170,11 +173,11 @@ function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy }: {
     );
 }
 
-export async function showCredentialEditor(caps: DnsCapabilities, row?: DnsCredentialRow, fixedGroup?: DnsGroupChoice): Promise<DnsCredentialRow | null> {
+export async function showCredentialEditor(caps: DnsCapabilities, row?: DnsCredentialRow, fixedGroup?: DnsGroupChoice, options: { signal?: AbortSignal; onBusyChange?: (busy: boolean) => void } = {}): Promise<DnsCredentialRow | null> {
     let busy = false;
     return modal.open<DnsCredentialRow | null>((close) => (
-        <CredentialSecretForm caps={caps} row={row} fixedGroup={fixedGroup} close={close} onBusy={value => { busy = value; }} />
-    ), { size: 'md', canDismiss: () => !busy });
+        <CredentialSecretForm caps={caps} row={row} fixedGroup={fixedGroup} signal={options.signal} close={close} onBusy={value => { busy = value; options.onBusyChange?.(value); }} />
+    ), { signal: options.signal, size: 'md', canDismiss: () => !busy });
 }
 
 function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabilities; close: () => void }) {

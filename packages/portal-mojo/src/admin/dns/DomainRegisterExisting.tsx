@@ -42,7 +42,7 @@ export function DomainRegisterExisting({ close, back, setBusyGate }: { close: ()
             await requireDomainManager(session.current);
             if (!mounted.current) return;
             setAttempted(true);
-            const saved = await registerExistingDomain({ group: group.id, domain, credential: credential.id });
+            const saved = await registerExistingDomain({ group: group.id, domain, credential: credential.id }, () => { if (!mounted.current || domainSession() !== session.current || scope.current !== group.id) throw new Error('Session or group changed. Reopen this task.'); });
             if (!mounted.current || domainSession() !== session.current) return;
             await DomainModel.invalidate(queryClient); toast.success(`${saved.name} registered`); close();
         } catch (reason) {

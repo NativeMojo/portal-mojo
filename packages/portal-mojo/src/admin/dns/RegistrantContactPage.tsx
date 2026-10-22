@@ -29,6 +29,7 @@ export function RegistrantContactPage({ initialGroup, lockScope = false, onSaved
     const response = loaded?.identity === identity && canManage ? loaded.response : null;
     const pending = (value: boolean) => { flight.current = value; setBusy(value); callbacks.current.onBusyChange?.(value); };
     const current = (accepted: number, owner: string, uid = auth.uid, rev = revision) => mounted.current && generation.current === accepted && latest.current === owner && getAuthSnapshot().uid === uid && getAuthSessionRevision() === rev;
+    const guard = (accepted: number, owner: string) => () => { if (!current(accepted, owner)) throw new Error('Registrant scope or session changed. Reopen this task.'); };
     const accept = (value: RegistrantContactResponse, target: Scope) => {
         const group = target.kind === 'group' ? target.group.id : null;
         if (value.group !== group || value.scope !== (group == null ? 'global' : 'group')) throw new Error('The contact response did not match the selected scope');
@@ -39,7 +40,7 @@ export function RegistrantContactPage({ initialGroup, lockScope = false, onSaved
         const accepted = ++generation.current, owner = identity;
         setScope(next); setLoaded(null); setDraft({}); setError(''); setNotice(''); setTab('contact'); setLoading(!!next);
         if (!next) return;
-        try { const value = await fetchRegistrantContact(next.kind === 'group' ? next.group.id : null); if (current(accepted, owner)) accept(value, next); }
+        try { const value = await fetchRegistrantContact(next.kind === 'group' ? next.group.id : null, guard(accepted, owner)); if (current(accepted, owner)) accept(value, next); }
         catch (reason) { if (current(accepted, owner)) setError(redactRegistrarError(reason)); }
         finally { if (current(accepted, owner)) setLoading(false); }
     };
@@ -57,7 +58,7 @@ export function RegistrantContactPage({ initialGroup, lockScope = false, onSaved
         if (problems.length) { setError(problems.join('; ')); setTab(problems.some(value => /FirstName|LastName|ContactType|PhoneNumber|Email/.test(value)) ? 'contact' : 'address'); return; }
         const accepted = generation.current, owner = identity, target = scope; const group = target.kind === 'group' ? target.group.id : null;
         const payload = contactPayload(draft, response, { group }); pending(true); setError(''); setNotice('');
-        try { const saved = await saveRegistrantContact(payload, group); if (current(accepted, owner)) { accept(saved, target); setNotice('Contact saved.'); callbacks.current.onSaved?.(); } }
+        try { const saved = await saveRegistrantContact(payload, group, guard(accepted, owner)); if (current(accepted, owner)) { accept(saved, target); setNotice('Contact saved.'); callbacks.current.onSaved?.(); } }
         catch (reason) { if (current(accepted, owner)) setError(redactRegistrarError(reason)); }
         finally { if (current(accepted, owner)) pending(false); }
     };
@@ -67,7 +68,7 @@ export function RegistrantContactPage({ initialGroup, lockScope = false, onSaved
         try {
             if (!await modal.confirm({ title: 'Clear this contact?', message: `Remove the saved contact for ${target.kind === 'house' ? 'House' : target.group.name}. Any inherited contact will apply instead.`, confirmText: 'Clear contact', danger: true })) return;
             if (!current(accepted, owner)) return;
-            const saved = await clearRegistrantContact(target.kind === 'group' ? target.group.id : null);
+            const saved = await clearRegistrantContact(target.kind === 'group' ? target.group.id : null, guard(accepted, owner));
             if (current(accepted, owner)) { accept(saved, target); setNotice('Saved contact cleared.'); }
         } catch (reason) { if (current(accepted, owner)) setError(redactRegistrarError(reason)); }
         finally { if (current(accepted, owner)) pending(false); }
