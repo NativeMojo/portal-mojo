@@ -20,7 +20,11 @@ const section = {
 };
 ```
 
-Main setup shows primary provider, Mojo HTTPS origin and write-only Mojo key.
+Main setup shows primary provider and the write-only MojoVerify key. MojoVerify
+always uses `https://api.mojoverify.com`; the URL is supplied automatically and
+has no setup control. The wire provider identifier remains `mojo`, displayed as
+MojoVerify. Older custom origins remain readable as evidence, while this setup
+stages the standard URL and shows a replacement-key warning before switching.
 Advanced holds fallback, ordered additional providers (add/remove/up/down), and
 threat-signal sharing. Labels, descriptions and constraints come from the
 server's explicit five-key descriptor layout. Unknown configured provider IDs

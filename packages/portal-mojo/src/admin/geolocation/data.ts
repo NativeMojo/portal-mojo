@@ -116,7 +116,7 @@ async function geoCall(body: Record<string, unknown> | null, scope: PrivateScope
             if ([401, 403].includes(reason.status)) throw new GeoLocationError('denied');
             if ([404, 405].includes(reason.status)) throw new GeoLocationError('unsupported');
             if (reason.status === 409 || reason.status === 400 && /changed; reload before publishing/i.test(reason.message)) throw new GeoLocationError('conflict');
-            if (reason.status === 400) throw new GeoLocationError('validation', 'The server rejected the provider settings or credential. Check the Mojo origin and key. A pending published origin may need Fleet Configuration applied first, or a replacement key.');
+            if (reason.status === 400) throw new GeoLocationError('validation', 'The server rejected the provider settings or credential. Check the MojoVerify key. Pending service configuration may need Fleet Configuration applied first, or a replacement key.');
         }
         throw new GeoLocationError(body?.action === 'configure_providers' ? 'uncertain' : 'unavailable');
     } finally {

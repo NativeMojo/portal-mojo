@@ -4,7 +4,7 @@ export const mockGeoProviderScenarios = ['ready', 'unknown-provider', 'empty-reg
 export type MockGeoProviderScenario = typeof mockGeoProviderScenarios[number];
 const endpoint = '/api/account/admin/settings';
 const keys = ['GEOIP_PRIMARY_PROVIDER', 'GEOIP_FALLBACK_PROVIDER', 'GEOIP_ADDITIONAL_PROVIDERS', 'GEOIP_MOJO_PROVIDER_URL', 'GEOIP_MOJO_SYNC_ENABLED'];
-const defaults: GeoDraft = { GEOIP_PRIMARY_PROVIDER: 'mojo', GEOIP_FALLBACK_PROVIDER: 'ipinfo', GEOIP_ADDITIONAL_PROVIDERS: ['ipapi', 'maxmind'], GEOIP_MOJO_PROVIDER_URL: 'https://geo.example.invalid', GEOIP_MOJO_SYNC_ENABLED: false };
+const defaults: GeoDraft = { GEOIP_PRIMARY_PROVIDER: 'mojo', GEOIP_FALLBACK_PROVIDER: 'ipinfo', GEOIP_ADDITIONAL_PROVIDERS: ['ipapi', 'maxmind'], GEOIP_MOJO_PROVIDER_URL: 'https://api.mojoverify.com', GEOIP_MOJO_SYNC_ENABLED: false };
 const metadata = [
     ['Primary GeoIP provider', 'Provider queried first for IP intelligence.', 'string', 'Provider identifier'],
     ['Fallback GeoIP provider', 'Provider used when the primary cannot answer.', 'string', 'Provider identifier'],
@@ -24,7 +24,7 @@ export function setMockGeoProviderScenario(value: MockGeoProviderScenario): void
     stored = { ok: true, code: null, message: 'Connection verified', at: '2026-10-21T12:00:00Z' };
     if (value === 'unknown-provider') { values.GEOIP_PRIMARY_PROVIDER = 'custom_geo'; values.GEOIP_ADDITIONAL_PROVIDERS = ['custom_extra', 'maxmind']; }
     if (['pending-restart', 'published-origin-pending', 'changed-origin'].includes(value)) { publishedRevision = configurationRevision = '2'.repeat(32); }
-    if (['published-origin-pending', 'changed-origin'].includes(value)) values.GEOIP_MOJO_PROVIDER_URL = 'https://new-geo.example.invalid';
+    if (['published-origin-pending', 'changed-origin'].includes(value)) loadedOrigin = 'https://legacy-geo.example.invalid';
 }
 export const getMockGeoProviderScenario = (): MockGeoProviderScenario => scenario;
 export const getMockGeoProviderObservations = () => observations.map(row => ({ ...row }));
