@@ -15,6 +15,7 @@ for (const app of ['showcase', 'portal']) {
         const result = await server.transformRequest('/src/theme.css');
         assert(result, `${app} stylesheet compiles`);
         for (const selector of selectors) assert(result.code.includes(selector), `${app} served CSS is missing ${selector}`);
+        if (app === 'portal') assert(result.code.includes('.admin-sidebar-dismiss'), 'Portal mobile navigation must overlay rather than squeeze the page');
         console.log(`PASS ${app}: canonical stylesheet, ${selectors.length} operations layout selectors compiled`);
     } finally { await server.close(); }
 }

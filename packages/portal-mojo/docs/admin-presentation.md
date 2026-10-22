@@ -35,6 +35,9 @@ stay in closed Demo controls disclosures; they are not the product's UI.
 6. Repeat a smoke check in the actual Admin shell and built Showcase output.
    Check the browser console and run focused behavior contracts plus typecheck.
    DOM-only tests verify behavior; they cannot certify layout or visual quality.
+   At mobile width, verify navigation starts collapsed, expands over the page,
+   closes with Escape/outside activation or navigation, and preserves the saved
+   desktop preference when returning to a wider viewport.
 
 Keep screenshot evidence and the screen/theme/viewport/interaction results on
 the Maestro item. State whether evidence is mock or live. A preview link must

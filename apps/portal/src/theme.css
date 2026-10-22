@@ -75,3 +75,15 @@
     --color-mute: var(--mute);
     --color-accent: var(--accent);
 }
+
+/* Mobile navigation opens over the page, preserving readable content width. */
+.app-admin-mobile > .main { grid-column: 2; grid-row: 1; }
+.app-admin-mobile > .sidebar:not(.sidebar-collapsed) {
+    position: fixed; z-index: 42; inset: 0 auto 0 0;
+    width: 228px; max-width: calc(100vw - 40px); box-shadow: var(--shadow-pop);
+}
+.admin-sidebar-dismiss {
+    position: fixed; z-index: 41; inset: 0; border: 0;
+    background: rgb(0 0 0 / 30%); cursor: pointer;
+}
+@media (max-width: 640px) { .app-admin-mobile .content { padding: 16px 12px 28px; } }
