@@ -109,6 +109,8 @@
         "verify:admin-operational-fleet-partial": "node scripts/verify-admin-operational-fleet-partial.mjs",
         "verify:admin-operational-fleet-unsent": "node scripts/verify-admin-operational-fleet-unsent.mjs",
         "verify:admin-deployments-mounted": "node scripts/verify-admin-deployments-mounted.mjs",
+        "verify:admin-deployments-setup-mounted": "node scripts/verify-admin-deployments-setup-mounted.mjs",
+        "verify:admin-webapp-inspection-mounted": "node scripts/verify-admin-webapp-inspection-mounted.mjs",
         "verify:admin-presentation": "node scripts/verify-admin-presentation.mjs"
     },
     "devDependencies": {

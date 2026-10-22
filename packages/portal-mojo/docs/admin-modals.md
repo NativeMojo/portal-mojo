@@ -19,6 +19,12 @@ create flow keep one draft. The launcher guards native dismissal while any write
 route preflight is pending; focused child editors retain the same owner lifetime.
 This is scoped to Serving and does not change the shared DetailView contract.
 
+Deployments likewise uses compact `modal.open` task dialogs: API Overview/Nodes/
+Activity; WebApp Overview/Deployments/Releases/Deploy/Settings. Read-only actors
+omit deployment controls, and attempt viewers get a direct overview when there
+is no admitted node evidence. Workflow, integration, setup identity and profile
+editing use focused child dialogs. No shared DetailView default is changed.
+
 Use `modal-pad`, `modal-title`, `modal-message`, grouped fields and `modal-actions`.
 Cancel precedes the primary button. Pending operations disable repeat submission;
 `canDismiss` also protects native Escape/backdrop dismissal during a write.

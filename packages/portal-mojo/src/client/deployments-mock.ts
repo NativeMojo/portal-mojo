@@ -90,7 +90,7 @@ const no = (message = 'Permission denied', code = 403) => ({
 function platformAttempt(id = B) { let status = scenario === 'partial' ? 'partial' : scenario === 'converged' ? 'converged' : scenario === 'reported-only' ? 'verified' : scenario === 'unknown' ? 'unknown' : 'failed'; if (id !== B && id !== A)
     status = scenario === 'timeout' ? 'requested' : 'converged'; if (id === A)
     status = 'converged'; return {
-    id, sha: id === A ? shaA : shaB, framework_version: '5.0.0', status, source: 'admin_retry', actor: 'fixture operator', retry_of: id !== B && id !== A ? B : null, created: stamp, finished: status === 'converged' ? stamp : null, frozen_roster: ['node-a', 'node-b'], node_summary: {
+    id, sha: id === A ? shaA : shaB, framework_version: '5.0.0', status, source: 'admin_retry', actor: 'fixture operator', retry_of: id !== B && id !== A ? B : null, created: stamp, finished: ['converged', 'failed', 'superseded'].includes(status) ? stamp : null, frozen_roster: ['node-a', 'node-b'], node_summary: {
         expected: 2, proven: status === 'converged' ? 2 : status === 'partial' ? 1 : 0, reported: scenario === 'reported-only' ? 2 : 0, failed: status === 'failed' ? 1 : 0, dispatched: 2, other: 0
     }, node_evidence: [{
             runner: 'node-a', status: status === 'converged' ? 'proven' : 'reported', proof: status === 'converged' ? { platform_sha: id === A ? shaA : shaB, platform_deployment: id } : {}
