@@ -27,6 +27,8 @@ export interface Certificate {
 }
 export interface Attempt {
     id: number;
+    started?: string;
+    detail?: string;
     status: string;
     created: string;
     finished: string;

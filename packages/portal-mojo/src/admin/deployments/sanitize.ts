@@ -18,7 +18,7 @@ export function projectWebApp(v: unknown): WebApp { const r = record(v); return 
 }; }
 export function projectWebAppObject(v: unknown): WebAppObject { const r = record(v), g = record(r.group); return { ...projectWebApp(r), group: { id: positiveId(g.id), name: text(g.name) } }; }
 export function projectAttempt(v: unknown): Attempt { const r = record(v); return {
-    id: positiveId(r.id), status: text(r.status) || 'unknown', created: dateText(r.created), finished: dateText(r.finished), release: r.release ? projectRelease(r.release) : null
+    id: positiveId(r.id), status: text(r.status) || 'unknown', created: dateText(r.created), started: dateText(r.started), finished: dateText(r.finished), detail: text(r.detail, 1500), release: r.release ? projectRelease(r.release) : null
 }; }
 export function projectSummary(v: unknown): WebAppSummary { const r = record(v), a = record(r.address), o = record(r.onboarding), k = record(r.deployment_key); return {
     webapp: projectWebApp(r.webapp), address: r.address ? {
