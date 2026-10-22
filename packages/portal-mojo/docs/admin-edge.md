@@ -160,7 +160,7 @@ both Me and bootstrap. Server still refuses key-backed/noninteractive sessions;
 client invents no provenance flag. Schema 1 validates status/time/count/coverage,
 keeps the selected section only, caps checks at 64 and scalar details at 16 keys.
 
-The unboxed summary sits beside the page heading and keeps timestamp and
+The unboxed summary sits within the page header and keeps timestamp and
 partial-report warning visible. DNS-only sessions that cannot request bootstrap
 see no global checks summary; admitted observation failures remain visible. Check
 details holds technical evidence. HTTP is a file-rendering setting; DNS-01 is an
