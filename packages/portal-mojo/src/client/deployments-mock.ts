@@ -1,6 +1,6 @@
 /** Contract fixture only. No live calls, request-body/header history or retained token/URL. */
 import { backendGlobalCan, type BackendGlobalUser } from '../admin/fleet/access';
-export type DeploymentMockScenario = 'failed-newer' | 'partial' | 'reported-only' | 'converged' | 'unknown' | 'stale' | 'mixed-webapp' | 'rolled-back' | 'missing-destination' | 'missing-bucket' | 'missing-apps-domain' | 'revision-conflict' | 'lease-conflict' | 'unknown-create' | 'key-replay' | 'upload-failure' | 'timeout' | 'read-failure' | 'ownership-refusal' | 'superseded-webapp' | 'new-workspace-domain-ready';
+export type DeploymentMockScenario = 'failed-newer' | 'partial' | 'reported-only' | 'converged' | 'unknown' | 'stale' | 'mixed-webapp' | 'rolled-back' | 'missing-destination' | 'missing-bucket' | 'missing-apps-domain' | 'revision-conflict' | 'lease-conflict' | 'unknown-create' | 'key-replay' | 'upload-failure' | 'timeout' | 'read-failure' | 'ownership-refusal' | 'superseded-webapp' | 'new-workspace-domain-ready' | 'collector-unavailable' | 'active-webapp' | 'many-releases';
 let scenario: DeploymentMockScenario = 'failed-newer';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', shaA = 'a'.repeat(40), shaB = 'b'.repeat(40);
 const stamp = '2026-10-21T12:00:00Z';
@@ -33,6 +33,8 @@ const operations = new Map<string, {
     address?: Record<string, unknown>;
 }>();
 const keyReceipts = new Set<string>();
+const profiles = new Map<number, Record<string, string>>();
+let activeReads = 0;
 const apiReceipts = new Map<string, string>();
 let deployment = 303, releaseId = 103, appId = 2, keyLinked = true;
 const releases = [{
@@ -60,8 +62,12 @@ const uploadManifests = new Map<number, {
 }>();
 const uploadedPaths = new Set<string>();
 let currentReleaseId = 101;
-export function setDeploymentMockScenario(value: DeploymentMockScenario) { scenario = value; }
-export function resetDeploymentMock() { scenario = 'failed-newer'; operations.clear(); keyReceipts.clear(); apiReceipts.clear(); uploadManifests.clear(); uploadedPaths.clear(); keyLinked = true; currentReleaseId = 101; releases.splice(0, releases.length, {
+export function setDeploymentMockScenario(value: DeploymentMockScenario) {
+    scenario = value;
+    if (value === 'many-releases' && !releases.some(r => r.id === 99)) for (let id = 99; id >= 60; id--) releases.push({ id, webapp: 1, version: `0.8.${id}`, status: 'superseded', source: 'github', created: stamp });
+    if (value === 'active-webapp' && attempts[0]) { attempts[0].status = 'deploying'; attempts[0].finished = ''; activeReads = 0; }
+}
+export function resetDeploymentMock() { scenario = 'failed-newer'; operations.clear(); profiles.clear(); activeReads = 0; keyReceipts.clear(); apiReceipts.clear(); uploadManifests.clear(); uploadedPaths.clear(); keyLinked = true; currentReleaseId = 101; releases.splice(0, releases.length, {
     id: 102, webapp: 1, version: '2.0.0', status: 'pending', source: 'github', created: stamp
 }, {
     id: 101, webapp: 1, version: '1.0.0', status: 'live', source: 'github', created: stamp
@@ -94,7 +100,7 @@ function platformAttempt(id = B) { let status = scenario === 'partial' ? 'partia
 }; }
 function summary(id = 1, full = false) { const current = releases.find(r => r.id === currentReleaseId) ?? releases[1]!; return {
     schema_version: 1, webapp: {
-        id, slug: id === 1 ? 'example-app' : `app-${id}`, display_name: id === 1 ? 'Example WebApp' : `New WebApp ${id}`, environment: 'production', deployment_ref: 'main', repository: 'NativeMojo/example', build_output: 'dist'
+        id, slug: id === 1 ? 'example-app' : `app-${id}`, display_name: id === 1 ? 'Example WebApp' : `New WebApp ${id}`, environment: 'production', deployment_ref: 'main', repository: 'NativeMojo/example', build_output: 'dist', ...profiles.get(id)
     }, address: {
         hostname: 'example.apps.example.test', certificate: { status: 'active', not_after: '2027-01-01T00:00:00Z' }, aliases: []
     }, current_release: current, latest_deployment: {
@@ -125,14 +131,14 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         return no();
     if (scenario === 'read-failure' && method === 'GET')
         return no('Observation unavailable', 503);
-    if (method === 'POST' && !['/api/edge/release', '/api/edge/release/complete', '/api/edge/webapp/onboarding/create'].includes(path)) {
+    if (method === 'POST' && !/^\/api\/edge\/webapp\/\d+$/.test(path) && !['/api/edge/release', '/api/edge/release/complete', '/api/edge/webapp/onboarding/create'].includes(path)) {
         const seconds = path.endsWith('/revoke_key') ? 300 : 600;
         if (context.authTime === null || Date.now() / 1000 - context.authTime > seconds)
             return no('Fresh authentication required', 440);
     }
     if (path === '/api/account/admin/platform' && method === 'GET')
         return ok({ schema_version: 1, sections: { deployments: {
-                    status: scenario === 'stale' ? 'stale' : 'healthy', observed_at: stamp, data: {
+                    status: scenario === 'collector-unavailable' ? 'unavailable' : scenario === 'stale' ? 'stale' : 'healthy', observed_at: stamp, reason: scenario === 'collector-unavailable' ? 'The deployment collector is unavailable.' : '', data: scenario === 'collector-unavailable' ? null : {
                         items: [...apiReceipts.values()].reverse().map(x => platformAttempt(x)).concat([platformAttempt(), platformAttempt(A)]), limit: 50, desired_commit: shaB, desired_deployment: B, currently_serving: {
                             deployment: A, sha: shaA, framework_version: '5.0.0', converged_at: stamp
                         }, coordination: {
@@ -177,16 +183,27 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
             ...summary(id).webapp, group: { id: 1, name: 'Example workspace' }, bucket: 'must-be-stripped', prefix: 'must-be-stripped'
         });
     }
+    if (/^\/api\/edge\/webapp\/\d+$/.test(path) && method === 'POST') {
+        const id = Number(path.split('/').pop());
+        if (!save || scenario === 'ownership-refusal') return no();
+        if (id !== 1 && ![...operations.values()].some(x => x.app === id)) return no('Unknown app', 404);
+        const allowed = ['display_name', 'environment', 'github_repository', 'deployment_ref', 'build_output'];
+        if (Object.keys(b).some(key => !allowed.includes(key)) || Object.values(b).some(value => typeof value !== 'string')) return no('Unsupported profile fields', 400);
+        const current = profiles.get(id) ?? {};
+        profiles.set(id, { ...current, ...Object.fromEntries(Object.entries(b).map(([key, value]) => [key === 'github_repository' ? 'repository' : key, String(value)])) });
+        return ok({ ...summary(id).webapp, group: { id: 1, name: 'Example workspace' } });
+    }
     if (path === '/api/edge/release' && method === 'GET') {
-        const items = releases.filter(r => r.webapp === Number(p.webapp));
+        const items = releases.filter(r => r.webapp === Number(p.webapp) && (p.id === undefined || r.id === Number(p.id)));
         return {
-            status: true, data: items.slice(Number(p.start) || 0, (Number(p.start) || 0) + 25), count: items.length
+            status: true, data: items.slice(Number(p.start) || 0, (Number(p.start) || 0) + (Number(p.size) || 25)).map(r => ({id:r.id,version:r.version,status:r.status,source:r.source,created:r.created})), count: items.length
         };
     }
-    if (path === '/api/edge/deployment' && method === 'GET')
-        return {
-            status: true, data: attempts.filter(r => r.webapp === Number(p.webapp)), count: attempts.length
-        };
+    if (path === '/api/edge/deployment' && method === 'GET') {
+        if (scenario === 'active-webapp' && p.id && ++activeReads >= 2 && attempts[0]?.status === 'deploying') { attempts[0].status = 'live'; attempts[0].finished = stamp; currentReleaseId = attempts[0].release.id; }
+        const items = attempts.filter(r => r.webapp === Number(p.webapp) && (p.id === undefined || r.id === Number(p.id)));
+        return { status: true, data: items.slice(Number(p.start) || 0, (Number(p.start) || 0) + (Number(p.size) || 15)).map(r => ({ id: r.id, release: r.release, status: r.status, created: r.created, finished: r.finished, ...(p.graph === 'default' ? { detail: r.status === 'failed' ? 'The deployment failed; the desired version is separate.' : 'Observed CI deployment' } : {}) })), count: items.length };
+    }
     if (path === '/api/edge/webapp/health' && method === 'GET')
         return ok({
             webapp: Number(p.webapp), status: 'healthy', detail: 'HTTP 200 (separate from version proof)', checked: stamp
@@ -204,6 +221,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         return ok(statusPayload(a));
     }
     if (/^\/api\/edge\/release\/deployment\/\d+$/.test(path) && method === 'GET') {
+        if (!save) return no('Unknown deployment', 404);
         const a = attempts.find(a => a.id === Number(path.split('/').pop()));
         if (!a)
             return no('Unknown deployment', 404);

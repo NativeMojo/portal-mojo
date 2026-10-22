@@ -23,6 +23,20 @@ try{
   const status=sanitize.projectDeployment({deployment:900,webapp:1,release:100,status:'superseded',terminal:true,success:true});
   assert.equal(status.terminal,true,'Superseded is a terminal deployment, not an unsettled observer');assert.equal(status.success,false);
  }
+ // Ordinary viewers inspect scoped generic rows; rich rollout status retains SAVE authority.
+ const uxCtx={user:{id:7,permissions:{view_dns:true}},keyBacked:false,authTime:Date.now()/1000};
+ const scopedAttempt=mock.deploymentsMock('/api/edge/deployment',{params:{webapp:1,id:302,graph:'default',start:0,size:1}},uxCtx);
+ assert.equal(scopedAttempt.data.length,1);assert.equal(scopedAttempt.data[0].id,302);assert(!('targets' in scopedAttempt.data[0]));assert(!('webapp' in scopedAttempt.data[0]));
+ assert.equal(mock.deploymentsMock('/api/edge/deployment',{params:{webapp:999,id:302,size:1}},uxCtx).data.length,0,'Exact app filter must confine attempt lookup');
+ assert.equal(mock.deploymentsMock('/api/edge/release/deployment/302',{},uxCtx).code,404,'Viewer must not be sent to SAVE-gated rollout status');
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/health',{params:{webapp:1,group:1}},uxCtx).status,true,'Explicit health read is VIEW-first on the backend');
+ mock.setDeploymentMockScenario('collector-unavailable');const unavailable=sanitize.projectPlatform(mock.deploymentsMock('/api/account/admin/platform',{params:{sections:'deployments,api'}},{...uxCtx,user:{id:7,is_superuser:true}}).data);assert.equal(unavailable.deployments.data,null);assert.equal(unavailable.deployments.status,'unavailable');
+ mock.setDeploymentMockScenario('many-releases');const older=mock.deploymentsMock('/api/edge/release',{params:{webapp:1,start:25,size:5}},uxCtx);assert.equal(older.data.length,5);assert(older.count>25);const exactOlder=mock.deploymentsMock('/api/edge/release',{params:{webapp:1,id:older.data[0].id,size:1}},uxCtx);assert.equal(exactOlder.data.length,1);assert.equal(exactOlder.data[0].id,older.data[0].id);
+ const profileBody={display_name:'Renamed',environment:'staging',github_repository:'Example/app',deployment_ref:'main',build_output:'dist'};
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{method:'POST',body:profileBody},uxCtx).code,403);
+ const profileCtx={...uxCtx,user:{id:7,permissions:{manage_dns:true}},authTime:0};assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{method:'POST',body:profileBody},profileCtx).status,true,'Generic profile CRUD has no invented fresh-auth requirement');
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{},profileCtx).data.repository,'Example/app');assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{method:'POST',body:{...profileBody,bucket:'other'}},profileCtx).code,400);
+ mock.resetDeploymentMock();
  const canary='NEVER-CACHE-CREDENTIAL';
  const row=sanitize.projectSummary({webapp:{id:1,slug:'app',token:canary,bucket:canary},address:{hostname:'app.example.test',certificate:{status:'new-status',not_after:'2027'},private_key:canary},current_release:{id:10,version:'A',status:'live',source:'github',secret:canary},latest_deployment:{id:12,status:'failed',release:{id:11,version:'B',token:canary}},onboarding:{status:'waiting',cursor:'address',evidence:{token:canary}},deployment_key:{linked:true,active:true,token:canary},token:canary});
  assert.equal(row.current_release.version,'A');assert.equal(row.latest_deployment.release.version,'B');assert.equal(row.address.certificate.status,'new-status');assert(!JSON.stringify(row).includes(canary));
