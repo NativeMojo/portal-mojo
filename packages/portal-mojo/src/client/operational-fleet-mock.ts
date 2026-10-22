@@ -1,7 +1,7 @@
 /** Mock-only dashboard/capacity contract. Runtime modules never import this file. */
 import { backendGlobalCan, FLEET_DASHBOARD_GRANTS, type BackendGlobalUser } from '../admin/fleet/access';
 import type { CapacityAction, CapacityBatch, CapacityPlan, CapacityReport, CapacityStep, FleetDashboard, FleetFacts } from '../admin/fleet/types';
-export const mockOperationalFleetScenarios = ['healthy', 'down', 'external', 'partial', 'restricted', 'missing-evidence', 'transitional', 'drained', 'unknown-price', 'stale-plan', 'expired-plan', 'duplicate', 'failed', 'stalled', 'uncertain-apply', 'status-unavailable', 'reauth'] as const;
+export const mockOperationalFleetScenarios = ['healthy', 'down', 'external', 'partial', 'restricted', 'missing-evidence', 'aged-observations', 'inventory-unavailable', 'transitional', 'drained', 'unknown-price', 'stale-plan', 'expired-plan', 'duplicate', 'failed', 'stalled', 'uncertain-apply', 'status-unavailable', 'reauth'] as const;
 export type MockOperationalFleetScenario = typeof mockOperationalFleetScenarios[number];
 export interface MockFleetActor extends BackendGlobalUser {
     id: number;
@@ -49,6 +49,11 @@ function dashboard(actor: MockFleetActor): FleetDashboard {
     }
     if (scenario === 'partial')
         sources.compute = { ...sources.compute!, status: 'unknown', reason: 'provider_denied', data: {} };
+    if (scenario === 'aged-observations')
+        for (const row of Object.values(sources)) {
+            if (row.observed_at) row.observed_at = new Date(Date.now() - 15 * 60_000).toISOString();
+            if (row.stale_after) row.stale_after = new Date(Date.now() - 13 * 60_000).toISOString();
+        }
     return { schema_version: 2, observed_at, availability: { state: scenario === 'down' ? 'down' : scenario === 'restricted' || scenario === 'partial' ? 'unknown' : 'ok', message: scenario === 'down' ? 'Load balancer has no healthy targets' : scenario === 'restricted' || scenario === 'partial' ? 'Availability cannot be confirmed' : 'The serving fleet is available', down: scenario === 'down' ? ['load_balancer'] : [] }, attention: { message: 'Recent job failures and open incidents need review.' }, sources };
 }
 function validateSteps(steps: unknown): CapacityStep[] {
@@ -195,6 +200,8 @@ export function handleOperationalFleetMock(path: string, method: string, body: R
     if (!backendGlobalCan(actor, 'manage_aws'))
         return fail('permission_denied', 403, 'Global manage_aws required.');
     if (method === 'GET' && path === '/api/aws/capacity') {
+        if (scenario === 'inventory-unavailable')
+            return fail('provider_unavailable', 503, 'Capacity inventory is temporarily unavailable.');
         state.generated_at = timestamp();
         return ok(state);
     }

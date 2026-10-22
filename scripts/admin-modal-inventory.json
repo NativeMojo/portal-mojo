@@ -8612,6 +8612,225 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx:placement:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx",
+      "owner": "placement",
+      "launcher": "modal.open",
+      "body": [
+        "Placement"
+      ],
+      "category": "editor",
+      "parent": "placement",
+      "target": null,
+      "fingerprint": "5c54832c2459a3e5f0cc",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx:CapacityEditor:placement:0",
+      "file": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx",
+      "owner": "CapacityEditor",
+      "launcher": "placement",
+      "body": [],
+      "category": "editor",
+      "parent": "CapacityEditor",
+      "target": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx:placement",
+      "fingerprint": "8a25a5b39c899c84af8b",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:import:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "launch",
+      "target": null,
+      "fingerprint": "a50a10a9de0c030c7b3a",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "modal.open",
+      "body": [
+        "CapacityEditor"
+      ],
+      "category": "editor",
+      "parent": "launch",
+      "target": null,
+      "fingerprint": "4aefbc2bdaecbb6bc734",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:launch:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "launch",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "launch",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch",
+      "fingerprint": "ec3192fd9abd130d9b82",
+      "categories": [
+        "action",
+        "dependency",
+        "editor",
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:import:1",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "launch",
+      "target": null,
+      "fingerprint": "ef99d30df55d339e03ae",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:1",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "modal.open",
+      "body": [
+        "CapacityInspector"
+      ],
+      "category": "record",
+      "parent": "launch",
+      "target": null,
+      "fingerprint": "60deacac66d7dd013284",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:import:2",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "launch",
+      "target": null,
+      "fingerprint": "79e4679f41e0a5f28235",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:2",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "launch",
+      "launcher": "modal.open",
+      "body": [
+        "CapacityProgress"
+      ],
+      "category": "action",
+      "parent": "launch",
+      "target": null,
+      "fingerprint": "a5c28a6f89f8893f8c8d",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:FleetWorkspace:launch:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "FleetWorkspace",
+      "launcher": "launch",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "FleetWorkspace",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch",
+      "fingerprint": "ec3192fd9abd130d9b82",
+      "categories": [
+        "action",
+        "dependency",
+        "editor",
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:FleetWorkspace:launch:1",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "FleetWorkspace",
+      "launcher": "launch",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "FleetWorkspace",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch",
+      "fingerprint": "aaad17b65a40e0a4f8c3",
+      "categories": [
+        "action",
+        "dependency",
+        "editor",
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:FleetWorkspace:launch:2",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "FleetWorkspace",
+      "launcher": "launch",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "FleetWorkspace",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch",
+      "fingerprint": "a2357d84fcf9717937da",
+      "categories": [
+        "action",
+        "dependency",
+        "editor",
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:FleetWorkspace:launch:3",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx",
+      "owner": "FleetWorkspace",
+      "launcher": "launch",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "FleetWorkspace",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch",
+      "fingerprint": "ec3192fd9abd130d9b82",
+      "categories": [
+        "action",
+        "dependency",
+        "editor",
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetPage.tsx:<module>:import:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetPage.tsx",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "f49a032e882a3fcead35",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
       "owner": "<module>",

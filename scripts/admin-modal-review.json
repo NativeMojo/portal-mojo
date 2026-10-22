@@ -599,6 +599,30 @@
       "fingerprint": "cabe98c20990a27b96a5",
       "category": "record",
       "purpose": "Inspect nonsecret configuration revisions and historical diagnostic evidence in a focused information dialog. No sidebar, mutation or raw credential. Owner session signal closes it."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx:placement:modal.open:0",
+      "fingerprint": "5c54832c2459a3e5f0cc",
+      "category": "editor",
+      "purpose": "Choose a source-compatible subnet in a focused nested Placement editor; parent draft receives only deliberate acceptance"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:0",
+      "fingerprint": "4aefbc2bdaecbb6bc734",
+      "category": "editor",
+      "purpose": "Stage exact standalone capacity targets, then review the authoritative stored plan and explicit consent before one coordinator submission"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:1",
+      "fingerprint": "60deacac66d7dd013284",
+      "category": "record",
+      "purpose": "Inspect read-only capacity and addressing through App nodes, Database, Redis and Addresses tabs"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:2",
+      "fingerprint": "a5c28a6f89f8893f8c8d",
+      "category": "action",
+      "purpose": "Observe the existing capacity receipt and reconcile its exact batch without offering a mutation or replay"
     }
   ],
   "lifecycle": [

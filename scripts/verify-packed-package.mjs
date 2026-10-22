@@ -48,11 +48,14 @@ try {
     // (1,699,010 compressed). Only source, docs, styles and mock fixtures
     // account for this growth; no generated repository payload is included.
     // GeoLocation9240 adds retained task panels, guarded dialogs and SVG info
-    // help: measured 621 intended files, 6,333,534 bytes (no new files or
-    // generated payload). Bound that source-only growth at 6.340 MB.
+    // help: measured 621 intended files, 6,333,534 bytes. Standalone Fleet9244
+    // adds seven source/style modules for isolated inspection, editing and
+    // progress: 628 intended files, 6,399,725 unpacked bytes (1,724,038 packed).
+    // No generated files or dependency payload added; bound source-only growth
+    // at 6.410 MB. Shared Dashboard/coordinator source remains unchanged.
     // Content/consumer/style/export checks and the separate 530,000-byte
     // eager-runtime cap remain unchanged.
-    assert.ok(artifact.unpackedSize <= 6_340_000, `unpacked package exceeds 6.340 MB budget (${artifact.unpackedSize})`);
+    assert.ok(artifact.unpackedSize <= 6_410_000, `unpacked package exceeds 6.410 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { createServer } from 'vite';
 
 // Test the styles each app actually serves, rather than finding CSS files on disk.
-const selectors = ['.geo-admin', '.operational-fleet', '.fleet-scale', '.admin-maintenance', '.maintenance-resource', '.admin-deployments', '.domains-header', '.edge-serving-evidence'];
+const selectors = ['.geo-admin', '.operational-fleet', '.fleet-scale', '.fleet-page', '.fleet-standalone-dialog', '.admin-maintenance', '.maintenance-resource', '.admin-deployments', '.domains-header', '.edge-serving-evidence'];
 for (const app of ['showcase', 'portal']) {
     const root = resolve(`apps/${app}`);
     const theme = await readFile(resolve(root, 'src/theme.css'), 'utf8');

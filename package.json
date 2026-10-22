@@ -96,6 +96,7 @@
         "verify:admin-geolocation-mounted": "node scripts/verify-admin-geolocation-mounted.mjs",
         "verify:admin-operational-fleet": "node scripts/verify-admin-operational-fleet.mjs",
         "verify:admin-operational-fleet-mounted": "node scripts/verify-admin-operational-fleet-mounted.mjs",
+        "verify:admin-fleet-workspace": "node scripts/verify-admin-fleet-workspace.mjs && node scripts/verify-admin-fleet-workspace-mounted.mjs",
         "verify:admin-operations-mounted": "node scripts/verify-admin-operations-mounted.mjs",
         "verify:admin-operations": "node scripts/verify-admin-operations.mjs",
         "verify:admin-maintenance": "node scripts/verify-admin-maintenance.mjs",

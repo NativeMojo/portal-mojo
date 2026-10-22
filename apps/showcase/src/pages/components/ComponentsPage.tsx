@@ -514,7 +514,7 @@ const GROUPS: DemoGroup[] = [
             },
             {
                 key: 'admin-operational-fleet', title: 'Operational Fleet', icon: 'bi-cloud',
-                blurb: 'Authoritative fleet health, independent source grants, and reviewed capacity plans with exact observation.',
+                blurb: 'Fleet health, tabbed capacity inspection and exact resource changes with server review and progress.',
                 render: () => <AdminOperationalFleetDemo />,
             },
             {

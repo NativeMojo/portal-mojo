@@ -1,26 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { login } from 'portal-mojo/client/runtime';
-import { FleetOverview } from '../../../../../packages/portal-mojo/src/admin/fleet/FleetOverview';
-import { mockOperationalFleetScenarios, setMockOperationalFleetScenario, type MockOperationalFleetScenario } from '../../../../../packages/portal-mojo/src/client/operational-fleet-mock';
+import { modal } from '../../../../../packages/portal-mojo/src/ui/modal';
+import { FleetPage } from '../../../../../packages/portal-mojo/src/admin/fleet/FleetPage';
+import { fleetOperations, fleetSessionScope } from '../../../../../packages/portal-mojo/src/admin/fleet/operations';
+import { getMockOperationalFleetBatchIds, mockOperationalFleetScenarios, setMockOperationalFleetScenario, type MockOperationalFleetScenario } from '../../../../../packages/portal-mojo/src/client/operational-fleet-mock';
 const noLinks = Object.fromEntries(['certificates', 'incidents', 'tickets', 'jobs', 'email', 'sms', 'framework', 'last_deployment'].map(key => [key, null]));
-/** The actual reusable overview/editor, backed exclusively by the central mock bridge. */
+function DemoControls({ scenario, change, close }: { scenario: MockOperationalFleetScenario; change: (v: MockOperationalFleetScenario) => Promise<void>; close: () => void }) {
+    const scope = fleetSessionScope(), operation = useSyncExternalStore(fn => scope ? fleetOperations.subscribe(scope, fn) : () => {}, () => scope ? fleetOperations.get(scope) : null, () => null);
+    const [selected, setSelected] = useState(scenario), [ids, setIds] = useState<string[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('');
+    const unresolved = !!operation && ['submitting', 'running', 'unknown'].includes(operation.status);
+    return <div className="modal-pad fleet-standalone-dialog"><h2 className="modal-title">Fleet demo controls</h2><div className="fleet-standalone-body fp-stack"><p>Mock operator, health evidence and reviewed capacity changes. Nothing contacts AWS.</p><label className="field"><span className="field-label">Mock evidence and outcome</span><select className="input" value={selected} disabled={busy || unresolved} onChange={e => setSelected(e.target.value as MockOperationalFleetScenario)}>{mockOperationalFleetScenarios.map(value => <option key={value} value={value}>{value.replaceAll('-', ' ')}</option>)}</select></label>{unresolved && <p className="text-warn">Observe the original batch before resetting the mock. Scenario changes reset server evidence and cannot clear the in-session reconciliation guard.</p>}<section className="fp-resource fp-stack"><strong>Read-only mock evidence</strong><button className="btn" onClick={() => setIds(getMockOperationalFleetBatchIds())}>Refresh mock evidence</button><p className="dim">Batch IDs from the simulated server logs. Use only the batch matching the submitted plan.</p>{ids.length ? <pre>{ids.join('\n')}</pre> : <p>No mock batches observed here yet.</p>}</section>{error && <p className="form-alert" role="alert">{error}</p>}</div><div className="modal-actions"><button className="btn" disabled={busy} onClick={close}>Close</button><button className="btn btn-primary" disabled={busy || unresolved} onClick={async () => { setBusy(true); try { await change(selected); close(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Mock scenario unavailable.'); } finally { setBusy(false); } }}>Use scenario</button></div></div>;
+}
+/** Standalone Fleet workspace; Dashboard's separate overview stays unchanged. */
 export function AdminOperationalFleetDemo() {
-    const queryClient = useQueryClient();
-    const [scenario, setScenario] = useState<MockOperationalFleetScenario>('healthy');
-    const [busy, setBusy] = useState(false), [error, setError] = useState('');
-    const change = async (value: MockOperationalFleetScenario) => { setBusy(true); setError(''); try {
-        await login('dns.platform@nativemojo.com', 'mojo');
-        setMockOperationalFleetScenario(value);
-        setScenario(value);
-        await queryClient.invalidateQueries({ queryKey: ['operational-fleet'] });
-    }
-    catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Mock persona could not be selected.');
-    }
-    finally {
-        setBusy(false);
-    } };
-    useEffect(() => { void change('healthy'); }, []);
-    return <div className="flex flex-col gap-4"><details className="panel panel-pad demo-controls"><summary>Demo controls · mock data</summary><div className="eyebrow">Operational overview and reviewed scaling</div><p>Use the operator persona to stage nodes, independent database sizes and Redis capacity. Review the actual server plan, apply once and observe the batch. Mock outcomes advance after three observations; nothing contacts AWS.</p><div className="flex gap-2 flex-wrap"><button className="btn" disabled={busy} onClick={() => void change(scenario)}>Use fleet operator</button><label className="field"><span className="field-label">Mock evidence and outcome</span><select className="input" value={scenario} disabled={busy} onChange={e => void change(e.target.value as MockOperationalFleetScenario)}>{mockOperationalFleetScenarios.map(value => <option key={value} value={value}>{value.replaceAll('-', ' ')}</option>)}</select></label></div><p className="dim">Unknown outcomes deliberately retain a reconciliation block, including after closing and reopening the dialog. Scenario selection never clears an unresolved operation; inspect and observe the original batch before starting another change.</p>{error && <p className="form-alert" role="alert">{error}</p>}</details><FleetOverview capacityDetails="modal" headingLevel={1} mount="" links={noLinks} showConfigurationLink={false}/></div>;
+    const queryClient = useQueryClient(), owner = useRef<AbortController | null>(null);
+    const [scenario, setScenario] = useState<MockOperationalFleetScenario>('healthy'), [busy, setBusy] = useState(false), [error, setError] = useState('');
+    const change = async (value: MockOperationalFleetScenario) => { const scope = fleetSessionScope(); if (scope && fleetOperations.blocked(scope)) throw new Error('Reconcile the current batch before changing the scenario.'); setBusy(true); setError(''); try { await login('dns.platform@nativemojo.com', 'mojo'); setMockOperationalFleetScenario(value); setScenario(value); await queryClient.invalidateQueries({ queryKey: ['operational-fleet'] }); } finally { setBusy(false); } };
+    useEffect(() => { void change('healthy').catch(reason => setError(reason instanceof Error ? reason.message : 'Mock operator unavailable.')); return () => owner.current?.abort(); }, []);
+    const controls = () => { owner.current?.abort(); const controller = new AbortController(); owner.current = controller; return modal.open(done => <DemoControls scenario={scenario} change={change} close={() => done(null)}/>, { size: 'md', signal: controller.signal }); };
+    return <div className="flex flex-col gap-4"><div className="flex gap-2 items-center flex-wrap"><button className="btn" disabled={busy} onClick={() => void controls()}>Demo controls</button><span className="dim">Mock · {scenario.replaceAll('-', ' ')}</span></div>{error && <p className="form-alert" role="alert">{error}</p>}<FleetPage mount="" links={noLinks} showConfigurationLink={false}/></div>;
 }
