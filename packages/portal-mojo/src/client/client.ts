@@ -85,6 +85,8 @@ export function buildQuery(params: Params): string {
 }
 
 export interface FetchOpts {
+    /** Domain receipt identity; the only caller-supplied request header. */
+    idempotencyKey?: string;
     params?: Params;
     method?: 'GET' | 'POST' | 'DELETE';
     body?: Record<string, unknown>;
@@ -145,6 +147,9 @@ export function installAuthHooks(hooks: AuthHooks | null): void {
 }
 
 async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
+    if (opts.idempotencyKey !== undefined && (typeof opts.idempotencyKey !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(opts.idempotencyKey))) {
+        throw new TypeError('idempotencyKey must contain 1–128 safe receipt characters');
+    }
     // Gate BEFORE headers are built: after a mid-gate token refresh the fresh
     // Authorization value is picked up below by construction (web-mojo had to
     // re-stamp a snapshotted header here).
@@ -157,6 +162,7 @@ async function transport(path: string, opts: FetchOpts): Promise<Envelope> {
     };
     const bearer = authHooks?.authHeader();
     if (bearer) headers['Authorization'] = bearer;
+    if (opts.idempotencyKey !== undefined) headers['Idempotency-Key'] = opts.idempotencyKey;
 
     if (usingMockTransport()) {
         const { mockFetch } = await loadMockModule();
