@@ -572,9 +572,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:openRoute:modal.open:0",
-      "fingerprint": "7c184834b239aae45173",
+      "fingerprint": "62835af24b34020b9c79",
       "category": "editor",
-      "purpose": "Focused prefix/upstream editor. Current complete route preflight and quiet-path guard run under shared single flight; exact owner/shared choices and per-send fence. Native dismissal guarded throughout preflight/write; uncertain outcome is observed without replay."
+      "purpose": "Focused prefix/upstream editor. Current complete route preflight and quiet-path guard run under shared single flight; exact owner/shared choices and a synchronous live-auth guard before each send, including reauthentication. Native dismissal guarded throughout preflight/write; uncertain outcome is observed without replay."
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx:showDetails:modal.open:0",

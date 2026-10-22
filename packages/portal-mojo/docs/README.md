@@ -42,7 +42,7 @@ everything: run the showcase (`npm run dev:showcase`) → **Develop → Componen
 | [admin-dns-registrar.md](admin-dns-registrar.md) | Domain search/quote/purchase, one-use token custody, durable-ledger reconciliation, scoped registrant PII, and manual House adoption |
 | [admin-storage.md](admin-storage.md) | Global S3 buckets, masked storage backends, explicit policy-backed File uploads, capability-safe FileView/shares, and finite rendition convergence |
 | [admin-media-rendering.md](admin-media-rendering.md) | Storage → Media rendering: the three FILEMAN_RENDITIONS_* settings as a descriptor-driven form — delta-from-defaults writes, inline 400 routing, reset by writing `{}` |
-| [admin-edge.md](admin-edge.md) | Serving hostname configuration with a shape-first wizard, independently admitted node posture and bounded hosting readiness, `site_api` routes and their create order, declared upstreams, and the fleet blocklist with log-first modes. |
+| [admin-edge.md](admin-edge.md) | Serving hostname configuration with Address → Routing → Certificate → Review creation, independently admitted node posture and bounded hosting readiness, `site_api` routes and their create order, declared upstreams, and the fleet blocklist with log-first modes. |
 | [admin-shortlinks.md](admin-shortlinks.md) | Global shortlink operations, destination-free caches, bounded click history, and reconciled one-shot mutations |
 | [admin-messaging.md](admin-messaging.md) | SES domains/mailboxes/sent/templates plus public contact requests, with write-only credentials and offline HTML previews |
 | [admin-phonehub.md](admin-phonehub.md) | Global Phone Hub: evidence-backed lookup, sanitized SMS audits, and write-only provider configuration |

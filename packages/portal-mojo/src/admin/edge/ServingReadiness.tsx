@@ -16,7 +16,8 @@ export function ServingReadiness({ refreshRevision = 0 }: { refreshRevision?: nu
     const [state, setState] = useState<{ scope: string | null; busy: boolean; bootstrap?: ServingBootstrap; report?: HostingReadiness; error?: string; reportError?: string }>({ scope: null, busy: false });
     const flight = useRef(0);
     const owner = useRef<AbortController | null>(null);
-    useEffect(() => { const controller = new AbortController(); owner.current = controller; return () => controller.abort(); }, [scope]);
+    const evidenceAuthority = `${scope}:${admitted}:${bootstrapAllowed}:${me?.is_superuser === true}:${state.scope === scope && state.bootstrap?.user.is_superuser === true}:${state.scope === scope && state.bootstrap?.capabilities.setup === true}`;
+    useEffect(() => { const controller = new AbortController(); owner.current = controller; return () => controller.abort(); }, [evidenceAuthority]);
     useEffect(() => {
         const serial = ++flight.current, controller = new AbortController();
         const current = () => !controller.signal.aborted && flight.current === serial && getAuthSnapshot().authenticated && `${getAuthSnapshot().uid}:${getAuthSessionRevision()}` === scope;

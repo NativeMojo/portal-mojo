@@ -19,6 +19,18 @@ function reason(error: unknown): string {
 
 interface RouteRowDraft extends RouteDraft { key: number; upstreamName?: string }
 
+const submittedFieldNames: Record<string, string> = { label: 'Label', kind: 'Serving type', certificate: 'Certificate', pool: 'Pool', is_enabled: 'Enabled', upstream: 'Upstream', redirect_to: 'Redirect destination', spa: 'Single-page app', serve_static: 'Static files', quiet_paths: 'Quiet paths', body_size_mb: 'Maximum request body' };
+function observedDifferences(submitted: Record<string, unknown>, row: EdgeVhostRow): string[] {
+    const fields = row as unknown as Record<string, unknown>;
+    const relation = (key: string, value: unknown) => ['domain', 'certificate', 'upstream'].includes(key) && value != null && typeof value === 'object' ? (value as { id?: unknown }).id : value;
+    const display = (value: unknown) => value === undefined ? 'unknown' : JSON.stringify(value).slice(0, 120);
+    return Object.entries(submitted).flatMap(([key, expected]) => {
+        const observed = relation(key, fields[key]);
+        return JSON.stringify(observed) === JSON.stringify(expected) ? [] : [`${submittedFieldNames[key] ?? key}: expected ${display(expected)}, observed ${display(observed)}`];
+    });
+}
+
+
 /** One path per row; the server takes a list of exact request paths. */
 function PathListEditor({ label, help, paths, onChange, disabled }: { label: string; help: string; paths: string[]; onChange: (paths: string[]) => void; disabled: boolean }) {
     return <div className="field edge-path-list">
@@ -74,7 +86,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'ad
     const [storedRoutes, setStoredRoutes] = useState<string[] | null>(editing ? null : []);
     const [routesUnread, setRoutesUnread] = useState(false);
     const nextRouteKey = useRef(1);
-    // Finish reruns whole on every retry, so what already landed is recorded
+    // Explicit continuation retains acknowledged steps rather than duplicating them
     // here and skipped: never a second vhost, never a duplicate route.
     const progress = useRef<{ vhostId: number | null; routes: Map<string, number> }>({ vhostId: null, routes: new Map() });
     const [createdId, setCreatedId] = useState<number | null>(null);
@@ -85,6 +97,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'ad
     const [error, setError] = useState('');
     const [domainOwner, setDomainOwner] = useState<{ id: number; group: number | null } | null>(null);
     const [ownerError, setOwnerError] = useState('');
+    const submitted = useRef<Record<string, unknown> | null>(null);
     const uncertain = useRef<{ step: 'create' | 'route' | 'finish' | 'edit'; prefix?: string } | null>(null);
     const [unconfirmed, setUnconfirmed] = useState('');
     const reveal = (message: string, tab = 'settings', selector = 'input:not(:disabled):not([readonly]):not([type=radio]):not([type=checkbox]),select:not(:disabled),textarea:not(:disabled)'): never => {
@@ -109,7 +122,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'ad
         const observedId = progress.current.vhostId ?? row?.id;
         if (observedId == null) return;
         try {
-            // Observation belongs to Finish's existing single-flight lifecycle.
+            // Observe outcome shares the submit lifecycle and never sends a write.
             if (pending.step === 'route') {
                 const observed = await listVhostRoutes(observedId);
                 const expected = routes.find(route => route.path_prefix === pending.prefix);
@@ -119,11 +132,18 @@ export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'ad
             } else {
                 await EdgeVhostModel.invalidate(queryClient);
                 const observed = await EdgeVhostModel.fetchOne(queryClient, observedId);
-                setUnconfirmed(`Observed configuration intent: ${observed.is_enabled ? 'enabled' : 'disabled'}. Review the observed intent, then Save again only if you still need the change. Readiness remains separate.`);
+                if (!current()) return;
+                const differences = submitted.current ? observedDifferences(submitted.current, observed) : ['The submitted configuration receipt is missing.'];
+                if (observed.id !== observedId) differences.unshift(`Hostname ID: expected ${observedId}, observed ${observed.id ?? 'unknown'}`);
+                if (differences.length) {
+                    setUnconfirmed(`Outcome still unconfirmed. ${differences.slice(0, 3).join('; ')}${differences.length > 3 ? `; ${differences.length - 3} more differences` : ''}. No write was replayed.`);
+                    return;
+                }
+                setUnconfirmed(`The exact submitted configuration was observed. Select ${editing ? 'Save changes' : 'Add hostname'} again to continue. Fleet application remains unverified.`);
             }
             if (!current()) return;
             uncertain.current = null;
-            if (pending.step === 'route') setUnconfirmed('Route observed. Finish again to continue from acknowledged progress.');
+            if (pending.step === 'route') setUnconfirmed('Route observed. Select Add hostname again to continue from acknowledged progress.');
         } catch (error) { throw new Error(`Observation unavailable: ${reason(error)}. No write was replayed.`); }
     };
 
@@ -208,7 +228,8 @@ export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'ad
         const values = draft();
         if (editing) {
             let saved: EdgeVhostRow;
-            try { saved = await saveVhost(row.id, buildVhostPayload(values, { create: false }), guard); }
+            submitted.current = buildVhostPayload(values, { create: false });
+            try { saved = await saveVhost(row.id, submitted.current, guard); }
             catch (error) { if (!refused(error)) unknown('edit'); throw error; }
             if (saved.id !== row.id || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('edit');
             await EdgeVhostModel.invalidate(queryClient);
@@ -248,8 +269,9 @@ export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'ad
                     throw new Error(`Hostname #${state.vhostId} was created disabled, but the route ${route.path_prefix} was refused: ${reason(error)}. Fix it and finish again; nothing is created twice.`);
                 }
             }
+            submitted.current = buildVhostPayload(values, { create: false });
             try {
-                saved = await saveVhost(state.vhostId, buildVhostPayload(values, { create: false }), guard);
+                saved = await saveVhost(state.vhostId, submitted.current, guard);
                 if (saved.id !== state.vhostId || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('finish');
             } catch (error) {
                 await Promise.allSettled([EdgeVhostModel.invalidate(queryClient), EdgeRouteModel.invalidate(queryClient)]);

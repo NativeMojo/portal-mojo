@@ -123,7 +123,7 @@ that works is:
 
 The wizard does exactly this. Step 3 always runs, so the enable-time checks
 happen at the end and a failure part-way never leaves a live vhost with no
-routes. An explicit server refusal stays visible and retains acknowledged progress. A transport error, malformed response or 5xx response can follow a committed write: the outcome is unconfirmed. An unacknowledged create is blocked from replay; close and inspect Serving before starting another create. For an uncertain route or final save, the next Finish performs observation only. An observed matching route is acknowledged before continuing; a missing route in the bounded observation remains blocked. A final-save observation states the observed enabled intent and requires another explicit Finish. No unknown enable outcome is called refused or still disabled.
+routes. An explicit server refusal stays visible and retains acknowledged progress. A transport error, malformed response or 5xx response can follow a committed write: the outcome is unconfirmed. An unacknowledged create is blocked from replay; close and inspect Serving before starting another create. For an uncertain route or final save, select **Observe outcome**. Observation does not write. An observed matching route is acknowledged before continuing; a missing route remains blocked. After observation, explicitly select **Add hostname** or **Save changes** to continue. No unknown enable outcome is called refused or still disabled.
 
 The server will store an enabled `site_api` hostname with no routes. The create wizard requires at least one explicit valid route. This is a create-only requirement: route-less edits and supported Site → Site + API conversion remain available, then routes can be authored in detail.
 
@@ -139,7 +139,7 @@ The native detail modal has **Overview / Routes / Certificate / Settings**. Rout
 
 A successful create opens the saved hostname. An acknowledged partial Site + API create offers **Inspect saved hostname**, preserving its real disabled/saved state. An unacknowledged create is never replayed. Explicit backend refusals remain actionable; lost/malformed/5xx outcomes require **Observe outcome** before another mutation. Observation never writes or automatically retries.
 
-Routes uses a paginated local table with focused Add/Edit dialogs. Rename and removal inspect the complete bounded route inventory and current quiet paths first. A change that would strand a quiet path is blocked with the exact path and points to Settings; remove or repair the quiet path before changing the route. There is no pretend atomic multi-row transaction. Safety inspection paginates up to 2,000 routes and refuses changing/incomplete inventories rather than treating a partial page as complete.
+Routes uses a paginated local table with focused Add/Edit dialogs. Rename and removal inspect the complete bounded route inventory and current quiet paths first. A change that would strand a quiet path is blocked with the exact path and points to Settings; remove or repair the quiet path before changing the route. There is no pretend atomic multi-row transaction. Safety inspection paginates up to 2,000 routes and rejects changed counts, duplicate IDs, incomplete pages or inventories exceeding 2,000 routes rather than treating a partial page as complete. Same-count concurrent edits cannot all be detected.
 
 Detail edits, route writes, enablement and deletion share the detail's pending state. Native Escape/backdrop/X are locked during submitted writes and preflight. Owned dialogs close on scope loss; before each write and every fresh-auth attempt, a guard verifies the original session and current permission. A closed or replaced editor cannot continue the staged create's later writes. Unknown outcomes stay visibly unconfirmed; closing a dialog does not cancel a server operation or establish its outcome.
 
@@ -212,8 +212,8 @@ The editor shows the saved value from the response.
 
 Styles live in `src/styles/components/admin-edge.css` and ship in
 `portal-mojo/styles.css`; the app declares the tokens. They are built from
-tokens only, so both themes render from one sheet. The showcase still carries
-its own identical copy until it adopts the package stylesheet. The showcase
+tokens only, so both themes render from one sheet. Both Admin and Showcase
+import the canonical package stylesheet. The showcase
 demo (Develop → Components → Admin → Edge) runs the shipped pages against the
 mock under five identities: platform administrator, DNS manager, DNS viewer,
 security manager and security viewer.

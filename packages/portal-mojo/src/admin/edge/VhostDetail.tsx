@@ -19,7 +19,7 @@ function confirmRemoval({ title, message, confirmText, signal }: { title: string
 }
 
 
-function RouteEditor({ route, vhost, run, onDone, signal }: { route: EdgeRouteRow | null; vhost: EdgeVhostRow; run: Run; onDone: () => void; signal: AbortSignal }) {
+function RouteEditor({ route, vhost, run, onDone, signal, beforeWrite }: { route: EdgeRouteRow | null; vhost: EdgeVhostRow; run: Run; onDone: () => void; signal: AbortSignal; beforeWrite: () => void }) {
     const queryClient = useQueryClient();
     const [prefix, setPrefix] = useState(route?.path_prefix ?? '');
     const [upstream, setUpstream] = useState<{ id: number; name: string } | null>(route?.upstream ? { id: route.upstream.id, name: route.upstream.name } : null);
@@ -40,7 +40,7 @@ function RouteEditor({ route, vhost, run, onDone, signal }: { route: EdgeRouteRo
         pending.current = true; setBusy(true); setError('');
         try {
             const target = { path_prefix: prefix, upstream: upstream!.id };
-            const routeGuard = () => { if (signal.aborted) throw new MojoError('Session or permission changed. Reopen the hostname.', 403); };
+            const routeGuard = () => { beforeWrite(); if (signal.aborted) throw new MojoError('Session or permission changed. Reopen the hostname.', 403); };
             const ok = await run(async () => {
                 let current: EdgeRouteRow[], currentVhost: EdgeVhostRow;
                 try { current = await listVhostRoutes(vhost.id); await EdgeVhostModel.invalidate(queryClient); currentVhost = await EdgeVhostModel.fetchOne(queryClient, vhost.id); }
@@ -131,7 +131,7 @@ export function VhostDetail({ id, onClose, onChanged, onBusyChange }: { id: numb
     const openRoute = async (route: EdgeRouteRow | null) => {
         if (pending.current || unknown || !canManage || !current()) return;
         let childBusy = false;
-        await modal.open(close => <RouteEditor route={route} vhost={vhost} run={async (write, operation) => { childBusy = true; try { return await run(write, operation); } finally { childBusy = false; } }} signal={owner.current!.signal} onDone={() => { if (!childBusy) close(null); }} />, { size: 'md', canDismiss: () => !childBusy, signal: owner.current?.signal });
+        await modal.open(close => <RouteEditor route={route} vhost={vhost} beforeWrite={guard} run={async (write, operation) => { childBusy = true; try { return await run(write, operation); } finally { childBusy = false; } }} signal={owner.current!.signal} onDone={() => { if (!childBusy) close(null); }} />, { size: 'md', canDismiss: () => !childBusy, signal: owner.current?.signal });
     };
     const removeRoute = async (route: EdgeRouteRow) => {
         if (pending.current || unknown || !current()) return;

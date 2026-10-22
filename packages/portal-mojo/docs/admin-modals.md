@@ -78,7 +78,7 @@ the inventory using `node scripts/verify-admin-modals.mjs --write-inventory`.
 | Email/support | Domain, mailbox, sent message, template, contact; credentials/onboarding/audit/reconcile/test/template/status | Preserve evidence; separate mailbox directions and support status |
 | Phone/Push | Number, SMS, config, device, delivery, template; lookup/test/config editors | Config/template lifecycle; number/SMS/device/delivery evidence retained |
 | Operations | Fleet capacity planning, Maintenance exact resource/window confirmation, GeoLocation local key-removal confirmation, API/WebApp detail and focused onboarding/recovery/upload/credential flows | No generic deployment/release edits or deletion; staged intent, observed receipts and transient secrets remain distinct |
-| Edge | Vhost with nested routes; shape-first wizard, route editor, upstream declare/retire, blocklist entry editor | Vhost and upstream enabled state; upstreams retire and are never deleted; vhost, route and blocklist deletion are retained operations |
+| Edge | Vhost with nested routes; Address → Routing → Certificate → Review creation, route editor, upstream declare/retire, blocklist entry editor | Vhost and upstream enabled state; upstreams retire and are never deleted; vhost, route and blocklist deletion are retained operations |
 | Assistant/settings | Conversation, Skill, Setting; feed continuation, scoped memory, typed settings editor | Owner-only continuation; Skill active selection; memory is scoped editing |
 
 ## Resource lifecycle matrix
@@ -101,7 +101,7 @@ the inventory using `node scripts/verify-admin-modals.mjs --write-inventory`.
 | Push config / template | Existing active selection with separate manage/test grants |
 | Assistant conversation | Retain history; no arbitrary REST save or invented archive |
 | Assistant Skill | Existing `is_active` save requires `sys.view_admin`; authoritative reload after mutation |
-| Edge vhost | Enable/disable from the header; Edit and Delete in the header menu. Disabling keeps the row and is how a replacement is staged |
+| Edge vhost | Enable/disable and Edit in the header; Delete in the header menu. Disabling keeps the row and is how a replacement is staged |
 | Edge upstream | `is_enabled` only. Retire (platform administrators) disables and keeps the row; server `CAN_DELETE=False` |
 | Edge blocklist entry | Mode is the lifecycle: `off` parks an entry without losing it. Deletion is a retained operation |
 | Other logs/devices/history | Read-only by default, even where low-level REST supports DELETE |
