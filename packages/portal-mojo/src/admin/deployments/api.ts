@@ -60,7 +60,7 @@ export async function write<T>(o: DeploymentOwner, r: ActionReceipt, path: strin
 }
 catch (error) {
     if (isReauthRequired(error)) {
-        saveReceipt({ ...r, submitted: false });
+        saveReceipt({ ...r, submitted: false, ...(r.kind === 'profile' ? { settled: true } : {}) });
         await requestFreshAuth();
         throw new Error('Authentication renewed or cancelled. Refresh authoritative state and explicitly confirm again; nothing was replayed.');
     }
