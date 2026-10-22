@@ -1,0 +1,16 @@
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { login } from 'portal-mojo/client';
+import { DeploymentsPage } from '../../../../packages/portal-mojo/src/admin/deployments/DeploymentsPage';
+import { setDeploymentMockScenario, type DeploymentMockScenario } from '../../../../packages/portal-mojo/src/client/deployments-mock';
+const identities = [['operator', 'Operator · both lanes', 'showcase.operator@nativemojo.com'], ['viewer', 'Read-only viewer', 'deployments.viewer@nativemojo.com'], ['platform', 'Platform manager', 'deployments.platform@nativemojo.com'], ['webapp', 'WebApp manager', 'deployments.webapp@nativemojo.com'], ['group', 'Group-only · no global lane', 'deployments.group@nativemojo.com'], ['denied', 'Denied', 'deployments.denied@nativemojo.com']] as const;
+const scenarios: DeploymentMockScenario[] = ['failed-newer', 'partial', 'reported-only', 'converged', 'unknown', 'stale', 'mixed-webapp', 'rolled-back', 'missing-destination', 'missing-bucket', 'missing-apps-domain', 'revision-conflict', 'lease-conflict', 'unknown-create', 'key-replay', 'upload-failure', 'timeout', 'read-failure', 'ownership-refusal'];
+export function AdminDeploymentsDemo() {
+    const qc = useQueryClient(), [identity, setIdentity] = useState('showcase.operator@nativemojo.com'), [scenario, setScenario] = useState<DeploymentMockScenario>('failed-newer'), [ready, setReady] = useState(false), [error, setError] = useState('');
+    useEffect(() => { let active = true; setReady(false); setError(''); setDeploymentMockScenario(scenario); void login(identity, 'mojo').then(async () => { qc.removeQueries({ queryKey: ['me'] }); qc.removeQueries({ queryKey: ['deployments'] }); await qc.invalidateQueries(); if (active)
+        setReady(true); }).catch(() => { if (active)
+        setError('Mock persona not configured. The central fixture must supply this exact identity.'); }); return () => { active = false; }; }, [identity, scenario, qc]);
+    useEffect(() => () => { setDeploymentMockScenario('failed-newer'); void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
+    return <div className="admin-deployments"><section className="panel panel-pad"><h2>Deployment contract playground</h2><p className="dim">Deterministic local fixtures. API convergence, WebApp pointers, deployment attempts, reachability and certificate status are separate observations. No live fleet or public hostname is changed.</p><div className="deployment-form"><label>Authority<select value={identity} onChange={e => setIdentity(e.target.value)}>{identities.map(([key, label, email]) => <option key={key} value={email}>{label}</option>)}</select></label><label>Scenario<select value={scenario} onChange={e => setScenario(e.target.value as DeploymentMockScenario)}>{scenarios.map(value => <option key={value}>{value}</option>)}</select></label></div><p>Use a verified earlier release for rollback, inspect the exact returned attempt, create or resume a WebApp, generate a workflow, reveal a transient key, or upload an actual built file. Group-only and denied personas make no global lane requests.</p></section>{error ? <p role="alert">{error}</p> : ready ? <DeploymentsPage key={`${identity}:${scenario}`}/> : <p>Preparing mock identity…</p>}</div>;
+}
+export default AdminDeploymentsDemo;
