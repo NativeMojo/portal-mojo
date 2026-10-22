@@ -10,15 +10,15 @@ type Surface = 'vhosts' | 'upstreams' | 'blocklist';
 type Leg = 'platform' | 'manager' | 'viewer' | 'security' | 'security-viewer';
 
 const SURFACES: Array<{ key: Surface; label: string }> = [
-    { key: 'vhosts', label: 'Vhosts' },
+    { key: 'vhosts', label: 'Serving' },
     { key: 'upstreams', label: 'Upstreams' },
     { key: 'blocklist', label: 'Edge Blocklist' },
 ];
 const LEGS: Array<{ key: Leg; label: string; email: string; opens: Surface[]; note: string }> = [
     { key: 'platform', label: 'Platform administrator', email: 'dns.platform@nativemojo.com', opens: ['vhosts', 'upstreams', 'blocklist'], note: 'Sees house rows, and may declare and retire upstreams.' },
-    { key: 'manager', label: 'DNS manager', email: 'dns.manager@nativemojo.com', opens: ['vhosts', 'upstreams'], note: 'Creates and edits vhosts and routes, and switches an upstream on or off. House rows are hidden.' },
+    { key: 'manager', label: 'DNS manager', email: 'dns.manager@nativemojo.com', opens: ['vhosts', 'upstreams'], note: 'Creates and edits hostname configurations and routes, and switches an upstream on or off. House rows are hidden.' },
     { key: 'viewer', label: 'DNS viewer', email: 'dns.viewer@nativemojo.com', opens: ['vhosts', 'upstreams'], note: 'Reads everything a manager sees; every change control is absent.' },
-    { key: 'security', label: 'Security manager', email: 'security.manager@nativemojo.com', opens: ['blocklist'], note: 'Owns the fleet blocklist. Has no access to vhosts.' },
+    { key: 'security', label: 'Security manager', email: 'security.manager@nativemojo.com', opens: ['blocklist'], note: 'Owns the fleet blocklist. Has no access to Serving.' },
     { key: 'security-viewer', label: 'Security viewer', email: 'security.viewer@nativemojo.com', opens: ['blocklist'], note: 'Reads the blocklist; cannot change it.' },
 ];
 
@@ -92,11 +92,11 @@ export function AdminEdgeDemo() {
                     <div className="eyebrow">{identity.label}</div>
                     <p className="dim">{identity.note}</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {canChangeVhosts && <button type="button" className="btn" onClick={() => void openVhostWizard()}><i className="bi bi-magic" /> Vhost wizard: pick a shape, then only its settings</button>}
+                        {canChangeVhosts && <button type="button" className="btn" onClick={() => void openVhostWizard()}><i className="bi bi-magic" /> Add hostname: name, shape and certificate first</button>}
                         {leg === 'platform' && <button type="button" className="btn" onClick={() => void openDeclareUpstream()}><i className="bi bi-hdd-rack" /> Declare upstream</button>}
                         {leg === 'security' && <button type="button" className="btn" onClick={() => void openBlocklistEditor()}><i className="bi bi-slash-circle" /> New blocklist entry: log first</button>}
                     </div>
-                    <p className="dim" style={{ marginBottom: 0 }}>To see the create order for a site with API paths: open the wizard, choose “Site + API paths”, add a route and a quiet path under it. The vhost is created disabled, the routes land, then one last save applies the quiet paths and switches it on.</p>
+                    <p className="dim" style={{ marginBottom: 0 }}>To see the create order for a site with API paths: open the wizard, choose “Site + API”, add a route and a quiet path under it. The hostname configuration is created disabled, the routes land, then one last save applies the quiet paths and sets its enabled intent. Readiness is shown separately.</p>
                 </div>
                 {!allowed && <div className="panel panel-pad"><div className="eyebrow">Denied</div><p className="dim" style={{ marginBottom: 0 }}>This identity has no access to this surface, and the navigation would not show it.</p></div>}
                 {allowed && surface === 'vhosts' && <VhostsPage />}

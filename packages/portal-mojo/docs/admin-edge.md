@@ -1,4 +1,4 @@
-# Edge Admin
+# Edge Admin · Serving
 
 ```ts
 import {
@@ -58,14 +58,15 @@ refused at Finish.
 
 ## The four kinds
 
-The wizard never shows a kind dropdown over one long form. Its first step is
-four cards in plain words; the following steps show only that shape's settings.
+Serving keeps the `/edge/vhosts` route, public `Vhost*` exports and persisted table key `admin:edge:vhosts`. Add hostname begins with the managed domain and one DNS label, four shape cards, certificate and explicit enabled intent. Apex (empty label) and wildcard (`*`) remain supported. Redirect target and SPA behavior remain basic controls.
+
+Advanced starts closed on create and holds declared upstreams, explicit API routes, pool, body limit, quiet paths and static files. Configure API destination / Configure API paths opens it; required hidden destination validation opens and focuses it. Collapsing retains the controlled draft. Edit opens Advanced for nondefault settings and preserves them. The server validates the entered pool against its declared pools; there is no client pool catalog.
 
 | Kind | Card | Needs | May carry | Refuses |
 |---|---|---|---|---|
-| `api` | API host | `upstream` | `quiet_paths`, `serve_static` | `spa`, `redirect_to` |
-| `site` | Static site or SPA | — | `spa` | `upstream`, `quiet_paths`, `serve_static`, `redirect_to` |
-| `site_api` | Site + API paths | routes | `spa`, `serve_static`, `quiet_paths` | whole-host `upstream`, `redirect_to` |
+| `api` | API | `upstream` | `quiet_paths`, `serve_static` | `spa`, `redirect_to` |
+| `site` | Site | — | `spa` | `upstream`, `quiet_paths`, `serve_static`, `redirect_to` |
+| `site_api` | Site + API | explicit routes on create | `spa`, `serve_static`, `quiet_paths` | whole-host `upstream`, `redirect_to` |
 | `redirect` | Redirect | `redirect_to` | — | everything else |
 
 `buildVhostPayload(draft, { create })` is the one place a draft becomes a
@@ -119,13 +120,9 @@ that works is:
 
 The wizard does exactly this. Step 3 always runs, so the enable-time checks
 happen at the end and a failure part-way never leaves a live vhost with no
-routes. If a step is refused the wizard stays open and says which step and
-what already exists. Finishing again continues from there: it never posts the
-vhost a second time and never repeats a route that landed.
+routes. An explicit server refusal stays visible and retains acknowledged progress. A transport error, malformed response or 5xx response can follow a committed write: the outcome is unconfirmed. An unacknowledged create is blocked from replay; close and inspect Serving before starting another create. For an uncertain route or final save, the next Finish performs observation only. An observed matching route is acknowledged before continuing; a missing route in the bounded observation remains blocked. A final-save observation states the observed enabled intent and requires another explicit Finish. No unknown enable outcome is called refused or still disabled.
 
-The server will store an enabled `site_api` vhost with no routes. The wizard
-does not: at least one valid route is required at the settings step and again
-at review.
+The server will store an enabled `site_api` hostname with no routes. The create wizard requires at least one explicit valid route. This is a create-only requirement: route-less edits and supported Site → Site + API conversion remain available, then routes can be authored in detail.
 
 In edit mode routes are read-only, with a pointer to the detail view, which
 owns adding, changing and deleting them. Changing a `site_api` vhost to
@@ -135,12 +132,22 @@ wizard does not judge quiet paths against them and leaves that to the server.
 
 ## Vhost detail
 
-The detail follows the admin modal contract (`admin-modals.md`). The header
+Basic hostname, shape, enabled intent and certificate summary come first. Detailed pool/body/quiet/static and evidence-policy facts are in Advanced. The detail follows the admin modal contract (`admin-modals.md`). The header
 switch enables and disables. Edit and Delete are in the header menu, shown
 only with the manage grant. Delete asks for confirmation, names the address,
 says its routes go with it, and points at Disable as the choice that can be
 undone. A refused enable shows the server's message in the overview. Routes
 are content: the Routes section lists them and owns add, change and delete.
+
+## Serving evidence
+
+`ServingReadiness.tsx` and `serving-data.ts` are internal, read-only helpers. Bootstrap is requested independently through `GET /api/account/admin/bootstrap` only for an authenticated global identity admitted by `view_admin | manage_users | manage_settings | admin` (literal superuser bypass). DNS access alone never starts that read. A positive projection retains only matching user id/superuser boolean, setup boolean and the edge available/HTTP/issuance fields; unrelated bootstrap data never enters Query or local state.
+
+Hosting readiness calls `GET /api/account/admin/setup/readiness?section=hosting_vhosts` only after that same identity successfully bootstraps with `capabilities.setup === true`, and both current Me and bootstrap report literal superuser. The server still rejects key-backed/noninteractive sessions. The client invents no key provenance flag. The schema-1 parser finds the selected section by code, validates status/time/count/coverage bounds, caps checks at 64 and scalar details at 16 keys, and drops unrelated response fields.
+
+Certificate serving posture shows HTTP enabled/disabled as informational file rendering configuration. DNS-01 identifies issuance method. Hosting readiness checks enabled rows' domain and certificate status only: pass does not prove certificate expiry/coverage/material installation, fleet convergence, expected nodes or running generation. Absence from bounded failing-row details is no per-host verdict. Enabled badges and saved notices express configuration intent.
+
+Errors, denied reads, old-backend 404s and malformed data are visible as Unavailable/Unknown with manual refresh; a failed refresh clears prior evidence instead of leaving a current-looking pass. Auth uid plus session revision fences requests and clears projections on replacement/logout. Reads happen only while mounted and admitted; there is no polling. Completed configuration actions refresh the panel, and list/detail CRUD retains its existing freshness helpers.
 
 ## Upstreams
 
@@ -207,4 +214,4 @@ demo (Develop → Components → Admin → Edge) runs the shipped pages against 
 mock under five identities: platform administrator, DNS manager, DNS viewer,
 security manager and security viewer.
 
-`npm run verify:admin-edge` is the executable contract.
+`npm run verify:admin-edge` retains the existing endpoint contract. `node scripts/verify-admin-serving-mounted.mjs` mounts the native wizard and modal to check basic/Advanced validation, payloads, route-less conversion, busy dismissal and committed-response-loss recovery. `node scripts/verify-admin-serving-mounted-evidence.mjs` mounts evidence for DTO bounds, exact gates, unknown posture, refresh failures and auth replacement.

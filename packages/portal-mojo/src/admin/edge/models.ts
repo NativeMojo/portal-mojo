@@ -16,9 +16,9 @@ export const VHOST_KINDS: readonly VhostKind[] = ['api', 'site', 'site_api', 're
 export interface VhostKindCard { value: VhostKind; title: string; description: string; icon: string }
 /** The wizard's first step: a product shape in plain words, never a raw enum. */
 export const VHOST_KIND_CARDS: readonly VhostKindCard[] = [
-    { value: 'api', title: 'API host', description: 'Every request on this name goes to one declared upstream.', icon: 'bi-hdd-rack' },
-    { value: 'site', title: 'Static site or SPA', description: 'Serves a published site. Nothing is proxied.', icon: 'bi-window' },
-    { value: 'site_api', title: 'Site + API paths', description: 'Serves a site, and sends chosen path prefixes to upstreams.', icon: 'bi-diagram-3' },
+    { value: 'api', title: 'API', description: 'Every request on this name goes to one declared upstream.', icon: 'bi-hdd-rack' },
+    { value: 'site', title: 'Site', description: 'Serves a published site. Nothing is proxied.', icon: 'bi-window' },
+    { value: 'site_api', title: 'Site + API', description: 'Serves a site, and sends chosen path prefixes to upstreams.', icon: 'bi-diagram-3' },
     { value: 'redirect', title: 'Redirect', description: 'Sends every request to another host, permanently.', icon: 'bi-arrow-return-right' },
 ];
 
