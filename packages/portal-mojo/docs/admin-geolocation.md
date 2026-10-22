@@ -50,17 +50,17 @@ are discarded. Form state is imperative, outside Query/Mutation caches.
 even when null. The five static keys are primary, fallback, additional, Mojo URL
 and sync. Untouched/blank replacement omits credentials; nonempty replacement
 adds `GEOIP_API_KEY_MOJO`; confirmed removal adds `clear_api_key:true`.
-Additional providers are unique and ordered, at most16. Identifiers match
+Additional providers are unique and ordered, at most 16. Identifiers match
 `^[a-z][a-z0-9_-]{0,31}$`. HTTPS origins permit no credentials, path, query,
-fragment or alternate port (443 allowed); keys are at most4096 characters.
+fragment or alternate port (443 allowed); keys are at most 4096 characters.
 
 Secrets stay only in the password DOM and short-lived request objects, whose
 raw key is deleted in `finally`. They never enter React/Query/Mutation state,
 URLs, storage, logs or mock observations. Tabs retain the element and candidate;
 Save attempts, explicit discard, fresh-auth refusal, session change and unmount
-clear it. Writes are single-flight. A440 invokes fresh authentication without
+clear it. Writes are single-flight. A 440 invokes fresh authentication without
 replaying; Refresh and a deliberate retry are required. Stale revisions
-(400 “changed; reload before publishing”, or409), unreadable state and uncertain
+(400 “changed; reload before publishing”, or 409), unreadable state and uncertain
 saves require authoritative Refresh before another write.
 
 Test verifies **only MojoVerify credentials**, regardless of primary. It requires
