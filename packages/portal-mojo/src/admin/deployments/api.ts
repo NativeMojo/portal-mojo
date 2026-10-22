@@ -37,10 +37,21 @@ export async function getHistory(o: DeploymentOwner, app: number, kind: 'release
 }).catch(error => { throw privateError(error); }); assertOwner(o, signal); return { items: list(body.data, Math.max(1, Math.min(100, Math.floor(size)))).map(v => kind === 'release' ? projectRelease(v) : projectAttempt(v)), count: typeof body.count === 'number' ? body.count : 0 }; }
 export const getDeployment = (o: DeploymentOwner, id: number, app: number, release: number, signal?: AbortSignal) => safeCall(o, `${ROOT}/release/deployment/${id}`, v => { const d = projectDeployment(v); if (d.deployment !== id || d.webapp !== app || d.release !== release)
     throw new Error('Deployment identity mismatch'); return d; }, { signal });
+/** Generic graphs omit the parent: bind the read through both exact server filters. */
+export const getAttempt = (o: DeploymentOwner, id: number, app: number, signal?: AbortSignal) => safeCall(o, `${ROOT}/deployment`, v => {
+    const rows = list(v, 2); const row = projectAttempt(rows[0]);
+    if (!positiveId(id) || !positiveId(app) || rows.length !== 1 || row.id !== id || !row.release?.id) throw new Error('Attempt unavailable in this WebApp');
+    return row;
+}, { params: { webapp: app, id, graph: 'default', start: 0, size: 1 }, signal });
+export const getRelease = (o: DeploymentOwner, id: number, app: number, signal?: AbortSignal) => safeCall(o, `${ROOT}/release`, v => {
+    const rows = list(v, 2); const row = projectRelease(rows[0]);
+    if (!positiveId(id) || !positiveId(app) || rows.length !== 1 || row.id !== id) throw new Error('Release unavailable in this WebApp');
+    return row;
+}, { params: { webapp: app, id, graph: 'default', start: 0, size: 1 }, signal });
 export async function write<T>(o: DeploymentOwner, r: ActionReceipt, path: string, body: Record<string, unknown>, project: (v: unknown) => T, signal?: AbortSignal): Promise<T> { assertOwner(o, signal); if (appActionsRefused(o, r.app))
     throw new Error('App actions were refused. Refresh safe state and establish a new session before another mutation.'); if (appUnsettled(o, r.app, r.key))
-    throw new Error('Another app operation has an unknown outcome. Refresh its exact status before continuing.'); if (r.kind === 'rollback' && r.submitted && !r.settled)
-    throw new Error('Rollback delivery is unknown. Observe summary/history; no rollback was replayed.'); saveReceipt({
+    throw new Error('Another app operation has an unknown outcome. Refresh its exact status before continuing.'); if (['rollback', 'profile'].includes(r.kind) && r.submitted && !r.settled)
+    throw new Error(r.kind === 'profile' ? 'Settings save outcome is unknown. Reload saved settings before making another save.' : 'Rollback delivery is unknown. Observe summary/history; no rollback was replayed.'); saveReceipt({
     ...r, submitted: true, submittedAt: r.submittedAt ?? Date.now()
 }); return singleFlight(`${o.actor}:${r.app || r.key}`, async () => { try {
     return await safeCall(o, path, project, {
@@ -59,6 +70,16 @@ catch (error) {
         saveReceipt({ ...r, settled: r.kind==='upload'&&r.uploadPhase==='completion_submitted'?false:true });
     throw new Error(error instanceof DOMException && error.name === 'AbortError' ? 'Session or view changed. The submitted operation may persist. Resume to reconcile.' : 'The operation was refused or delivery is uncertain. Refresh authoritative state before retrying.');
 } }); }
+export type WebAppProfilePatch = { display_name: string; environment: string; github_repository: string; deployment_ref: string; build_output: string };
+export function saveWebAppProfile(o: DeploymentOwner, r: ActionReceipt, app: WebAppObject, patch: WebAppProfilePatch, signal?: AbortSignal) {
+    const fields = ['display_name', 'environment', 'github_repository', 'deployment_ref', 'build_output'] as const;
+    if (r.kind !== 'profile' || r.app !== app.id || Object.keys(patch).some(key => !fields.includes(key as typeof fields[number])) || fields.some(key => typeof patch[key] !== 'string')) throw new Error('Unsupported WebApp profile fields');
+    return write(o, r, `${ROOT}/webapp/${app.id}`, Object.fromEntries(fields.map(key => [key, patch[key]])), v => {
+        const saved = projectWebAppObject(v);
+        if (saved.id !== app.id || saved.group.id !== app.group.id) throw new Error('WebApp ownership changed');
+        return saved;
+    }, signal);
+}
 export async function recoverApi(o: DeploymentOwner, r: ActionReceipt, id: string, action: ApiAction, signal?: AbortSignal) { if (!uuid(id))
     throw new Error('Invalid deployment ID'); return write(o, r, `/api/account/admin/platform/deploy/${action}`, { deployment: id }, v => { const d = projectPlatformAttempt(record(v).deployment); if (!d.id || (action !== 'retry' && d.id !== id))
     throw new Error('Deployment identity mismatch'); return d; }, signal); }

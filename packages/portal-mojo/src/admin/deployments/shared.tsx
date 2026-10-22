@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { deploymentTone } from './deployment-state';
 import type { DeploymentOwner } from './permissions';
 import { assertOwner } from './permissions';
+export { FleetHelp as DeploymentHelp } from '../fleet/FleetHelp';
 export function Status({ value }: {
     value: string;
 }) { return <span className={`deployment-status text-${deploymentTone(value)}`}>{value || 'unknown'}</span>; }
