@@ -25,7 +25,7 @@
 @import "./components/admin-security.css" layer(portal-mojo);
 @import "./components/admin-dashboard.css" layer(portal-mojo);
 @import "./components/admin-operational-fleet.css" layer(portal-mojo);
-@import "./fleet-page.css" layer(portal-mojo);
+@import "./components/fleet-page.css" layer(portal-mojo);
 @import "./components/admin-maintenance.css" layer(portal-mojo);
 @import "./components/admin-deployments.css" layer(portal-mojo);
 @import "./components/admin-domains.css" layer(portal-mojo);

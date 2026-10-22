@@ -17,6 +17,8 @@ const { createRoot } = await import('react-dom/client');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 const router = await import('react-router-dom');
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', define: { 'import.meta.env.VITE_MOJO_API': JSON.stringify('http://fleet-workspace.invalid') }, server: { middlewareMode: true } });
+const selectedCase = process.argv.find(value => value.startsWith('--case='))?.slice('--case='.length);
+assert(!selectedCase || selectedCase === 'plan-identity', `Unknown mounted Fleet case: ${selectedCase}`);
 let root, qc, actor, history = [], transformInventory = null, transformPlan = null, transformBatch = null, failInventory = false, pausePlan = null, pauseApply = null, checks = 0;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const wait = async (fn, label) => {
@@ -141,6 +143,48 @@ try {
         await act(async () => link.click());
     };
 
+    // Deliberately return different authoritative params than the local draft.
+    // This is presentation evidence only: it never consents to or applies the plan.
+    await reset();
+    transformPlan = plan => ({ ...plan, steps: plan.steps.map((step, index) => ({
+        ...step,
+        description: `Authoritative step ${index + 1}`,
+        params: step.action === 'add_node' ? { ...step.params, source_instance: 'i-mockc', subnet_id: 'subnet-server9244' }
+            : step.action === 'resize_database' ? { ...step.params, size: 'small' }
+                : step.action === 'set_cache_replicas' ? { ...step.params, count: 7 } : step.params,
+    })) });
+    await openEditor();
+    const sourceChoices = [...input('Healthy source').options].filter(option => option.value).map(option => ({ id: option.value, label: option.textContent }));
+    await stageNode();
+    await click('Placement');
+    await field('Subnet override', 'subnet-9244');
+    await click('Use placement');
+    await click('Database');
+    await field('Size for db-reader-b', 'medium');
+    await click('Redis');
+    await field('Replicas for mock-redis', 2);
+    await click(/^Review changes/);
+    await wait(() => review(), 'authoritative identity review');
+    const identitySteps = [...review().querySelectorAll('li')];
+    const authoritativeStep = number => identitySteps.find(node => node.querySelector('strong')?.textContent === `Authoritative step ${number}`)?.textContent ?? '';
+    const nodeStep = authoritativeStep(1), replicaStep = authoritativeStep(2), databaseStep = authoritativeStep(3);
+    assert(nodeStep.includes('Source node: i-mockc'), 'Review exposes the exact source_instance from the authoritative server plan');
+    assert(nodeStep.includes('Subnet: subnet-server9244'), 'Review exposes the exact subnet_id from the authoritative server plan');
+    assert(!nodeStep.includes('i-mockb') && !nodeStep.includes('subnet-9244'), 'Review does not substitute the locally staged source or placement');
+    assert(databaseStep.includes('db-reader-b') && databaseStep.includes('Target size: small'), 'Review pairs the exact database target with its server-returned size');
+    assert(replicaStep.includes('Count: 7'), 'Review exposes the server-returned replica count rather than the staged count');
+    assert.equal(plans().length, 1, 'One deliberate review creates one server plan');
+    assert.deepEqual(plans()[0].body, { steps: [
+        { action: 'add_node', source_instance: 'i-mockb', subnet_id: 'subnet-9244' },
+        { action: 'resize_database', resource: 'db-reader-b', size: 'medium', apply_immediately: true },
+        { action: 'set_cache_replicas', resource: 'mock-redis', count: 2, apply_immediately: true },
+    ] }, 'Independent request evidence proves the review values came from the server response');
+    assert(sourceChoices.length > 0 && sourceChoices.every(option => option.label.includes(option.id)), 'Each healthy source option includes its exact instance ID');
+    assert(button('Apply reviewed plan').disabled, 'Displaying authoritative parameters still requires exact-plan consent');
+    assert.equal(applies().length, 0, 'The identity-display regression never approves or applies the transformed plan');
+    checks++;
+
+    if (!selectedCase) {
     await reset();
     assert.equal(document.querySelector('h1')?.textContent, 'Fleet', 'Standalone route owns the Fleet workspace heading');
     assert(!text().includes('203.0.113.10'), 'Detailed addressing stays in the inspector');
@@ -376,7 +420,8 @@ try {
     assert(!history.some(row => row.path.startsWith('/api/aws/capacity')), 'Denied capacity reader emits zero capacity requests');
     assert(!button('Change capacity'), 'Dashboard-only grant cannot open capacity changes');
     checks++;
-    console.log(`PASS mounted standalone Fleet workspace: ${checks} behavior groups (explicit tasks/review, exact IDs, server order, retained draft, single-flight, shared progress and no-replay recovery)`);
+    }
+    console.log(`PASS mounted standalone Fleet workspace: ${checks} behavior groups${selectedCase ? ` (${selectedCase})` : ' (explicit tasks/review, authoritative identity, exact IDs, server order, retained draft, single-flight, shared progress and no-replay recovery)'}`);
     ops.fleetOperations.dispose();
 } finally {
     if (root) await act(async () => root.unmount());

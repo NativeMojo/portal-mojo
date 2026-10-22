@@ -74,9 +74,9 @@ size and target groups are shown, and Placement is a focused subnet dialog.
 Removal retains the existing self-node and healthy-floor checks; the server also
 re-proves each target group's floor and ownership.
 
-Every database member shows its exact ID, role and **current** class. Resize and
-remove checkboxes target that ID; there is no automatic reader selection or
-shared existing-reader sizing fan-out. Newly added readers inherit the current
+Every database member shows its exact ID, role and **current** class. Its size
+select and remove checkbox target that ID; there is no automatic reader selection
+or shared existing-reader sizing fan-out. Newly added readers inherit the current
 source class, even when the writer also resizes. Observe their concrete IDs after
 creation and resize separately. For a Redis group, stage size **or** replica
 count in one plan. The other control is locked until the first returns to current
@@ -86,19 +86,30 @@ current backend cannot quote them cumulatively.
 
 The explicit **Review changes (N)** button is the only plan request. It replaces
 the editor with the authoritative server plan, including step order, warnings,
-unknown prices, expiry and exact-plan consent. **Back to changes** preserves the
-draft and invalidates consent. No background/debounced quote is requested by the
-standalone editor. **Refresh and clear changes** explicitly discards the draft
+unknown prices, expiry and exact-plan consent. Review shows only allowlisted
+server parameters for source node, subnet, target size, count and immediate-apply
+mode when the server reports supported scalar values. Draft intent never fills
+in missing plan facts. Source choices include the exact node ID. **Back to changes**
+preserves the draft and invalidates consent. No background/debounced quote is
+requested by the standalone editor. **Refresh and clear changes** explicitly discards the draft
 before reading fresh inventory; there is no silent reset. Initial open also
 requires a fresh observation before staging. Apply uses only `fleetOperations`.
+Both standalone and Dashboard changes require a literal superuser, an interactive
+user credential and backend fresh authentication. A 440 opens fresh authentication,
+spends consent and requires an explicit refreshed review; planning and applying
+are never automatically replayed.
 
-**View capacity progress** is independently available with capacity-read authority,
-including external infrastructure, unavailable inventories and non-superuser
+**View capacity progress** is independently available when an in-session operation
+record is retained with a non-idle status and the account has capacity-read
+authority, including external infrastructure, unavailable inventories and non-superuser
 readers. It uses the same in-session operation record as Dashboard. It never
 hydrates an operation from storage or creates another coordinator. When an apply
 reply is lost, the exact batch ID can be entered for read-only reconciliation of
 the retained plan. Matching terminal evidence is required before another change.
-Actor/session changes and permission loss fence requests and close owned dialogs;
+Keep the current document open while reconciling: a full document reload loses
+the in-memory operation record. Batch-ID entry reconciles a retained plan and
+does not import an arbitrary operation after reload. Actor/session changes and
+permission loss fence requests and close owned dialogs;
 Escape/backdrop and explicit close are locked while requests are pending.
 
 The Showcase demo uses `FleetPage` and a focused Demo controls dialog. Scenario
@@ -145,7 +156,9 @@ review. All count/cache/database resize steps explicitly send
 `fleetOperations` lives outside component/dialog state. Its records contain safe
 IDs and observed batch facts, keyed by installation and actor. Unresolved state
 survives dialog closure, Dashboard/Fleet navigation, and same-actor reauthentication;
-new sends and read replies are still fenced to the exact session revision. A
+it does not survive a full document reload. Keep the current document open when
+reconciling an uncertain submission. New sends and read replies are still fenced
+to the exact session revision. A
 different actor sees no previous actor record. No credentials or mutation drafts
 are stored locally. The coordinator never replays a mutation. Expiry or session refusal at the final transport boundary is provably unsent: refresh inventory and review again. A transport failure after that boundary remains unknown and retains the reconciliation guard.
 
