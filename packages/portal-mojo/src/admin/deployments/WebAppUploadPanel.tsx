@@ -6,7 +6,7 @@ import { buildManifest, manifestEqual, putReleaseFiles } from './upload';
 import { makeReceipt, receiptsFor, saveReceipt, settleReceipt } from './receipts';
 import { useDeploymentObservation, useDeploymentOwner } from './useDeploymentObservation';
 import { DeploymentHelp, ErrorNotice, Status, useWrite } from './shared';
-import type { WebAppObject } from './types';
+import type { DeploymentStatus, WebAppObject } from './types';
 
 export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
     app: WebAppObject;
@@ -24,6 +24,7 @@ export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
     );
     const [reconciliation, setReconciliation] = useState<Awaited<ReturnType<typeof reconcileUploadCompletion>> | null>(null);
     const [consent, setConsent] = useState('');
+    const [lastTerminal, setLastTerminal] = useState<DeploymentStatus | null>(null);
     const observe = useDeploymentObservation(s.owner, tracked ? String(tracked.deployment) : null,
         signal => getDeployment(s.owner, tracked!.deployment, app.id, tracked!.release, signal), d => d.terminal);
     const completionSubmitted = !!existing && ['completion_submitted', 'observing'].includes(existing.uploadPhase ?? '');
@@ -78,11 +79,14 @@ export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
         saveReceipt({ ...fresh.receipt, operation: crypto.randomUUID(), uploadPhase: 'registered',
             completionSubmittedAt: undefined, completionBaseline: undefined, deployment: undefined,
             submitted: false, submittedAt: undefined, settled: false });
-        setTracked(null); setReconciliation(null); setConsent('');
+        setTracked(null); setReconciliation(null); setLastTerminal(null); setConsent('');
         files.current = []; setFileCount(0);
         setProgress('New deployment consent recorded. Reselect the identical artifact and deliberately upload/deploy again.');
     });
+    const outcome = observe.value ?? reconciliation?.status ?? lastTerminal;
+    const succeeded = outcome?.terminal === true && outcome.success === true && outcome.status === 'live';
     const notified = useRef(new Set<number>());
+    useEffect(() => { if (observe.value?.terminal) setLastTerminal(observe.value); }, [observe.value]);
     useEffect(() => {
         if (!observe.value?.terminal) return;
         const receipt = receiptsFor(s.owner).find(r => r.kind === 'upload' && r.app === app.id && r.deployment === observe.value?.deployment);
@@ -94,8 +98,12 @@ export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
     const lockedFiles = w.busy || !!tracked || completionSubmitted;
     const mayRenew = !!reconciliation && (!reconciliation.status ||
         (reconciliation.status.terminal && !reconciliation.status.success));
+    if (succeeded) return <div className="deployment-stack">
+        <div className="deployment-result" role="status"><strong>{outcome.version || version}</strong> <Status value="live"/><p>Deployment completed.</p></div>
+        {['error', 'stopped'].includes(observe.state) && <p className="text-warn">Latest refresh unavailable. Showing the last observed result.</p>}
+        <div className="modal-actions">{onClose && <button className="btn" disabled={w.busy} onClick={onClose}>Close upload</button>}<button className="btn" disabled={w.busy || observe.state === 'observing'} onClick={observe.refresh}>Refresh exact deployment</button></div>
+    </div>;
     return <div>
-        {onClose && <button className="btn" disabled={w.busy} onClick={onClose}>Close upload</button>}
         <label>Release version<input value={version} disabled={w.busy || !!tracked || !!existing} onChange={e => setVersion(e.target.value)} /></label>
         <label>Built files<input type="file" multiple disabled={lockedFiles} onChange={e => { files.current = Array.from(e.target.files ?? []); setFileCount(files.current.length); }} /></label>
         <label>Built folder<input type="file" multiple {...{ webkitdirectory: '', directory: '' }} disabled={lockedFiles} onChange={e => {
@@ -109,10 +117,11 @@ export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
         {existing && !tracked && !completionSubmitted && <p>Pending version {existing.target}. Signed URLs were discarded; identical manifest registration remints them.</p>}
         {completionSubmitted && !tracked && <p role="status">Completion may already have started a deployment. Re-registering or sending completion again can start another rollout. Reconcile the recorded release first.</p>}
         {w.error && <ErrorNotice>{w.error}</ErrorNotice>}
-        {progress && <p role="status">{progress}</p>}
-        {tracked ? <><p>Deployment {tracked.deployment}: <Status value={observe.value?.status ?? reconciliation?.status?.status ?? 'unknown'} /> · {observe.state}{['error', 'stopped'].includes(observe.state) && ' · outcome unknown'}</p><button className="btn" disabled={w.busy} onClick={observe.refresh}>Refresh exact deployment</button></> :
+        {progress && !tracked && <p role="status">{progress}</p>}
+        {tracked ? <><p>Deployment {tracked.deployment}: <Status value={outcome?.status ?? 'unknown'} />{['error', 'stopped'].includes(observe.state) && ' · Observation unavailable; outcome unconfirmed'}</p><button className="btn" disabled={w.busy} onClick={observe.refresh}>Refresh exact deployment</button></> :
             !completionSubmitted && <button className="btn btn-primary" disabled={w.busy || !fileCount || !version} onClick={() => void upload()}>Upload and deploy verified release</button>}
         {(completionSubmitted || tracked) && <button className="btn" disabled={w.busy} onClick={() => void reconcile()}>Reconcile submitted completion</button>}
+        {onClose && <div className="modal-actions"><button className="btn" disabled={w.busy} onClick={onClose}>Close upload</button></div>}
         {mayRenew && <div className="deployment-confirm"><p>The prior completion may have run. Starting again is a new deployment decision and can overlap an unobserved attempt. This does not erase or retry the earlier operation.</p>
             <label>New deployment consent: type {app.slug}/{version}<input value={consent} disabled={w.busy} onChange={e => setConsent(e.target.value)} /></label>
             <button className="btn" disabled={w.busy || consent !== `${app.slug}/${version}`} onClick={() => void renewConsent()}>Consent to a new deployment attempt</button>

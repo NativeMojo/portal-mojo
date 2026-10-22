@@ -23,6 +23,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
     const s = useDeploymentOwner(), me = useMe(), w = useWrite(s.owner, s.signal, onBusy);
     const initial = resume ?? receiptsFor(s.owner).find(r => r.kind === 'create' && !r.settled);
     const [receipt, setReceipt] = useState<ActionReceipt | undefined>(initial);
+    const [createTab, setCreateTab] = useState('app');
     const [operation, setOperation] = useState<OnboardingOperation | null>(null);
     const [workspace, setWorkspace] = useState(String(initial?.profile?.group ?? bootstrap?.groups[0]?.id ?? 'new'));
     const [name, setName] = useState(initial?.profile?.display_name ?? ''), [slug, setSlug] = useState(initial?.profile?.slug ?? '');
@@ -66,8 +67,11 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
     const newIntent = !receipt && workspace === 'new';
     const addressReady = checked?.verdict === 'ready' && !!checked.domain;
     const savedAddress = receipt?.address;
-    const addressChoiceReady = addressReady || !!savedAddress;
+    const addressChoiceReady = addressReady || (!address.trim() && !!savedAddress);
+    const savedHostname = savedAddress && options.data?.apps_domain?.id === savedAddress.domain ? `${savedAddress.label ? `${savedAddress.label}.` : ''}${options.data.apps_domain.name}` : '';
     const validSlug = /^[a-z0-9][a-z0-9-]{0,63}$/.test(slug);
+    const creationReady = setupReady && !!name.trim() && validSlug && (newIntent || addressReady);
+    const reviewApp = createTab === 'build' && !creationReady;
     const domainsPath = destinations?.domains;
     const domainLink = domainsPath && /^\/[a-z0-9/_-]+$/i.test(domainsPath) && canReadWebApps(me.data)
         ? <Link className="btn" to={domainsPath} onClick={onClose}>Open Domains to configure this workspace</Link> : null;
@@ -112,7 +116,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
         const fresh = await getOperation(s.owner, latest.operation_id, s.signal);
         acceptOperation(fresh, receipt);
         if (onboardingGeneration(fresh) !== generation) throw new Error('Setup changed. Review the observed cursor and choose again.');
-        const selected = addressReady && checked?.domain ? { domain: checked.domain.id, label: checked.label } : receipt.address;
+        const selected = addressReady && checked?.domain ? { domain: checked.domain.id, label: checked.label } : !address.trim() ? receipt.address : undefined;
         let choice = managedChoice(fresh, selected?.domain ?? 0, selected?.label ?? slug);
         if (fresh.cursor === 'github' && githubMode !== 'skip') {
             if (!repository.trim()) throw new Error('Enter an OWNER/REPOSITORY before requesting verification');
@@ -150,7 +154,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
         <h2 className="modal-title">{receipt ? latest?.profile.display_name || 'WebApp setup' : 'New WebApp'}</h2>
         <p className="modal-message">You can close and resume setup at any time.</p>
         {!receipt ? <>
-            <Tabs ariaLabel="New WebApp" items={[
+            <Tabs ariaLabel="New WebApp" activeKey={createTab} onActiveKeyChange={setCreateTab} items={[
                 { key: 'app', label: 'App', panel: <><div className="deployment-form">
                     <label>Workspace<select value={workspace} disabled={w.busy} onChange={e => { setWorkspace(e.target.value); setChecked(null); }}>
                         {bootstrap?.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}{bootstrap?.can_create_webapp_group && <option value="new">New workspace</option>}
@@ -175,7 +179,9 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
             {latest?.last_error && <ErrorNotice>{latest.last_error}</ErrorNotice>}
             {(observer.state === 'error' || observer.state === 'stopped' && (!latest || onboardingPollable(latest))) && <p role="status" className="text-warn">Observation unavailable or stopped; outcome is unconfirmed. Refresh to check server setup.</p>}
             {latest?.cursor === 'address' && !onboardingTerminal(latest) && <section className="deployment-stack">
-                <p>Choose a public address for {latest.group.name}.</p>
+                <p>Public address for {latest.group.name}.</p>
+                {savedAddress && !address.trim() && <p role="status">A checked address is saved{savedHostname && <>: <code>{savedHostname}</code></>}. Continue to use it, or check a replacement.</p>}
+                {savedAddress && !!address.trim() && !addressReady && <p role="status" className="dim">Check the replacement address before continuing.</p>}
                 {!options.data?.apps_domain && <p role="status">{options.data?.apps_domain_error || 'No managed apps domain was observed.'} Configure or connect a domain for {latest.group.name}, then refresh and check the public address.</p>}
                 {domainLink}
                 <div><button className="btn" disabled={w.busy || options.isFetching} onClick={() => void options.refetch()}>Refresh workspace address options</button></div>
@@ -196,15 +202,16 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
             {latest && currentStep < 0 && !onboardingTerminal(latest) && <p className="text-warn">This setup step is not supported here. Refresh or inspect Setup details before continuing.</p>}
             <button className="btn" onClick={setupDetails}><i className="bi bi-info-circle" aria-hidden="true"/> Setup details</button>
         </>}
+        {!receipt && reviewApp && <p role="status" className="dim">{!name.trim() || !validSlug ? 'Add a name and valid app label on App before creating this WebApp.' : !newIntent && !addressReady ? 'Check the public address on App before creating this WebApp.' : 'Review the app and its deployment destination before creating this WebApp.'}</p>}
         {w.error && <ErrorNotice>{w.error}</ErrorNotice>}
         <div className="modal-actions"><button className="btn" disabled={w.busy} onClick={onClose}>Close</button>
             {receipt ? <><button className="btn" disabled={w.busy} onClick={observer.refresh}>Refresh / Resume observation</button>
                 {!latest && receipt.profile && <button className="btn" disabled={w.busy} onClick={() => void retryCreate()}>Reconcile / retry same create</button>}
                 {latest && !onboardingTerminal(latest) && <><button className="btn" disabled={w.busy} onClick={() => void cancel()}>Cancel server setup</button>
                     <button className="btn btn-primary" disabled={w.busy || choiceSent.current.has(generation) || !['app', 'address', 'github', 'verify'].includes(latest.cursor) || (latest.cursor === 'address' && !addressChoiceReady)} onClick={() => void choose()}>
-                        {latest.cursor === 'github' ? (githubMode === 'skip' ? 'Skip GitHub verification' : githubMode === 'attest' ? 'Attest unavailable verification' : 'Verify repository') : `Continue ${latest.cursor}`}
+                        {latest.cursor === 'github' ? (githubMode === 'skip' ? 'Skip GitHub verification' : githubMode === 'attest' ? 'Attest unavailable verification' : 'Verify repository') : latest.cursor === 'address' ? 'Apply address' : latest.cursor === 'verify' ? 'Check HTTPS' : 'Create app'}
                     </button></>}
-            </> : <button className="btn btn-primary" disabled={w.busy || !setupReady || !name.trim() || !validSlug || (!newIntent && !addressReady)} onClick={() => void create()}>Create WebApp</button>}
+            </> : reviewApp ? <button className="btn btn-primary" disabled={w.busy} onClick={() => setCreateTab('app')}>Review app</button> : <button className="btn btn-primary" disabled={w.busy || !creationReady} onClick={() => void create()}>Create WebApp</button>}
         </div>
     </div>;
 }
