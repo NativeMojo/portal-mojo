@@ -1,3 +1,4 @@
+import { ComboBox } from '../ui/ComboBox';
 // Shared MetricsChart presentation. The owner supplies every payload and request.
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { DateRangePicker } from '../ui/date/DateRangePicker';
@@ -180,17 +181,9 @@ export function MetricsChartView({
                                     );
                                 })}
                             </div>
-                            <select
-                                className="input input-compact gran-select"
-                                value={effective}
-                                disabled={disabled || available.length === 0}
-                                onChange={(e) => setGranularity(e.target.value)}
-                                aria-label="Granularity"
-                            >
-                                {GRANULARITIES.filter((g) => available.includes(g.value)).map((g) => (
-                                    <option key={g.value} value={g.value}>{g.label}</option>
-                                ))}
-                            </select>
+                            <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} className="gran-select" value={String(effective)} disabled={disabled || available.length === 0} onChange={(selectedValue) => setGranularity(String(selectedValue))} aria-label="Granularity" options={[...(GRANULARITIES.filter((g) => available.includes(g.value)).map((g) => (
+                                    ({ value: String(g.value), label: String(g.label) })
+                                )) ?? [])]} />
                         </>
                     )}
 

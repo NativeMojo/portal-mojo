@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'https://verify.invalid/' });
 for (const name of ['window', 'document', 'location', 'Element', 'HTMLElement', 'HTMLInputElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 const server = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), appType: 'custom', logLevel: 'silent', define: { 'import.meta.env.VITE_MOJO_API': JSON.stringify('https://verify.invalid') }, server: { middlewareMode: true } });
 const React = await import('react');
@@ -73,10 +74,16 @@ try {
     assert.equal(nestedActivations, 1);
     await click(document.querySelector('[title="Refresh"]'));
     assert.equal(refreshes, 1);
-    const size = document.querySelector('.pager select');
-    await React.act(async () => { size.value = '25'; size.dispatchEvent(new Event('change', { bubbles: true })); });
+    const choose = async (input, value) => {
+        await click(input);
+        const list = document.getElementById(input.getAttribute('aria-controls'));
+        assert(list, 'shared dropdown opened its owned listbox');
+        await click(list.querySelector(`[role="option"][data-value="${value}"]`));
+    };
+    const size = document.querySelector('.pager [role="combobox"]');
+    await choose(size, '25');
     assert.equal(seen.at(-1).params.size, 25);
-    await React.act(async () => { size.value = '10'; size.dispatchEvent(new Event('change', { bubbles: true })); });
+    await choose(size, '10');
     assert.equal(seen.at(-1).params.size, 10, 'choosing 10 survives caller default 25');
     await click(document.querySelector('[title="Next page"]'));
     assert.equal(seen.at(-1).params.start, 10);
@@ -185,8 +192,8 @@ try {
     assert.equal(paramsOf('schedule').status, 'done');
     await click(inTable('schedule', '[title="Remove filter"]'));
     assert.equal(paramsOf('schedule').status, undefined, 'removing local filter does not resurrect defaults');
-    const localSize = inTable('schedule', '.pager select');
-    await React.act(async () => { localSize.value = '10'; localSize.dispatchEvent(new Event('change', { bubbles: true })); });
+    const localSize = inTable('schedule', '.pager [role="combobox"]');
+    await choose(localSize, '10');
     assert.equal(paramsOf('schedule').size, 10, 'local size serialization uses caller default');
     assert.deepEqual(paramsOf('fleet'), initialFleet);
     assert.deepEqual(paramsOf('analytics'), initialAnalytics);

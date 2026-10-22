@@ -1,3 +1,4 @@
+import { ComboBox } from './ComboBox';
 // ModelTable — schema-driven server table at web-mojo TableView fidelity
 // (ListView.js / TableView.js / TablePage.js port). No table library: sort,
 // filter, search and paging are all wire params django-mojo processes, so
@@ -986,14 +987,7 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
                     )}
                     <label className="page-size">
                         <span className="dim">Rows</span>
-                        <select
-                            className="input input-compact"
-                            value={p.size}
-                            onChange={(e) => p.setSize(Number(e.target.value))}
-                            aria-label="Rows per page"
-                        >
-                            {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} value={String(p.size)} onChange={(selectedValue) => p.setSize(Number(String(selectedValue)))} aria-label="Rows per page" options={[...(PAGE_SIZES.map((s) => ({ value: String(s), label: String(s) })) ?? [])]} />
                     </label>
                 </div>
             </div>

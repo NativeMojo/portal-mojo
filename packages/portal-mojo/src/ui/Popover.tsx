@@ -26,7 +26,7 @@
 // flagged autofocus, and we don't. Typing in an anchored input keeps
 // working; per-option focus retention (e.g. preventDefault on option
 // mousedown) belongs to the consuming control.
-import { useEffect, useLayoutEffect, useRef, type HTMLAttributes, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type HTMLAttributes, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 
 export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
@@ -52,6 +52,7 @@ export interface PopoverProps extends HTMLAttributes<HTMLDivElement> {
 
 const PLACEMENTS: readonly PopoverPlacement[] = ['bottom-start', 'bottom-end', 'top-start', 'top-end'];
 const VIEWPORT_INSET = 8; // px breathing room at viewport edges (source parity)
+const openPopovers: HTMLDivElement[] = [];
 
 const SUPPORTS_POPOVER =
     typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype;
@@ -71,7 +72,7 @@ export function Popover({
     // Latest-callback ref so an inline `onClose` doesn't churn the document
     // listeners (and their deferred attach) on every parent render.
     const onCloseRef = useRef(onClose);
-    useEffect(() => { onCloseRef.current = onClose; });
+    useLayoutEffect(() => { onCloseRef.current = onClose; });
 
     // ── Show + position ──────────────────────────────────────────────
     // Layout effect: promote to the top layer and position BEFORE paint, so
@@ -146,8 +147,11 @@ export function Popover({
     }, [open, placement, gap, anchorRef]);
 
     // ── Outside-mousedown + Escape ───────────────────────────────────
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!open) return;
+        const popover = popRef.current;
+        if (!popover) return;
+        openPopovers.push(popover);
 
         const onDocDown = (event: MouseEvent) => {
             const target = event.target as Node;
@@ -159,7 +163,9 @@ export function Popover({
             onCloseRef.current('outside');
         };
         const onKey = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
+            if (event.key !== 'Escape' || event.defaultPrevented || openPopovers.at(-1) !== popover) return;
+            const targetDialog = event.target instanceof popover.ownerDocument.defaultView!.Element ? event.target.closest('dialog') : null;
+            if (targetDialog && targetDialog !== anchorRef.current?.closest('dialog')) return;
             // Capture phase + preventDefault: when the anchor lives inside
             // an open <dialog>, the first Escape must close the popover
             // ONLY — preventing default stops the dialog's cancel/close
@@ -170,16 +176,18 @@ export function Popover({
             onCloseRef.current('escape');
         };
 
-        // Defer attach so the interaction that opened the popover can't
-        // immediately close it (source parity).
+        // Escape must be active in the opening frame, before native dialog
+        // cancellation. Only outside-click registration waits out the opener.
+        document.addEventListener('keydown', onKey, true);
         const timer = window.setTimeout(() => {
             document.addEventListener('mousedown', onDocDown, true);
-            document.addEventListener('keydown', onKey, true);
         }, 0);
         return () => {
             window.clearTimeout(timer);
             document.removeEventListener('mousedown', onDocDown, true);
             document.removeEventListener('keydown', onKey, true);
+            const index = openPopovers.indexOf(popover);
+            if (index !== -1) openPopovers.splice(index, 1);
         };
     }, [open, anchorRef]);
 

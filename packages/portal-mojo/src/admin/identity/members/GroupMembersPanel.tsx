@@ -1,3 +1,4 @@
+import { ComboBox } from '../../../ui/ComboBox';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCan, type Params } from '../../../client/runtime';
@@ -135,14 +136,7 @@ export function GroupMembersPanel({
                     className="input" type="search" placeholder="Search members…"
                     value={search} onChange={(event) => setSearch(event.target.value)}
                 />
-                <select
-                    className="input input-compact" value={status} aria-label="Status filter"
-                    onChange={(event) => setStatus(event.target.value as StatusFilter)}
-                >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="all">All</option>
-                </select>
+                <ComboBox allowCustom={false} maxSuggestions={Number.MAX_SAFE_INTEGER} value={String(status)} aria-label="Status filter" onChange={(selectedValue) => setStatus(String(selectedValue) as StatusFilter)} options={[({ value: "active", label: "Active" }), ({ value: "inactive", label: "Inactive" }), ({ value: "all", label: "All" })]} />
             </div>
             {query.isPending && <div className="skel skel-block" />}
             {query.error && <p className="text-bad">{query.error.message}</p>}

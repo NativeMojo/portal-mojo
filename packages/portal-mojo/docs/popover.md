@@ -95,9 +95,10 @@ that here would close both layers on one keypress.)
 Outside-mousedown does NOT stop propagation: the click still activates
 whatever was under it (click a second trigger → this popover closes and
 that one opens). Clicks on the anchor are never "outside" — the anchor's
-own click handler owns its toggle. The listener attach is deferred one
-tick so the interaction that opened the popover can't immediately close
-it (source parity).
+own click handler owns its toggle. Outside-click registration waits one tick so the opener cannot close its own
+menu. Escape registration runs in a layout effect, before the opening frame
+paints. Only the most recently opened popover handles Escape; a dialog opened
+above its owner keeps its own dismissal behavior.
 
 ## Styling
 
@@ -125,7 +126,7 @@ baked in 20px padding + 260px min-width for its one tenant, the calendar
   to the consuming control.
 - The opening interaction can be `click` or `mousedown`-driven; both are
   safe. But if you open programmatically and simultaneously flip other
-  document state, remember listeners attach a tick later.
+  document state, only outside-click registration waits a tick. Escape protection is immediate.
 - Placement flips only bottom→top (per source). If content can be taller
   than the viewport, cap and scroll it in YOUR content styles.
 

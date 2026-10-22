@@ -19,6 +19,7 @@ interface ComboOption {
     value: ComboValue;
     label: string;          // what the input displays
     description?: string;   // muted second line in the list
+    disabled?: boolean;    // shown but never committed
     meta?: Record<string, unknown>;  // opaque; returned via onSelect
 }
 
@@ -32,6 +33,8 @@ interface ComboOption {
     minChars={0}    // typing auto-opens the list only at ≥ N chars
     maxSuggestions={10}  // caps the rendered list AND keyboard wraparound
     placeholder disabled readOnly required id className
+    inputRef={fieldRef} // input focus target for form validation
+    aria-label="Output" aria-describedby="output-help" aria-invalid={invalid}
 />
 ```
 
@@ -103,3 +106,18 @@ strings.
   containers and native dialogs do not clip it.
 - Styles live in `packages/portal-mojo/src/styles/components/combobox.css` (tokens only, both
   themes) and ship in `portal-mojo/styles.css`.
+
+## Fixed-choice dropdowns
+
+Use `allowCustom={false}` for enums and filters. Pass the same string/number
+type to `value` and each option. Disabled options remain visible (including
+a saved, unavailable selection); pointer, typed settlement and arrow navigation
+cannot commit them. Permission loss closes the list and discards the draft.
+Use `id` with a label or `aria-label`/`aria-labelledby`; description and validation
+attributes reach the input. `inputRef` supports validation focus.
+
+For short fixed lists that must show every choice, set `maxSuggestions` to the
+list length; searchable catalogs may retain the default cap. Shared tables,
+chart settings, filters and schema select fields use this same component.
+
+The chevron is a pointer shortcut for the input. It is hidden from assistive technology so a wrapping field label does not include redundant button text; the combobox input owns the name and keyboard interaction.
