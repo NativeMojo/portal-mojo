@@ -83,7 +83,9 @@ export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
         files.current = []; setFileCount(0);
         setProgress('New deployment consent recorded. Reselect the identical artifact and deliberately upload/deploy again.');
     });
-    const outcome = observe.value ?? reconciliation?.status ?? lastTerminal;
+    const forTracked = (value: DeploymentStatus | null | undefined) => value && tracked && value.deployment === tracked.deployment && value.release === tracked.release && value.webapp === app.id ? value : null;
+    // A later exact terminal observation outranks an earlier reconciliation read.
+    const outcome = forTracked(observe.value) ?? forTracked(lastTerminal) ?? forTracked(reconciliation?.status);
     const succeeded = outcome?.terminal === true && outcome.success === true && outcome.status === 'live';
     const notified = useRef(new Set<number>());
     useEffect(() => { if (observe.value?.terminal) setLastTerminal(observe.value); }, [observe.value]);
