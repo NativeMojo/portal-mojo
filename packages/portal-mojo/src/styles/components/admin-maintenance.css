@@ -1,0 +1,109 @@
+.admin-maintenance {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 80rem;
+    margin: auto;
+    padding: 1.5rem;
+    overflow-wrap: anywhere;
+}
+.admin-maintenance header,
+.maintenance-resource {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.admin-maintenance section {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg, 0.75rem);
+    padding: 1.25rem;
+    min-width: 0;
+}
+.admin-maintenance h1,
+.admin-maintenance h2,
+.admin-maintenance h3 {
+    margin: 0 0 0.5rem;
+}
+.maintenance-resource {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line);
+}
+.maintenance-resource:last-child {
+    border-bottom: 0;
+}
+.admin-maintenance p {
+    margin: 0.5rem 0;
+}
+.admin-maintenance dl {
+    display: grid;
+    grid-template-columns: minmax(7rem, auto) 1fr;
+    gap: 0.5rem 1rem;
+}
+.admin-maintenance dd {
+    margin: 0;
+}
+.maintenance-warning {
+    color: var(--warn);
+}
+.maintenance-mode {
+    color: var(--mute);
+}
+.maintenance-dialog {
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg, 0.75rem);
+    max-width: min(38rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+}
+.maintenance-dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+}
+.maintenance-dialog-body {
+    padding: 1.25rem;
+    display: grid;
+    gap: 1rem;
+}
+.maintenance-dialog h2,
+.maintenance-dialog p {
+    margin: 0;
+}
+.maintenance-dialog fieldset {
+    display: grid;
+    gap: 0.75rem;
+}
+.maintenance-confirm-label {
+    display: grid;
+    gap: 0.5rem;
+}
+.maintenance-confirm-label input {
+    width: 100%;
+    min-width: 0;
+    background: var(--field-bg, var(--surface));
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 0.65rem;
+    border-radius: 0.35rem;
+}
+.maintenance-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+@media (max-width: 600px) {
+    .admin-maintenance {
+        padding: 0.75rem;
+    }
+    .admin-maintenance header,
+    .maintenance-resource {
+        flex-direction: column;
+    }
+    .admin-maintenance section {
+        padding: 0.8rem;
+    }
+    .maintenance-actions {
+        flex-wrap: wrap;
+    }
+}
