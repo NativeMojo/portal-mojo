@@ -2,3 +2,11 @@
 
 .domains-header h1 { margin: 4px 0 8px; font-size: 26px; line-height: 1.2; font-weight: 750; letter-spacing: -.025em; color: var(--ink-strong); }
 .domains-header { align-items: center; margin-bottom: 24px; }
+
+.domains-page, .domains-page > * { min-width: 0; }
+.domains-demo { grid-template-columns: minmax(0, 1fr); }
+.domains-demo > * { min-width: 0; }
+@media (max-width: 560px) { .domains-header { align-items: flex-start; } }
+
+.domain-onboarding > .dim { margin: 4px 0 20px; }
+.domain-onboarding .dns-registrar-grid { gap: 20px; }

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CollectionSelect, toast } from '../../ui';
+import { OperationsHelp } from '../core/OperationsHelp';
 import { DNS_GROUP_CHOICE_ENDPOINT, registerExistingDomain } from './api';
 import { DnsCredentialModel, DomainModel, type DnsCredentialRow, type DnsGroupChoice } from './models';
 import { normalizePurchaseDomain, redactRegistrarError } from './purchase-data';
@@ -43,14 +44,14 @@ export function DomainRegisterExisting({ close, back, setBusyGate }: { close: ()
         } finally { inFlight.current = false; setBusy(false); setBusyGate(false); }
     };
     const groupId = group?.id;
-    return <form className="modal-pad" onSubmit={(event) => void submit(event)} noValidate>
+    return <form className="modal-pad domain-onboarding" onSubmit={(event) => void submit(event)} noValidate>
         <h2 className="modal-title">Register existing domain</h2>
-        <p className="dim">The provider checks ownership of this exact name. This probe spends no money and does not list the provider account.</p>
+        <p className="dim">Connect a GoDaddy domain you already own. <OperationsHelp label="domain registration">The provider checks ownership of this exact name without charging or listing the provider account. Choose an authorized group and an active, verified GoDaddy credential belonging to it. If no credentials appear, link and verify one in Provider Credentials.</OperationsHelp></p>
         {error && <div className="form-alert" role="alert">{error}</div>}
         <div className="dns-registrar-grid">
-            <CollectionSelect<DnsGroupChoice> endpoint={DNS_GROUP_CHOICE_ENDPOINT} value={group} onChange={(_id, row) => changeGroup(row ?? null)} label="Authorized group" help="Only active groups authorized for DNS credential assignment appear. If none are available, ask a platform administrator to review access." required maxItems={25} defaultParams={{ start: 0 }} disabled={busy || attempted} placeholder="Search eligible groups…" />
+            <CollectionSelect<DnsGroupChoice> endpoint={DNS_GROUP_CHOICE_ENDPOINT} value={group} onChange={(_id, row) => changeGroup(row ?? null)} label="Authorized group" help="Choose the group that owns this domain." required maxItems={25} defaultParams={{ start: 0 }} disabled={busy || attempted} placeholder="Search eligible groups…" />
             <label className="field"><span className="field-label">Domain name <em>*</em></span><input className="input" value={name} disabled={busy || attempted} onChange={(event) => setName(event.target.value)} placeholder="example.com" /></label>
-            {groupId ? <CollectionSelect<DnsCredentialRow> key={groupId} model={DnsCredentialModel} value={credential ? { ...credential } : null} label="GoDaddy credential" required maxItems={25} defaultParams={{ group: groupId, provider: 'godaddy', is_active: true, verified: true, start: 0 }} disabled={busy || attempted} placeholder="Search verified GoDaddy credentials…" help="Only active, verified credentials in this group are usable. If none appear, link and verify one in Provider Credentials." onChange={(_id, row) => {
+            {groupId ? <CollectionSelect<DnsCredentialRow> key={groupId} model={DnsCredentialModel} value={credential ? { ...credential } : null} label="GoDaddy credential" required maxItems={25} defaultParams={{ group: groupId, provider: 'godaddy', is_active: true, verified: true, start: 0 }} disabled={busy || attempted} placeholder="Search verified GoDaddy credentials…" help="An active, verified credential in the selected group." onChange={(_id, row) => {
                 if (scope.current !== groupId || inFlight.current || attempted) return;
                 if (!row) { setCredential(null); return; }
                 if (!usableRegistrationCredential(row, groupId)) { setCredential(null); setError('That credential is not usable in the selected group'); return; }

@@ -147,3 +147,11 @@
     .cmp-rail { position: static; width: 100%; max-height: 160px; overflow: auto; margin-bottom: 20px; }
     .content { padding: 16px 12px 32px; }
 }
+
+.cmp-mobile-nav-trigger { display: none; }
+.cmp-body > div { min-width: 0; }
+@media (max-width: 700px) {
+    .cmp-mobile-nav-trigger { display: inline-flex; margin-bottom: 16px; }
+    .cmp-rail { display: none; }
+    .cmp-rail.cmp-rail-mobile-open { display: block; max-height: 50dvh; }
+}

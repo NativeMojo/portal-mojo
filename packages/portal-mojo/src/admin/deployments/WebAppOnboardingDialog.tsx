@@ -143,7 +143,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
             {newIntent && <p>A new workspace has no domain yet. Create its durable app intent first, then configure a domain for the workspace returned by the server and resume this operation.</p>}
             {options.isPending ? <p>Resolving available destination and bucket…</p> : options.isError ? <ErrorNotice>Setup options unavailable.</ErrorNotice> :
                 !setupReady ? <ErrorNotice>{options.data?.destination_error || 'No allowed release bucket. Complete installation setup before creating an app.'}</ErrorNotice> :
-                    <p className="dim">{environment} · bucket {options.data.buckets[0]}{options.data.apps_domain ? ` · managed domain ${options.data.apps_domain.name}` : ''}. Custom domains and purchases use Domains & Serving.</p>}
+                    <details className="ops-details"><summary>Deployment destination</summary><p className="dim">{environment} · bucket {options.data.buckets[0]}{options.data.apps_domain ? ` · managed domain ${options.data.apps_domain.name}` : ''}. Custom domains and purchases use Domains & Serving.</p></details>}
             <details><summary>Repository and build options</summary><div className="deployment-form">
                 <label>GitHub OWNER/REPOSITORY (optional)<input value={repository} disabled={w.busy} onChange={e => setRepository(e.target.value)} /></label>
                 <label>Branch<input value={ref} disabled={w.busy} onChange={e => setRef(e.target.value)} /></label>
@@ -155,6 +155,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
                 ['Workspace', latest ? `${latest.group.name} (#${latest.group.id})` : 'Not yet observed'],
                 ['Status', <Status value={latest?.status ?? 'unknown'} />], ['Current server cursor', latest?.cursor], ['Message', latest?.last_error],
             ]} />
+            {(observer.state === 'error' || observer.state === 'stopped' && (!latest || onboardingPollable(latest))) && <p role="status" className="text-warn">Observation unavailable or stopped; outcome is unconfirmed. Refresh to check server setup.</p>}
             {latest?.cursor === 'address' && <section>
                 <h3>Configure this workspace’s public address</h3>
                 {!options.data?.apps_domain && <p role="status">{options.data?.apps_domain_error || 'No managed apps domain was observed.'} Configure or connect a domain for {latest.group.name} (workspace #{latest.group.id}), then refresh and check the public address. No other workspace’s domain is borrowed.</p>}

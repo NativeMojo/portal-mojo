@@ -41,7 +41,9 @@ try {
         await wait(() => document.querySelector('.fleet-evidence-grid'));
     };
     const unmount = async () => { await act(async () => { root.unmount(); modal.closeAll(); }); root = null; memoryRouter.dispose(); client.clear(); };
+    const assertNoSourceLinks = async () => { for (const node of [...document.querySelectorAll('.fleet-detail-button')]) { await act(async () => node.click()); assert.equal(document.querySelectorAll('dialog a').length, 0, 'Unregistered sibling destinations are suppressed inside source dialogs'); await act(async () => [...document.querySelectorAll('dialog button')].find(b => b.textContent === 'Close').click()); } };
     await mount();
+    await assertNoSourceLinks();
     assert.equal(document.querySelectorAll('.operational-fleet a').length, 0, 'A Fleet-only embedded host must suppress unregistered source and Fleet Configuration links');
     await unmount();
     const Empty = () => null;
@@ -49,12 +51,12 @@ try {
     await act(async () => document.querySelector('[aria-label="Details for Certificates"]').click());
     assert(document.querySelector('a[href="/product/control/dns/certificates"]'), 'Registered source link keeps the actual arbitrary embedded mount');
     await act(async () => [...document.querySelectorAll('dialog button')].find(b => b.textContent === 'Close').click());
-    await act(async () => document.querySelector('[aria-label="About fleet configuration"]').click());
     assert(document.querySelector('a[href="/product/control/fleet-configuration"]'), 'Registered owner destination stays available');
-    assert.equal(document.querySelectorAll('a').length, 1, 'Other unregistered destinations remain suppressed');
+    assert.equal(document.querySelectorAll('.operational-fleet a').length, 1, 'Other unregistered destinations remain suppressed');
     await unmount();
     actor = { id: 1, is_active: true, is_superuser: false, permissions: { view_admin: true, view_platform: true, view_dns: true } };
     await mount([], true);
+    await assertNoSourceLinks();
     assert.equal(document.querySelectorAll('.operational-fleet a').length, 0, 'Embedded Dashboard overview also suppresses absent sibling routes');
     await unmount();
     await mount([{ id: 'dns', title: 'DNS', icon: 'bi-globe', permissions: ['sys.view_dns'], routes: [{ path: 'certificates', loadComponent: async () => ({ default: Empty }) }] }], true);

@@ -639,6 +639,7 @@ export function ComponentsPage() {
         });
     }, [active.key]);
 
+    const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
     const toggleGroup = (title: string) =>
         setOpenGroups((prev) => {
             const next = new Set(prev);
@@ -649,6 +650,7 @@ export function ComponentsPage() {
 
     const pick = (key: string) => {
         const next = new URLSearchParams(sp);
+        setMobileNavigationOpen(false);
         next.set('demo', key);
         setSp(next, { replace: true });
         setRemountNonce((n) => n + 1);
@@ -656,7 +658,8 @@ export function ComponentsPage() {
 
     return (
         <div className="cmp-layout">
-            <nav className="cmp-rail panel" aria-label="Component demos">
+            <button type="button" className="btn cmp-mobile-nav-trigger" aria-controls="component-demo-navigation" aria-expanded={mobileNavigationOpen} onClick={() => setMobileNavigationOpen(value => !value)}>Browse components</button>
+            <nav id="component-demo-navigation" className={`panel cmp-rail${mobileNavigationOpen ? ' cmp-rail-mobile-open' : ''}`} aria-label="Component demos">
                 <div className="eyebrow" style={{ padding: '14px 16px 6px' }}>portal-mojo</div>
                 {GROUPS.map((g) => {
                     const isOpen = openGroups.has(g.title);

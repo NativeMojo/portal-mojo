@@ -30,6 +30,8 @@ try{
  assert(document.querySelector('.deployment-current strong')?.getAttribute('title') === 'a'.repeat(40),'Last-converged serving evidence loads on the first mount');
  assert.equal(qc.getQueryCache().getAll().filter(q=>q.queryKey[0]==='deployments'&&q.state.status==='error').length,0);
  await unmount();fixture.beforeTransport=null;
+ // Resting app rows keep desired content distinct from the latest attempt's outcome.
+ mock.setDeploymentMockScenario('mixed-webapp');await mount(DeploymentsPage);await click('WebApps');await flush();const attemptSummary=document.querySelector('.deployment-attempt-summary');assert(attemptSummary?.textContent.includes('Latest attempt'),'Outcome explicitly names the latest attempt, not the release pointer');assert(document.body.textContent.includes('Release pointer:'));await unmount();mock.setDeploymentMockScenario('failed-newer');
  // The stable handle survives artificial replay, but real disposal/session/authority changes still revoke it.
  const permissions=await server.ssrLoadModule(prefix+'permissions.ts'),api=await server.ssrLoadModule(prefix+'api.ts');let capturedScope;
  function OwnerProbe(){capturedScope=obs.useDeploymentOwner();return React.createElement('output',null,capturedScope.key);}
@@ -54,6 +56,8 @@ try{
  // Frozen durable create receipt survives dialog closure and is resumed only by a detail GET.
  const owner={actor:'7',origin:window.location.origin,session:fixture.revision};const r=receipts.makeReceipt(owner,'create','mounted-uncertain');receipts.saveReceipt({...r,profile:{operation_id:r.operation,group:1,slug:'resume-app',display_name:'Resume',environment:'production',bucket:'approved-releases',github_repository:'',deployment_ref:'main',build_output:'dist'},address:{domain:10,label:'resume-app'}});mock.deploymentsMock('/api/edge/webapp/onboarding/create',{method:'POST',body:{operation_id:r.operation,group:1,slug:'resume-app'}},{user:fixture.user,keyBacked:false,authTime:Date.now()/1000});fixture.calls=[];await mount(WebAppOnboardingDialog,{onClose(){},onBusy(){},resume:receipts.receiptsFor(owner).find(x=>x.operation===r.operation)});assert(fixture.calls.some(c=>c.path.endsWith('/onboarding/detail')&&c.params.operation===r.operation));assert(!fixture.calls.some(c=>c.path.endsWith('/onboarding/create')));await unmount();
 
+ // Failed observation stays visible outside closed setup details, even with a saved operation.
+ { const previousCall=fixture.call;fixture.call=async(path,opts={})=>{if(path.endsWith('/onboarding/detail'))throw error(503);return previousCall(path,opts);};await mount(WebAppOnboardingDialog,{resume:receipts.receiptsFor(owner).find(x=>x.operation===r.operation),onClose(){},onBusy(){}});const warning=[...document.querySelectorAll('[role="status"]')].find(e=>e.textContent.includes('outcome is unconfirmed'));assert(warning&&!warning.closest('details'),'Onboarding observation uncertainty is visible without opening details');await unmount();fixture.call=previousCall; }
  // The mounted upload executes the real checksum PUT contract; CORS failure stops completion.
  for(const pending of receipts.receiptsFor(owner))receipts.settleReceipt(pending);
  const {WebAppUploadPanel}=await server.ssrLoadModule(prefix+'WebAppUploadPanel.tsx');const originalFetch=globalThis.fetch;

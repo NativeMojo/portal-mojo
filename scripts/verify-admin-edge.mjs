@@ -348,9 +348,10 @@ try {
     assert.match(edgeSources, /group__isnull: false/, 'non-superusers never see house domains in the wizard');
     assert.match(edgeSources, /me\?\.is_superuser === true/, 'declare and retire follow the server\'s platform gate');
     const packageCss = await read('packages/portal-mojo/src/styles/components/admin-edge.css');
-    assert.equal(packageCss, await read('apps/showcase/src/theme/admin-edge.css'), 'the package and the showcase ship the same Edge styles');
+    assert.match(packageCss, /\.edge-serving-page/, 'Serving layout is owned by the canonical package');
     assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-edge\.css" layer\(portal-mojo\);/);
-    assert.match(await read('apps/showcase/src/theme.css'), /admin-edge\.css/);
+    assert.match(await read('apps/showcase/src/theme.css'), /@import "portal-mojo\/styles\.css"/);
+    assert.doesNotMatch(await read('apps/showcase/src/theme.css'), /@import.*theme\/admin-edge\.css/, 'No stale Showcase component override');
     assert.match(await read('apps/showcase/src/pages/components/ComponentsPage.tsx'), /admin-edge/);
     const docs = await read('packages/portal-mojo/docs/admin-edge.md');
     for (const topic of [/site_api/, /quiet/i, /Both themes|Themes and showcase/i, /claim/i]) assert.match(docs, topic);

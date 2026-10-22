@@ -8,3 +8,5 @@
 .deployment-current > p { margin: 6px 0; }
 .admin-deployments { max-width: 1120px; margin-inline: auto; }
 .admin-deployments .deployment-record { padding: 16px 20px; }
+
+.deployment-attempt-summary { flex-shrink: 0; text-align: right; }
