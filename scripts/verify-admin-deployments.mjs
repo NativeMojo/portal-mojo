@@ -71,6 +71,14 @@ try{
  assert.equal(createdSummary.onboarding.status,'waiting');
  const anotherActorInventory=mock.deploymentsMock('/api/edge/webapp/summaries',{}, {...ctx,user:{...ctx.user,id:88}}).data;
  assert(!anotherActorInventory.items.some(row=>row.webapp.id===createdId),'Created mock operations are actor-owned');
+ const newKeyStatus=mock.deploymentsMock('/api/edge/webapp/key_status',{params:{webapp:createdId}},ctx).data;
+ assert.equal(newKeyStatus.status.linked,false,'Created app cannot inherit the seed deployment key');
+ const createdKeyBody={webapp:createdId,group:1,operation_id:crypto.randomUUID()};
+ mock.deploymentsMock('/api/edge/webapp/link_key',{method:'POST',body:createdKeyBody},ctx);
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/summary',{params:{webapp:createdId}},ctx).data.deployment_key.linked,true);
+ mock.deploymentsMock('/api/edge/webapp/revoke_key',{method:'POST',body:{...createdKeyBody,operation_id:crypto.randomUUID()}},ctx);
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/key_status',{params:{webapp:createdId}},ctx).data.status.linked,false);
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/key_status',{params:{webapp:1}},ctx).data.status.linked,true,'Created-app revocation cannot alter seed CI access');
  const seedBeforeFirstUpload=mock.deploymentsMock('/api/edge/webapp/summary',{params:{webapp:1}},ctx).data;
  const createdRegistration=mock.deploymentsMock('/api/edge/release',{method:'POST',body:{webapp:createdId,group:1,version:'first-created-release',manifest}},ctx).data;
  await mock.deploymentMockStorageFetch(createdRegistration.uploads[0].url,{method:'PUT',headers:createdRegistration.uploads[0].headers,body:file,credentials:'omit'});

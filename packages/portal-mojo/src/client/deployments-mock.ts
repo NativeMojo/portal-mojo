@@ -36,7 +36,8 @@ const keyReceipts = new Set<string>();
 const profiles = new Map<number, Record<string, string>>();
 let activeReads = 0;
 const apiReceipts = new Map<string, string>();
-let deployment = 303, releaseId = 103, appId = 2, keyLinked = true;
+let deployment = 303, releaseId = 103, appId = 2;
+const linkedKeys = new Set<number>([1]);
 const releases = [{
         id: 102, webapp: 1, version: '2.0.0', status: 'pending', source: 'github', created: stamp
     }, {
@@ -67,7 +68,7 @@ export function setDeploymentMockScenario(value: DeploymentMockScenario) {
     if (value === 'many-releases' && !releases.some(r => r.id === 99)) for (let id = 99; id >= 60; id--) releases.push({ id, webapp: 1, version: `0.8.${id}`, status: 'superseded', source: 'github', created: stamp });
     if (value === 'active-webapp' && attempts[0]) { attempts[0].status = 'deploying'; attempts[0].finished = ''; activeReads = 0; }
 }
-export function resetDeploymentMock() { scenario = 'failed-newer'; operations.clear(); profiles.clear(); activeReads = 0; keyReceipts.clear(); apiReceipts.clear(); uploadManifests.clear(); uploadedPaths.clear(); keyLinked = true; currentReleases.clear(); currentReleases.set(1,101); releases.splice(0, releases.length, {
+export function resetDeploymentMock() { scenario = 'failed-newer'; operations.clear(); profiles.clear(); activeReads = 0; keyReceipts.clear(); apiReceipts.clear(); uploadManifests.clear(); uploadedPaths.clear(); linkedKeys.clear(); linkedKeys.add(1); currentReleases.clear(); currentReleases.set(1,101); releases.splice(0, releases.length, {
     id: 102, webapp: 1, version: '2.0.0', status: 'pending', source: 'github', created: stamp
 }, {
     id: 101, webapp: 1, version: '1.0.0', status: 'live', source: 'github', created: stamp
@@ -105,7 +106,7 @@ function summary(id = 1, full = false) {
         webapp: { id, slug: String(created.profile.slug ?? `app-${id}`), display_name: String(created.profile.display_name ?? ''), environment: String(created.profile.environment ?? 'production'), deployment_ref: String(created.profile.deployment_ref ?? 'main'), repository: String(created.profile.github_repository ?? ''), build_output: String(created.profile.build_output ?? 'dist'), ...profiles.get(id) },
         address: { hostname: `${created.profile.slug ?? `app-${id}`}.apps.example.test`, certificate: { status: created.status === 'succeeded' ? 'active' : 'pending', not_after: '' }, aliases: [] },
         current_release: releases.find(row => row.webapp === id && row.id === currentReleases.get(id)) ?? null, latest_deployment: attempts.find(row => row.webapp === id) ?? null,
-        onboarding: { status: created.status, cursor: created.cursor }, deployment_key: { linked: false, active: false }
+        onboarding: { status: created.status, cursor: created.cursor }, deployment_key: { linked: linkedKeys.has(id), active: linkedKeys.has(id) }
     };
     const current = releases.find(r => r.webapp === id && r.id === currentReleases.get(id)) ?? releases[1]!; return {
     schema_version: 1, webapp: {
@@ -114,7 +115,7 @@ function summary(id = 1, full = false) {
         hostname: 'example.apps.example.test', certificate: { status: 'active', not_after: '2027-01-01T00:00:00Z' }, aliases: []
     }, current_release: current, latest_deployment: {
         ...attempts.find(row => row.webapp === id)!, status: scenario === 'rolled-back' ? 'rolled_back' : scenario === 'mixed-webapp' ? 'failed' : attempts.find(row => row.webapp === id)?.status, ...(full ? { release: undefined } : {})
-    }, onboarding: { status: 'succeeded', cursor: 'verify' }, deployment_key: { linked: keyLinked, active: keyLinked }
+    }, onboarding: { status: 'succeeded', cursor: 'verify' }, deployment_key: { linked: linkedKeys.has(id), active: linkedKeys.has(id) }
 }; }
 function operation(id: string, entry: NonNullable<ReturnType<typeof operations.get>>) { return {
     schema_version: 1, operation_id: id, id: 1, group: { id: entry.group, name: entry.group===1?'Example workspace':String(entry.profile.display_name??'New workspace') }, status: entry.status, cursor: entry.cursor, revision: entry.revision, profile: entry.profile, evidence: {
@@ -296,16 +297,16 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
     }
     if (path === '/api/edge/webapp/key_status' && method === 'GET')
         return ok({
-            webapp: Number(p.webapp), secret_name: 'MOJO_DEPLOY_KEY', status: { linked: keyLinked, active: keyLinked }
+            webapp: Number(p.webapp), secret_name: 'MOJO_DEPLOY_KEY', status: { linked: linkedKeys.has(Number(p.webapp)), active: linkedKeys.has(Number(p.webapp)) }
         });
     if (['/api/edge/webapp/link_key', '/api/edge/webapp/revoke_key'].includes(path) && method === 'POST') {
         if (!custom || scenario === 'ownership-refusal' || Number(b.group) !== 1)
             return no();
         const receipt = `${u.id}:${b.webapp}:${b.operation_id}`, replayed = keyReceipts.has(receipt) || scenario === 'key-replay';
         keyReceipts.add(receipt);
-        keyLinked = !path.endsWith('/revoke_key');
+        if (path.endsWith('/revoke_key')) linkedKeys.delete(Number(b.webapp)); else linkedKeys.add(Number(b.webapp));
         return ok({
-            webapp: Number(b.webapp), secret_name: 'MOJO_DEPLOY_KEY', replayed, token: keyLinked && !replayed ? crypto.randomUUID() + crypto.randomUUID() : null
+            webapp: Number(b.webapp), secret_name: 'MOJO_DEPLOY_KEY', replayed, token: linkedKeys.has(Number(b.webapp)) && !replayed ? crypto.randomUUID() + crypto.randomUUID() : null
         });
     }
     if (path === '/api/edge/release' && method === 'POST') {
