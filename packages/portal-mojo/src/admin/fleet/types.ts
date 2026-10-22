@@ -51,7 +51,7 @@ export interface CapacityNode {
 export interface DatabaseMember {
     id: string;
     role: string;
-    status: string;
+    status: string | null;
     lifecycle_state: string;
     instance_class: string | null;
     can_resize: boolean;
@@ -66,7 +66,7 @@ export interface CapacityDatabase {
     readers: string[];
     instance_class: string | null;
     writer_instance_class: string | null;
-    reader_instance_classes: Record<string, string>;
+    reader_instance_classes: Record<string, string | null>;
     members: DatabaseMember[];
     blocked_reason: string | null;
 }

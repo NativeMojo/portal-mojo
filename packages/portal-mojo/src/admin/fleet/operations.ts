@@ -130,10 +130,14 @@ export function createFleetOperationCoordinator(deps: {
             entry.actor = plan.actor;
             entry.deadline = now() + Math.max(1, plan.steps.length) * 90 * 60_000;
             update(scope, { status: 'submitting', planId: plan.id, batchId: null, batch: null, message: 'Submitting the reviewed stored plan…', since: now() });
+            let beforeSendPassed = false, localRefusal = false;
             try {
                 const batch = await apply(plan.id, { beforeSend: () => {
-                    active(scope);
-                    if (Date.parse(plan.expires_at) <= now()) throw new Error('Plan expired before submission.');
+                    try {
+                        active(scope);
+                        if (Date.parse(plan.expires_at) <= now()) throw new Error('Plan expired before submission.');
+                        beforeSendPassed = true;
+                    } catch (error) { localRefusal = true; throw error; }
                 } });
                 if (current() !== scope) {
                     update(scope, { batchId: batch.id, status: 'unknown', message: 'The session changed during submission. Its batch ID is retained for reconciliation; observe it deliberately from your current session.' });
@@ -141,6 +145,12 @@ export function createFleetOperationCoordinator(deps: {
                 }
                 accept(scope, batch);
             } catch (error) {
+                // The production transport always completes beforeSend before dispatch.
+                // An auth gate or our final fence can refuse without any request.
+                if (localRefusal || !deps.apply && !beforeSendPassed) {
+                    update(scope, { status: 'idle', planId: null, batchId: null, batch: null, message: `${errorMessage(error)} Refresh inventory and review a new plan.` });
+                    throw error;
+                }
                 const duplicate = error instanceof MojoError && error.errorCode === 'plan_already_applied';
                 const duplicateBatch = duplicate && error.data && typeof error.data === 'object'
                     ? (error.data as { batch?: unknown }).batch : null;

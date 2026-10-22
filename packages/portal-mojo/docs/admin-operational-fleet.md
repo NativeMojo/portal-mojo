@@ -43,7 +43,7 @@ provider output and deployment stderr never enter this cache.
 Load-balancer target health, fixed ingress addresses, and stable node outbound
 addresses are distinct observations. Unknown egress reads say unavailable, never
 an empty allowlist. Serving-process database/Redis reader routing is explicitly
-per process. Database and cache members retain their own lifecycle/status.
+per process. Database and cache members retain their own lifecycle/status. An Aurora reader absent from filtered instance facts may carry null class/status with unknown lifecycle. That database remains transition-blocked while node/cache evidence and independently supported changes remain available.
 
 ## Reviewed scaling
 
@@ -86,7 +86,7 @@ IDs and observed batch facts, keyed by installation and actor. Unresolved state
 survives dialog closure, Dashboard/Fleet navigation, and same-actor reauthentication;
 new sends and read replies are still fenced to the exact session revision. A
 different actor sees no previous actor record. No credentials or mutation drafts
-are stored locally. The coordinator never replays a mutation.
+are stored locally. The coordinator never replays a mutation. Expiry or session refusal at the final transport boundary is provably unsent: refresh inventory and review again. A transport failure after that boundary remains unknown and retains the reconciliation guard.
 
 Running batches are observed about every ten seconds, with a backstop covering
 90 minutes per step. Completed steps remain visible on failure; nothing rolls
