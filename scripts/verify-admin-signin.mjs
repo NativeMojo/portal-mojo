@@ -85,6 +85,7 @@ try {
         { tone: 'warning', text: 'The client secret expires in 12 days.' },
         { tone: 'danger', text: 'The client secret expired on 2026-10-01.' },
         { tone: 'unknown', text: 'Unknown tones read as info.' },
+        { tone: '__proto__', text: 'Inherited property names read as info too.' },
     ] };
     const markup = render([...quiet, microsoft]);
     assert.match(markup, /<i class="bi bi-microsoft"><\/i><\/span><div class="signin-provider-title"><h3 id="signin-provider-microsoft">Microsoft<\/h3>/);
@@ -94,6 +95,7 @@ try {
         ['signin-note is-warning', 'bi-exclamation-triangle', 'The client secret expires in 12 days.'],
         ['signin-note is-danger', 'bi-x-octagon', 'The client secret expired on 2026-10-01.'],
         ['signin-note', 'bi-info-circle', 'Unknown tones read as info.'],
+        ['signin-note', 'bi-info-circle', 'Inherited property names read as info too.'],
     ]);
     console.log('admin sign-in contract verified');
 } finally {

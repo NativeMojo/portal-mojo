@@ -334,7 +334,7 @@ function ProviderCard({ provider, onSaved }: { provider: SigninProvider; onSaved
             <span>Shown on the sign-in page, but it will not work until these are set: {provider.missing.join(', ')}.</span>
         </div>}
         {(provider.notices ?? []).map((notice, index) => {
-            const style = NOTICE_STYLES[notice.tone] ?? NOTICE_STYLES.info;
+            const style = Object.hasOwn(NOTICE_STYLES, notice.tone) ? NOTICE_STYLES[notice.tone] : NOTICE_STYLES.info;
             return <div key={index} className={style.className} role="status">
                 <i className={`bi ${style.icon}`} />
                 <span>{notice.text}</span>
