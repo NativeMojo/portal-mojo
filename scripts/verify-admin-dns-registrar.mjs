@@ -40,22 +40,36 @@ try {
     assert.deepEqual(Object.keys(quote.data).sort(), ['currency', 'expires', 'name', 'price', 'privacy_supported', 'purchase', 'token', 'years']);
     const identity = purchase.quoteIdentity(quote.data, 1);
     assert(purchase.quoteMatches(identity, { group: 1, domain: 'safe-buy.example', years: 2, price: '12.00', currency: 'USD' }));
-    const bought = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: { group: 1, purchase: quote.data.purchase, confirm_token: quote.data.token } });
+    // Fresh interactive login above supplies auth_time. Refusals must precede token
+    // consumption: the same quote must still be usable with its exact tuple.
+    const confirmation = (quote) => ({ group: 1, purchase: quote.purchase, confirm_token: quote.token, confirm_domain: quote.name, confirm_price: quote.price });
+    const exact = confirmation(quote.data);
+    for (const body of [
+        { group: exact.group, purchase: exact.purchase, confirm_token: exact.confirm_token },
+        { ...exact, confirm_domain: 'another-name.example' },
+        { ...exact, confirm_price: '12.01' },
+    ]) {
+        const refused = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body });
+        assert.equal(refused.status, false, 'missing or mismatched confirmation tuple refuses before spending');
+        const unspent = await mock.mockFetch(`/api/dnsman/purchase/${quote.data.purchase}`, { headers: manager, params: { graph: 'default' } });
+        assert.equal(unspent.data.status, 'quoted', 'invalid tuple must not consume its token or durable intent');
+    }
+    const bought = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: exact });
     assert.deepEqual(Object.keys(bought.data).sort(), ['domain', 'name', 'operation_id', 'privacy', 'privacy_downgraded', 'purchase', 'status']);
-    const replay = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: { group: 1, purchase: quote.data.purchase, confirm_token: quote.data.token } });
+    const replay = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: confirmation(quote.data) });
     assert.match(replay.error, /not valid/);
     const settled = await purchase.pollPurchaseLedger({ purchase: quote.data.purchase, delays: [0, 0], fetch: async (id) => dns.sanitizeDomainPurchaseRow((await mock.mockFetch(`/api/dnsman/purchase/${id}`, { headers: manager, params: { graph: 'default' } })).data) });
     assert.equal(settled.status, 'completed');
 
     const ambiguousQuote = await mock.mockFetch('/api/dnsman/registrar/quote', { method: 'POST', headers: manager, body: { group: 1, domain: 'ambiguous-buy.example', years: 1 } });
     mock.armMockRegistrarPurchaseFault('ambiguous');
-    const ambiguous = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: { group: 1, purchase: ambiguousQuote.data.purchase, confirm_token: ambiguousQuote.data.token } });
+    const ambiguous = await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: confirmation(ambiguousQuote.data) });
     assert.equal(ambiguous.error_code, 503);
     const durable = await mock.mockFetch(`/api/dnsman/purchase/${ambiguousQuote.data.purchase}`, { headers: manager, params: { graph: 'default' } });
     assert.equal(durable.data.status, 'submitted');
     const failedQuote = await mock.mockFetch('/api/dnsman/registrar/quote', { method: 'POST', headers: manager, body: { group: 1, domain: 'failed-buy.example', years: 1 } });
     mock.armMockRegistrarPurchaseFault('failed');
-    await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: { group: 1, purchase: failedQuote.data.purchase, confirm_token: failedQuote.data.token } });
+    await mock.mockFetch('/api/dnsman/registrar/purchase', { method: 'POST', headers: manager, body: confirmation(failedQuote.data) });
     const failedLedger = await mock.mockFetch(`/api/dnsman/purchase/${failedQuote.data.purchase}`, { headers: manager, params: { graph: 'default' } });
     assert.equal(failedLedger.data.status, 'failed');
     assert.match(purchase.PURCHASE_MAY_HAVE_MOVED, /Money may have moved/);
