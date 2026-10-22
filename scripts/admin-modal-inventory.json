@@ -6249,9 +6249,9 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:requestRefresh:modal.open:0",
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:confirmDiscard:modal.open:0",
       "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
-      "owner": "requestRefresh",
+      "owner": "confirmDiscard",
       "launcher": "modal.open",
       "body": [
         "div",
@@ -6260,9 +6260,37 @@
         "button"
       ],
       "category": "confirmation",
-      "parent": "requestRefresh",
+      "parent": "confirmDiscard",
       "target": null,
-      "fingerprint": "0d0b58b73636dcb14d33",
+      "fingerprint": "814f8b310098898cebfe",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:requestRefresh:confirmDiscard:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "requestRefresh",
+      "launcher": "confirmDiscard",
+      "body": [],
+      "category": "confirmation",
+      "parent": "requestRefresh",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:confirmDiscard",
+      "fingerprint": "85971dba7c9f5b90f1c1",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:openFleet:confirmDiscard:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "openFleet",
+      "launcher": "confirmDiscard",
+      "body": [],
+      "category": "confirmation",
+      "parent": "openFleet",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:confirmDiscard",
+      "fingerprint": "ddc89a2cbb6adbd0dade",
       "categories": [
         "confirmation"
       ]
@@ -6361,6 +6389,20 @@
       "parent": "GeoLocationContent",
       "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode",
       "fingerprint": "ebebb1f634aa996e96c3",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:GeoLocationContent:openFleet:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "GeoLocationContent",
+      "launcher": "openFleet",
+      "body": [],
+      "category": "confirmation",
+      "parent": "GeoLocationContent",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:openFleet",
+      "fingerprint": "55adc1c8a4b4d49af203",
       "categories": [
         "confirmation"
       ]
@@ -8295,6 +8337,20 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:edit:1",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "edit",
+      "body": [],
+      "category": "editor",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:edit",
+      "fingerprint": "cfe49bd0bfa908732c5f",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:openRoute:0",
       "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
       "owner": "VhostDetail",
@@ -8320,20 +8376,6 @@
       "fingerprint": "25c620ae93dcdeea8eb7",
       "categories": [
         "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:edit:1",
-      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
-      "owner": "VhostDetail",
-      "launcher": "edit",
-      "body": [],
-      "category": "editor",
-      "parent": "VhostDetail",
-      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:edit",
-      "fingerprint": "cfe49bd0bfa908732c5f",
-      "categories": [
-        "editor"
       ]
     },
     {

@@ -580,13 +580,13 @@
       "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open:modal.open:0",
       "fingerprint": "49582f9eb0e018f36eb7",
       "category": "record",
-      "purpose": "Compact hostname inspection with horizontal Overview/conditional Routes/Certificate/Settings. Header lifecycle and focused child editors; owner signal and native canDismiss pending guard. Runtime: verify-admin-serving-mounted.mjs and actual Admin shell layouts."
+      "purpose": "Compact hostname inspection with horizontal Overview/conditional Routes/Settings, certificate details and direct editor in Overview. Header lifecycle and focused child editors; owner signal and native canDismiss pending guard. Runtime: verify-admin-serving-mounted.mjs and actual Admin shell layouts."
     },
     {
-      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:requestRefresh:modal.open:0",
-      "fingerprint": "0d0b58b73636dcb14d33",
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:confirmDiscard:modal.open:0",
+      "fingerprint": "814f8b310098898cebfe",
       "category": "confirmation",
-      "purpose": "Confirm discarding the unsaved local draft and entered key before authoritative Refresh. Owner-fenced and single-flight; Keep editing/Escape preserves draft. Runtime: verify-admin-geolocation-mounted.mjs."
+      "purpose": "Confirm discarding the unsaved local draft and entered key before authoritative Refresh or opening Fleet Configuration. Owner-fenced and single-flight; Keep editing/Escape preserves draft and private key, accepted departure clears it. Runtime: verify-admin-geolocation-mounted.mjs."
     },
     {
       "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
@@ -604,7 +604,7 @@
       "id": "packages/portal-mojo/src/admin/fleet/CapacityEditor.tsx:placement:modal.open:0",
       "fingerprint": "5c54832c2459a3e5f0cc",
       "category": "editor",
-      "purpose": "Choose a source-compatible subnet in a focused nested Placement editor; parent draft receives only deliberate acceptance"
+      "purpose": "Choose a source-compatible subnet in a focused Change subnet dialog; parent draft receives only deliberate acceptance"
     },
     {
       "id": "packages/portal-mojo/src/admin/fleet/FleetWorkspace.tsx:launch:modal.open:0",
