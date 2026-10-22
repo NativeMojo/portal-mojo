@@ -58,7 +58,8 @@ the backend availability verdict and each source status. Overall observation age
 is visible; each source timestamp stays in its info popover, while stale sources
 also show their age inline. Stale thresholds remain in info popovers; refreshing never relabels
 old evidence as current. Missing sources stay unknown, denied sections stay
-restricted, and unauthorized related-page links are omitted.
+restricted. Authorized, mounted related destinations are direct links on source names;
+unauthorized destinations are omitted. Info popovers contain evidence, not navigation.
 
 The primary action is **Change capacity**. **Inspect capacity** opens App nodes,
 Database, Redis and Addresses tabs. Fleet outbound allowlist, fallback attachments,
@@ -70,7 +71,7 @@ Redis reader routing explicitly describe the serving process.
 The standalone editor uses one `CapacityDraft` from `standalone-data.ts` across
 App nodes, Database and Redis tabs. App nodes has Add nodes and Remove nodes tasks.
 Additions require an explicit healthy, registered, running, settled source; its
-size and target groups are shown, and Placement is a focused subnet dialog.
+size and target groups are shown, and Change subnet opens a focused override dialog.
 Removal retains the existing self-node and healthy-floor checks; the server also
 re-proves each target group's floor and ownership.
 

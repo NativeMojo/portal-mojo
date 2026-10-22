@@ -405,7 +405,7 @@ export function MaintenancePage({
 
                 </>
             )}
-<Tabs items={tabs} defaultActiveKey={new URLSearchParams(location.search).get('tab')} ariaLabel="Maintenance category" />
+{tabs.length === 1 ? tabs[0]!.panel : <Tabs items={tabs} defaultActiveKey={new URLSearchParams(location.search).get('tab')} ariaLabel="Maintenance category" />}
             {attempts.length > 0 && (
                 <section aria-label="Submitted operations">
                     <h2>Submitted operations</h2>

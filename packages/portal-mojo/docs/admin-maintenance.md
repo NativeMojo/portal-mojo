@@ -123,7 +123,8 @@ Resource rows keep the offered version, provider state and upgrade action visibl
 
 ### KISS presentation
 
-Database, Cache and Django-MOJO are separate tabs. Scan metadata is collapsed; scan errors, incomplete evidence and scanning-off warnings stay above the tabs. Submitted operations remain visible independently of the selected category. See [visual QA](admin-presentation.md).
+Database, Cache and Django-MOJO use tabs when multiple categories are authorized.
+A reader with only one authorized category sees its panel directly without a tab strip. Scan metadata is collapsed; scan errors, incomplete evidence and scanning-off warnings stay above the tabs. Submitted operations remain visible independently of the selected category. See [visual QA](admin-presentation.md).
 
 Standard support deadlines within 30 days or overdue remain visible on resource rows;
 standard and extended support stay separate. Missing support dates are not

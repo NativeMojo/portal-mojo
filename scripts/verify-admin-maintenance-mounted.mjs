@@ -171,7 +171,9 @@ try {
         !paths().some((p) => p.startsWith('/api/aws/') || p.endsWith('/bootstrap')),
         'framework-only never reads AWS or bootstrap',
     );
-    checks += 2;
+    assert(!document.querySelector('[role=tablist]'), 'Framework-only reader sees the category directly without a one-item tab stripe');
+    assert(document.body.textContent.includes('Latest published'), 'The sole authorized panel stays visible');
+    checks += 4;
     await unmount();
     await configure(
         {
@@ -395,7 +397,8 @@ try {
     await click('Close'); await unmount();
     checks += 9;
     fixture.persona={is_superuser:false,permissions:{manage_platform:true,view_platform:true,manage_settings:true,manage_advanced:true}};
-    mock.setMockMaintenanceScenario('findings'); await login('dns.manager@nativemojo.com'); await mount(); await ready(); await click('Django-MOJO');
+    mock.setMockMaintenanceScenario('findings'); await login('dns.manager@nativemojo.com'); await mount(); await ready();
+    assert(!document.querySelector('[role=tablist]'), 'Platform-only reader has no one-item tab bar');
     assert(!button('Update policy'),'advanced/platform grants do not bypass literal superuser owner');checks++;
     await unmount();
     // A definite policy refusal requires fresh explicit review; renewal must not replay it.
