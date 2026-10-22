@@ -3,3 +3,7 @@
 @media(max-width:700px){.fleet-page .fp-header{align-items:flex-start;flex-direction:column;gap:16px}.fleet-page .fp-actions{justify-content:flex-start}.fleet-page .fp-evidence-grid{grid-template-columns:1fr}.fleet-page .fp-capacity-strip{grid-template-columns:repeat(3,1fr);padding:16px;gap:16px}.fleet-page .fp-capacity-context{grid-column:1/-1;align-items:flex-start}.fleet-page .fp-health,.fleet-page .fp-operation{padding:18px;align-items:flex-start}.fleet-page .fp-operation{flex-direction:column}.fleet-standalone-dialog{max-height:calc(100dvh - 32px)}.fleet-standalone-dialog .fp-fields{grid-template-columns:1fr}.fleet-standalone-dialog .fp-resource>.fp-row{align-items:flex-start;flex-wrap:wrap}.fleet-standalone-dialog .fp-resource{padding:14px}.fleet-page .fp-source{padding:12px 4px}.fleet-page .fp-source:nth-last-child(2){border-bottom:1px solid var(--line)}.fleet-page .fp-section{padding:8px 14px}}
 /* Keep every inspection tab visible within a narrow native dialog. */
 @media(max-width:700px){.fleet-standalone-dialog .mojo-tab-list{flex-wrap:wrap;overflow:visible}}
+
+/* Destination names are actions; keep evidence-only labels visually distinct. */
+.fleet-page .fp-source strong a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.fleet-page .fp-source strong a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
