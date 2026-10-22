@@ -32,9 +32,9 @@ export function decimalTupleEqual(left: string | number, right: string | number)
     return a != null && b != null && a === b;
 }
 
-export interface QuoteIdentity { purchase: number; group: number; domain: string; years: number; price: string; currency: string; expires: number }
+export interface QuoteIdentity { purchase: number; group: number; domain: string; years: number; price: string; currency: string; expires: number; privacy_supported: boolean }
 export function quoteIdentity(quote: RegistrarQuote, group: number): QuoteIdentity {
-    return { purchase: quote.purchase, group, domain: normalizePurchaseDomain(quote.name), years: quote.years, price: String(quote.price), currency: quote.currency, expires: quote.expires };
+    return { purchase: quote.purchase, group, domain: normalizePurchaseDomain(quote.name), years: quote.years, price: String(quote.price), currency: quote.currency, expires: quote.expires, privacy_supported: quote.privacy_supported };
 }
 export function quoteMatches(identity: QuoteIdentity, input: { group: number; domain: string; years: number; price: string | number; currency: string }, now = Date.now() / 1000): boolean {
     return identity.group === input.group && identity.domain === normalizePurchaseDomain(input.domain) && identity.years === input.years
@@ -50,7 +50,7 @@ export function redactRegistrarError(error: unknown): string {
 
 export function sanitizePurchaseResult(value: unknown): RegistrarPurchaseResult {
     const row = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-    if (!Number.isInteger(row.purchase) || !Number.isInteger(row.domain) || typeof row.name !== 'string' || typeof row.status !== 'string') throw new Error('Registrar returned a malformed purchase acknowledgement');
+    if (!Number.isInteger(row.purchase) || Number(row.purchase) <= 0 || !Number.isInteger(row.domain) || Number(row.domain) <= 0 || typeof row.name !== 'string' || typeof row.status !== 'string') throw new Error('Registrar returned a malformed purchase acknowledgement');
     return { purchase: Number(row.purchase), domain: Number(row.domain), name: normalizePurchaseDomain(row.name), status: row.status.slice(0, 32), operation_id: typeof row.operation_id === 'string' ? row.operation_id.slice(0, 128) : null, privacy: row.privacy === true, privacy_downgraded: row.privacy_downgraded === true };
 }
 
@@ -61,6 +61,8 @@ export async function pollPurchaseLedger(options: { purchase: number; fetch: (id
         if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
         if (options.isCurrent?.() === false) return null;
         const row = await options.fetch(options.purchase);
+        if (options.isCurrent?.() === false) return null;
+        if (row.id !== options.purchase) throw new Error('The ledger response did not match this purchase');
         if (purchaseTerminal(row)) return row;
     }
     return null;
