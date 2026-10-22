@@ -61,13 +61,13 @@ const uploadManifests = new Map<number, {
     deployment?: number;
 }>();
 const uploadedPaths = new Set<string>();
-let currentReleaseId = 101;
+const currentReleases = new Map<number, number>([[1,101]]);
 export function setDeploymentMockScenario(value: DeploymentMockScenario) {
     scenario = value;
     if (value === 'many-releases' && !releases.some(r => r.id === 99)) for (let id = 99; id >= 60; id--) releases.push({ id, webapp: 1, version: `0.8.${id}`, status: 'superseded', source: 'github', created: stamp });
     if (value === 'active-webapp' && attempts[0]) { attempts[0].status = 'deploying'; attempts[0].finished = ''; activeReads = 0; }
 }
-export function resetDeploymentMock() { scenario = 'failed-newer'; operations.clear(); profiles.clear(); activeReads = 0; keyReceipts.clear(); apiReceipts.clear(); uploadManifests.clear(); uploadedPaths.clear(); keyLinked = true; currentReleaseId = 101; releases.splice(0, releases.length, {
+export function resetDeploymentMock() { scenario = 'failed-newer'; operations.clear(); profiles.clear(); activeReads = 0; keyReceipts.clear(); apiReceipts.clear(); uploadManifests.clear(); uploadedPaths.clear(); keyLinked = true; currentReleases.clear(); currentReleases.set(1,101); releases.splice(0, releases.length, {
     id: 102, webapp: 1, version: '2.0.0', status: 'pending', source: 'github', created: stamp
 }, {
     id: 101, webapp: 1, version: '1.0.0', status: 'live', source: 'github', created: stamp
@@ -104,16 +104,16 @@ function summary(id = 1, full = false) {
         schema_version: 1,
         webapp: { id, slug: String(created.profile.slug ?? `app-${id}`), display_name: String(created.profile.display_name ?? ''), environment: String(created.profile.environment ?? 'production'), deployment_ref: String(created.profile.deployment_ref ?? 'main'), repository: String(created.profile.github_repository ?? ''), build_output: String(created.profile.build_output ?? 'dist'), ...profiles.get(id) },
         address: { hostname: `${created.profile.slug ?? `app-${id}`}.apps.example.test`, certificate: { status: created.status === 'succeeded' ? 'active' : 'pending', not_after: '' }, aliases: [] },
-        current_release: null, latest_deployment: null,
+        current_release: releases.find(row => row.webapp === id && row.id === currentReleases.get(id)) ?? null, latest_deployment: attempts.find(row => row.webapp === id) ?? null,
         onboarding: { status: created.status, cursor: created.cursor }, deployment_key: { linked: false, active: false }
     };
-    const current = releases.find(r => r.id === currentReleaseId) ?? releases[1]!; return {
+    const current = releases.find(r => r.webapp === id && r.id === currentReleases.get(id)) ?? releases[1]!; return {
     schema_version: 1, webapp: {
         id, slug: id === 1 ? 'example-app' : `app-${id}`, display_name: id === 1 ? 'Example WebApp' : `New WebApp ${id}`, environment: 'production', deployment_ref: 'main', repository: 'NativeMojo/example', build_output: 'dist', ...profiles.get(id)
     }, address: {
         hostname: 'example.apps.example.test', certificate: { status: 'active', not_after: '2027-01-01T00:00:00Z' }, aliases: []
     }, current_release: current, latest_deployment: {
-        ...attempts[0], status: scenario === 'rolled-back' ? 'rolled_back' : scenario === 'mixed-webapp' ? 'failed' : attempts[0]?.status, ...(full ? { release: undefined } : {})
+        ...attempts.find(row => row.webapp === id)!, status: scenario === 'rolled-back' ? 'rolled_back' : scenario === 'mixed-webapp' ? 'failed' : attempts.find(row => row.webapp === id)?.status, ...(full ? { release: undefined } : {})
     }, onboarding: { status: 'succeeded', cursor: 'verify' }, deployment_key: { linked: keyLinked, active: keyLinked }
 }; }
 function operation(id: string, entry: NonNullable<ReturnType<typeof operations.get>>) { return {
@@ -209,7 +209,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         };
     }
     if (path === '/api/edge/deployment' && method === 'GET') {
-        if (scenario === 'active-webapp' && p.id && ++activeReads >= 2 && attempts[0]?.status === 'deploying') { attempts[0].status = 'live'; attempts[0].finished = stamp; currentReleaseId = attempts[0].release.id; }
+        if (scenario === 'active-webapp' && p.id && ++activeReads >= 2 && attempts[0]?.status === 'deploying') { attempts[0].status = 'live'; attempts[0].finished = stamp; currentReleases.set(attempts[0].webapp, attempts[0].release.id); }
         const items = attempts.filter(r => r.webapp === Number(p.webapp) && (p.id === undefined || r.id === Number(p.id)));
         return { status: true, data: items.slice(Number(p.start) || 0, (Number(p.start) || 0) + (Number(p.size) || 15)).map(r => ({ id: r.id, release: r.release, status: r.status, created: r.created, finished: r.finished, ...(p.graph === 'default' ? { detail: r.status === 'failed' ? 'The deployment failed; the desired version is separate.' : 'Observed CI deployment' } : {}) })), count: items.length };
     }
@@ -236,7 +236,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
             return no('Unknown deployment', 404);
         if (scenario !== 'timeout' && a.status === 'deploying') {
             a.status = 'live';
-            currentReleaseId = a.release.id;
+            currentReleases.set(a.webapp, a.release.id);
         }
         return ok(statusPayload(a));
     }
@@ -339,7 +339,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         if (!r || r.manifest.some(m => !uploadedPaths.has(`${b.release}/${m.path}`)))
             return no('Missing uploaded files', 400);
         const active=attempts.find(a=>a.webapp===r.app&&a.release.id===Number(b.release)&&['queued','deploying','rolling_back','live'].includes(a.status));
-        if (currentReleaseId===Number(b.release)&&active)
+        if (currentReleases.get(r.app)===Number(b.release)&&active)
             return ok({
                 release: Number(b.release), version: r.version, status: 'uploaded', promoted: true, deployment: active.id, deployment_status: active.status, webapp: r.app
             });
@@ -350,8 +350,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         const a = {
             id: ++deployment, webapp: r.app, release, status: scenario==='rolled-back'?'rolled_back':scenario==='mixed-webapp'?'failed':scenario==='superseded-webapp'?'superseded':'deploying', created: new Date().toISOString(), finished: ''
         };
-        const previous=currentReleaseId;currentReleaseId=release.id;
-        if(['rolled_back','superseded'].includes(a.status))currentReleaseId=previous;
+        if(!['rolled_back','superseded'].includes(a.status))currentReleases.set(r.app,release.id);
         attempts.unshift(a);
         if(!releases.some(x=>x.id===release.id))releases.unshift(release);
         r.deployment = a.id;

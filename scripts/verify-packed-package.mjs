@@ -58,7 +58,7 @@ try {
     // No generated files or dependencies added; bound source growth at 6.440 MB.
     // Deployments9243, measured against 02313ef (6,433,280 bytes), adds two
     // source modules and grows 17 existing source/docs/style/mock files by
-    // 45,072 bytes total: 630 intended files, 6,478,352 unpacked bytes.
+    // 45,774 bytes total: 630 intended files, 6,479,054 unpacked bytes.
     // No generated files or dependencies added. Bound audited source growth
     // at 6.480 MB, with the eager-runtime cap independently enforced.
     // Shared Dashboard/coordinator source remains unchanged.
