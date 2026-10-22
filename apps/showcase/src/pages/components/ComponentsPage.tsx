@@ -85,6 +85,8 @@ const AdminMonitoringDemo = lazyDemo(() => import('./demos-admin-monitoring'), '
 const AdminMetricsExplorerDemo = lazyDemo(() => import('./demos-admin-metrics-explorer'), 'AdminMetricsExplorerDemo');
 const AdminDashboardDemo = lazyDemo(() => import('./demos-admin-dashboard'), 'AdminDashboardDemo');
 const AdminCloudWatchDemo = lazyDemo(() => import('./demos-admin-cloudwatch'), 'AdminCloudWatchDemo');
+const AdminOperationalFleetDemo = lazyDemo(() => import('./demos-admin-operational-fleet'), 'AdminOperationalFleetDemo');
+const AdminGeoLocationDemo = lazyDemo(() => import('./demos-admin-geolocation'), 'AdminGeoLocationDemo');
 const FleetConfigurationDemo = lazyDemo(() => import('./demos-admin-settings'), 'FleetConfigurationDemo');
 const AdminSettingsDemo = lazyDemo(() => import('./demos-admin-settings'), 'AdminSettingsDemo');
 const AdminBouncerDemo = lazyDemo(() => import('./demos-admin-bouncer'), 'AdminBouncerDemo');
@@ -506,6 +508,16 @@ const GROUPS: DemoGroup[] = [
                 key: 'admin-metrics-explorer', title: 'Metrics Explorer', icon: 'bi-graph-up',
                 blurb: 'Permission-safe recorded-metrics discovery with full colon-slug identity, KPI deltas, group fan-out, and exact scalar reads.',
                 render: () => <AdminMetricsExplorerDemo />,
+            },
+            {
+                key: 'admin-operational-fleet', title: 'Operational Fleet', icon: 'bi-cloud',
+                blurb: 'Authoritative fleet health, independent source grants, and reviewed capacity plans with exact observation.',
+                render: () => <AdminOperationalFleetDemo />,
+            },
+            {
+                key: 'admin-geolocation', title: 'GeoLocation', icon: 'bi-geo-alt',
+                blurb: 'Owner-only provider order, transient Mojo credentials, verification and truthful publication status.',
+                render: () => <AdminGeoLocationDemo />,
             },
             {
                 key: 'admin-settings', title: 'Runtime settings', icon: 'bi-gear',

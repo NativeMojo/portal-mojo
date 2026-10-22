@@ -7,6 +7,7 @@ import { isChunkLoadError } from '../../ui/route-error';
 import { GroupContext } from '../../client/group-context';
 import { hasPermission, useMe } from '../../client/me';
 import type { PermSpec } from '../../client/model';
+import { AdminRouteContext, type AdminRouteContextValue } from './route-context';
 import { Guarded } from '../../ui/Guarded';
 import type { MenuConfig, MenuItem } from '../../ui/menu-registry';
 
@@ -127,7 +128,7 @@ function routeElement(route: AdminRoute): ReactNode {
         : createElement(route.component);
 }
 
-function guardedElement(section: AdminSection, route: AdminRoute, sections: readonly AdminSection[], mount: string): ReactNode {
+function guardedElement(section: AdminSection, route: AdminRoute, sections: readonly AdminSection[], mount: string, context: AdminRouteContextValue): ReactNode {
     const fallback = route.fallbackToFirstVisible
         ? createElement(AdminMountLanding, { sections: sections.filter((candidate) => candidate !== section), mount })
         : createElement(AdminDenied);
@@ -146,9 +147,9 @@ function guardedElement(section: AdminSection, route: AdminRoute, sections: read
     // navigation between packaged admin pages silently stopped rendering
     // (reproduced in both the reference portal and a consumer). The key
     // forces a fresh mount, and a fresh Suspense, per route.
-    return createElement(AdminGlobalScope, { key: relativePath(mount, section.basePath ?? section.id, route.path), children: createElement(Guarded, {
+    return createElement(AdminRouteContext.Provider, { key: relativePath(mount, section.basePath ?? section.id, route.path), value: context, children: createElement(AdminGlobalScope, { children: createElement(Guarded, {
         permission: section.permissions, fallback, children: routeGuarded,
-    }) });
+    }) }) });
 }
 
 /** Admin is global even when embedded beneath a product portal's provider. */
@@ -182,6 +183,7 @@ function AdminMountLanding({ sections, mount }: { sections: readonly AdminSectio
 export function adminSectionRoutes(sections: readonly AdminSection[], opts: { mount?: string } = {}): RouteObject[] {
     const mount = relativePath(opts.mount ?? '');
     const routes: RouteObject[] = [];
+    const context: AdminRouteContextValue = { mount: absolutePath(mount), paths: sections.flatMap((section) => section.routes.map((route) => absolutePath(mount, section.basePath ?? section.id, route.path))) };
     const rootSections = sections.filter((section) => relativePath(section.basePath ?? section.id) === '');
     const rootHasIndex = rootSections.some((section) => section.routes.some((route) => relativePath(route.path) === ''));
     if (mount && rootSections.length > 0 && !rootHasIndex) routes.push({
@@ -198,7 +200,7 @@ export function adminSectionRoutes(sections: readonly AdminSection[], opts: { mo
         });
         for (const route of section.routes) routes.push({
             path: relativePath(mount, base, route.path),
-            element: guardedElement(section, route, sections, mount),
+            element: guardedElement(section, route, sections, mount, context),
         });
     }
     return routes;

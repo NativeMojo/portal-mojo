@@ -26,3 +26,7 @@ export * from './assistant';
 export { ADMIN_SECTIONS } from './registry';
 export { FleetConfigurationPage, FleetNodeStatus } from './fleet-configuration/FleetConfigurationPage';
 export { FLEET_CONFIGURATION_ADMIN_SECTION } from './domains/operations';
+export * from './fleet';
+export * from './geolocation';
+export { FLEET_ADMIN_SECTION } from './domains/infrastructure';
+export { GEOLOCATION_ADMIN_SECTION } from './domains/operations';

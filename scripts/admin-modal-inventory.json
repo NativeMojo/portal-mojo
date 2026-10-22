@@ -248,6 +248,51 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:import:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "openScale",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "openScale",
+      "target": null,
+      "fingerprint": "00209b8f5811d19e8cb3",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "openScale",
+      "launcher": "modal.open",
+      "body": [
+        "ScaleFleetDialog"
+      ],
+      "category": "action",
+      "parent": "openScale",
+      "target": null,
+      "fingerprint": "8ad911eb2279355348a1",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:FleetOverview:openScale:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "FleetOverview",
+      "launcher": "openScale",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "FleetOverview",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale",
+      "fingerprint": "1cc51d0da58c51e42d49",
+      "categories": [
+        "action",
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/bouncer/signals.tsx:BouncerSignalDetail:DetailView:0",
       "file": "packages/portal-mojo/src/admin/bouncer/signals.tsx",
       "owner": "BouncerSignalDetail",
@@ -5774,6 +5819,67 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "chooseKeyMode",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "chooseKeyMode",
+      "target": null,
+      "fingerprint": "b9170da4ccaf90279e96",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:GeoLocationContent:chooseKeyMode:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "GeoLocationContent",
+      "launcher": "chooseKeyMode",
+      "body": [],
+      "category": "confirmation",
+      "parent": "GeoLocationContent",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode",
+      "fingerprint": "2e8aa9ec2f6a4cf48f43",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:GeoLocationContent:chooseKeyMode:1",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "GeoLocationContent",
+      "launcher": "chooseKeyMode",
+      "body": [],
+      "category": "confirmation",
+      "parent": "GeoLocationContent",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode",
+      "fingerprint": "3e81c9409997d374d1c3",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:GeoLocationContent:chooseKeyMode:2",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "GeoLocationContent",
+      "launcher": "chooseKeyMode",
+      "body": [],
+      "category": "confirmation",
+      "parent": "GeoLocationContent",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode",
+      "fingerprint": "ebebb1f634aa996e96c3",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:0",
       "file": "packages/portal-mojo/src/admin/domains/operations.ts",
       "owner": "<module>",
@@ -5853,6 +5959,20 @@
       "parent": "<module>",
       "target": null,
       "fingerprint": "3052519ab2b6089d5191",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/operations.ts:<module>:import:6",
+      "file": "packages/portal-mojo/src/admin/domains/operations.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "62b897b4cf12b8d88c98",
       "categories": [
         "dependency"
       ]
@@ -7863,6 +7983,20 @@
       "parent": "<module>",
       "target": null,
       "fingerprint": "15683da8a430ec05f1ba",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/domains/infrastructure.ts:<module>:import:12",
+      "file": "packages/portal-mojo/src/admin/domains/infrastructure.ts",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "b425408adc4016666616",
       "categories": [
         "dependency"
       ]

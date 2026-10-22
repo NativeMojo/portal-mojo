@@ -2,7 +2,11 @@
 
 `AdminDashboardPage` is the package-owned global Admin landing at `/` in the standalone portal and `/system` when embedded. Import it, its data helpers, and `ADMIN_DASHBOARD_PERMISSIONS` from `portal-mojo/admin`.
 
-The page uses only authoritative django-mojo signals: time series `user_activity_day`, `group_activity_day`, `api_calls`, and `api_errors`; global scalars `total_users` and `total_groups`; and `size=0` counts for open incidents, failed jobs, and bounced sent email. Scalar values must be finite non-negative strings or numbers. Malformed values surface as errors rather than fabricated zeroes.
+The first panel is the operational Fleet overview (`GET /api/account/admin/dashboard`), admitted by exact global `view_admin | manage_users | manage_settings | admin` grants or literal superuser. Capacity facts have their separate `manage_aws` gate. Existing panels follow below it.
+
+Every route built by `adminSectionRoutes` supplies internal mount and registered-path facts. Fleet links retain arbitrary embedded prefixes and omit destinations absent from a partial host registry. These facts do not grant permission; every link and read retains its independent backend gate.
+
+The remaining page uses only authoritative django-mojo signals: time series `user_activity_day`, `group_activity_day`, `api_calls`, and `api_errors`; global scalars `total_users` and `total_groups`; and `size=0` counts for open incidents, failed jobs, and bounced sent email. Scalar values must be finite non-negative strings or numbers. Malformed values surface as errors rather than fabricated zeroes.
 
 Each panel owns an independent permission gate. A caller without metrics access can still see authorized incident, job, email, or login-geography panels, and no denied panel issues a request. Every dashboard query cache key includes the authenticated caller UID. Login geography starts at the previous 30-day date and deliberately omits `dr_end`, matching the backend's instant-bound semantics.
 

@@ -7,7 +7,7 @@ import { JOBS_VIEW_PERMS } from '../jobs/models';
 import { LOGIN_SUMMARY_PERMS } from '../security/devices/models';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
 
-export const ADMIN_DASHBOARD_PERMISSIONS = [...new Set([...DASHBOARD_METRIC_PERMISSIONS, ...SECURITY_VIEW_PERMS, ...JOBS_VIEW_PERMS, ...EMAIL_ADMIN_PERMISSIONS, ...LOGIN_SUMMARY_PERMS])];
+export const ADMIN_DASHBOARD_PERMISSIONS = [...new Set(['sys.view_admin', 'sys.manage_users', 'sys.manage_settings', 'sys.admin', ...DASHBOARD_METRIC_PERMISSIONS, ...SECURITY_VIEW_PERMS, ...JOBS_VIEW_PERMS, ...EMAIL_ADMIN_PERMISSIONS, ...LOGIN_SUMMARY_PERMS])];
 export const DASHBOARD_ADMIN_SECTION: AdminSection = {
     id: 'dashboard', basePath: '', title: 'Dashboard', icon: 'bi-grid-1x2', navigationGroup: null, permissions: ADMIN_DASHBOARD_PERMISSIONS,
     routes: [{ path: '', label: 'Dashboard', loadComponent: () => import('../dashboard/AdminDashboardPage').then(({ AdminDashboardPage }) => ({ default: AdminDashboardPage })), permissions: ADMIN_DASHBOARD_PERMISSIONS, fallbackToFirstVisible: true }],

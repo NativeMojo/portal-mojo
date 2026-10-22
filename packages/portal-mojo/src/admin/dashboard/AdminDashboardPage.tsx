@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { MetricsChart } from '../../charts';
 import { modal } from '../../ui';
-import { useAuthSnapshot, useCan } from '../../client/runtime';
+import { useAuthSnapshot, useCan, useMe } from '../../client/runtime';
+import { backendGlobalCan, FLEET_DASHBOARD_GRANTS } from '../fleet/access';
+import { FleetOverview } from '../fleet/FleetOverview';
 import { SECURITY_VIEW_PERMS } from '../security-permissions';
 import { JOBS_VIEW_PERMS } from '../jobs/models';
 import { EMAIL_ADMIN_PERMISSIONS } from '../messaging/models';
@@ -82,9 +84,15 @@ function LoginOverview() {
     </section>;
 }
 
+function OperationalOverview() {
+    const { data: me } = useMe();
+    return backendGlobalCan(me, FLEET_DASHBOARD_GRANTS) ? <FleetOverview /> : null;
+}
+
 export function AdminDashboardPage() {
     return <div className="admin-dashboard">
         <header className="admin-dashboard-header"><h1>Dashboard</h1><p className="dim">Authoritative operational signals for this django-mojo deployment.</p></header>
+        <OperationalOverview />
         <MetricOverview />
         <AttentionOverview />
         <LoginOverview />

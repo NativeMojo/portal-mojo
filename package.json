@@ -91,7 +91,13 @@
         "verify:admin-assistant-setup": "node scripts/verify-admin-assistant-setup-route.mjs && node scripts/verify-admin-assistant-setup.mjs",
         "verify:admin-dns-shared-validation": "node scripts/verify-admin-dns-shared-validation.mjs && node scripts/verify-admin-dns-shared-validation-mounted.mjs",
         "verify:admin-shared-validation-config": "node scripts/verify-admin-shared-validation-config.mjs && node scripts/verify-admin-shared-validation-config-mounted.mjs",
-        "verify:hosted-reauth": "node scripts/verify-hosted-reauth.mjs"
+        "verify:hosted-reauth": "node scripts/verify-hosted-reauth.mjs",
+        "verify:admin-geolocation": "node scripts/verify-admin-geolocation.mjs",
+        "verify:admin-geolocation-mounted": "node scripts/verify-admin-geolocation-mounted.mjs",
+        "verify:admin-operational-fleet": "node scripts/verify-admin-operational-fleet.mjs",
+        "verify:admin-operational-fleet-mounted": "node scripts/verify-admin-operational-fleet-mounted.mjs",
+        "verify:admin-operations-mounted": "node scripts/verify-admin-operations-mounted.mjs",
+        "verify:admin-operations": "node scripts/verify-admin-operations.mjs"
     },
     "devDependencies": {
         "jsdom": "^26.1.0"

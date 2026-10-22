@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { createServer } from 'vite';
+globalThis.window = { addEventListener() {}, removeEventListener() {}, location: { hash: '', pathname: '/', search: '', origin: 'http://localhost' }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) };
+globalThis.location = window.location;
+const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true } });
+try {
+    const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
+    const bridge = await server.ssrLoadModule('/packages/portal-mojo/src/client/operations-mock.ts');
+    const fleet = await server.ssrLoadModule('/packages/portal-mojo/src/client/operational-fleet-mock.ts');
+    const geo = await server.ssrLoadModule('/packages/portal-mojo/src/client/geo-provider-mock.ts');
+    const login = await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'showcase.operator@nativemojo.com', password: 'mojo' } });
+    const original = login.data.access_token;
+    const claims = JSON.parse(Buffer.from(original.split('.')[1], 'base64url').toString());
+    const headers = (patch = {}) => {
+        const value = { ...claims, ...patch };
+        if (patch.auth_time === null) delete value.auth_time;
+        return { Authorization: `Bearer ${original.split('.')[0]}.${Buffer.from(JSON.stringify(value)).toString('base64url')}.mock-signature` };
+    };
+    let result = await mock.mockFetch('/api/account/admin/bootstrap', { headers: headers() });
+    assert.equal(result.status, true); assert.equal(result.data.user.id, claims.uid); assert.equal(result.data.features.platform.capabilities.infrastructure_managed, true);
+    assert.equal((await mock.mockFetch('/api/account/admin/bootstrap', { method: 'POST', headers: headers() })).error_code, 405);
+    for (const credential_kind of ['api_key', 'group_token', 'group_scoped_token']) assert.equal((await mock.mockFetch('/api/account/admin/bootstrap', { headers: headers({ credential_kind }) })).error_code, 403);
+    assert.equal((await mock.mockFetch('/api/account/admin/bootstrap', { headers: headers({ token_type: 'user_api_key' }) })).status, true, 'Ordinary operator bootstrap admits a per-user API key');
+    fleet.setMockOperationalFleetScenario('external');
+    result = await mock.mockFetch('/api/account/admin/bootstrap', { headers: headers() });
+    assert.equal(result.data.infrastructure.mode, 'external'); assert.equal(result.data.features.platform.capabilities.infrastructure_managed, false);
+    fleet.setMockOperationalFleetScenario('healthy');
+    result = await mock.mockFetch('/api/account/admin/settings', { headers: headers() });
+    assert.equal(result.data.schema_version, 1); assert(result.data.provider_setup.geoip); assert.equal(result.data.sms, undefined);
+    const user = { id: 44, is_active: true, is_superuser: false, permissions: { users: true } };
+    assert.equal((await bridge.operationsMock('/api/account/admin/bootstrap', {}, { user })).status, true, 'Finite category users admits manage_users bootstrap');
+    assert.equal((await bridge.operationsMock('/api/aws/capacity', {}, { user: { ...user, permissions: { admin: true } } })).code, 403);
+    assert.equal((await bridge.operationsMock('/api/account/admin/settings', {}, { user })).error_code, 403);
+    assert.equal((await bridge.operationsMock('/api/account/admin/bootstrap', {}, { user: { ...user, is_active: false, is_superuser: true } })).error_code, 401);
+    const secret = 'distinctive-private-geo-key-7f8e9d';
+    const body = { action: 'test_providers', topic: 'geoip', providers: { expected_revision: geo.geoProviderSetupMock().configuration_revision, geoip: { ...geo.geoProviderSetupMock().geoip, GEOIP_API_KEY_MOJO: secret } } };
+    delete body.providers.geoip.GEOIP_API_KEY_MOJO_CONFIGURED; delete body.providers.geoip.GEOIP_API_KEY_MOJO_HINT;
+    assert.equal((await mock.mockFetch('/api/account/admin/settings', { method: 'POST', body, headers: headers({ auth_time: null }) })).error_code, 440, 'No invented freshness for a superuser bearer');
+    assert.equal((await mock.mockFetch('/api/account/admin/settings', { method: 'POST', body, headers: { ...headers(), Origin: 'https://foreign.example.invalid' } })).error_code, 403);
+    assert.equal((await mock.mockFetch('/api/account/admin/settings', { method: 'POST', body, headers: headers() })).tested, true);
+    const history = JSON.stringify(mock.getMockRequestHistory());
+    assert(!history.includes(secret)); assert(!history.includes('Authorization')); assert(!history.includes('providers'));
+    const source = await readFile('packages/portal-mojo/src/client/mock.ts', 'utf8');
+    assert(!/^import .*operations-mock/m.test(source)); assert(source.includes("await import('./operations-mock')"));
+    console.log('PASS operations bridge: exact admission, confined provenance, allowed per-user keys, real freshness, external facts, Geo catalog and safe history');
+} finally { await server.close(); }

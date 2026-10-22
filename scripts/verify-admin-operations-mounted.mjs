@@ -1,0 +1,58 @@
+// Integration regression: partial AdminSection hosts must not advertise absent destinations.
+import assert from 'node:assert/strict';
+import { JSDOM } from 'jsdom';
+import { createServer } from 'vite';
+const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/' });
+for (const name of ['window', 'document', 'location', 'Element', 'HTMLElement', 'HTMLDialogElement', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
+Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
+window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const React = await import('react'), { act } = React, { createRoot } = await import('react-dom/client');
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+const router = await import('react-router-dom');
+const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', define: { 'import.meta.env.VITE_MOJO_API': JSON.stringify('http://operations-mock.invalid') }, server: { middlewareMode: true } });
+let root, client, memoryRouter;
+const wait = async (predicate) => { for (let i = 0; i < 100; i++) { await act(async () => new Promise(resolve => setTimeout(resolve, 15))); if (predicate()) return; } assert.fail(`Timed out: ${document.body.textContent}`); };
+try {
+    const auth = await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts'); auth.initAuth();
+    const { adminSectionRoutes } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/core/index.ts');
+    const { AdminDashboardPage } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dashboard/AdminDashboardPage.tsx');
+    const { FleetPage } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/fleet/FleetPage.tsx');
+    const fleet = await server.ssrLoadModule('/packages/portal-mojo/src/client/operational-fleet-mock.ts');
+    let actor = { id: 1, is_active: true, is_superuser: true, permissions: {} };
+    const token = () => `e30.${Buffer.from(JSON.stringify({ uid: actor.id, exp: Date.now() / 1000 + 3600, auth_time: Date.now() / 1000 })).toString('base64url')}.mock`;
+    auth.setTokens(token(), token());
+    globalThis.fetch = async (input, options = {}) => {
+        const url = new URL(String(input)); assert.equal(url.origin, 'http://operations-mock.invalid');
+        const result = url.pathname === '/api/user/me' ? { status: true, data: actor } : fleet.handleOperationalFleetMock(url.pathname, options.method ?? 'GET', undefined, Object.fromEntries(url.searchParams), actor, Date.now() / 1000);
+        assert.notEqual(result, undefined, `Unexpected request ${url.pathname}`);
+        return new Response(JSON.stringify(result), { status: 200 });
+    };
+    const mount = async (extras = [], dashboard = false) => {
+        client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }); client.setQueryData(['me', '1'], actor);
+        const sections = [{ id: dashboard ? 'dashboard' : 'fleet', basePath: dashboard ? '' : undefined, title: 'Fleet', icon: 'bi-cloud', permissions: ['sys.view_admin'], routes: [{ path: '', loadComponent: async () => ({ default: dashboard ? AdminDashboardPage : FleetPage }) }] }, ...extras];
+        memoryRouter = router.createMemoryRouter(adminSectionRoutes(sections, { mount: '/product/control' }), { initialEntries: [dashboard ? '/product/control' : '/product/control/fleet'] });
+        root = createRoot(document.getElementById('root'));
+        await act(async () => root.render(React.createElement(QueryClientProvider, { client }, React.createElement(React.StrictMode, null, React.createElement(router.RouterProvider, { router: memoryRouter })))));
+        await wait(() => document.querySelector('.fleet-evidence-grid'));
+    };
+    const unmount = async () => { await act(async () => root.unmount()); root = null; memoryRouter.dispose(); client.clear(); };
+    await mount();
+    assert.equal(document.querySelectorAll('.operational-fleet a').length, 0, 'A Fleet-only embedded host must suppress unregistered source and Fleet Configuration links');
+    await unmount();
+    const Empty = () => null;
+    await mount([{ id: 'dns', title: 'DNS', icon: 'bi-globe', permissions: ['sys.view_dns'], routes: [{ path: 'certificates', loadComponent: async () => ({ default: Empty }) }] }, { id: 'fleet-configuration', title: 'Fleet Configuration', icon: 'bi-cloud', permissions: [], routes: [{ path: '', requireSuperuser: true, loadComponent: async () => ({ default: Empty }) }] }]);
+    assert(document.querySelector('a[href="/product/control/dns/certificates"]'), 'Registered source link keeps the actual arbitrary embedded mount');
+    assert(document.querySelector('a[href="/product/control/fleet-configuration"]'), 'Registered owner destination stays available');
+    assert.equal(document.querySelectorAll('.operational-fleet a').length, 2, 'Other unregistered destinations remain suppressed');
+    await unmount();
+    actor = { id: 1, is_active: true, is_superuser: false, permissions: { view_admin: true, view_platform: true, view_dns: true } };
+    await mount([], true);
+    assert.equal(document.querySelectorAll('.operational-fleet a').length, 0, 'Embedded Dashboard overview also suppresses absent sibling routes');
+    await unmount();
+    await mount([{ id: 'dns', title: 'DNS', icon: 'bi-globe', permissions: ['sys.view_dns'], routes: [{ path: 'certificates', loadComponent: async () => ({ default: Empty }) }] }], true);
+    assert(document.querySelector('a[href="/product/control/dns/certificates"]'), 'Dashboard source links use their matched arbitrary mount');
+    await unmount();
+    console.log('PASS mounted operations integration: partial roster suppresses absent links; admitted sibling links preserve arbitrary embedded mount');
+} finally { if (root) await act(async () => root.unmount()); client?.clear(); memoryRouter?.dispose(); await server.close(); dom.window.close(); }

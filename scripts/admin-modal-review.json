@@ -491,6 +491,18 @@
       "fingerprint": "777836408687c363845d",
       "category": "confirmation",
       "purpose": "Enable hub sharing for the exact verified ordinary deployment, preserving independent issuer certificates and keys; existing operator session, cancel/no replay and backend revalidation"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:modal.open:0",
+      "fingerprint": "8ad911eb2279355348a1",
+      "category": "action",
+      "purpose": "Review server capacity plan, submit its stored identity, and observe exact batch evidence"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
+      "fingerprint": "b9170da4ccaf90279e96",
+      "category": "confirmation",
+      "purpose": "Confirm local intent to remove the stored Mojo GeoIP credential on the next explicit Save"
     }
   ],
   "lifecycle": [

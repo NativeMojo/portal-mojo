@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { decodeJwt, getAccessToken, getAuthSessionRevision, useAuthSnapshot, useMe } from '../../client/runtime';
 import { modal } from '../../ui/modal';
+import { useAdminRouteContext } from '../core/route-context';
 import { backendGlobalCan, FLEET_CAPACITY_GRANTS, FLEET_DASHBOARD_GRANTS, type BackendGlobalUser } from './access';
 import { readCapacity, readFleetDashboard } from './api';
 import { fleetOperations, fleetSessionScope } from './operations';
@@ -87,7 +88,8 @@ export function CapacityFacts({ report }: {
 }
 export function FleetOverview({ mount: explicitMount, links: customLinks, showConfigurationLink = true }: FleetOverviewProps = {}) {
     const queryClient = useQueryClient(), fresh = useRef(false);
-    const location = useLocation(), mount = fleetMount(location.pathname, explicitMount), auth = useAuthSnapshot(), { data: me } = useMe();
+    const routeContext = useAdminRouteContext();
+    const location = useLocation(), mount = fleetMount(location.pathname, explicitMount ?? routeContext?.mount), auth = useAuthSnapshot(), { data: me } = useMe();
     const scope = auth.authenticated && auth.uid ? `${auth.uid}:${getAuthSessionRevision()}` : null;
     const canDashboard = !!scope && backendGlobalCan(me, FLEET_DASHBOARD_GRANTS), canCapacity = !!scope && backendGlobalCan(me, FLEET_CAPACITY_GRANTS);
     const dashboard = useQuery({ queryKey: ['operational-fleet', 'dashboard', scope], queryFn: ({ signal }) => readFleetDashboard(fresh.current, { signal }), enabled: canDashboard, retry: false, refetchOnWindowFocus: false });
@@ -95,6 +97,10 @@ export function FleetOverview({ mount: explicitMount, links: customLinks, showCo
     const operation = useSyncExternalStore(fn => scope ? fleetOperations.subscribe(scope, fn) : () => { }, () => scope ? fleetOperations.get(scope) : null, () => null);
     const owner = useRef<AbortController | null>(null), [refreshing, setRefreshing] = useState(false), [error, setError] = useState('');
     const links = { ...defaultLinks, ...customLinks };
+    if (routeContext) for (const [name, link] of Object.entries(links)) {
+        if (link && !routeContext.paths.includes(`${mount}/${link.to.replace(/^\//, '').split('?')[0]}`)) links[name] = null;
+    }
+    const configurationMounted = !routeContext || routeContext.paths.includes(`${mount}/fleet-configuration`);
     useEffect(() => () => { owner.current?.abort(); }, [scope]);
     useEffect(() => { if (!scope || !canCapacity || !operation || !['done', 'failed', 'unknown'].includes(operation.status))
         return; const expected = scope; void readCapacity(true).then(next => { if (fleetSessionScope() === expected)
@@ -122,7 +128,7 @@ export function FleetOverview({ mount: explicitMount, links: customLinks, showCo
     if (!canDashboard && !canCapacity)
         return null;
     const data = dashboard.data;
-    return <section className="operational-fleet" aria-label="Fleet overview"><header className="fleet-heading"><div><div className="eyebrow">Operations</div><h2>Fleet overview</h2><p className="dim">Serving health, software and work that needs attention.</p></div><div className="fleet-buttons"><button className="btn" disabled={refreshing || dashboard.isFetching || capacity.isFetching || operation?.status === 'submitting'} onClick={() => void refresh()}>Refresh fleet</button>{eligible && <button className="btn btn-primary" onClick={() => void openScale()}>{operation && ['submitting', 'running', 'unknown'].includes(operation.status) ? 'View capacity progress' : 'Scale fleet'}</button>}{showConfigurationLink && me?.is_superuser === true && <Link className="btn" to={`${mount}/fleet-configuration`}>Fleet Configuration</Link>}</div></header>
+    return <section className="operational-fleet" aria-label="Fleet overview"><header className="fleet-heading"><div><div className="eyebrow">Operations</div><h2>Fleet overview</h2><p className="dim">Serving health, software and work that needs attention.</p></div><div className="fleet-buttons"><button className="btn" disabled={refreshing || dashboard.isFetching || capacity.isFetching || operation?.status === 'submitting'} onClick={() => void refresh()}>Refresh fleet</button>{eligible && <button className="btn btn-primary" onClick={() => void openScale()}>{operation && ['submitting', 'running', 'unknown'].includes(operation.status) ? 'View capacity progress' : 'Scale fleet'}</button>}{showConfigurationLink && configurationMounted && me?.is_superuser === true && <Link className="btn" to={`${mount}/fleet-configuration`}>Fleet Configuration</Link>}</div></header>
         {canDashboard && !data && <div className="panel panel-pad" role={dashboard.error ? 'alert' : 'status'}>{dashboard.error?.message ?? 'Loading fleet health…'}</div>}
         {data && <><div className={`panel panel-pad fleet-availability fleet-availability-${data.availability.state}`}><strong>{data.availability.message}</strong><p className="dim">Observed {data.observed_at}</p>{dashboard.error && <p className="text-warn">Latest observation failed: {dashboard.error.message}. The prior report is retained with its original timestamps.</p>}</div><div className="fleet-evidence-grid"><EvidenceSection title="Infrastructure" names={['load_balancer', 'compute', 'database', 'cache', 'certificates', 'public_api']} sources={data.sources} links={links} mount={mount} user={me!}/><EvidenceSection title="Software" names={['framework', 'last_deployment', 'sms', 'email']} sources={data.sources} links={links} mount={mount} user={me!}/><EvidenceSection title="Needs attention" names={['jobs', 'sanity', 'incidents', 'tickets']} sources={data.sources} links={links} mount={mount} user={me!}/></div>{data.attention.message && <p>{data.attention.message}</p>}</>}
         {canCapacity && capacity.error && <p className="form-alert" role="alert">Capacity observation unavailable: {capacity.error.message}</p>}{canCapacity && capacity.data && <CapacityFacts report={capacity.data}/>}

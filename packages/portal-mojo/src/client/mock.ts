@@ -9916,6 +9916,12 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         armedReauth = null;
         return { status: false, error: 'reauth_required', error_code: 440 };
     }
+    if (path === '/api/account/admin/bootstrap' || path === '/api/account/admin/settings'
+        || path === '/api/account/admin/dashboard' || path.startsWith('/api/aws/capacity')) {
+        const { operationsMock } = await import('./operations-mock');
+        const claims = decodeMockJwt((opts.headers?.Authorization ?? '').replace(/^Bearer /, ''));
+        return operationsMock(path, opts, { user: userFromBearer(opts.headers), credentialKind: claims?.credential_kind ?? claims?.token_type, authTime: authTimeFromBearer(opts.headers), origin: opts.headers?.Origin });
+    }
     const pushResult = await pushFetch(path, opts);
     if (pushResult !== undefined) return pushResult;
     const phoneHubResult = await phoneHubFetch(path, opts);
@@ -10822,11 +10828,6 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         return { status: true, data: { name: domain.name, registrant: transientContact, admin: transientContact, tech: transientContact, privacy: domain.privacy, admin_privacy: domain.privacy, registrant_privacy: domain.privacy, tech_privacy: domain.privacy, auto_renew: domain.auto_renew, nameservers: ['ns-1.example.invalid', 'ns-2.example.invalid'], registrar: 'Amazon Registrar, Inc.', registered_on: domain.registered_on, expires: domain.expires, status_list: ['ok'], privacy_supported: true } };
     }
     // ══ end DNSMan wire ═══════════════════════════════════════════════
-    if (path === '/api/account/admin/bootstrap') {
-        const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
-        if (!caller.is_superuser) return permissionDenied();
-        return { status: true, data: { admin_path: '/admin/', capabilities: { setup: true }, infrastructure: { mode: 'managed' }, features: { platform: { enabled: true, capabilities: { setup: true, view: true, capacity: true } }, settings: { enabled: true, capabilities: { owner_edit: true } } } } };
-    }
     if (path === '/api/account/admin/fleet/shared-validation/recipient') {
         const caller = userFromBearer(opts.headers); if (!caller) return permissionDenied(401);
         if (caller.is_superuser !== true) return permissionDenied();

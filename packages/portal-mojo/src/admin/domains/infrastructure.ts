@@ -31,4 +31,9 @@ export const EDGE_ADMIN_SECTION: AdminSection = {
         { path: 'upstreams', label: 'Upstreams', loadComponent: () => import('../edge/UpstreamsPage').then(({ UpstreamsPage }) => ({ default: UpstreamsPage })), permissions: DNS_VIEW_PERMISSIONS },
     ],
 };
-export const INFRASTRUCTURE_ADMIN_SECTIONS = [DNS_ADMIN_SECTION, STORAGE_ADMIN_SECTION, EDGE_ADMIN_SECTION] as const;
+export const FLEET_ADMIN_SECTION: AdminSection = {
+    id: 'fleet', title: 'Fleet', icon: 'bi-cloud', navigationGroup: 'operations',
+    permissions: ['sys.view_admin', 'sys.manage_users', 'sys.manage_settings', 'sys.admin', 'sys.manage_aws'],
+    routes: [{ path: '', label: 'Fleet', loadComponent: () => import('../fleet/FleetPage').then(({ FleetPage }) => ({ default: FleetPage })) }],
+};
+export const INFRASTRUCTURE_ADMIN_SECTIONS = [FLEET_ADMIN_SECTION, DNS_ADMIN_SECTION, STORAGE_ADMIN_SECTION, EDGE_ADMIN_SECTION] as const;

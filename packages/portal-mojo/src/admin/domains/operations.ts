@@ -24,4 +24,8 @@ export const JOBS_ADMIN_SECTION: AdminSection = {
         { path: 'scheduled-tasks', label: 'Scheduled Tasks', loadComponent: () => import('../jobs/ScheduledTasksPage').then(({ ScheduledTasksPage }) => ({ default: ScheduledTasksPage })), permissions: SCHEDULED_TASK_VIEW_PERMS },
     ],
 };
-export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, FLEET_CONFIGURATION_ADMIN_SECTION, JOBS_ADMIN_SECTION] as const;
+export const GEOLOCATION_ADMIN_SECTION: AdminSection = {
+    id: 'geolocation', title: 'GeoLocation', icon: 'bi-geo-alt', navigationGroup, permissions: [],
+    routes: [{ path: '', label: 'GeoLocation', requireSuperuser: true, loadComponent: () => import('../geolocation/GeoLocationPage').then(({ GeoLocationPage }) => ({ default: GeoLocationPage })) }],
+};
+export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, FLEET_CONFIGURATION_ADMIN_SECTION, JOBS_ADMIN_SECTION, GEOLOCATION_ADMIN_SECTION] as const;
