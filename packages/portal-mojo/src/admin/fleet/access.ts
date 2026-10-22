@@ -6,7 +6,14 @@ export const FLEET_CAPACITY_GRANTS = ['manage_aws'] as const;
 export function backendGlobalCan(user: BackendGlobalUser | null | undefined, grants: string | readonly string[]): boolean {
     if (!user) return false;
     if (user.is_superuser === true) return true;
-    const granted = (key: string) => user.permissions?.[key] === true || user.permissions?.[key] === 1;
+    // Python bool(JSON value), including false for empty containers.
+    const granted = (key: string) => {
+        if (!user.permissions || !Object.hasOwn(user.permissions, key)) return false;
+        const value = user.permissions[key];
+        if (Array.isArray(value)) return value.length > 0;
+        if (value && typeof value === 'object') return Object.keys(value).length > 0;
+        return Boolean(value);
+    };
     return (typeof grants === 'string' ? [grants] : grants).some((key) => {
         if (granted(key)) return true;
         const match = /^(?:view_|manage_)(.+)$/.exec(key);
