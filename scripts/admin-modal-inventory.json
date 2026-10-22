@@ -5012,12 +5012,13 @@
       "owner": "openDetail",
       "launcher": "modal.detail",
       "body": [
+        "AdminRouteContext.Provider",
         "SettingDetail"
       ],
       "category": "record",
       "parent": "openDetail",
       "target": null,
-      "fingerprint": "1f24d4a7da6cb74b0bc8",
+      "fingerprint": "029038db0e45e91b75e0",
       "categories": [
         "record"
       ]
