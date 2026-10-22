@@ -226,10 +226,10 @@ export function quoteDomain(input: { group: number; domain: string; years?: numb
     return postData('/api/dnsman/registrar/quote', input);
 }
 
-export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string; confirm_domain: string; confirm_price: string }): Promise<RegistrarPurchaseResult> {
+export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string; confirm_domain: string; confirm_price: string }, beforeSend?: () => void): Promise<RegistrarPurchaseResult> {
     // Snapshot once: the safe 440 continuation must use the identical quote.
     const body = Object.freeze({ ...input });
-    return sanitizePurchaseResult(await withFreshAuth(() => postData('/api/dnsman/registrar/purchase', body)));
+    return sanitizePurchaseResult(await withFreshAuth(() => { beforeSend?.(); return postData('/api/dnsman/registrar/purchase', body); }));
 }
 
 /** Detail and its error remain modal-local; neither enters Query cache. */
