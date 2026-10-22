@@ -12,9 +12,10 @@ A nested child may have its own contextual actions. Evidence such as a firewall
 log's Action **column** describes the event and is not an operation section.
 
 Serving hostname inspection uses a compact `modal.open` with horizontal task
-tabs instead of a side rail: Overview, conditional Routes, Certificate and
-Settings. Its Address/Routing/Certificate/Settings editor and four-step create
-flow keep one draft. The launcher guards native dismissal while any write or
+tabs instead of a side rail: Overview, conditional Routes and Settings.
+Certificate details and a direct certificate editor are available in Overview.
+Its Hostname/Certificate/Settings editor and Hostname → Certificate → Review
+create flow keep one draft. The launcher guards native dismissal while any write or
 route preflight is pending; focused child editors retain the same owner lifetime.
 This is scoped to Serving and does not change the shared DetailView contract.
 
@@ -78,7 +79,7 @@ the inventory using `node scripts/verify-admin-modals.mjs --write-inventory`.
 | Email/support | Domain, mailbox, sent message, template, contact; credentials/onboarding/audit/reconcile/test/template/status | Preserve evidence; separate mailbox directions and support status |
 | Phone/Push | Number, SMS, config, device, delivery, template; lookup/test/config editors | Config/template lifecycle; number/SMS/device/delivery evidence retained |
 | Operations | Fleet capacity planning, Maintenance exact resource/window confirmation, GeoLocation local key-removal confirmation, API/WebApp detail and focused onboarding/recovery/upload/credential flows | No generic deployment/release edits or deletion; staged intent, observed receipts and transient secrets remain distinct |
-| Edge | Vhost with nested routes; Address → Routing → Certificate → Review creation, route editor, upstream declare/retire, blocklist entry editor | Vhost and upstream enabled state; upstreams retire and are never deleted; vhost, route and blocklist deletion are retained operations |
+| Edge | Vhost with nested routes; Hostname → Certificate → Review creation, route editor, upstream declare/retire, blocklist entry editor | Vhost and upstream enabled state; upstreams retire and are never deleted; vhost, route and blocklist deletion are retained operations |
 | Assistant/settings | Conversation, Skill, Setting; feed continuation, scoped memory, typed settings editor | Owner-only continuation; Skill active selection; memory is scoped editing |
 
 ## Resource lifecycle matrix
