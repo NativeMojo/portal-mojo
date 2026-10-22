@@ -27,7 +27,7 @@ export function WebAppDetail({ id, onClose, destinations }: {
     const object = useQuery({
         queryKey: ['deployments', s.key, id, 'default'], queryFn: ({ signal }) => getWebApp(s.owner, id, signal), enabled: read, retry: false
     });
-    const globalAuthority = backendGlobalCan(me.data, ['manage_webapp']) && backendGlobalCan(me.data, ['view_dns', 'manage_dns', 'security']);
+    const globalAuthority = backendGlobalCan(me.data, ['manage_webapp']) && backendGlobalCan(me.data, ['manage_dns', 'security']);
     const member = useQuery({
         queryKey: ['deployments', s.key, id, 'member', object.data?.group.id], queryFn: ({ signal }) => getMember(s.owner, object.data!.group.id, signal), enabled: read && !!object.data && !globalAuthority, retry: false
     });
@@ -54,7 +54,7 @@ export function WebAppDetail({ id, onClose, destinations }: {
     }); };
     const launchKey = async (action: 'mint' | 'rotate' | 'revoke') => { const { WebAppKeyDialog } = await import('./WebAppKeyDialog'); assertOwner(s.owner, s.signal); let busy = false; await modal.open(close => <WebAppKeyDialog app={object.data!} action={action} onChanged={() => void refresh()} onClose={() => close(null)} onBusy={value => { busy = value; }}/>, { signal: s.signal, canDismiss: () => !busy }); };
     const loadSetup = async () => { const { WebAppDeploySetup } = await import('./WebAppDeploySetup'); assertOwner(s.owner, s.signal); setSetup(() => WebAppDeploySetup); };
-    const resume = async () => { const { WebAppOnboardingDialog } = await import('./WebAppOnboardingDialog'); assertOwner(s.owner, s.signal); let busy = false; await modal.open(close => <WebAppOnboardingDialog resume={receiptsFor(s.owner).find(r => r.kind === 'create' && r.app === id)} onClose={() => close(null)} onBusy={value => { busy = value; }}/>, {
+    const resume = async () => { const { WebAppOnboardingDialog } = await import('./WebAppOnboardingDialog'); assertOwner(s.owner, s.signal); let busy = false; await modal.open(close => <WebAppOnboardingDialog destinations={destinations} resume={receiptsFor(s.owner).find(r => r.kind === 'create' && r.app === id)} onClose={() => close(null)} onBusy={value => { busy = value; }}/>, {
         signal: s.signal, canDismiss: () => !busy, size: 'lg'
     }); };
     if (!read || denied)

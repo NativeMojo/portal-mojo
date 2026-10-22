@@ -21,15 +21,17 @@ export function deploymentOwner(): DeploymentOwner { return {
 export function ownerKey(o: DeploymentOwner): string { return `${o.origin}:${o.actor}:${o.session}`; }
 export function assertOwner(o: DeploymentOwner, signal?: AbortSignal): void { signal?.throwIfAborted(); o.signal?.throwIfAborted(); const now = deploymentOwner(); if (!getAuthSnapshot().authenticated || !o.actor || ownerKey(o) !== ownerKey(now))
     throw new DOMException('Session changed; refresh and review again', 'AbortError'); }
-/** Verb and exact object VIEW/SAVE are independent; member dict is from this app's owning group only. */
+/** SAVE_PERMS is the first configured RestMeta clause for writes; VIEW is read-only. */
 export function webAppAuthority(user: BackendGlobalUser | null | undefined, app: WebAppObject, member?: {
     permissions?: Record<string, unknown>;
 } | null) {
     const local = member ? { permissions: member.permissions } : null;
     const can = (grants: readonly string[]) => backendGlobalCan(user, grants) || backendGlobalCan(local, grants);
-    const view = active(user) && app.id > 0 && app.group.id > 0 && can(['view_dns', 'manage_dns', 'security']);
+    const object = active(user) && app.id > 0 && app.group.id > 0;
+    const view = object && can(['view_dns', 'manage_dns', 'security']);
+    const save = object && can(['manage_dns', 'security']);
     return {
-        read: view, custom: view && can(['manage_webapp']), release: view, workflow: active(user) && app.group.id > 0 && (can(['security']) || (can(['manage_webapp']) && can(['manage_dns'])))
+        read: view, custom: save && can(['manage_webapp']), release: save, workflow: active(user) && app.group.id > 0 && (can(['security']) || (can(['manage_webapp']) && can(['manage_dns'])))
     };
 }
 export function canOnboard(bootstrap: Bootstrap | undefined): boolean { return !!bootstrap && (bootstrap.groups.length > 0 || bootstrap.can_create_webapp_group); }

@@ -1,6 +1,6 @@
 /** Contract fixture only. No live calls, request-body/header history or retained token/URL. */
 import { backendGlobalCan, type BackendGlobalUser } from '../admin/fleet/access';
-export type DeploymentMockScenario = 'failed-newer' | 'partial' | 'reported-only' | 'converged' | 'unknown' | 'stale' | 'mixed-webapp' | 'rolled-back' | 'missing-destination' | 'missing-bucket' | 'missing-apps-domain' | 'revision-conflict' | 'lease-conflict' | 'unknown-create' | 'key-replay' | 'upload-failure' | 'timeout' | 'read-failure' | 'ownership-refusal';
+export type DeploymentMockScenario = 'failed-newer' | 'partial' | 'reported-only' | 'converged' | 'unknown' | 'stale' | 'mixed-webapp' | 'rolled-back' | 'missing-destination' | 'missing-bucket' | 'missing-apps-domain' | 'revision-conflict' | 'lease-conflict' | 'unknown-create' | 'key-replay' | 'upload-failure' | 'timeout' | 'read-failure' | 'ownership-refusal' | 'superseded-webapp' | 'new-workspace-domain-ready';
 let scenario: DeploymentMockScenario = 'failed-newer';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', shaA = 'a'.repeat(40), shaB = 'b'.repeat(40);
 const stamp = '2026-10-21T12:00:00Z';
@@ -23,6 +23,7 @@ interface Opts {
 }
 const operations = new Map<string, {
     actor: number;
+    group: number;
     origin?: string;
     profile: Record<string, unknown>;
     revision: number;
@@ -101,7 +102,7 @@ function summary(id = 1, full = false) { const current = releases.find(r => r.id
     }, onboarding: { status: 'succeeded', cursor: 'verify' }, deployment_key: { linked: keyLinked, active: keyLinked }
 }; }
 function operation(id: string, entry: NonNullable<ReturnType<typeof operations.get>>) { return {
-    schema_version: 1, operation_id: id, id: 1, group: { id: 1, name: 'Example workspace' }, status: entry.status, cursor: entry.cursor, revision: entry.revision, profile: entry.profile, evidence: {
+    schema_version: 1, operation_id: id, id: 1, group: { id: entry.group, name: entry.group===1?'Example workspace':String(entry.profile.display_name??'New workspace') }, status: entry.status, cursor: entry.cursor, revision: entry.revision, profile: entry.profile, evidence: {
         app: { status: 'ready' }, address: { status: entry.cursor === 'address' ? 'waiting' : 'ready', hostname: 'example.apps.example.test' }, github: { status: 'unavailable', reason: 'Repository verification has not been attested' }, verify: { status: entry.status === 'succeeded' ? 'ready' : 'unknown' }
     }, activity: [{
             message: `Observed ${entry.cursor} at revision ${entry.revision}`, kind: 'info', at: stamp
@@ -119,7 +120,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         return no('Interactive user session required');
     if (api && !backendGlobalCan(u, method === 'GET' ? ['view_platform', 'manage_platform', 'admin'] : ['manage_platform', 'admin']))
         return no();
-    const view = backendGlobalCan(u, ['view_dns', 'manage_dns', 'security']), custom = view && backendGlobalCan(u, ['manage_webapp']), workflow = backendGlobalCan(u, ['security']) || (backendGlobalCan(u, ['manage_webapp']) && backendGlobalCan(u, ['manage_dns']));
+    const view = backendGlobalCan(u, ['view_dns', 'manage_dns', 'security']), save = backendGlobalCan(u, ['manage_dns', 'security']), custom = save && backendGlobalCan(u, ['manage_webapp']), workflow = backendGlobalCan(u, ['security']) || (backendGlobalCan(u, ['manage_webapp']) && backendGlobalCan(u, ['manage_dns']));
     if (!api && !view)
         return no();
     if (scenario === 'read-failure' && method === 'GET')
@@ -197,7 +198,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         if (!target)
             return no('Release not verified', 400);
         const a = {
-            id: ++deployment, webapp: 1, release: target, status: scenario === 'mixed-webapp' ? 'failed' : 'deploying', created: stamp, finished: ''
+            id: ++deployment, webapp: 1, release: target, status: scenario === 'rolled-back'?'rolled_back':scenario === 'mixed-webapp' ? 'failed' : scenario==='superseded-webapp'?'superseded':'deploying', created: stamp, finished: ''
         };
         attempts.unshift(a);
         return ok(statusPayload(a));
@@ -218,12 +219,12 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         const action = path.split('/').pop();
         if (action === 'options' && method === 'GET')
             return ok({
-                schema_version: 1, buckets: scenario === 'missing-bucket' ? [] : ['approved-releases'], environments: ['production', 'staging', 'preview', 'development'], destination: scenario === 'missing-destination' ? null : { type: 'cname', value: 'serving.example.test' }, destination_error: scenario === 'missing-destination' ? 'Complete the serving destination in Setup' : null, apps_domain: scenario === 'missing-apps-domain' ? null : { id: 10, name: 'apps.example.test' }, apps_domain_error: scenario === 'missing-apps-domain' ? 'Connect a managed apps domain' : null, github_connected: false
+                schema_version: 1, buckets: scenario === 'missing-bucket' ? [] : ['approved-releases'], environments: ['production', 'staging', 'preview', 'development'], destination: scenario === 'missing-destination' ? null : { type: 'cname', value: 'serving.example.test' }, destination_error: scenario === 'missing-destination' ? 'Complete the serving destination in Setup' : null, apps_domain: scenario==='missing-apps-domain'||p.group_intent==='new'||(Number(p.group)>=1000&&scenario!=='new-workspace-domain-ready')?null:{id:10,name:'apps.example.test'}, apps_domain_error: p.group_intent==='new'||Number(p.group)>=1000||scenario==='missing-apps-domain'?'This workspace has no domain managed here yet.':null, github_connected: false
             });
         if (action === 'precheck' && method === 'GET') {
             const host = String(p.url ?? '').replace(/^https?:\/\//, '');
             return ok({
-                schema_version: 1, verdict: host.endsWith('.apps.example.test') ? 'ready' : 'domain_unknown', normalized: { hostname: host, label: host.split('.')[0] }, domain: { id: 10, name: 'apps.example.test' }
+                schema_version: 1, verdict: p.group_intent==='new'||(Number(p.group)>=1000&&scenario!=='new-workspace-domain-ready')?'domain_unknown':host.endsWith('.apps.example.test')?'ready':'domain_unknown', normalized: { hostname: host, label: host.split('.')[0] }, domain: { id: 10, name: 'apps.example.test' }
             });
         }
         if (action === 'create' && method === 'POST') {
@@ -233,7 +234,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
                 return no('Receipt profile changed', 409);
             if (!e) {
                 e = {
-                    actor: u.id, profile: { ...b }, revision: 1, cursor: 'app', status: 'waiting', app: ++appId
+                    actor: u.id, group: b.group_intent==='new'?1000+appId:Number(b.group), profile: { ...b }, revision: 1, cursor: b.group_intent==='new'?'address':'app', status: 'waiting', app: ++appId
                 };
                 operations.set(id, e);
             }
@@ -281,6 +282,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         });
     }
     if (path === '/api/edge/release' && method === 'POST') {
+        if (!save) return no();
         const manifest = b.manifest as {
             path: string;
             sha256: string;
@@ -299,28 +301,32 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
             uploadManifests.set(entry[0], r);
         }
         return ok({
-            release: entry[0], version: entry[1].version, status: entry[1].complete ? 'uploaded' : 'pending', uploads: entry[1].complete ? [] : manifest.map(e => ({
+            release: entry[0], version: entry[1].version, status: releases.find(x=>x.id===entry![0])?.status??(entry[1].complete?'uploaded':'pending'), uploads: entry[1].complete ? [] : manifest.map(e => ({
                 path: e.path, url: `https://deployment-storage.invalid/${entry![0]}/${encodeURIComponent(e.path)}`, headers: { 'x-amz-checksum-sha256': btoa(String.fromCharCode(...Uint8Array.from(e.sha256.match(/../g) ?? [], x => parseInt(x, 16)))) }
             }))
         });
     }
     if (path === '/api/edge/release/complete' && method === 'POST') {
+        if (!save) return no();
         const r = uploadManifests.get(Number(b.release));
         if (!r || r.manifest.some(m => !uploadedPaths.has(`${b.release}/${m.path}`)))
             return no('Missing uploaded files', 400);
-        if (r.deployment)
+        const active=attempts.find(a=>a.webapp===r.app&&a.release.id===Number(b.release)&&['queued','deploying','rolling_back','live'].includes(a.status));
+        if (currentReleaseId===Number(b.release)&&active)
             return ok({
-                release: Number(b.release), version: r.version, status: 'uploaded', promoted: true, deployment: r.deployment, deployment_status: attempts.find(a => a.id === r.deployment)?.status ?? 'unknown', webapp: r.app
+                release: Number(b.release), version: r.version, status: 'uploaded', promoted: true, deployment: active.id, deployment_status: active.status, webapp: r.app
             });
         r.complete = true;
         const release = {
-            id: Number(b.release), webapp: r.app, version: r.version, status: 'uploaded', source: 'upload', created: stamp
+            id: Number(b.release), webapp: r.app, version: r.version, status: 'live', source: 'upload', created: stamp
         };
         const a = {
-            id: ++deployment, webapp: r.app, release, status: 'deploying', created: stamp, finished: ''
+            id: ++deployment, webapp: r.app, release, status: scenario==='rolled-back'?'rolled_back':scenario==='mixed-webapp'?'failed':scenario==='superseded-webapp'?'superseded':'deploying', created: new Date().toISOString(), finished: ''
         };
+        const previous=currentReleaseId;currentReleaseId=release.id;
+        if(['rolled_back','superseded'].includes(a.status))currentReleaseId=previous;
         attempts.unshift(a);
-        releases.unshift(release);
+        if(!releases.some(x=>x.id===release.id))releases.unshift(release);
         r.deployment = a.id;
         return ok({
             release: release.id, version: r.version, status: 'uploaded', promoted: true, deployment: a.id, deployment_status: a.status, webapp: r.app
@@ -328,8 +334,8 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
     }
     return no('Unsupported deployment method', 405);
 }
-function statusPayload(a: typeof attempts[number]) { const status = scenario === 'rolled-back' ? 'rolled_back' : a.status; return {
-    deployment: a.id, webapp: a.webapp, release: a.release.id, version: a.release.version, status, terminal: ['live', 'failed', 'rolled_back'].includes(status), success: status === 'live', detail: status === 'rolled_back' ? 'Attempted release failed; rollback observed' : scenario === 'mixed-webapp' ? 'Partial node proof; mixed fleet possible' : 'Fixture observation', created: a.created, finished: a.finished, targets: [{ runner: 'node-a', status: status === 'live' ? 'succeeded' : 'unknown' }], rollback_targets: []
+function statusPayload(a: typeof attempts[number]) { const status = a.status; return {
+    deployment: a.id, webapp: a.webapp, release: a.release.id, version: a.release.version, status, terminal: ['live', 'failed', 'rolled_back', 'superseded'].includes(status), success: status === 'live', detail: status === 'rolled_back' ? 'Attempted release failed; rollback observed' : scenario === 'mixed-webapp' ? 'Partial node proof; mixed fleet possible' : 'Fixture observation', created: a.created, finished: a.finished, targets: [{ runner: 'node-a', status: status === 'live' ? 'succeeded' : 'unknown' }], rollback_targets: []
 }; }
 /** Secondary storage simulator receives the exact anonymous PUT contract, never an API token. */
 export async function deploymentMockStorageFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> { const url = new URL(String(input)); if (url.origin !== 'https://deployment-storage.invalid')

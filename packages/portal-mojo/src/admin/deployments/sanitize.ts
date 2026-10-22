@@ -54,7 +54,7 @@ export function projectBootstrap(v: unknown): Bootstrap { const r = record(v); r
     }; }).filter(x => x.id > 0), can_create_webapp_group: r.can_create_webapp_group === true, setup: record(r.capabilities).setup === true
 }; }
 export function projectDeployment(v: unknown): DeploymentStatus { const r = record(v), status = text(r.status) || 'unknown'; return {
-    deployment: positiveId(r.deployment), webapp: positiveId(r.webapp), release: positiveId(r.release), version: text(r.version), status, terminal: ['live', 'failed', 'rolled_back'].includes(status) && r.terminal === true, success: status === 'live' && r.success === true, detail: text(r.detail, 1500), created: dateText(r.created), started: dateText(r.started), finished: dateText(r.finished), targets: list(r.targets).map(proof), rollback_targets: list(r.rollback_targets).map(proof)
+    deployment: positiveId(r.deployment), webapp: positiveId(r.webapp), release: positiveId(r.release), version: text(r.version), status, terminal: ['live', 'failed', 'rolled_back', 'superseded'].includes(status) && r.terminal === true, success: status === 'live' && r.success === true, detail: text(r.detail, 1500), created: dateText(r.created), started: dateText(r.started), finished: dateText(r.finished), targets: list(r.targets).map(proof), rollback_targets: list(r.rollback_targets).map(proof)
 }; }
 export function projectOperation(v: unknown): OnboardingOperation { const r = record(v), g = record(r.group), p = record(r.profile), e = record(r.evidence), a = record(e.app), d = record(e.address), h = record(e.github), f = record(e.verify), resources = record(r.resources); if (r.schema_version !== 1 || !uuid(r.operation_id))
     throw new Error('Invalid onboarding operation'); return {

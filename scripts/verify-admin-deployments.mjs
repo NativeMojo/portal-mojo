@@ -7,13 +7,29 @@ const server=await createServer({root:process.cwd(),appType:'custom',logLevel:'s
 try{
  const root='/packages/portal-mojo/src/admin/deployments/';
  const sanitize=await server.ssrLoadModule(root+'sanitize.ts'),state=await server.ssrLoadModule(root+'deployment-state.ts'),onboarding=await server.ssrLoadModule(root+'onboarding-state.ts'),upload=await server.ssrLoadModule(root+'upload.ts'),receipts=await server.ssrLoadModule(root+'receipts.ts'),perms=await server.ssrLoadModule(root+'permissions.ts'),mock=await server.ssrLoadModule('/packages/portal-mojo/src/client/deployments-mock.ts');
+
+ const regression=process.env.DEPLOYMENT_REGRESSION;
+ if(!regression||regression==='authority'){
+  const app={id:1,group:{id:1}};
+  const viewer={permissions:{view_dns:true,manage_webapp:true}};
+  assert.equal(perms.webAppAuthority(viewer,app).custom,false,'VIEW plus manage_webapp must not satisfy exact WebApp SAVE');
+  assert.equal(perms.webAppAuthority(viewer,app).release,false,'Manual release registration requires SAVE');
+  assert.equal(perms.webAppAuthority({permissions:{}},app,viewer).custom,false,'Owning-group VIEW plus verb is not SAVE');
+  assert(perms.webAppAuthority({permissions:{manage_dns:true,manage_webapp:true}},app).custom);
+  const ctx={user:{id:7,permissions:viewer.permissions},keyBacked:false,authTime:Date.now()/1000};
+  for(const path of ['/api/edge/webapp/link_key','/api/edge/webapp/revoke_key','/api/edge/webapp/rollback','/api/edge/release'])assert.equal(mock.deploymentsMock(path,{method:'POST',body:{webapp:1,group:1,release:100,action:'mint',operation_id:crypto.randomUUID(),version:'v',manifest:[{path:'index.html',sha256:'a'.repeat(64),size:1}]}},ctx).code,403,`${path} requires SAVE in the mock too`);
+ }
+ if(!regression||regression==='superseded'){
+  const status=sanitize.projectDeployment({deployment:900,webapp:1,release:100,status:'superseded',terminal:true,success:true});
+  assert.equal(status.terminal,true,'Superseded is a terminal deployment, not an unsettled observer');assert.equal(status.success,false);
+ }
  const canary='NEVER-CACHE-CREDENTIAL';
  const row=sanitize.projectSummary({webapp:{id:1,slug:'app',token:canary,bucket:canary},address:{hostname:'app.example.test',certificate:{status:'new-status',not_after:'2027'},private_key:canary},current_release:{id:10,version:'A',status:'live',source:'github',secret:canary},latest_deployment:{id:12,status:'failed',release:{id:11,version:'B',token:canary}},onboarding:{status:'waiting',cursor:'address',evidence:{token:canary}},deployment_key:{linked:true,active:true,token:canary},token:canary});
  assert.equal(row.current_release.version,'A');assert.equal(row.latest_deployment.release.version,'B');assert.equal(row.address.certificate.status,'new-status');assert(!JSON.stringify(row).includes(canary));
  assert(!JSON.stringify(sanitize.projectWebAppObject({id:1,group:{id:2,name:'Own',token:canary},bucket:canary,prefix:canary})).includes(canary));
  assert.deepEqual(state.apiActions('failed'),['retry','verify']);assert.deepEqual(state.apiActions('partial'),['verify','converge']);for(const value of ['requested','canary','fleet','superseded','future-status'])assert.deepEqual(state.apiActions(value),[]);
  for(const status of ['uploaded','live','superseded'])assert(state.rollbackEligible({id:2,status},{id:1}));assert(!state.rollbackEligible({id:1,status:'live'},{id:1}));assert(!state.rollbackEligible({id:2,status:'pending'},{id:1}));
- const member={permissions:{manage_webapp:true,view_dns:true}},app={id:1,group:{id:1}};assert(perms.webAppAuthority({permissions:{}},app,member).custom);assert(!perms.webAppAuthority({permissions:{}},app,member).workflow);assert(!perms.canReadApi({permissions:{view_platform_security:true}}));assert(!perms.canReadWebApps({permissions:{admin:true}}));
+ const member={permissions:{manage_webapp:true,view_dns:true}},app={id:1,group:{id:1}};assert(!perms.webAppAuthority({permissions:{}},app,member).custom);assert(!perms.webAppAuthority({permissions:{}},app,member).workflow);assert(!perms.canReadApi({permissions:{view_platform_security:true}}));assert(!perms.canReadWebApps({permissions:{admin:true}}));
  assert(!onboarding.onboardingPollable({status:'waiting',cursor:'address',next_attempt_at:''}));assert(!onboarding.onboardingPollable({status:'active',cursor:'future'}));assert.deepEqual(onboarding.managedChoice({cursor:'address'},10,'app'),{domain:10,label:'app'});
  const user={id:7,is_superuser:true,is_active:true,permissions:{}},ctx={user,keyBacked:false,authTime:Date.now()/1000};
  assert.equal(mock.deploymentsMock('/api/edge/unrelated',{method:'GET'},ctx),undefined);assert.equal(mock.deploymentsMock('/api/account/admin/bootstrap',{},ctx),undefined);
@@ -27,6 +43,16 @@ try{
  const checksum=btoa(String.fromCharCode(...Uint8Array.from(manifest[0].sha256.match(/../g),x=>parseInt(x,16))));let putCalls=0;await upload.putReleaseFiles([file],manifest,[{path:'index.html',url:'https://storage.example.test/signed',headers:{'x-amz-checksum-sha256':checksum}}],controller.signal,()=>{},async(url,opts)=>{putCalls++;assert.equal(opts.method,'PUT');assert.equal(opts.credentials,'omit');assert.equal(opts.redirect,'error');assert.deepEqual(Object.keys(opts.headers),['x-amz-checksum-sha256']);assert.equal(opts.body,file);return new Response('',{status:200});});assert.equal(putCalls,1);await assert.rejects(()=>upload.putReleaseFiles([file],manifest,[{path:'index.html',url:'https://storage.example.test/signed',headers:{'x-amz-checksum-sha256':checksum}}],controller.signal,()=>{},async()=>{throw new Error(canary);}),error=>!error.message.includes(canary)&&/CORS/.test(error.message));
  mock.setDeploymentMockScenario('reported-only');const reported=sanitize.projectPlatform(mock.deploymentsMock('/api/account/admin/platform',{params:{sections:'deployments,api'}},ctx).data).deployments.data.items.find(x=>x.id==='22222222-2222-4222-8222-222222222222');assert.equal(reported.node_summary.proven,0);assert(state.platformProof(reported).includes('2 reported'));
  mock.setDeploymentMockScenario('revision-conflict');const op=crypto.randomUUID();const created=mock.deploymentsMock('/api/edge/webapp/onboarding/create',{method:'POST',body:{operation_id:op,group:1,slug:'x'}},ctx);assert.equal(created.data.operation.operation_id,op);assert.equal(mock.deploymentsMock('/api/edge/webapp/onboarding/choose',{method:'POST',body:{operation:op,revision:1,step:'app',choice:{}}},ctx).code,409);
+
+ if(!regression||regression==='completion-mock-parity'){
+  mock.resetDeploymentMock();mock.setDeploymentMockScenario('rolled-back');
+  const registered=mock.deploymentsMock('/api/edge/release',{method:'POST',body:{webapp:1,group:1,version:'terminal-first-attempt',manifest}},ctx).data;
+  await mock.deploymentMockStorageFetch(registered.uploads[0].url,{method:'PUT',headers:registered.uploads[0].headers,body:file,credentials:'omit'});
+  const first=mock.deploymentsMock('/api/edge/release/complete',{method:'POST',body:{release:registered.release,group:1}},ctx).data;
+  const terminal=mock.deploymentsMock(`/api/edge/release/deployment/${first.deployment}`,{},ctx).data;assert.equal(terminal.status,'rolled_back');
+  const repeated=mock.deploymentsMock('/api/edge/release/complete',{method:'POST',body:{release:registered.release,group:1}},ctx).data;
+  assert.notEqual(repeated.deployment,first.deployment,'Backend completion promotes again after a terminal unsuccessful attempt; mock must not fabricate permanent idempotency');
+ }
  console.log('Deployments contracts: safe DTOs, independent authority, current/latest identities, status matrix, stable receipts, exact retry, key replay, cursor refusal, manifest collision and anonymous checksum PUT passed.');
 }finally{await server.close();dom.window.close();}
 // Exercise the ACTUAL client transport and single unwrap boundary for both paths.
