@@ -1,17 +1,18 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usingMockTransport, useMe } from '../../client/runtime';
 import { completeUpload, getDeployment, reconcileUploadCompletion, resolveAppAuthority, getWebApp, registerUpload } from './api';
 import { isInteractive } from './permissions';
 import { buildManifest, manifestEqual, putReleaseFiles } from './upload';
 import { makeReceipt, receiptsFor, saveReceipt, settleReceipt } from './receipts';
 import { useDeploymentObservation, useDeploymentOwner } from './useDeploymentObservation';
-import { ErrorNotice, Status, useWrite } from './shared';
+import { DeploymentHelp, ErrorNotice, Status, useWrite } from './shared';
 import type { WebAppObject } from './types';
 
-export function WebAppUploadPanel({ app, onClose, onBusy }: {
+export function WebAppUploadPanel({ app, onClose, onBusy, onChanged }: {
     app: WebAppObject;
     onClose?: () => void;
     onBusy?: (v: boolean) => void;
+    onChanged?: () => void;
 }) {
     const s = useDeploymentOwner(), me = useMe(), w = useWrite(s.owner, s.signal, onBusy);
     const files = useRef<File[]>([]);
@@ -81,10 +82,15 @@ export function WebAppUploadPanel({ app, onClose, onBusy }: {
         files.current = []; setFileCount(0);
         setProgress('New deployment consent recorded. Reselect the identical artifact and deliberately upload/deploy again.');
     });
-    if (observe.value?.terminal) {
+    const notified = useRef(new Set<number>());
+    useEffect(() => {
+        if (!observe.value?.terminal) return;
         const receipt = receiptsFor(s.owner).find(r => r.kind === 'upload' && r.app === app.id && r.deployment === observe.value?.deployment);
         if (receipt && !receipt.settled) settleReceipt(receipt);
-    }
+        if (!notified.current.has(observe.value.deployment)) {
+            notified.current.add(observe.value.deployment); onChanged?.();
+        }
+    }, [observe.value?.deployment, observe.value?.terminal, onChanged]);
     const lockedFiles = w.busy || !!tracked || completionSubmitted;
     const mayRenew = !!reconciliation && (!reconciliation.status ||
         (reconciliation.status.terminal && !reconciliation.status.success));
@@ -99,7 +105,7 @@ export function WebAppUploadPanel({ app, onClose, onBusy }: {
                 return copy;
             }); setFileCount(files.current.length);
         }} /></label>
-        <p>{fileCount} selected. Defaults: 5000 files, 1 GiB maximum; this installation may refuse lower limits. Reselect and rehash identical files to resume an upload that has not submitted completion.</p>
+        <p>{fileCount} files selected <DeploymentHelp label="Upload limits and resume">Default limits are 5000 files and 1 GiB; this installation may set lower limits. Reselect and rehash the identical files to resume an upload that has not submitted completion.</DeploymentHelp></p>
         {existing && !tracked && !completionSubmitted && <p>Pending version {existing.target}. Signed URLs were discarded; identical manifest registration remints them.</p>}
         {completionSubmitted && !tracked && <p role="status">Completion may already have started a deployment. Re-registering or sending completion again can start another rollout. Reconcile the recorded release first.</p>}
         {w.error && <ErrorNotice>{w.error}</ErrorNotice>}
