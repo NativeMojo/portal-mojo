@@ -33,11 +33,11 @@ attempt history and exact deployment status before naming its attempted version.
 The current release pointer is desired content, never proof of fleet convergence.
 HTTPS health and active certificates are independent observations.
 
-Rollback requires `manage_webapp` plus the owning object's VIEW/SAVE authority.
+Rollback requires `manage_webapp` plus the owning object's SAVE authority (`manage_dns|security`).
 Current-user membership may be resolved only for that known app's owning group;
 global grants bypass unnecessary membership reads. Bootstrap eligible groups do
 not grant or narrow existing-app custom actions. Manual release registration has
-its own exact object VIEW/SAVE predicate; workflow generation requires security or
+its own exact object SAVE predicate (`manage_dns|security`); read-only `view_dns` does not grant release registration; workflow generation requires security or
 both WebApp and DNS management. A 403 removes app mutation controls for that
 session. The backend remains authoritative for all object, actor, origin,
 interactive and freshness rules.
@@ -51,8 +51,7 @@ a failed rollout can leave mixed nodes. An uncertain rollback is not replayed on
 remount. Its safe receipt blocks conflicting app mutations while it is unsettled.
 
 New WebApp uses separately admitted bootstrap eligibility and server onboarding
-options/precheck. Missing destination, allowed bucket or managed apps domain
-blocks creation with a concrete prerequisite. Defaults are production, main,
+options/precheck. Missing destination or allowed bucket blocks creation with a concrete prerequisite. Existing workspaces precheck their concrete address before create. New-workspace intent deliberately has no domain before create and does not require an invented ready verdict. Defaults are production, main,
 dist and the first allowed bucket. The durable server operation owns cursor,
 revision, status, activity and resources. Choose/cancel use its latest observation;
 a revision/lease refusal requires another detail read, never repeated POST.
@@ -110,3 +109,32 @@ replacement, fresh auth without replay, one-time key replay, denied no-request
 lanes, safe operation resume, terminal/parked/error/timeout and observer disposal.
 The central integration owner runs the full release/modal inventories and actual
 light/dark, narrow and native-dialog browser verification.
+
+
+New workspace continuation uses the exact `operation.group.id` returned by durable
+create. That group identity is saved separately from the immutable create profile;
+resuming never rewrites `group_intent:new` into another create body. The address
+cursor reads options for that concrete group and explicitly links to the host's
+registered Domains destination when configured and independently admitted. A new
+workspace starts without an own/ancestor domain; configure or connect one for the
+named group, refresh options, then precheck the address and submit the returned
+`domain`/normalized `label` with the latest operation revision. Continue stays
+unavailable with a concrete prerequisite until an actual address choice exists.
+The frontend never borrows an installation-wide or unrelated workspace domain.
+
+A WebApp deployment marked `superseded` with `terminal:true` stops observation and
+settles its receipt, with `success:false`. It is not a successful rollout.
+
+Upload receipts durably record `completion_submitted`, the completion timestamp,
+and bounded prior deployment IDs before sending completion. Completion is a new
+promotion request: after an earlier failed, rolled-back or superseded attempt,
+repeating it can create another deployment. A lost response therefore blocks
+implicit registration/completion even after remount or same-manifest reselection.
+Reconcile reads the owning app summary/history and validates exact app, release,
+version and newly observed deployment identity before observing terminal outcome.
+Ambiguity remains unknown. Only a separately typed, freshly rechecked new deployment
+consent permits resetting the local upload phase; that consent sends no POST and
+requires a subsequent deliberate reselect/upload/deploy action. It neither erases
+an earlier attempt nor silently replays it. The mock follows the backend's narrow
+reuse rule: current release plus an active/live attempt, not permanent reuse for
+every release ID.

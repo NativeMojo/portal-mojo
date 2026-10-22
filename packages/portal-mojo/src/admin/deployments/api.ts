@@ -4,7 +4,7 @@ import { appActionsRefused, refuseAppActions } from './authority-state';
 import type { FetchOpts } from '../../client/client';
 import { projectAttempt, projectBootstrap, projectDeployment, projectOperation, projectOptions, projectPlatform, projectPlatformAttempt, projectPrecheck, projectRelease, projectSummaries, projectSummary, projectWebAppObject, record, text, positiveId, list, uuid } from './sanitize';
 import { assertOwner, webAppAuthority, type DeploymentOwner } from './permissions';
-import { appUnsettled, saveReceipt, singleFlight, type ActionReceipt } from './receipts';
+import { appUnsettled, receiptsFor, saveReceipt, singleFlight, type ActionReceipt } from './receipts';
 import type { BackendGlobalUser } from '../fleet/access';
 import type { WebAppObject } from './types';
 import type { ApiAction, CreateProfile, ManifestEntry, OnboardingOperation } from './types';
@@ -56,7 +56,7 @@ catch (error) {
     if (error instanceof MojoError && error.status === 403 && r.app)
         refuseAppActions(o, r.app);
     if (error && typeof error === 'object' && 'status' in error && [400, 401, 403, 404, 409, 440].includes(Number(error.status)))
-        saveReceipt({ ...r, settled: true });
+        saveReceipt({ ...r, settled: r.kind==='upload'&&r.uploadPhase==='completion_submitted'?false:true });
     throw new Error(error instanceof DOMException && error.name === 'AbortError' ? 'Session or view changed. The submitted operation may persist. Resume to reconcile.' : 'The operation was refused or delivery is uncertain. Refresh authoritative state before retrying.');
 } }); }
 export async function recoverApi(o: DeploymentOwner, r: ActionReceipt, id: string, action: ApiAction, signal?: AbortSignal) { if (!uuid(id))
@@ -104,7 +104,7 @@ export const getHealth = (o: DeploymentOwner, app: number, group: number, signal
     throw new Error('Health identity mismatch'); return {
     status: text(r.status) || 'unknown', detail: text(r.detail, 500), checked: text(r.checked)
 }; }, { params: { webapp: app, group }, signal });
-export async function registerUpload(o: DeploymentOwner, r: ActionReceipt, app: number, group: number, version: string, manifest: ManifestEntry[], signal?: AbortSignal) { return write(o, r, `${ROOT}/release`, {
+export async function registerUpload(o: DeploymentOwner, r: ActionReceipt, app: number, group: number, version: string, manifest: ManifestEntry[], signal?: AbortSignal) { const current=receiptsFor(o).find(x=>x.key===r.key)??r;if(['completion_submitted','observing'].includes(current.uploadPhase??''))throw new Error('Completion was already submitted. Reconcile its exact deployment before a new explicit deployment decision.');return write(o, r, `${ROOT}/release`, {
     webapp: app, group, version, manifest
 }, v => { const d = record(v); if (!positiveId(d.release) || text(d.version) !== version)
     throw new Error('Release identity mismatch'); return {
@@ -112,7 +112,26 @@ export async function registerUpload(o: DeploymentOwner, r: ActionReceipt, app: 
         path: text(u.path, 1024), url: text(u.url, 8192), headers: { 'x-amz-checksum-sha256': text(h['x-amz-checksum-sha256'], 64) }
     }; })
 }; }, signal); }
-export const completeUpload = (o: DeploymentOwner, r: ActionReceipt, release: number, app: number, group: number, signal?: AbortSignal) => write(o, r, `${ROOT}/release/complete`, { release, group }, v => { const d = record(v); if (positiveId(d.release) !== release || positiveId(d.webapp) !== app || !positiveId(d.deployment))
-    throw new Error('Completion identity mismatch'); return {
-    deployment: positiveId(d.deployment), release, app
-}; }, signal);
+/** Completion is a deployment request, not an idempotent verification read. */
+export async function completeUpload(o:DeploymentOwner,r:ActionReceipt,release:number,app:number,group:number,signal?:AbortSignal){
+ return singleFlight(`upload-completion:${o.actor}:${app}`,async()=>{
+  const current=receiptsFor(o).find(x=>x.key===r.key)??r;
+  if(['completion_submitted','observing'].includes(current.uploadPhase??''))throw new Error('Completion delivery is unsettled or already observed. Reconcile before consenting to another deployment.');
+  if(current.release!==release||current.app!==app)throw new Error('Upload receipt identity changed');
+  const history=await getHistory(o,app,'deployment',0,signal,100);
+  const submitted=saveReceipt({...current,uploadPhase:'completion_submitted',completionSubmittedAt:Date.now(),completionBaseline:history.items.map(x=>x.id)});
+  const result=await write(o,submitted,`${ROOT}/release/complete`,{release,group},v=>{const d=record(v);if(positiveId(d.release)!==release||positiveId(d.webapp)!==app||!positiveId(d.deployment))throw new Error('Completion identity mismatch');return {deployment:positiveId(d.deployment),release,app};},signal);
+  saveReceipt({...submitted,uploadPhase:'observing',deployment:result.deployment});return result;
+ });
+}
+export async function reconcileUploadCompletion(o:DeploymentOwner,r:ActionReceipt,signal?:AbortSignal){
+ const current=receiptsFor(o).find(x=>x.key===r.key)??r;
+ if(current.kind!=='upload'||!current.release||!['completion_submitted','observing'].includes(current.uploadPhase??''))throw new Error('No submitted completion receipt is available');
+ const [summary,history]=await Promise.all([getSummary(o,current.app,signal),getHistory(o,current.app,'deployment',0,signal,100)]);
+ const candidates=history.items.filter(x=>{const a=x as import('./types').Attempt;return !!a.release&&a.release.id===current.release&&a.release.version===current.target&&!(current.completionBaseline??[]).includes(a.id);});
+ const id=current.deployment??(candidates.length===1?candidates[0]!.id:0);
+ const status=id?await getDeployment(o,id,current.app,current.release,signal):null;
+ const signature=JSON.stringify([summary.current_release?.id??null,history.items.map(x=>[x.id,x.status,(x as import('./types').Attempt).release?.id])]);
+ if(status)saveReceipt({...current,uploadPhase:'observing',deployment:status.deployment,settled:status.terminal});
+ return {receipt:receiptsFor(o).find(x=>x.key===current.key)!,status,signature};
+}
