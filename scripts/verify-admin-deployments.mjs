@@ -23,6 +23,20 @@ try{
   const status=sanitize.projectDeployment({deployment:900,webapp:1,release:100,status:'superseded',terminal:true,success:true});
   assert.equal(status.terminal,true,'Superseded is a terminal deployment, not an unsettled observer');assert.equal(status.success,false);
  }
+ // Ordinary viewers inspect scoped generic rows; rich rollout status retains SAVE authority.
+ const uxCtx={user:{id:7,permissions:{view_dns:true}},keyBacked:false,authTime:Date.now()/1000};
+ const scopedAttempt=mock.deploymentsMock('/api/edge/deployment',{params:{webapp:1,id:302,graph:'default',start:0,size:1}},uxCtx);
+ assert.equal(scopedAttempt.data.length,1);assert.equal(scopedAttempt.data[0].id,302);assert(!('targets' in scopedAttempt.data[0]));assert(!('webapp' in scopedAttempt.data[0]));
+ assert.equal(mock.deploymentsMock('/api/edge/deployment',{params:{webapp:999,id:302,size:1}},uxCtx).data.length,0,'Exact app filter must confine attempt lookup');
+ assert.equal(mock.deploymentsMock('/api/edge/release/deployment/302',{},uxCtx).code,404,'Viewer must not be sent to SAVE-gated rollout status');
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/health',{params:{webapp:1,group:1}},uxCtx).status,true,'Explicit health read is VIEW-first on the backend');
+ mock.setDeploymentMockScenario('collector-unavailable');const unavailable=sanitize.projectPlatform(mock.deploymentsMock('/api/account/admin/platform',{params:{sections:'deployments,api'}},{...uxCtx,user:{id:7,is_superuser:true}}).data);assert.equal(unavailable.deployments.data,null);assert.equal(unavailable.deployments.status,'unavailable');
+ mock.setDeploymentMockScenario('many-releases');const older=mock.deploymentsMock('/api/edge/release',{params:{webapp:1,start:25,size:5}},uxCtx);assert.equal(older.data.length,5);assert(older.count>25);const exactOlder=mock.deploymentsMock('/api/edge/release',{params:{webapp:1,id:older.data[0].id,size:1}},uxCtx);assert.equal(exactOlder.data.length,1);assert.equal(exactOlder.data[0].id,older.data[0].id);
+ const profileBody={display_name:'Renamed',environment:'staging',github_repository:'Example/app',deployment_ref:'main',build_output:'dist'};
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{method:'POST',body:profileBody},uxCtx).code,403);
+ const profileCtx={...uxCtx,user:{id:7,permissions:{manage_dns:true}},authTime:0};assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{method:'POST',body:profileBody},profileCtx).status,true,'Generic profile CRUD has no invented fresh-auth requirement');
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{},profileCtx).data.repository,'Example/app');assert.equal(mock.deploymentsMock('/api/edge/webapp/1',{method:'POST',body:{...profileBody,bucket:'other'}},profileCtx).code,400);
+ mock.resetDeploymentMock();
  const canary='NEVER-CACHE-CREDENTIAL';
  const row=sanitize.projectSummary({webapp:{id:1,slug:'app',token:canary,bucket:canary},address:{hostname:'app.example.test',certificate:{status:'new-status',not_after:'2027'},private_key:canary},current_release:{id:10,version:'A',status:'live',source:'github',secret:canary},latest_deployment:{id:12,status:'failed',release:{id:11,version:'B',token:canary}},onboarding:{status:'waiting',cursor:'address',evidence:{token:canary}},deployment_key:{linked:true,active:true,token:canary},token:canary});
  assert.equal(row.current_release.version,'A');assert.equal(row.latest_deployment.release.version,'B');assert.equal(row.address.certificate.status,'new-status');assert(!JSON.stringify(row).includes(canary));
@@ -43,6 +57,41 @@ try{
  const checksum=btoa(String.fromCharCode(...Uint8Array.from(manifest[0].sha256.match(/../g),x=>parseInt(x,16))));let putCalls=0;await upload.putReleaseFiles([file],manifest,[{path:'index.html',url:'https://storage.example.test/signed',headers:{'x-amz-checksum-sha256':checksum}}],controller.signal,()=>{},async(url,opts)=>{putCalls++;assert.equal(opts.method,'PUT');assert.equal(opts.credentials,'omit');assert.equal(opts.redirect,'error');assert.deepEqual(Object.keys(opts.headers),['x-amz-checksum-sha256']);assert.equal(opts.body,file);return new Response('',{status:200});});assert.equal(putCalls,1);await assert.rejects(()=>upload.putReleaseFiles([file],manifest,[{path:'index.html',url:'https://storage.example.test/signed',headers:{'x-amz-checksum-sha256':checksum}}],controller.signal,()=>{},async()=>{throw new Error(canary);}),error=>!error.message.includes(canary)&&/CORS/.test(error.message));
  mock.setDeploymentMockScenario('reported-only');const reported=sanitize.projectPlatform(mock.deploymentsMock('/api/account/admin/platform',{params:{sections:'deployments,api'}},ctx).data).deployments.data.items.find(x=>x.id==='22222222-2222-4222-8222-222222222222');assert.equal(reported.node_summary.proven,0);assert(state.platformProof(reported).includes('2 reported'));
  mock.setDeploymentMockScenario('revision-conflict');const op=crypto.randomUUID();const created=mock.deploymentsMock('/api/edge/webapp/onboarding/create',{method:'POST',body:{operation_id:op,group:1,slug:'x'}},ctx);assert.equal(created.data.operation.operation_id,op);assert.equal(mock.deploymentsMock('/api/edge/webapp/onboarding/choose',{method:'POST',body:{operation:op,revision:1,step:'app',choice:{}}},ctx).code,409);
+
+
+ // A created app becomes inspectable in its owner's summary inventory without
+ // borrowing the seed app's release or deployment history.
+ const createdId=created.data.operation.resources.webapp;
+ const createdInventory=mock.deploymentsMock('/api/edge/webapp/summaries',{},ctx).data;
+ const createdSummary=createdInventory.items.find(row=>row.webapp.id===createdId);
+ assert(createdSummary,'Created WebApp is visible after list refresh');
+ assert.equal(createdSummary.webapp.slug,'x');
+ assert.equal(createdSummary.current_release,null);
+ assert.equal(createdSummary.latest_deployment,null);
+ assert.equal(createdSummary.onboarding.status,'waiting');
+ const anotherActorInventory=mock.deploymentsMock('/api/edge/webapp/summaries',{}, {...ctx,user:{...ctx.user,id:88}}).data;
+ assert(!anotherActorInventory.items.some(row=>row.webapp.id===createdId),'Created mock operations are actor-owned');
+ const newKeyStatus=mock.deploymentsMock('/api/edge/webapp/key_status',{params:{webapp:createdId}},ctx).data;
+ assert.equal(newKeyStatus.status.linked,false,'Created app cannot inherit the seed deployment key');
+ const createdKeyBody={webapp:createdId,group:1,operation_id:crypto.randomUUID()};
+ mock.deploymentsMock('/api/edge/webapp/link_key',{method:'POST',body:createdKeyBody},ctx);
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/summary',{params:{webapp:createdId}},ctx).data.deployment_key.linked,true);
+ mock.deploymentsMock('/api/edge/webapp/revoke_key',{method:'POST',body:{...createdKeyBody,operation_id:crypto.randomUUID()}},ctx);
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/key_status',{params:{webapp:createdId}},ctx).data.status.linked,false);
+ assert.equal(mock.deploymentsMock('/api/edge/webapp/key_status',{params:{webapp:1}},ctx).data.status.linked,true,'Created-app revocation cannot alter seed CI access');
+ const seedBeforeFirstUpload=mock.deploymentsMock('/api/edge/webapp/summary',{params:{webapp:1}},ctx).data;
+ const createdRegistration=mock.deploymentsMock('/api/edge/release',{method:'POST',body:{webapp:createdId,group:1,version:'first-created-release',manifest}},ctx).data;
+ await mock.deploymentMockStorageFetch(createdRegistration.uploads[0].url,{method:'PUT',headers:createdRegistration.uploads[0].headers,body:file,credentials:'omit'});
+ const createdCompletion=mock.deploymentsMock('/api/edge/release/complete',{method:'POST',body:{release:createdRegistration.release,group:1}},ctx).data;
+ const firstObserved=mock.deploymentsMock(`/api/edge/release/deployment/${createdCompletion.deployment}`,{},ctx).data;
+ assert.equal(firstObserved.status,'live');
+ const uploadedCreated=mock.deploymentsMock('/api/edge/webapp/summary',{params:{webapp:createdId}},ctx).data;
+ assert.equal(uploadedCreated.current_release?.id,createdRegistration.release,'Created app exposes its own first desired release after upload');
+ assert.equal(uploadedCreated.latest_deployment?.id,createdCompletion.deployment);
+ assert.equal(uploadedCreated.latest_deployment?.status,'live');
+ const seedAfterFirstUpload=mock.deploymentsMock('/api/edge/webapp/summary',{params:{webapp:1}},ctx).data;
+ assert.equal(seedAfterFirstUpload.current_release.id,seedBeforeFirstUpload.current_release.id,'Created-app upload cannot change seed desired content');
+ assert.equal(seedAfterFirstUpload.latest_deployment.id,seedBeforeFirstUpload.latest_deployment.id,'Created-app upload cannot replace seed latest attempt');
 
  if(!regression||regression==='completion-mock-parity'){
   mock.resetDeploymentMock();mock.setDeploymentMockScenario('rolled-back');

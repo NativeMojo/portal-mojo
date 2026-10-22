@@ -500,21 +500,21 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx:openRecovery:modal.open:0",
-      "fingerprint": "fc529513535ae357daf9",
+      "fingerprint": "dac3e37d85660fec2297",
       "category": "action",
-      "purpose": "Confirm exact observed API attempt recovery and follow the returned identity"
+      "purpose": "Confirm latest-only exact API attempt recovery after fresh status/authority preflight; no arbitrary commit and no implicit POST replay. Runtime: deployments mounted."
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:loadUpload:modal.open:0",
-      "fingerprint": "1ffe3acd949398053ae6",
+      "fingerprint": "3432f60affae865e554c",
       "category": "action",
-      "purpose": "Register an immutable manifest, upload checksum-bound files, and observe the exact deployment"
+      "purpose": "Focused upload task with one compact header close: immutable manifest, anonymous checksum-bound storage upload and exact rollout observation; native pending dismissal guard, terminal owner refresh and concise success without replay controls."
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchRollback:modal.open:0",
-      "fingerprint": "305b2c916cfd5ded0c85",
+      "fingerprint": "6b5390b518b96e119cc8",
       "category": "action",
-      "purpose": "Review verified release and exact app/version confirmation before rollback and bounded observation"
+      "purpose": "Review selected paged verified release with fresh exact app/target preflight and typed consent; no replay, native pending lock and exact terminal owner refresh."
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchKey:modal.open:0",
@@ -524,15 +524,15 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:resume:modal.open:0",
-      "fingerprint": "c0df87a061beb97c3d22",
+      "fingerprint": "a4b0e5b94c867812b9e5",
       "category": "action",
-      "purpose": "Resume the matching durable onboarding operation using observed cursor and revision"
+      "purpose": "Resume matching durable setup receipt at the observed server cursor/revision; preserve native write guard and refresh owning summary on transitions."
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:newApp:modal.open:0",
-      "fingerprint": "4c01462dfcd12640f40b",
+      "fingerprint": "85d04bc54f195a2723cb",
       "category": "editor",
-      "purpose": "Choose eligible workspace, app identity and public address for durable server onboarding"
+      "purpose": "Eligible WebApps lane app/build draft then current durable server task; exact receipt/profile ownership, native pending lock and transition refresh."
     },
     {
       "id": "packages/portal-mojo/src/admin/maintenance/MaintenanceDialogs.tsx:MaintenanceDialog:dialog:0",
@@ -635,6 +635,54 @@
       "fingerprint": "1080fdf32600c97fe26d",
       "category": "action",
       "purpose": "Observe a retained exact upgrade or framework deployment operation without resubmitting or clearing uncertainty"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:cancel:modal.open:0",
+      "fingerprint": "b90e85679351c5ceaeeb",
+      "category": "confirmation",
+      "purpose": "Explicit server-setup cancellation consent, preserving created resources and owner signal; parent write guard stays held while confirmation and cancellation run. Runtime: setup mounted and deployment safety tests."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:setupDetails:modal.open:0",
+      "fingerprint": "b0deaa7938fc2c688ffb",
+      "category": "record",
+      "purpose": "Read-only destination or durable operation identity/revision/activity in a focused dialog; no action rail or secrets."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:generate:modal.open:0",
+      "fingerprint": "b7bab598974d01bd99f1",
+      "category": "record",
+      "purpose": "Inspect generated workflow YAML with copy/download, bound to the current owner; YAML contains a secret reference, never credential material."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:showIntegration:modal.open:0",
+      "fingerprint": "b1fd05273d948719e6bb",
+      "category": "record",
+      "purpose": "Read-only Other CI integration instructions; no credential, mutation, or side navigation."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:inspectAttempt:modal.open:0",
+      "fingerprint": "719de7d8671f0df12775",
+      "category": "record",
+      "purpose": "Inspect exact app-filtered viewer-safe attempt; SAVE-authorized readers may request bounded node status. Active known attempts observe within deadline and refresh owner on terminal."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:edit:modal.open:0",
+      "fingerprint": "a4223606d75e00d1fff1",
+      "category": "editor",
+      "purpose": "Edit only supported app profile fields under exact SAVE authority; stale-state refusal, guarded single flight, honest uncertain-save recovery and no automatic POST replay."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:inspect:modal.open:0",
+      "fingerprint": "bf13aade2ebf603f0011",
+      "category": "record",
+      "purpose": "Focused API attempt task dialog: overview, nodes, activity and latest-only authorized recovery; owner lifetime and bounded observations."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:inspect:modal.open:1",
+      "fingerprint": "1051c37725e66dbefa73",
+      "category": "record",
+      "purpose": "Focused WebApp task dialog: desired/attempt identity, paged history, admitted deployment methods and settings; owner lifetime and independent action gates."
     }
   ],
   "lifecycle": [

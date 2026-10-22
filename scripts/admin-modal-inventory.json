@@ -5776,6 +5776,92 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:cancel:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx",
+      "owner": "cancel",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "cancel",
+      "target": null,
+      "fingerprint": "b90e85679351c5ceaeeb",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:setupDetails:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx",
+      "owner": "setupDetails",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "Facts",
+        "h3",
+        "p",
+        "button"
+      ],
+      "category": "record",
+      "parent": "setupDetails",
+      "target": null,
+      "fingerprint": "b0deaa7938fc2c688ffb",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:WebAppOnboardingDialog:cancel:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx",
+      "owner": "WebAppOnboardingDialog",
+      "launcher": "cancel",
+      "body": [],
+      "category": "confirmation",
+      "parent": "WebAppOnboardingDialog",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:cancel",
+      "fingerprint": "61d66248bc9c3b146f50",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:WebAppOnboardingDialog:handler:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx",
+      "owner": "WebAppOnboardingDialog",
+      "launcher": "setupDetails",
+      "body": [
+        "setupDetails"
+      ],
+      "category": "record",
+      "parent": "onClick",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:setupDetails",
+      "fingerprint": "deb5d3e23b785b84bbed",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:WebAppOnboardingDialog:handler:1",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx",
+      "owner": "WebAppOnboardingDialog",
+      "launcher": "setupDetails",
+      "body": [
+        "setupDetails"
+      ],
+      "category": "record",
+      "parent": "onClick",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppOnboardingDialog.tsx:setupDetails",
+      "fingerprint": "deb5d3e23b785b84bbed",
+      "categories": [
+        "record"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx:openRecovery:modal.open:0",
       "file": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx",
       "owner": "openRecovery",
@@ -5786,34 +5872,9 @@
       "category": "action",
       "parent": "openRecovery",
       "target": null,
-      "fingerprint": "fc529513535ae357daf9",
+      "fingerprint": "dac3e37d85660fec2297",
       "categories": [
         "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx:ApiDeploymentDetail:DetailView:0",
-      "file": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx",
-      "owner": "ApiDeploymentDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "div",
-        "Facts",
-        "Status",
-        "details",
-        "summary",
-        "p",
-        "button",
-        "h3",
-        "pre"
-      ],
-      "category": "record",
-      "parent": "ApiDeploymentDetail",
-      "target": null,
-      "fingerprint": "e4c70bade6be85969d75",
-      "categories": [
-        "record"
       ]
     },
     {
@@ -5845,6 +5906,22 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:generate:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx",
+      "owner": "generate",
+      "launcher": "modal.open",
+      "body": [
+        "WorkflowDialog"
+      ],
+      "category": "record",
+      "parent": "generate",
+      "target": null,
+      "fingerprint": "b7bab598974d01bd99f1",
+      "categories": [
+        "record"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:loadUpload:import:0",
       "file": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx",
       "owner": "loadUpload",
@@ -5864,16 +5941,50 @@
       "owner": "loadUpload",
       "launcher": "modal.open",
       "body": [
-        "div",
-        "h2",
-        "WebAppUploadPanel"
+        "UploadDialog"
       ],
       "category": "action",
       "parent": "loadUpload",
       "target": null,
-      "fingerprint": "1ffe3acd949398053ae6",
+      "fingerprint": "3432f60affae865e554c",
       "categories": [
         "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:showIntegration:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx",
+      "owner": "showIntegration",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "ol",
+        "li",
+        "code",
+        "p",
+        "button"
+      ],
+      "category": "record",
+      "parent": "showIntegration",
+      "target": null,
+      "fingerprint": "b1fd05273d948719e6bb",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:WebAppDeploySetup:generate:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx",
+      "owner": "WebAppDeploySetup",
+      "launcher": "generate",
+      "body": [],
+      "category": "record",
+      "parent": "WebAppDeploySetup",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:generate",
+      "fingerprint": "fa0016db43b28d071502",
+      "categories": [
+        "record"
       ]
     },
     {
@@ -5889,6 +6000,66 @@
       "categories": [
         "action",
         "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:WebAppDeploySetup:handler:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx",
+      "owner": "WebAppDeploySetup",
+      "launcher": "showIntegration",
+      "body": [
+        "showIntegration"
+      ],
+      "category": "record",
+      "parent": "onClick",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:showIntegration",
+      "fingerprint": "0831bc2bdba875adba48",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:<module>:import:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "a36cf9ffa77d3d9a138e",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:inspectAttempt:import:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "inspectAttempt",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "inspectAttempt",
+      "target": null,
+      "fingerprint": "70fc4e3e7db81562fd53",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:inspectAttempt:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "inspectAttempt",
+      "launcher": "modal.open",
+      "body": [
+        "WebAppDeploymentDetail"
+      ],
+      "category": "record",
+      "parent": "inspectAttempt",
+      "target": null,
+      "fingerprint": "719de7d8671f0df12775",
+      "categories": [
+        "record"
       ]
     },
     {
@@ -5916,7 +6087,7 @@
       "category": "action",
       "parent": "launchRollback",
       "target": null,
-      "fingerprint": "305b2c916cfd5ded0c85",
+      "fingerprint": "6b5390b518b96e119cc8",
       "categories": [
         "action"
       ]
@@ -5952,17 +6123,33 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:loadSetup:import:0",
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:edit:import:0",
       "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
-      "owner": "loadSetup",
+      "owner": "edit",
       "launcher": "import",
       "body": [],
       "category": "dependency",
-      "parent": "loadSetup",
+      "parent": "edit",
       "target": null,
-      "fingerprint": "a36cf9ffa77d3d9a138e",
+      "fingerprint": "80976a780f3dc41b15d3",
       "categories": [
         "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:edit:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "edit",
+      "launcher": "modal.open",
+      "body": [
+        "WebAppEditDialog"
+      ],
+      "category": "editor",
+      "parent": "edit",
+      "target": null,
+      "fingerprint": "a4223606d75e00d1fff1",
+      "categories": [
+        "editor"
       ]
     },
     {
@@ -5990,49 +6177,24 @@
       "category": "action",
       "parent": "resume",
       "target": null,
-      "fingerprint": "c0df87a061beb97c3d22",
+      "fingerprint": "a4b0e5b94c867812b9e5",
       "categories": [
         "action"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:DetailView:0",
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:inspectAttempt:0",
       "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
       "owner": "WebAppDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "div",
-        "Facts",
-        "Status",
-        "p",
-        "button",
-        "HistoryContext.Provider",
-        "ModelTable",
-        "Setup",
-        "Link"
-      ],
-      "category": "record",
-      "parent": "WebAppDetail",
-      "target": null,
-      "fingerprint": "f0e13bfed4b1103945be",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:launchRollback:0",
-      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
-      "owner": "WebAppDetail",
-      "launcher": "launchRollback",
+      "launcher": "inspectAttempt",
       "body": [],
       "category": "nested-flow",
       "parent": "WebAppDetail",
-      "target": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchRollback",
-      "fingerprint": "2a7df7a220fca46cbb24",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:inspectAttempt",
+      "fingerprint": "1939f929065b826200b3",
       "categories": [
-        "action",
-        "dependency"
+        "dependency",
+        "record"
       ]
     },
     {
@@ -6051,6 +6213,36 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:inspectAttempt:1",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "WebAppDetail",
+      "launcher": "inspectAttempt",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "WebAppDetail",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:inspectAttempt",
+      "fingerprint": "8a79a967be4a58c8c1a2",
+      "categories": [
+        "dependency",
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:launchRollback:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "WebAppDetail",
+      "launcher": "launchRollback",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "WebAppDetail",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchRollback",
+      "fingerprint": "f2e480f8eaf5c8ef47b3",
+      "categories": [
+        "action",
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:launchKey:0",
       "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
       "owner": "WebAppDetail",
@@ -6063,6 +6255,21 @@
       "categories": [
         "action",
         "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:WebAppDetail:edit:0",
+      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
+      "owner": "WebAppDetail",
+      "launcher": "edit",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "WebAppDetail",
+      "target": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:edit",
+      "fingerprint": "a36069ec87e809e2acbb",
+      "categories": [
+        "dependency",
+        "editor"
       ]
     },
     {
@@ -6090,7 +6297,7 @@
       "category": "editor",
       "parent": "newApp",
       "target": null,
-      "fingerprint": "4c01462dfcd12640f40b",
+      "fingerprint": "85d04bc54f195a2723cb",
       "categories": [
         "editor"
       ]
@@ -6125,17 +6332,17 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:inspect:modal.detail:0",
+      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:inspect:modal.open:0",
       "file": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx",
       "owner": "inspect",
-      "launcher": "modal.detail",
+      "launcher": "modal.open",
       "body": [
         "ApiDeploymentDetail"
       ],
       "category": "record",
       "parent": "inspect",
       "target": null,
-      "fingerprint": "41469bdbfe7dbb903d8f",
+      "fingerprint": "bf13aade2ebf603f0011",
       "categories": [
         "record"
       ]
@@ -6170,17 +6377,17 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:inspect:modal.detail:1",
+      "id": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx:inspect:modal.open:1",
       "file": "packages/portal-mojo/src/admin/deployments/DeploymentsPage.tsx",
       "owner": "inspect",
-      "launcher": "modal.detail",
+      "launcher": "modal.open",
       "body": [
         "WebAppDetail"
       ],
       "category": "record",
       "parent": "inspect",
       "target": null,
-      "fingerprint": "7b4792542d9406029de6",
+      "fingerprint": "1051c37725e66dbefa73",
       "categories": [
         "record"
       ]
@@ -11818,48 +12025,6 @@
       "key": "'results'",
       "label": "Results",
       "fingerprint": "e395a4df232223944101"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx",
-      "owner": "ApiDeploymentDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "af64e595416712dcbf9f"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx",
-      "owner": "ApiDeploymentDetail",
-      "key": "'diagnosis'",
-      "label": "Failure diagnosis",
-      "fingerprint": "9c096e66e2e56cb0de81"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
-      "owner": "WebAppDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "2757702ec84e5be7b5e4"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
-      "owner": "WebAppDetail",
-      "key": "'versions'",
-      "label": "Versions",
-      "fingerprint": "fc1329083bbd45a5b7d4"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
-      "owner": "WebAppDetail",
-      "key": "'deploy-setup'",
-      "label": "Deploy setup",
-      "fingerprint": "77a61c3dd7380ae9c34a"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx",
-      "owner": "WebAppDetail",
-      "key": "'address'",
-      "label": "Address & serving",
-      "fingerprint": "5dd5b9ee9f2b2e535d53"
     },
     {
       "file": "packages/portal-mojo/src/admin/dns/CertificateDetail.tsx",

@@ -7,7 +7,7 @@ export interface ActionReceipt {
     origin: string;
     key: string;
     operation: string;
-    kind: 'create' | 'api' | 'key' | 'rollback' | 'upload';
+    kind: 'create' | 'api' | 'key' | 'rollback' | 'upload' | 'profile';
     app: number;
     target: string;
     settled: boolean;
@@ -30,7 +30,7 @@ export interface ActionReceipt {
 const STORAGE = 'mojo.deployment.receipts.v1';
 const memory = new Map<string, ActionReceipt>();
 const active = new Set<string>();
-function project(v: unknown): ActionReceipt | null { const r = record(v); if (r.version !== 1 || !['create', 'api', 'key', 'rollback', 'upload'].includes(String(r.kind)) || !uuid(r.operation) || !text(r.actor) || !text(r.origin) || !text(r.key))
+function project(v: unknown): ActionReceipt | null { const r = record(v); if (r.version !== 1 || !['create', 'api', 'key', 'rollback', 'upload', 'profile'].includes(String(r.kind)) || !uuid(r.operation) || !text(r.actor) || !text(r.origin) || !text(r.key))
     return null; const receipt: ActionReceipt = {
     version: 1, actor: text(r.actor), origin: text(r.origin), key: text(r.key), operation: uuid(r.operation), kind: r.kind as ActionReceipt['kind'], app: positiveId(r.app), target: text(r.target), settled: r.settled === true, submitted: r.submitted === true, submittedAt: typeof r.submittedAt === 'number' ? r.submittedAt : undefined, acknowledged: r.acknowledged === true, release: positiveId(r.release) || undefined, deployment: positiveId(r.deployment) || undefined
 }; if(positiveId(r.onboardingGroup))receipt.onboardingGroup=positiveId(r.onboardingGroup);if(r.kind==='upload'){
