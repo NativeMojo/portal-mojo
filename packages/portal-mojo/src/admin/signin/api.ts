@@ -30,6 +30,8 @@ export interface SigninProvider {
     console_url: string;
     help: string;
     fields: SigninProviderField[];
+    /** Server-supplied card notes (#8967), e.g. a secret nearing expiry. Absent from older backends; nothing renders then. */
+    notices?: { tone: 'warning' | 'danger' | 'info'; text: string }[];
 }
 
 export interface SigninOptions {

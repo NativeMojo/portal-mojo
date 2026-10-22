@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 globalThis.window = { addEventListener() {}, removeEventListener() {}, location: { hash: '', pathname: '/', search: '' }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) };
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -67,6 +70,31 @@ try {
     const on = (await mock.mockFetch(path, { method: 'POST', headers: su, body: { provider: 'apple', enabled: true } })).data;
     assert(on.auth.login.methods.includes('apple') && on.auth.registration.methods.includes('apple'));
     assert.equal((await mock.mockFetch(path, { method: 'POST', headers: su, body: { provider: 'nope' } })).error_code, 400);
+
+    // #8967: Microsoft label and icon, and optional server-supplied card notices.
+    const render = (providers) => {
+        const client = new QueryClient();
+        client.setQueryData(admin.SIGNIN_QUERY_KEY, { ...on, providers });
+        return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(admin.SigninPage)));
+    };
+    const quiet = on.providers.map((provider) => ({ ...provider, enabled: false }));
+    const baseline = render(quiet);
+    assert(!baseline.includes('signin-note'), 'providers without notices render no notes (older backends)');
+    const microsoft = { ...quiet[0], name: 'microsoft', label: 'Microsoft', enabled: false, ready: false, missing: [], fields: [], notices: [
+        { tone: 'info', text: 'No secret expiry date is recorded.' },
+        { tone: 'warning', text: 'The client secret expires in 12 days.' },
+        { tone: 'danger', text: 'The client secret expired on 2026-10-01.' },
+        { tone: 'unknown', text: 'Unknown tones read as info.' },
+    ] };
+    const markup = render([...quiet, microsoft]);
+    assert.match(markup, /<i class="bi bi-microsoft"><\/i><\/span><div class="signin-provider-title"><h3 id="signin-provider-microsoft">Microsoft<\/h3>/);
+    const notes = [...markup.matchAll(/<div class="(signin-note[^"]*)" role="status"><i class="bi ([^"]+)"><\/i><span>([^<]+)<\/span><\/div>/g)].map((match) => match.slice(1));
+    assert.deepEqual(notes, [
+        ['signin-note', 'bi-info-circle', 'No secret expiry date is recorded.'],
+        ['signin-note is-warning', 'bi-exclamation-triangle', 'The client secret expires in 12 days.'],
+        ['signin-note is-danger', 'bi-x-octagon', 'The client secret expired on 2026-10-01.'],
+        ['signin-note', 'bi-info-circle', 'Unknown tones read as info.'],
+    ]);
     console.log('admin sign-in contract verified');
 } finally {
     await server.close();

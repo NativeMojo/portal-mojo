@@ -52,6 +52,8 @@ textarea.signin-code { resize: vertical; }
 .signin-note i { flex: none; color: var(--accent); }
 .signin-note.is-warning { border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); background: var(--warn-soft); }
 .signin-note.is-warning i { color: var(--warn); }
+.signin-note.is-danger { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); background: var(--bad-soft); }
+.signin-note.is-danger i { color: var(--bad); }
 .signin-provider-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 
 @media (max-width: 1100px) { .signin-groups { grid-template-columns: 1fr; } }

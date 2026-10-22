@@ -1,5 +1,5 @@
 // System Sign-in admin (#5547): the SYSTEM login page look & feel plus the
-// Google / Apple / GitHub OAuth provider credentials, over one endpoint
+// Google / Apple / GitHub / Microsoft OAuth provider credentials, over one endpoint
 // (GET/POST /api/account/admin/signin, global manage_settings | admin).
 // Deliberately simple: an explicit Save for look & feel that sends only the
 // changed dotted paths, one Save per provider card, and an immediate Enabled
@@ -79,12 +79,19 @@ const FIELD_GROUPS: FieldGroup[] = [
 
 const TOKEN_LABELS: Record<string, string> = {
     password: 'Password', sms: 'SMS code', passkey: 'Passkey', magic: 'Magic link',
-    google: 'Google', apple: 'Apple', github: 'GitHub',
+    google: 'Google', apple: 'Apple', github: 'GitHub', microsoft: 'Microsoft',
     'branded-panel': 'Branded panel',
 };
 const tokenLabel = (token: string) => TOKEN_LABELS[token] ?? token.charAt(0).toUpperCase() + token.slice(1).replace(/-/g, ' ');
 const LAYOUT_ALIASES: Record<string, string> = { card: 'compact', fullscreen: 'branded-panel' };
-const PROVIDER_ICONS: Record<string, string> = { google: 'bi-google', apple: 'bi-apple', github: 'bi-github' };
+const PROVIDER_ICONS: Record<string, string> = { google: 'bi-google', apple: 'bi-apple', github: 'bi-github', microsoft: 'bi-microsoft' };
+// Server-supplied card notices (#8967), e.g. an app secret about to expire. Unknown tones read as info.
+type NoticeTone = NonNullable<SigninProvider['notices']>[number]['tone'];
+const NOTICE_STYLES: Record<NoticeTone, { className: string; icon: string }> = {
+    info: { className: 'signin-note', icon: 'bi-info-circle' },
+    warning: { className: 'signin-note is-warning', icon: 'bi-exclamation-triangle' },
+    danger: { className: 'signin-note is-danger', icon: 'bi-x-octagon' },
+};
 const SOURCE_LABELS: Record<SigninProviderField['source'], string> = {
     admin: 'Set in Admin', deployment: 'Set in server config', none: 'Not set',
 };
@@ -326,6 +333,13 @@ function ProviderCard({ provider, onSaved }: { provider: SigninProvider; onSaved
             <i className="bi bi-exclamation-triangle" />
             <span>Shown on the sign-in page, but it will not work until these are set: {provider.missing.join(', ')}.</span>
         </div>}
+        {(provider.notices ?? []).map((notice, index) => {
+            const style = NOTICE_STYLES[notice.tone] ?? NOTICE_STYLES.info;
+            return <div key={index} className={style.className} role="status">
+                <i className={`bi ${style.icon}`} />
+                <span>{notice.text}</span>
+            </div>;
+        })}
         {error && <div className="form-alert" role="alert">{error}</div>}
         <div className="field">
             <label className="field-label" htmlFor={`signin-${provider.name}-callback`}>Callback URL</label>
