@@ -31,5 +31,8 @@
 
 .fleet-capacity-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 64px); min-height: 0; overflow-wrap: anywhere; }
 .fleet-capacity-body { overflow: auto; min-height: 0; }
+.fleet-capacity-body p { margin: 8px 0; line-height: 1.5; }
+.fleet-capacity-body h4 { margin: 0 0 8px; }
+.fleet-capacity-body > .dim { margin: 0 0 18px; }
 .fleet-capacity-dialog .modal-actions { flex: none; padding-top: 16px; border-top: 1px solid var(--line); }
 @media (max-width: 560px) { .fleet-capacity-dialog .fleet-fact-grid { grid-template-columns: minmax(0, 1fr); } }
