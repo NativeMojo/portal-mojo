@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CollectionSelect, toast } from '../../ui';
 import { OperationsHelp } from '../core/OperationsHelp';
-import { DNS_GROUP_CHOICE_ENDPOINT, registerExistingDomain } from './api';
+import { DNS_GROUP_CHOICE_ENDPOINT, fetchDnsCapabilities, registerExistingDomain } from './api';
+import { domainSession, requireDomainManager } from './domain-authority';
 import { DnsCredentialModel, DomainModel, type DnsCredentialRow, type DnsGroupChoice } from './models';
 import { normalizePurchaseDomain, redactRegistrarError } from './purchase-data';
 
@@ -22,6 +23,9 @@ export function DomainRegisterExisting({ close, back, setBusyGate }: { close: ()
     const inFlight = useRef(false);
     // Both picker remounting and this ref reject responses/events from old scope.
     const scope = useRef<number | null>(null);
+    const session = useRef(domainSession());
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     const changeGroup = (selected: DnsGroupChoice | null) => {
         if (inFlight.current || attempted) return;
         scope.current = selected?.id ?? null; setGroup(selected); setCredential(null); setError('');
@@ -34,9 +38,12 @@ export function DomainRegisterExisting({ close, back, setBusyGate }: { close: ()
         try { domain = normalizePurchaseDomain(name); } catch (reason) { setError(redactRegistrarError(reason)); return; }
         inFlight.current = true; setBusy(true); setBusyGate(true); setError('');
         // An unknown outcome is terminal for this mounted form: inspect inventory.
-        setAttempted(true);
         try {
+            await requireDomainManager(session.current);
+            if (!mounted.current) return;
+            setAttempted(true);
             const saved = await registerExistingDomain({ group: group.id, domain, credential: credential.id });
+            if (!mounted.current || domainSession() !== session.current) return;
             await DomainModel.invalidate(queryClient); toast.success(`${saved.name} registered`); close();
         } catch (reason) {
             await DomainModel.invalidate(queryClient);
@@ -45,7 +52,7 @@ export function DomainRegisterExisting({ close, back, setBusyGate }: { close: ()
     };
     const groupId = group?.id;
     return <form className="modal-pad domain-onboarding" onSubmit={(event) => void submit(event)} noValidate>
-        <h2 className="modal-title">Register existing domain</h2>
+        <h2 className="modal-title">Connect GoDaddy domain</h2>
         <p className="dim">Connect a GoDaddy domain you already own. <OperationsHelp label="domain registration">The provider checks ownership of this exact name without charging or listing the provider account. Choose an authorized group and an active, verified GoDaddy credential belonging to it. If no credentials appear, link and verify one in Provider Credentials.</OperationsHelp></p>
         {error && <div className="form-alert" role="alert">{error}</div>}
         <div className="dns-registrar-grid">
@@ -57,7 +64,15 @@ export function DomainRegisterExisting({ close, back, setBusyGate }: { close: ()
                 if (!usableRegistrationCredential(row, groupId)) { setCredential(null); setError('That credential is not usable in the selected group'); return; }
                 setCredential(row); setError('');
             }} /> : <p className="dim">Choose an authorized group before selecting its GoDaddy credential.</p>}
+            {group && <button className="btn domains-inline-action" type="button" disabled={busy || attempted} onClick={() => void (async () => {
+                if (inFlight.current) return;
+                inFlight.current = true; setBusy(true); setBusyGate(true);
+                const selected = group.id;
+                try { const caps = await fetchDnsCapabilities(selected); const { showCredentialEditor } = await import('./ProviderCredentialsPage'); if (!mounted.current || scope.current !== selected || domainSession() !== session.current) return; const linked = await showCredentialEditor({ ...caps, providers: caps.providers.filter(provider => provider.name === 'godaddy') }, undefined, group); if (mounted.current && scope.current === selected && domainSession() === session.current && linked && usableRegistrationCredential(linked, selected)) setCredential(linked); }
+                catch (reason) { if (scope.current === selected) setError(redactRegistrarError(reason)); }
+                finally { inFlight.current = false; if (mounted.current) setBusy(false); setBusyGate(false); }
+            })()}><i className="bi bi-key" /> Link credential</button>}
         </div>
-        <div className="modal-actions"><button className="btn" type="button" disabled={busy} onClick={attempted ? close : back}>{attempted ? 'Close and review inventory' : 'Back'}</button><button className="btn btn-primary" type="submit" disabled={busy || attempted || !group || !credential || !name.trim()}>{busy ? 'Checking ownership…' : 'Register existing'}</button></div>
+        <div className="modal-actions"><button className="btn" type="button" disabled={busy} onClick={attempted ? close : back}>{attempted ? 'Close and review inventory' : 'Back'}</button><button className="btn btn-primary" type="submit" disabled={busy || attempted || !group || !credential || !name.trim()}>{busy ? 'Checking ownership…' : 'Connect domain'}</button></div>
     </form>;
 }

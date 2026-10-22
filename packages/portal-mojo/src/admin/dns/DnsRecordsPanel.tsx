@@ -1,16 +1,22 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { modal, toast } from '../../ui';
 import { useCan } from '../../client/runtime';
-import { deleteDnsRecordSet, useDnsCapabilities, useDnsRecordCoordinator, useDnsRecords } from './api';
+import { deleteDnsRecordSet, fetchDnsCapabilities, useDnsCapabilities, useDnsRecordCoordinator, useDnsRecords } from './api';
+import { domainSession, requireDomainManager } from './domain-authority';
 import { DNS_RECORD_TYPES, diffRecordSet, isSpentAcmeChallenge, recordKey, recordWarnings, relativeRecordName, snapshotRecordOwner } from './dns-data';
 import { DnsRecordEditor } from './DnsRecordEditor';
-import { DNS_MANAGE_PERMISSIONS, type DnsRecordRow, type DomainRow } from './models';
+import { DNS_MANAGE_PERMISSIONS, DnsCredentialModel, DomainModel, type DnsRecordRow, type DomainRow } from './models';
 
 export interface DnsRecordsPanelProps { domain: DomainRow; recordType?: string; onRecordTypeChange?: (type: string) => void }
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 const groupId = (domain: DomainRow): number | null => typeof domain.group === 'number' ? domain.group : domain.group?.id ?? null;
 
-export function DnsRecordsPanel({ domain, recordType = '', onRecordTypeChange }: DnsRecordsPanelProps) {
+export function DnsRecordsPanel({ domain, recordType: controlledType, onRecordTypeChange }: DnsRecordsPanelProps) {
+    const qc = useQueryClient();
+    const [localType, setLocalType] = useState('');
+    const recordType = controlledType ?? localType;
+    const changeType = (value: string) => { setLocalType(value); onRecordTypeChange?.(value); };
     const active = domain.status === 'active';
     const generalProvider = ['route53', 'godaddy'].includes(domain.provider.toLowerCase());
     const credential = typeof domain.credential === 'object' ? domain.credential : null;
@@ -29,7 +35,11 @@ export function DnsRecordsPanel({ domain, recordType = '', onRecordTypeChange }:
     if (!active) return <Blocked title="DNS changes are unavailable">This domain is {domain.status}. Live records are available only after activation completes.</Blocked>;
     if (domain.provider === 'mojo') return <Blocked title="Certificate-only domain">Mojo domains mark delegated certificate coverage and do not support general DNS record management.</Blocked>;
     if (!generalProvider) return <Blocked title="Unsupported DNS provider">The {domain.provider || 'unknown'} provider does not expose general DNS through this administration surface.</Blocked>;
-    if (!credentialUsable) return <Blocked title="Provider credential unavailable">This GoDaddy domain needs an active, verified provider credential. {credential?.is_active === false ? 'The linked credential is inactive.' : credential?.verified === false ? 'The linked credential is unverified.' : 'No usable credential is linked.'}</Blocked>;
+    if (!credentialUsable) return <Blocked title="Provider credential unavailable">This GoDaddy domain needs an active, verified provider credential. {credential?.is_active === false ? 'The linked credential is inactive.' : credential?.verified === false ? 'The linked credential is unverified.' : 'No usable credential is linked.'}{canManage && credential && <button className="btn" type="button" onClick={() => void (async () => {
+        const session = domainSession();
+        try { await requireDomainManager(session); await DnsCredentialModel.invalidate(qc); const [row, caps] = await Promise.all([DnsCredentialModel.fetchOne(qc, credential.id), fetchDnsCapabilities(groupId(domain))]); const owner = typeof row.group === 'number' ? row.group : row.group?.id; if (domainSession() !== session || owner !== groupId(domain) || row.id !== credential.id || row.provider !== 'godaddy') throw new Error('Credential ownership changed. Reopen this domain.'); const { showCredentialEditor } = await import('./ProviderCredentialsPage'); await showCredentialEditor(caps, row); await DomainModel.invalidate(qc); }
+        catch (error) { toast.error(errorMessage(error)); }
+    })()}>Repair linked credential</button>}</Blocked>;
     if (capabilities.isLoading) return <div className="dns-state dim">Loading DNS capabilities…</div>;
     if (capabilities.isError) return <Retry error={capabilities.error} retry={() => void capabilities.refetch()} />;
     if (!providerKnown) return <Blocked title="Provider unavailable">This deployment did not advertise {domain.provider} in its DNS capabilities.</Blocked>;
@@ -55,7 +65,7 @@ export function DnsRecordsPanel({ domain, recordType = '', onRecordTypeChange }:
     };
 
     return <div className="dns-records-panel">
-        <div className="dns-record-toolbar"><label className="field dns-record-filter"><span className="field-label">Record type</span><select className="input" value={recordType} onChange={(event) => onRecordTypeChange?.(event.target.value)}><option value="">All record types</option>{choices.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><div className="dns-toolbar-actions"><button type="button" className="btn" onClick={() => void records.refetch()}><i className={`bi ${records.isFetching ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`} /> Refresh</button>{canManage && <button type="button" className="btn btn-primary" onClick={() => openEditor()}><i className="bi bi-plus-lg" /> Add record set</button>}</div></div>
+        <div className="dns-record-toolbar"><label className="field dns-record-filter"><span className="field-label">Record type</span><select className="input" value={recordType} onChange={(event) => changeType(event.target.value)}><option value="">All record types</option>{choices.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><div className="dns-toolbar-actions"><button type="button" className="btn" onClick={() => void records.refetch()}><i className={`bi ${records.isFetching ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`} /> Refresh</button>{canManage && <button type="button" className="btn btn-primary" onClick={() => openEditor()}><i className="bi bi-plus-lg" /> Add record set</button>}</div></div>
         {domain.provider === 'godaddy' && <div className="dns-provider-note">GoDaddy DNS is managed here. Registrar purchase, renewal, privacy, and WHOIS remain in the provider account; refreshed TTLs have a 600-second floor and whole-set deletion is unavailable.</div>}
         {visible.length === 0 ? <div className="dns-state dim">{rows.length ? 'No records match this type.' : 'The provider returned an empty zone.'}</div> : <div className="dns-table-wrap"><table className="tbl dns-record-table"><thead><tr><th>Type</th><th>Name</th><th>Values</th><th>TTL</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visible.map((record) => {
             const type = record.type.toUpperCase();

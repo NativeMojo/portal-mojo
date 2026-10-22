@@ -181,28 +181,29 @@ export interface LinkDnsCredentialInput {
     api_secret: string;
 }
 
-async function submitCredential(body: Record<string, unknown>): Promise<DnsCredentialRow> {
-    const response = await withFreshAuth(() => mojoCall('/api/dnsman/credential/link', {
+async function submitCredential(body: Record<string, unknown>, beforeSend?: () => void): Promise<DnsCredentialRow> {
+    const response = await withFreshAuth(() => { beforeSend?.(); return mojoCall('/api/dnsman/credential/link', {
         method: 'POST', body,
-    }));
+    }); });
     return sanitizeDnsCredentialRow(response.data as DnsCredentialRow);
 }
 
-export async function linkDnsCredential(input: LinkDnsCredentialInput): Promise<DnsCredentialRow> {
+export async function linkDnsCredential(input: LinkDnsCredentialInput, beforeSend?: () => void): Promise<DnsCredentialRow> {
     if (!Number.isInteger(input.group) || input.group < 1) throw new Error('Choose a group');
-    return submitCredential({ ...input });
+    return submitCredential({ ...input }, beforeSend);
 }
 
 export async function rotateDnsCredential(
     row: DnsCredentialRow,
     input: Pick<LinkDnsCredentialInput, 'name' | 'api_key' | 'api_secret'>,
+    beforeSend?: () => void,
 ): Promise<DnsCredentialRow> {
     const group = typeof row.group === 'number' ? row.group : row.group?.id;
     if (!group) throw new Error('This credential has no valid group');
     return submitCredential({
         group, provider: row.provider, credential: row.id,
         name: input.name ?? row.name, api_key: input.api_key, api_secret: input.api_secret,
-    });
+    }, beforeSend);
 }
 
 async function postData<T>(path: string, body: Record<string, unknown>): Promise<T> {

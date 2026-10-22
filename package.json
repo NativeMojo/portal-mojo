@@ -2,7 +2,7 @@
     "name": "portal-mojo-repo",
     "private": true,
     "version": "0.0.0",
-    "description": "portal-mojo monorepo \u2014 React portal toolkit for django-mojo (packages/) and the base admin portal (apps/)",
+    "description": "portal-mojo monorepo — React portal toolkit for django-mojo (packages/) and the base admin portal (apps/)",
     "workspaces": [
         "packages/*",
         "apps/*"
@@ -104,7 +104,7 @@
         "verify:admin-maintenance-mounted": "node scripts/verify-admin-maintenance-mounted.mjs",
         "verify:admin-deployments": "node scripts/verify-admin-deployments.mjs",
         "verify:admin-domains": "node scripts/verify-admin-domains.mjs",
-        "verify:admin-domains-mounted": "node scripts/verify-admin-domains-mounted.mjs",
+        "verify:admin-domains-mounted": "node scripts/verify-admin-domains-mounted.mjs && node scripts/verify-admin-domains-journeys.mjs && node scripts/verify-admin-domain-registration-mounted.mjs && node scripts/verify-admin-domains-purchase-mounted.mjs",
         "verify:admin-serving-mounted": "node scripts/verify-admin-serving-mounted.mjs",
         "verify:admin-serving-mounted-evidence": "node scripts/verify-admin-serving-mounted-evidence.mjs",
         "verify:admin-operational-fleet-partial": "node scripts/verify-admin-operational-fleet-partial.mjs",

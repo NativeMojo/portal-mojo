@@ -7,6 +7,8 @@ import { DNS_MANAGE_PERMISSIONS, DomainModel } from './models';
 import { normalizePurchaseDomain, redactRegistrarError } from './purchase-data';
 import { DomainPurchaseWizard } from './DomainPurchaseWizard';
 import { DomainRegisterExisting } from './DomainRegisterExisting';
+import { domainSession, requireDomainManager } from './domain-authority';
+import { OperationsHelp } from '../core/OperationsHelp';
 
 export type OnboardingMode = 'menu' | 'register' | 'purchase' | 'adopt';
 
@@ -16,6 +18,7 @@ export function DomainOnboardingDialog({ close, setBusyGate, initialMode = 'menu
     const [name, setName] = useState(''); const [review, setReview] = useState<string | null>(null);
     const [busy, setBusy] = useState(false); const [attempted, setAttempted] = useState(false); const [error, setError] = useState('');
     const inFlight = useRef(false);
+    const session = useRef(domainSession());
     const canManage = hasPermission(me ?? null, DNS_MANAGE_PERMISSIONS, null);
     const prepareAdoption = () => {
         if (inFlight.current || attempted || me?.is_superuser !== true) return;
@@ -26,7 +29,7 @@ export function DomainOnboardingDialog({ close, setBusyGate, initialMode = 'menu
     const adopt = async () => {
         if (inFlight.current || attempted || !review || me?.is_superuser !== true || !canManage) return;
         inFlight.current = true; setBusy(true); setBusyGate(true); setAttempted(true); setError('');
-        try { const domain = await adoptHouseDomain({ domain: review }); await DomainModel.invalidate(queryClient); toast.success(`${domain.name} adopted at Platform scope`); close(); }
+        try { await requireDomainManager(session.current, true); const domain = await adoptHouseDomain({ domain: review }); await DomainModel.invalidate(queryClient); if (domainSession() !== session.current) return; toast.success(`${domain.name} adopted at Platform scope`); close(); }
         catch (reason) { await DomainModel.invalidate(queryClient); setError(`${redactRegistrarError(reason)} Review the domain inventory before another adoption.`); }
         finally { inFlight.current = false; setBusy(false); setReview(null); setBusyGate(false); }
     };
@@ -36,9 +39,9 @@ export function DomainOnboardingDialog({ close, setBusyGate, initialMode = 'menu
     if (mode === 'register') return <DomainRegisterExisting close={close} back={() => setMode('menu')} setBusyGate={setBusyGate} />;
     if (mode === 'adopt') {
         if (me.is_superuser !== true) return <div className="modal-pad domain-onboarding"><h2 className="modal-title">Platform superuser required</h2><button className="btn" onClick={close}>Close</button></div>;
-        return <div className="modal-pad domain-onboarding"><h2 className="modal-title">Adopt a House domain</h2><p className="dim">Adopt one existing public hosted zone at Platform scope. No account discovery, new zone, or tenant assignment.</p>{error && <div className="form-alert" role="alert">{error}</div>}
+        return <div className="modal-pad domain-onboarding"><h2 className="modal-title">Adopt Route 53 zone</h2><p className="dim">Connect an existing hosted zone to Platform. <OperationsHelp label="zone adoption">Enter one exact domain from this installation’s AWS account. This does not create a zone, buy a registration, or assign it to a group.</OperationsHelp></p>{error && <div className="form-alert" role="alert">{error}</div>}
             {review ? <div className="dns-quote-card"><h3>Review exact adoption</h3><div><span>Domain</span><code>{review}</code></div><div><span>Scope</span><b>Platform</b></div><div className="modal-actions"><button className="btn" disabled={busy} onClick={cancelReview}>Cancel review</button><button className="btn btn-primary" disabled={busy} onClick={() => void adopt()}>{busy ? 'Adopting…' : 'Confirm adoption'}</button></div></div> : <><label className="field"><span className="field-label">Existing House domain</span><input className="input" value={name} disabled={busy || attempted} onChange={(event) => setName(event.target.value)} /></label><div className="modal-actions"><button className="btn" disabled={busy} onClick={attempted ? close : () => setMode('menu')}>{attempted ? 'Close and review inventory' : 'Back'}</button><button className="btn btn-primary" disabled={busy || attempted || !name.trim()} onClick={prepareAdoption}>Review adoption</button></div></>}
         </div>;
     }
-    return <div className="modal-pad domain-onboarding"><h2 className="modal-title">Add a domain</h2><p className="dim">Choose one explicit workflow.</p><div className="dns-onboarding-options"><button className="panel panel-pad" onClick={() => setMode('register')}><i className="bi bi-globe2" /><b>Register existing</b><span>Prove ownership of one GoDaddy domain using a verified group credential.</span></button>{me.is_superuser === true && <button className="panel panel-pad" onClick={() => setMode('adopt')}><i className="bi bi-house-add" /><b>Adopt a House domain</b><span>Type an existing public zone name; keep it at Platform scope.</span></button>}<button className="panel panel-pad" onClick={() => setMode('purchase')}><i className="bi bi-cart-check" /><b>Buy domain</b><span>Search, quote, confirm once, and reconcile against the durable ledger.</span></button></div><div className="modal-actions"><button className="btn" onClick={close}>Cancel</button></div></div>;
+    return <div className="modal-pad domain-onboarding"><h2 className="modal-title">Add a domain</h2><div className="dns-onboarding-options"><button className="panel panel-pad" onClick={() => setMode('register')}><i className="bi bi-globe2" /><b>Connect GoDaddy domain</b><span>Manage DNS for a domain you already own.</span></button><button className="panel panel-pad" onClick={() => setMode('purchase')}><i className="bi bi-cart-check" /><b>Buy domain</b><span>Search available names and review the price.</span></button>{me.is_superuser === true && <button className="panel panel-pad" onClick={() => setMode('adopt')}><i className="bi bi-house-add" /><b>Adopt Route 53 zone</b><span>Connect an existing zone in this AWS account.</span></button>}</div><div className="modal-actions"><button className="btn" onClick={close}>Cancel</button></div></div>;
 }

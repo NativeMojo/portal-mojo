@@ -6779,6 +6779,8 @@ let domainRegistrarSaveFault: 'warning' | 'ambiguous' | null = null;
 let dnsWriteFault: 'reject' | 'ambiguous' | 'reconcile' | null = null;
 let dnsFailNextRead = false;
 const mockRegistrantScopeState = new Map<string, 'saved' | 'cleared'>();
+const mockRegistrantConfigured = (group: number) => mockRegistrantScopeState.get(group > 0 ? `group:${group}` : 'house') === 'saved'
+    || dnsRegistrarMode !== 'contact-missing' && (group === 0 || group % 2 === 1);
 
 export type MockUploadMode = 'raw-put' | 'raw-put-unprefixed' | 'config-put' | 'config-put-bearer' | 'config-post';
 export type MockUploadFault = 'initiate-ambiguous' | 'transfer-ambiguous' | 'transfer-failed' | 'transfer-expired' | 'complete-reject' | 'complete-ambiguous' | 'complete-body-malformed';
@@ -10339,7 +10341,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             status: true,
             data: {
                 purchase_enabled: dnsRegistrarMode !== 'disabled',
-                registrant_contact_configured: dnsRegistrarMode !== 'contact-missing' && (groupId === 0 || groupId % 2 === 1),
+                registrant_contact_configured: mockRegistrantConfigured(groupId),
                 max_domain_price: '100.00', currency: 'USD', quote_ttl_minutes: 15,
                 allowed_record_types: ['A', 'AAAA', 'CAA', 'CNAME', 'MX', 'NS', 'SRV', 'TXT'],
                 search_batch_limit: 20, suggestions_enabled: true,
@@ -10740,7 +10742,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             const group = db.groups.find((candidate) => candidate.id === groupId && candidate.is_active);
             if (!group || !body.domain) return missingParams('group', 'domain');
             if (dnsRegistrarMode === 'disabled') return { status: false, error: 'Domain purchasing is disabled on this deployment (DNSMAN_PURCHASE_ENABLED is off).', error_code: 400 };
-            if (dnsRegistrarMode === 'contact-missing' || groupId % 2 === 0) return { status: false, error: 'No registrant contact is configured', error_code: 400 };
+            if (!mockRegistrantConfigured(groupId)) return { status: false, error: 'No registrant contact is configured', error_code: 400 };
             const answer = resultRow(String(body.domain));
             if (answer.available !== true || !answer.tld_supported) return { status: false, error: 'The domain cannot be quoted', error_code: 400 };
             const years = Number(body.years ?? 1);
@@ -10841,7 +10843,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         const direct = state === 'saved' || (state == null && groupId === 1);
         const settingsFile = state == null && groupId === 0;
         const contact = direct || settingsFile ? canonical : null;
-        return { status: true, data: { scope: groupId > 0 ? 'group' : 'global', group: groupId || null, contact, source: direct ? 'database' : settingsFile ? 'settings_file' : 'none', inherited: groupId > 0 && !contact && groupId % 2 === 0, effective_configured: dnsRegistrarMode !== 'contact-missing' && (Boolean(contact) || groupId % 2 === 1 || groupId === 0), problems: [] } };
+        return { status: true, data: { scope: groupId > 0 ? 'group' : 'global', group: groupId || null, contact, source: direct ? 'database' : settingsFile ? 'settings_file' : 'none', inherited: groupId > 0 && !contact && groupId % 2 === 0, effective_configured: mockRegistrantConfigured(groupId), problems: [] } };
     }
 
     if (path === '/api/dnsman/whois' || path === '/api/dnsman/whois/privacy') {
@@ -10852,6 +10854,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         if (!domain) return { status: false, error: 'Domain not found', error_code: 404 };
         if (domain.provider !== 'route53') return { status: false, error: 'Registrar operations are not available for this provider', error_code: 400 };
         if (domain.group == null ? !caller.is_superuser : !dnsMemberCan(caller, domain.group, true)) return permissionDenied();
+        if (domain.registered_on == null) return { status: false, error: 'This hosted zone has no registration in the Route 53 Domains account. Check its registrar.', error_code: 400 };
         if (path.endsWith('/privacy')) {
             domain.privacy = Boolean(input.enabled); domain.modified = Math.floor(Date.now() / 1000);
             return { status: true, data: { name: domain.name, privacy: domain.privacy, operation_id: `op-privacy-${domain.id}` } };
