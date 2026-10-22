@@ -1,3 +1,4 @@
+import { Tabs } from '../../ui/Tabs';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getAuthSessionRevision, requestFreshAuth, useAuthSnapshot, useMe } from '../../client/runtime';
@@ -254,10 +255,10 @@ export function MaintenancePage({
                 </div>
                 {canWrite && access.aws && !attempt && aws.value?.status === 'ok' && (
                     <button
-                        className="btn"
+                        className="btn" aria-label={`Upgrade ${f.resource_id}`}
                         onClick={() => setReview({ finding: f, fingerprint: JSON.stringify(f) })}
                     >
-                        Upgrade {f.resource_id}
+                        Upgrade…
                     </button>
                 )}
             </article>
@@ -267,42 +268,90 @@ export function MaintenancePage({
     if (!access.aws && !access.framework)
         return <p role="alert">Maintenance requires global AWS or framework read permission.</p>;
     const fw = framework.value;
+    const tabs = [...(access.aws ? [{ key: 'database', label: 'Database', panel: (                    <section aria-label="Database">
+                        <h2>Database</h2>
+                        {aws.value?.findings.filter((f) => f.kind !== 'elasticache').map(row)}
+                        {aws.value?.status === 'ok' &&
+                            !aws.value.findings.some((f) => f.kind !== 'elasticache') && (
+                                <p>
+                                    No offered major upgrades found in this scan. Complete inventory and
+                                    support coverage are unknown.
+                                </p>
+                            )}
+                    </section>) }, { key: 'cache', label: 'Cache', panel: (                    <section aria-label="Cache">
+                        <h2>Cache</h2>
+                        {aws.value?.findings.filter((f) => f.kind === 'elasticache').map(row)}
+                        {aws.value?.status === 'ok' &&
+                            !aws.value.findings.some((f) => f.kind === 'elasticache') && (
+                                <p>
+                                    No offered major upgrades found in this scan. Complete inventory and
+                                    support coverage are unknown.
+                                </p>
+                            )}
+                    </section>) }] : []), ...(access.framework ? [{ key: 'framework', label: 'Django-MOJO', panel: (                <section aria-label="Framework">
+                    <h2>Django-MOJO</h2>
+                    {framework.loading && <p>Reading Framework evidence…</p>}
+                    {framework.error && (
+                        <p role="alert">Framework evidence is unavailable: {framework.error}</p>
+                    )}
+                    {fw && (
+                        <>
+                            <dl className="maintenance-framework-summary">
+                                <div><dt>Installed</dt><dd>{fw.installed ?? 'unknown'}</dd></div>
+                                <div><dt>Latest published</dt><dd>{fw.latest ?? 'unknown'}</dd></div>
+                                <div><dt>Update policy</dt><dd>{fw.pin.mode === 'latest' ? 'Automatic updates' : fw.pin.mode === 'hold' ? 'Updates paused' : `Pinned to ${fw.pin.value ?? 'unknown version'}`}</dd></div>
+                            </dl>
+                            {!fw.update_available && <p className="dim">No newer framework version reported.</p>}
+                            {fw.blocked_reason && <p className="maintenance-warning">{fw.blocked_reason.replaceAll('_', ' ')}</p>}
+                            <details className="maintenance-details"><summary>Framework evidence</summary><p>Checked: <ObservedTime value={fw.checked_at} /> · Source: {fw.source}</p><p>Pin policy: {fw.pin.mode} {fw.pin.value}</p><p>An accepted framework update clears the pin and requests redeployment. Follow Deployments for fleet evidence.</p></details>
+                            {canWrite && fw.can_update && !getMaintenanceAttempt('framework') && (
+                                <button
+                                    className="btn"
+                                    onClick={() =>
+                                        setReview({ framework: fw, fingerprint: JSON.stringify(fw) })
+                                    }
+                                >
+                                    {frameworkActionLabel(fw)}
+                                </button>
+                            )}
+                        </>
+                    )}
+                </section>) }] : [])];
     return (
         <main className="admin-maintenance">
             <header>
                 <div>
-                    <p className="muted">Operations</p>
+                    <p className="eyebrow">Operations</p>
                     <h1>Maintenance</h1>
-                    <p>Offered database and cache upgrades, and the framework update policy.</p>
+                    <p>Keep your database, cache and Django-MOJO up to date.</p>
                 </div>
                 <button className="btn" disabled={busy} onClick={() => void load(true)}>
                     Refresh Maintenance
                 </button>
             </header>
-            <p className="maintenance-mode">
+            {mode.value !== 'managed' && <p className="maintenance-mode">
                 {mode.value === 'external'
                     ? 'External infrastructure: your infrastructure team applies upgrades through IaC. Evidence remains available here.'
                     : mode.value === 'managed'
                       ? 'Managed infrastructure confirmed.'
                       : `Infrastructure mode is unconfirmed. Upgrade controls require current managed-mode proof. ${mode.error ?? ''}`}
-            </p>
+            </p>}
             {error && <p role="alert">{error}</p>}
             {access.aws && (
                 <>
-                    <section aria-label="AWS scan evidence">
-                        <h2>Scan evidence</h2>
+                    <section aria-label="AWS scan evidence" className="maintenance-scan">
                         {aws.loading && <p>Reading AWS evidence…</p>}
                         {aws.error && <p role="alert">AWS inventory is unavailable: {aws.error}</p>}
                         {aws.value && (
                             <>
-                                <p>
+                                <details className="ops-details"><summary>Scan details · <ObservedTime value={aws.value.generated_at} /></summary><p>
                                     Region: {aws.value.region ?? 'unknown'} · Scan time:{' '}
                                     <ObservedTime value={aws.value.generated_at} />
                                     {' · '}Scheduled scanning:{' '}
                                     {aws.value.scheduled
                                         ? 'on'
                                         : 'off — this page only reflects the current scan'}
-                                </p>
+                                </p></details>{!aws.value.scheduled && <p className="maintenance-warning">Scheduled scanning is off; results reflect this scan.</p>}
                                 {aws.value.status === 'unavailable' && (
                                     <p role="alert">
                                         AWS is unavailable. Offered upgrades are unknown. {aws.value.reason}
@@ -318,69 +367,19 @@ export function MaintenancePage({
                             </>
                         )}
                     </section>
-                    <section aria-label="Database">
-                        <h2>Database</h2>
-                        {aws.value?.findings.filter((f) => f.kind !== 'elasticache').map(row)}
-                        {aws.value?.status === 'ok' &&
-                            !aws.value.findings.some((f) => f.kind !== 'elasticache') && (
-                                <p>
-                                    No offered major upgrades found in this scan. Complete inventory and
-                                    support coverage are unknown.
-                                </p>
-                            )}
-                    </section>
-                    <section aria-label="Cache">
-                        <h2>Cache</h2>
-                        {aws.value?.findings.filter((f) => f.kind === 'elasticache').map(row)}
-                        {aws.value?.status === 'ok' &&
-                            !aws.value.findings.some((f) => f.kind === 'elasticache') && (
-                                <p>
-                                    No offered major upgrades found in this scan. Complete inventory and
-                                    support coverage are unknown.
-                                </p>
-                            )}
-                    </section>
+
+
                 </>
             )}
-            {access.framework && (
-                <section aria-label="Framework">
-                    <h2>Framework</h2>
-                    {framework.loading && <p>Reading Framework evidence…</p>}
-                    {framework.error && (
-                        <p role="alert">Framework evidence is unavailable: {framework.error}</p>
-                    )}
-                    {fw && (
-                        <>
-                            <dl className="maintenance-framework-summary">
-                                <div><dt>Installed</dt><dd>{fw.installed ?? 'unknown'}</dd></div>
-                                <div><dt>Latest published</dt><dd>{fw.latest ?? 'unknown'}</dd></div>
-                                <div><dt>Update policy</dt><dd>{fw.pin.mode === 'latest' ? 'Automatic updates' : fw.pin.mode === 'hold' ? 'Updates paused' : `Pinned to ${fw.pin.value ?? 'unknown version'}`}</dd></div>
-                            </dl>
-                            <p>{fw.update_available ? 'A newer framework version is available.' : 'No newer framework version reported.'} {fw.can_update ? 'Ready for a reviewed update.' : 'Update is unavailable.'}</p>
-                            {fw.blocked_reason && <p className="maintenance-warning">{fw.blocked_reason.replaceAll('_', ' ')}</p>}
-                            <details className="maintenance-details"><summary>Framework evidence</summary><p>Checked: <ObservedTime value={fw.checked_at} /> · Source: {fw.source}</p><p>Pin policy: {fw.pin.mode} {fw.pin.value}</p><p>An accepted framework update clears the pin and requests redeployment. Follow Deployments for fleet evidence.</p></details>
-                            {canWrite && fw.can_update && !getMaintenanceAttempt('framework') && (
-                                <button
-                                    className="btn"
-                                    onClick={() =>
-                                        setReview({ framework: fw, fingerprint: JSON.stringify(fw) })
-                                    }
-                                >
-                                    {frameworkActionLabel(fw)}
-                                </button>
-                            )}
-                        </>
-                    )}
-                </section>
-            )}
+<Tabs items={tabs} ariaLabel="Maintenance category" />
             {attempts.length > 0 && (
                 <section aria-label="Submitted operations">
                     <h2>Submitted operations</h2>
-                    <p>
+                    <details className="ops-details"><summary>About submitted operations</summary><p>
                         Requests stay guarded across refresh, navigation and authentication renewal. Unknown
                         outcomes require provider/window reconciliation; refreshing an old version does not
                         authorize another request.
-                    </p>
+                    </p></details>
                     {attempts.map((a) => (
                         <article key={a.key}>
                             <h3>{a.key}</h3>

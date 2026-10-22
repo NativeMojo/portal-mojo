@@ -26,16 +26,15 @@ export function DomainsPage() {
         void modal.detail((close) => <DomainDetail id={row.id} onClose={() => close(null)} />);
     };
     const columns: Column<DomainRow>[] = [
-        { key: 'name', label: 'Domain', sortable: true, hideable: false, render: (row) => <code>{row.name}</code> },
-        { key: 'provider', label: 'Provider', sortable: true, render: (row) => providerLabel(row.provider) },
+        { key: 'name', label: 'Domain', sortable: true, hideable: false, render: (row) => <span className="ops-cell"><strong>{row.name}</strong><small>{providerLabel(row.provider)}</small></span> },
         { key: 'status', label: 'Status', sortable: true, render: (row) => <Badge tone={fmt.inferTone(row.status)}>{row.status}</Badge> },
         { key: 'expires', label: 'Expires', sortable: true, render: (row) => fmt.date(row.expires) },
         { key: 'group', label: 'Scope', render: (row) => <span className="domains-scope">{domainScopeLabel(row.group)}</span> },
         { key: 'records', label: 'DNS Records', render: (row) => supportsDomainRecords(row.provider) ? <button className="btn btn-sm" type="button" onClick={(event) => { event.stopPropagation(); navigate(domainRecordsHref(location.pathname, row.id)); }}>DNS Records <i className="bi bi-arrow-right" /></button> : <span className="dim">{row.provider === 'mojo' ? 'Certificate-only' : 'Provider unavailable'}</span> },
     ];
     return <div>
-        <div className="domains-header"><p className="dim">Register, adopt, buy, and inspect managed domain names.</p>{canManage && <div className="domains-actions"><button className="btn" onClick={() => void start('register')}>Register existing</button>{me?.is_superuser === true && <button className="btn" onClick={() => void start('adopt')}>Adopt</button>}<button className="btn btn-primary" onClick={() => void start('purchase')}>Buy domain</button></div>}</div>
-        <ModelTable<DomainRow> model={DomainModel} eyebrow="Operations · DNS" title="Domains" searchable searchPlaceholder="Search domain names" columns={columns} filters={filters} defaultParams={{ sort: 'name' }} columnChooser persistState persistKey="admin:dns:domains" onRowClick={open} />
+        <header className="domains-header"><div><div className="eyebrow">Network &amp; hosting</div><h1>Domains</h1><p className="dim">Manage the names this installation controls.</p></div>{canManage && <div className="domains-actions"><button className="btn" onClick={() => void start('register')}>Register existing</button>{me?.is_superuser === true && <button className="btn" onClick={() => void start('adopt')}>Adopt</button>}<button className="btn btn-primary" onClick={() => void start('purchase')}>Buy domain</button></div>}</header>
+        <ModelTable<DomainRow> model={DomainModel} title="Managed domains" searchable searchPlaceholder="Search domain names" columns={columns} filters={filters} defaultParams={{ sort: 'name' }} columnChooser persistState persistKey="admin:dns:domains" onRowClick={open} />
         {canManage && <details className="domains-advanced"><summary>Advanced</summary><p className="dim">Connect external domains to shared wildcard validation, or review controller allocations and trust.</p><button className="btn" onClick={() => void import('./SharedValidationDialog').then(({ openSharedValidation }) => openSharedValidation())}>Shared validation setup</button></details>}
     </div>;
 }

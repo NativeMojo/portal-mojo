@@ -53,7 +53,7 @@ const wait = async (fn, name) => {
     }
     assert.fail(`Timed out: ${name}; ${document.body.textContent}`);
 };
-const buttons = (n) => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === n),
+const buttons = (n) => [...document.querySelectorAll('button')].filter((b) => (b.getAttribute('aria-label') ?? b.textContent.trim()) === n),
     button = (n) => buttons(n)[0];
 const click = async (n) => {
     await wait(() => button(n) && !button(n).disabled, `${n} enabled`);
@@ -128,6 +128,7 @@ try {
     };
     const paths = () => wire.getMockRequestHistory().map((r) => r.path);
     const review = async (resource, window = 'Immediately') => {
+        await click(resource.includes('cache') ? 'Cache' : 'Database');
         await click(`Upgrade ${resource}`);
         await field(resource);
         await act(async () => {
@@ -188,6 +189,7 @@ try {
     await ready();
     assert(document.body.textContent.includes('infrastructure team'));
     assert(!button('Upgrade orders-db'));
+    await click('Django-MOJO');
     assert(!button('Update to 4.1.0'));
     checks += 3;
     await unmount();
@@ -201,6 +203,7 @@ try {
     await unmount();
     await configure({ is_superuser: true }, 'framework-held');
     await ready();
+    await click('Django-MOJO');
     await click('Resume automatic updates and redeploy');
     assert(document.querySelector('dialog').textContent.includes('last converged application SHA'));
     await click('Cancel');
@@ -258,6 +261,7 @@ try {
     await wait(() => fresh === 1 && !document.querySelector('dialog'), '440 spends consent and prompts once');
     await act(async () => new Promise((r) => setTimeout(r, 60)));
     assert.equal(fixture.posts, 1, 'fresh authentication never replays');
+    await click('Cache');
     assert(!button('Upgrade standalone-cache'), 'renewed session retains refusal until explicit refresh');
     mock.setMockMaintenanceScenario('findings');
     await click('Refresh Maintenance');
@@ -279,6 +283,7 @@ try {
     await login();
     await mount();
     await ready();
+    await click('Cache');
     assert(
         !button('Upgrade session-cache'),
         'same actor replacement/remount cannot resend unknown operation',
@@ -291,6 +296,7 @@ try {
     await unmount();
     await configure({ is_superuser: true }, 'framework-pin-cleared-503');
     await ready();
+    await click('Django-MOJO');
     await click('Update to 4.1.0');
     await field('4.1.0');
     await click('Confirm framework update');
@@ -305,6 +311,7 @@ try {
     await ready();
     await click('Refresh Maintenance');
     await ready();
+    await click('Django-MOJO');
     assert(
         !button('Update to 4.1.0'),
         'same actor renewed session cannot duplicate unknown framework operation',
@@ -323,6 +330,7 @@ try {
     await login('dns.platform@nativemojo.com');
     await mount();
     await ready();
+    await click('Django-MOJO');
     await click('Update to 4.1.0');
     await field('4.1.0');
     fixture.delay = 80;
@@ -333,6 +341,7 @@ try {
     await act(async () => new Promise((r) => setTimeout(r, 110)));
     await mount();
     await ready();
+    await click('Django-MOJO');
     assert(!button('Update to 4.1.0'), 'late lost response cannot restore a new confirmation');
     assert.equal(fixture.posts, 1);
     assert(ops.getMaintenanceAttempt('framework'), 'receipt outlives owner unmount');

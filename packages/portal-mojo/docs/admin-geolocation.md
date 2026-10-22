@@ -107,3 +107,7 @@ typecheck, release/build and both-theme 390px browser verification. JSDOM checks
 behavior only and does not replace browser layout, focus or native-dialog proof.
 
 The owned component stylesheet is `styles/components/admin-geolocation.css`; it is included by `portal-mojo/styles.css` with the other Admin component styles.
+
+### KISS presentation
+
+Provider descriptions use accessible help popovers. Stored verification remains visible; timestamps, revision facts and Fleet Configuration are under Configuration details. Pending restart and operation errors stay visible. See [visual QA](admin-presentation.md).

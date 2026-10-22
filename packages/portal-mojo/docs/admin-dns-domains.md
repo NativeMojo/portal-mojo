@@ -86,3 +86,7 @@ pass supplies native focus, responsive layout and light/dark evidence.
 
 The focused **Admin → Domains** showcase uses mock manager, platform and viewer
 identities and preserves every earlier DNS showcase.
+
+### KISS presentation
+
+Domain/provider share one table cell. The page header owns registration/adoption/purchase; technical registrar facts are in Registration details. Provider warnings remain visible. See [visual QA](admin-presentation.md).

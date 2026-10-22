@@ -689,11 +689,11 @@ export function ComponentsPage() {
                 </div>
             </nav>
             <div className="cmp-body">
-                <div className="panel panel-pad cmp-intro">
+                {!new Set(['admin-geolocation', 'admin-operational-fleet', 'admin-maintenance', 'admin-deployments', 'admin-domains', 'admin-edge']).has(active.key) && <div className="panel panel-pad cmp-intro">
                     <div className="eyebrow">Playground</div>
                     <h1 className="panel-title">{active.title}</h1>
                     <p className="dim cmp-blurb">{active.blurb}</p>
-                </div>
+                </div>}
                 <div key={`${active.key}:${remountNonce}`}>{active.render()}</div>
             </div>
         </div>

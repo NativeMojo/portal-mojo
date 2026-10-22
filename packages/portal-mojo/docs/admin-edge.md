@@ -215,3 +215,7 @@ mock under five identities: platform administrator, DNS manager, DNS viewer,
 security manager and security viewer.
 
 `npm run verify:admin-edge` retains the existing endpoint contract. `node scripts/verify-admin-serving-mounted.mjs` mounts the native wizard and modal to check basic/Advanced validation, payloads, route-less conversion, busy dismissal and committed-response-loss recovery. `node scripts/verify-admin-serving-mounted-evidence.mjs` mounts evidence for DTO bounds, exact gates, unknown posture, refresh failures and auth replacement.
+
+### KISS presentation
+
+The Serving table defaults to hostname/domain, serving shape and enabled intent. Pool and created time remain in record inspection. HTTP/readiness summaries keep technical coverage and timestamps in separate details; configuration checks never claim fleet application. See [visual QA](admin-presentation.md).

@@ -35,10 +35,10 @@ export function AdminMaintenanceDemo() {
     }, [persona, queryClient]);
     return (
         <div>
-            <div className="panel panel-pad">
-                <label>
+            <details className="panel panel-pad demo-controls"><summary>Demo controls · mock data</summary><div className="demo-control-fields">
+                <label className="field">
                     Mock persona{' '}
-                    <select value={persona} onChange={(event) => setPersona(event.target.value)}>
+                    <select className="input" value={persona} onChange={(event) => setPersona(event.target.value)}>
                         {personas.map((p) => (
                             <option key={p.email} value={p.email}>
                                 {p.label}
@@ -46,10 +46,10 @@ export function AdminMaintenanceDemo() {
                         ))}
                     </select>
                 </label>
-                <label>
+                <label className="field">
                     {' '}
                     Mock evidence{' '}
-                    <select
+                    <select className="input"
                         value={scenario}
                         onChange={(event) => {
                             const next = event.target.value as MaintenanceScenario;
@@ -65,12 +65,12 @@ export function AdminMaintenanceDemo() {
                         ))}
                     </select>
                 </label>
-                <p>
+                </div><p>
                     Provider changes are simulated. Submitted attempts stay guarded across scenario changes.
                     Next-window and unknown operations require provider reconciliation; no automatic resend
                     occurs.
                 </p>
-            </div>
+            </details>
             {ready ? (
                 <MaintenancePage key={epoch} pollInterval={10_000} deploymentsHref="#/system/deployments" />
             ) : (

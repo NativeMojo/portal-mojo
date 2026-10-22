@@ -2,3 +2,9 @@
 
 .admin-deployments input:not([type="file"]),.admin-deployments select{padding:.55rem .7rem;border:1px solid var(--field-line);border-radius:6px;background:var(--field-bg);color:var(--ink);font:inherit;width:100%;box-sizing:border-box}.admin-deployments .page-header{display:flex;justify-content:space-between;align-items:start;gap:1rem;flex-wrap:wrap}
 .admin-deployments h1{font-size:26px;font-weight:750;line-height:1.2;letter-spacing:-.025em;color:var(--ink-strong);margin:0 0 .5rem}.admin-deployments h2{font-size:19px;font-weight:700;line-height:1.35;color:var(--ink-strong)}.admin-deployments h3{font-size:16px;font-weight:650;color:var(--ink-strong);margin-block:1rem .5rem}.admin-deployments .page-header{margin-bottom:1.25rem}.admin-deployments .page-header p{max-width:60ch}
+
+.deployment-current { padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.deployment-current > strong { display: block; margin-top: 8px; overflow-wrap: anywhere; font-size: 18px; }
+.deployment-current > p { margin: 6px 0; }
+.admin-deployments { max-width: 1120px; margin-inline: auto; }
+.admin-deployments .deployment-record { padding: 16px 20px; }

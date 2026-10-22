@@ -27,7 +27,7 @@ try{
  fixture.beforeTransport=async()=>{await Promise.resolve();};fixture.calls=[];
  await mount(DeploymentsPage);assert(button('New WebApp'),'StrictMode cold mount must finish bootstrap and admit New WebApp without manual refresh');
  assert(!document.body.textContent.includes('API observation unavailable'),'StrictMode must not leave the initial platform query poisoned by an aborted owner');
- assert(document.body.textContent.includes('a'.repeat(40)),'Last-converged serving evidence loads on the first mount');
+ assert(document.querySelector('.deployment-current strong')?.getAttribute('title') === 'a'.repeat(40),'Last-converged serving evidence loads on the first mount');
  assert.equal(qc.getQueryCache().getAll().filter(q=>q.queryKey[0]==='deployments'&&q.state.status==='error').length,0);
  await unmount();fixture.beforeTransport=null;
  // The stable handle survives artificial replay, but real disposal/session/authority changes still revoke it.

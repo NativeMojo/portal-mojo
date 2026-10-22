@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Badge, ModelTable, fmt, modal, toast, type Column, type FilterDef } from '../../ui';
+import { Badge, ModelTable, modal, toast, type Column, type FilterDef } from '../../ui';
 import { useCan } from '../../client/runtime';
 import { EDGE_MANAGE_PERMS, EdgeVhostModel, VHOST_KIND_CARDS, vhostKindTitle, type EdgeVhostRow } from './models';
 import { VhostDetail } from './VhostDetail';
@@ -8,12 +8,9 @@ import { ServingReadiness } from './ServingReadiness';
 import { openVhostWizard } from './VhostWizard';
 
 const COLUMNS: Column<EdgeVhostRow>[] = [
-    { key: 'server_name', label: 'Hostname', sortable: false, hideable: false, render: (row) => <code>{row.server_name ?? '—'}</code> },
+    { key: 'server_name', label: 'Hostname', sortable: false, hideable: false, render: (row) => <span className="ops-cell"><strong>{row.server_name ?? '—'}</strong><small>{row.domain?.name}</small></span> },
     { key: 'kind', label: 'Serves', sortable: true, render: (row) => <Badge tone="info">{vhostKindTitle(row.kind)}</Badge> },
-    { key: 'pool', label: 'Pool', sortable: true },
-    { key: 'is_enabled', label: 'State', sortable: true, render: (row) => row.is_enabled ? <Badge tone="info">Enabled · readiness separate</Badge> : <Badge tone="muted">Disabled</Badge> },
-    { key: 'domain', label: 'Domain', sortable: false, render: (row) => row.domain?.name ?? '—' },
-    { key: 'created', label: 'Created', sortable: true, render: (row) => fmt.date(row.created) },
+    { key: 'is_enabled', label: 'State', sortable: true, render: (row) => row.is_enabled ? <span title="Enabled configuration; readiness is reported separately"><Badge tone="info">Enabled</Badge></span> : <Badge tone="muted">Disabled</Badge> },
 ];
 
 const FILTERS: FilterDef[] = [

@@ -1,0 +1,9 @@
+.ops-help { display: inline-flex; align-items: center; justify-content: center; padding: 3px; border: 0; background: transparent; color: var(--mute); cursor: pointer; vertical-align: middle; font-size: 14px; line-height: 1; border-radius: 4px; }
+.ops-help:hover, .ops-help[aria-expanded="true"] { color: var(--accent); background: var(--accent-soft); }
+.ops-help-content { width: min(340px, calc(100vw - 32px)); padding: 14px 16px; font-size: 13px; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
+.ops-help-content p { margin: 0 0 8px; }
+.ops-help-content p:last-child { margin-bottom: 0; }
+.ops-details > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--mute); padding-block: 6px; }
+.ops-details[open] > summary { margin-bottom: 10px; }
+.ops-cell { display: grid; gap: 3px; min-width: 0; }
+.ops-cell small { color: var(--mute); font-size: 12px; }

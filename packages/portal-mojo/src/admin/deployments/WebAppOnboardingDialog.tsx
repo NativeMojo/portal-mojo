@@ -130,7 +130,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
         {checked && <p role="status">{checked.verdict}: {checked.hostname} {checked.reason}</p>}</>;
     return <div className="modal-pad admin-deployments">
         <h2 className="modal-title">{receipt ? 'Resume WebApp setup' : 'New WebApp'}</h2>
-        <p className="modal-message">Closing keeps server setup work. Resume uses its exact operation receipt; it never creates a replacement app.</p>
+        <p className="modal-message">You can close and resume setup at any time.</p>
         {!receipt ? <>
             <div className="deployment-form">
                 <label>Workspace<select value={workspace} disabled={w.busy} onChange={e => { setWorkspace(e.target.value); setChecked(null); }}>
@@ -152,9 +152,8 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
             </div></details>
         </> : <>
             <Facts rows={[
-                ['Operation', receipt.operation], ['Workspace', latest ? `${latest.group.name} (#${latest.group.id})` : 'Not yet observed'],
-                ['Status', <Status value={latest?.status ?? 'unknown'} />], ['Current server cursor', latest?.cursor], ['Revision', latest?.revision],
-                ['Observation', observer.state], ['Last observed', observer.observedAt ? new Date(observer.observedAt).toLocaleTimeString() : 'Not observed'], ['Message', latest?.last_error],
+                ['Workspace', latest ? `${latest.group.name} (#${latest.group.id})` : 'Not yet observed'],
+                ['Status', <Status value={latest?.status ?? 'unknown'} />], ['Current server cursor', latest?.cursor], ['Message', latest?.last_error],
             ]} />
             {latest?.cursor === 'address' && <section>
                 <h3>Configure this workspace’s public address</h3>
@@ -170,7 +169,7 @@ export function WebAppOnboardingDialog({ bootstrap, resume, destinations, onClos
                 <option value="skip">Skip optional repository verification</option><option value="verify">Verify the submitted repository</option>
                 {latest.evidence.github.status === 'unavailable' && <option value="attest">I attest this repository when verification is unavailable</option>}
             </select>{githubMode !== 'skip' && <input aria-label="Repository to verify" value={repository} disabled={w.busy} onChange={e => setRepository(e.target.value)} />}</label>}
-            {latest?.activity.map((a, i) => <p key={i}>{a.message}</p>)}
+            <details className="ops-details"><summary>Setup details</summary><Facts rows={[['Operation', receipt.operation], ['Revision', latest?.revision], ['Observation', observer.state], ['Last observed', observer.observedAt ? new Date(observer.observedAt).toLocaleTimeString() : 'Not observed']]}/>{latest?.activity.map((a, i) => <p key={i}>{a.message}</p>)}</details>
         </>}
         {w.error && <ErrorNotice>{w.error}</ErrorNotice>}
         <div className="modal-actions"><button className="btn" disabled={w.busy} onClick={onClose}>Close</button>

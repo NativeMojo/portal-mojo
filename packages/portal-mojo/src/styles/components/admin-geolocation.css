@@ -25,3 +25,13 @@
 }
 
 .geo-admin .page-header{display:flex;justify-content:space-between}.geo-admin h1{font-size:26px;font-weight:750;line-height:1.2;letter-spacing:-.025em;color:var(--ink-strong);margin:4px 0 8px}.geo-admin h2{font-size:18px;font-weight:700;line-height:1.35;color:var(--ink-strong);margin:0 0 10px}.geo-admin-configuration{margin:14px 0}.geo-admin-configuration summary{cursor:pointer;font-weight:600}.geo-admin-configuration[open] summary{margin-bottom:10px}
+
+.geo-admin { max-width: 880px; margin-inline: auto; gap: 24px; }
+.geo-admin-setup { padding: 24px; }
+.geo-admin-setup > h2 { margin-bottom: 24px; }
+.geo-admin-fields > .field { display: grid; gap: 8px; }
+.geo-admin-fields .field-label { display: flex; align-items: center; gap: 6px; }
+.geo-admin-status { padding: 18px 24px; }
+.geo-admin-verification { margin: 0 0 6px; }
+.geo-admin-status .geo-admin-configuration { margin-bottom: 0; }
+@container (max-width: 420px) { .geo-admin-setup, .geo-admin-status { padding: 18px; } }

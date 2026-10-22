@@ -148,3 +148,7 @@ abort the old lifetime and discard late results. The mounted harness places
 StrictMode above the providers/router so React 19 actually replays initial effects,
 and verifies cold authorized bootstrap/platform reads through an asynchronous
 transport gate as well as real owner cancellation.
+
+### KISS presentation
+
+The default API lane shows last convergence and attempts. Collector/framework/coordination facts are under Deployment details. Record inspection and setup preserve status/blocking messages while moving operation identity, revision and history into requested details. See [visual QA](admin-presentation.md).

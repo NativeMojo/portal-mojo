@@ -86,3 +86,7 @@ exports are MaintenancePage, maintenanceDeploymentsHref, maintenanceAccess,
 frameworkActionLabel, MAINTENANCE_ENDPOINTS and maintenanceCompleted.
 
 Resource rows keep the offered version, provider state and upgrade action visible. Support deadlines, member evidence and recovery notes remain under each row’s disclosure. Dates use compact local presentation and preserve the original wire value in their title. Framework policy uses readable labels; missing or refused evidence remains explicit.
+
+### KISS presentation
+
+Database, Cache and Django-MOJO are separate tabs. Scan metadata is collapsed; scan errors, incomplete evidence and scanning-off warnings stay above the tabs. Submitted operations remain visible independently of the selected category. See [visual QA](admin-presentation.md).

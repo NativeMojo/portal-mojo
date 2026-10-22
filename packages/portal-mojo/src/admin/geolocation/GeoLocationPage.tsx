@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { requestFreshAuth, useMe } from '../../client/runtime';
 import { modal } from '../../ui';
+import { OperationsHelp } from '../core/OperationsHelp';
 import { usePrivateOperator } from '../fleet-configuration/shared-validation-data';
 import { GeoLocationError, geoDraft, geoFleetRoute, geoProviderOptions, geoWriteBlock, readGeoLocation, saveGeoLocation, testGeoLocation, type GeoDraft, type GeoKeyEdit, type GeoLocationState, type GeoVerdict } from './data';
 
@@ -94,15 +95,15 @@ function GeoLocationContent() {
     const disabled = busy || loading || blocked || !!block;
     const options = state && draft ? geoProviderOptions(state, draft) : [];
     const meta = (key: keyof GeoDraft) => state?.fleet_fields.find(f => f.key === key);
-    const field = (key: keyof GeoDraft, control: ReactNode) => <label className="field"><span className="field-label">{meta(key)?.label ?? key}</span>{control}<span className="field-help">{meta(key)?.description}{meta(key)?.constraints ? ` ${meta(key)?.constraints}.` : ''}</span></label>;
+    const field = (key: keyof GeoDraft, control: ReactNode) => <div className="field"><span className="field-label">{meta(key)?.label ?? key} <OperationsHelp label={meta(key)?.label ?? key}>{meta(key)?.description}{meta(key)?.constraints ? ` ${meta(key)?.constraints}.` : ''}</OperationsHelp></span>{control}</div>;
     const providerSelect = (key: 'GEOIP_PRIMARY_PROVIDER' | 'GEOIP_FALLBACK_PROVIDER') => <select className="input" aria-label={meta(key)?.label ?? key} value={draft?.[key] ?? ''} onChange={e => change(key, e.target.value)}>{options.map(p => <option key={p} value={p}>{p}{state?.geoip_providers.includes(p) ? '' : ' (configured; not in registry)'}</option>)}</select>;
     const move = (index: number, offset: number) => { if (!draft) return; const next = [...draft.GEOIP_ADDITIONAL_PROVIDERS], target = index + offset; [next[index], next[target]] = [next[target]!, next[index]!]; change('GEOIP_ADDITIONAL_PROVIDERS', next); };
     const stored = state?.verify_state.geoip;
-    return <div className="page geo-admin"><header className="page-header"><div><div className="eyebrow">Operations</div><h1>GeoLocation</h1><p className="dim">Choose where IP location intelligence comes from and connect the Mojo service.</p></div><button className="btn" disabled={busy || loading} onClick={() => void refresh()}>Refresh</button></header>
+    return <div className="page geo-admin"><header className="page-header"><div><div className="eyebrow">Operations</div><h1>GeoLocation</h1><p className="dim">Set up your IP location provider.</p></div><button className="btn" disabled={busy || loading} onClick={() => void refresh()}>Refresh</button></header>
         {loading && <p role="status">Loading GeoLocation configuration…</p>}
         {error && <p className="form-alert" role="alert">{error}</p>}{notice && <p className="geo-admin-notice" role="status">{notice}</p>}
         {block && <div className="panel panel-pad" role="alert"><h2>Provider setup unavailable</h2><p>{block}</p></div>}
-        {state && draft && <><section className="panel panel-pad geo-admin-setup" aria-label="GeoLocation provider setup"><h2>Provider setup</h2><p className="dim">These values apply across the installation.</p>
+        {state && draft && <><section className="panel panel-pad geo-admin-setup" aria-label="GeoLocation provider setup"><h2>Provider setup</h2>
             <fieldset disabled={disabled} className="geo-admin-fields">
                 {field('GEOIP_PRIMARY_PROVIDER', providerSelect('GEOIP_PRIMARY_PROVIDER'))}
                 {field('GEOIP_MOJO_PROVIDER_URL', <input className="input" aria-label={meta('GEOIP_MOJO_PROVIDER_URL')?.label ?? 'Mojo origin'} type="url" maxLength={512} value={draft.GEOIP_MOJO_PROVIDER_URL} autoComplete="off" onChange={e => change('GEOIP_MOJO_PROVIDER_URL', e.target.value)} />)}
@@ -122,18 +123,16 @@ function GeoLocationContent() {
                     </div>
                     <label className="field"><span><input type="checkbox" checked={draft.GEOIP_MOJO_SYNC_ENABLED} onChange={e => change('GEOIP_MOJO_SYNC_ENABLED', e.target.checked)} /> Share threat signals with Mojo</span><span className="field-help">{meta('GEOIP_MOJO_SYNC_ENABLED')?.description} The remote key must have the geoip_sync permission.</span></label>
                 </div></details>
-                <div className="geo-admin-actions"><button className="btn" disabled={disabled || keyMode === 'clear'} onClick={() => void run('test')}>Test Mojo connection</button><button className="btn btn-primary" onClick={() => void run('save')}>{busy ? 'Working…' : 'Save'}</button><button className="btn" onClick={cancel}>Cancel changes</button></div>
+                <div className="geo-admin-actions"><button className="btn" disabled={disabled || keyMode === 'clear'} onClick={() => void run('test')}>Test Mojo connection</button><OperationsHelp label="connection test">Test checks only the Mojo credential, even when another provider is primary. It does not publish or prove the provider chain works.</OperationsHelp><button className="btn btn-primary" onClick={() => void run('save')}>{busy ? 'Working…' : 'Save'}</button><button className="btn" onClick={cancel}>Cancel changes</button></div>
             </fieldset>
-            <p className="dim">Test checks only the Mojo credential, even when another provider is primary. It does not publish or prove the provider chain works.</p>
             {verdict && <div className={verdict.success && verdict.code !== 'clear_requested' ? 'text-ok' : 'text-warn'} role="status" aria-label="Draft Mojo connection test"><strong>{verdict.success && verdict.code !== 'clear_requested' ? 'Draft Mojo connection verified' : 'Draft Mojo connection not verified'}</strong><p>{verdict.message}</p>{verdict.code && <code>{verdict.code}</code>}{!verdict.success && <p>A published Mojo origin may still be pending on this request node. Supply a replacement key, or apply the published configuration in Fleet Configuration and Refresh here.</p>}</div>}
         </section>
-        <section className="panel panel-pad geo-admin-status" aria-label="Stored configuration status"><h2>Stored configuration</h2>{(blocked || loading) && <p className="text-warn">Earlier stored observations are not current confirmation. Refresh to check the configuration.</p>}<p><strong>Stored Mojo connection verification:</strong> {stored ? stored.ok && stored.code !== 'clear_requested' ? 'Verified' : stored.code === 'clear_requested' ? 'Key removal requested; not a connection test' : 'Failed' : 'Not observed'}</p>{stored && <p>{stored.message}{stored.at && <> · {stored.at}</>}</p>}
-            <details className="geo-admin-configuration"><summary>Configuration details</summary>
+        <section className="panel panel-pad geo-admin-status" aria-label="Stored configuration status"><h2>Connection status</h2>{(blocked || loading) && <p className="text-warn">Earlier stored observations are not current confirmation. Refresh to check the configuration.</p>}<p className="geo-admin-verification"><strong>Stored Mojo connection verification:</strong> {stored ? stored.ok && stored.code !== 'clear_requested' ? 'Verified' : stored.code === 'clear_requested' ? 'Key removal requested; not a connection test' : 'Failed' : 'Not observed'}</p>
+            <details className="geo-admin-configuration"><summary>Configuration details</summary>{stored && <p>{stored.message}{stored.at && <> · {stored.at}</>}</p>}
             <p className="dim">Stored verification is separate from this draft. A test with no replacement uses the node-loaded Mojo origin and sharing setting to decide whether it updates this observation.</p>
             <dl><div><dt>Published revision</dt><dd><code>{state.published_revision ?? 'Not published'}</code></dd></div><div><dt>This request node loaded</dt><dd><code>{state.loaded_revision ?? 'Not reported'}</code></dd></div></dl>
-            </details>
-            <p className={state.pending_restart ? 'text-warn' : 'dim'}>{state.pending_restart ? 'Published changes are pending a config-sync restart on this request node.' : 'No revision restart is reported for this request node. Fleet health is not established.'}</p>
-            <Link className="btn" to={geoFleetRoute(location.pathname)}>Open Fleet Configuration</Link><p className="dim">Use Fleet Configuration to apply published changes and inspect node health. GeoIP Cache remains the IP inspection workspace.</p>
+            <p className="dim">No fleet health proof is established by a connection test.</p>
+            <Link className="btn" to={geoFleetRoute(location.pathname)}>Open Fleet Configuration</Link><p className="dim">Use Fleet Configuration to apply published changes and inspect node health. GeoIP Cache remains the IP inspection workspace.</p></details>{state.pending_restart && <p className="text-warn">Published changes are pending a config-sync restart on this request node.</p>}
         </section></>}
     </div>;
 }

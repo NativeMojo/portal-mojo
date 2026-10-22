@@ -125,3 +125,7 @@ React components in StrictMode, custom embedded mounts, denied request suppressi
 cancellation, stale responses, single-flight, fresh-auth without replay, cross-page
 progress and unknown-outcome reconciliation. Browser light/dark, narrow layout,
 native focus and console proof belong to the integrated closing run.
+
+### KISS presentation
+
+The overview uses compact service/status rows with modal Details. Scaling uses App nodes, Database and Redis tabs backed by one parent draft; switching tabs never clears staged changes or plan consent. All staged changes appear in one exact server-plan review. See [visual QA](admin-presentation.md).

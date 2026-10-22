@@ -77,18 +77,19 @@ export function AdminEdgeDemo() {
 
     return (
         <div style={{ display: 'grid', gap: 14 }}>
-            <div className="seg" style={{ flexWrap: 'wrap' }} aria-label="Edge showcase surface">
+            <details className="panel panel-pad demo-controls"><summary>Demo controls · mock data</summary><div className="seg" style={{ flexWrap: 'wrap' }} aria-label="Edge showcase surface">
                 {SURFACES.map((entry) => <button key={entry.key} type="button" disabled={switching || surface === null} className={`seg-btn${shown === entry.key ? ' seg-active' : ''}`} onClick={() => selectSurface(entry.key)}>{entry.label}</button>)}
             </div>
             <div className="seg" style={{ flexWrap: 'wrap' }} aria-label="Edge showcase identity">
                 {LEGS.map((entry) => <button key={entry.key} type="button" disabled={switching || surface === null} className={`seg-btn${leg === entry.key ? ' seg-active' : ''}`} onClick={() => setLeg(entry.key)}>{entry.label}</button>)}
             </div>
 
+            </details>
             {switching && <div className="panel panel-pad dim">Switching identity…</div>}
             {!switching && surface === null && <div className="panel panel-pad dim">Switching surface…</div>}
 
             {!switching && surface !== null && <>
-                <div className="panel panel-pad">
+                <details className="demo-controls demo-instructions"><summary>Demo instructions</summary>
                     <div className="eyebrow">{identity.label}</div>
                     <p className="dim">{identity.note}</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -97,7 +98,7 @@ export function AdminEdgeDemo() {
                         {leg === 'security' && <button type="button" className="btn" onClick={() => void openBlocklistEditor()}><i className="bi bi-slash-circle" /> New blocklist entry: log first</button>}
                     </div>
                     <p className="dim" style={{ marginBottom: 0 }}>To see the create order for a site with API paths: open the wizard, choose “Site + API”, add a route and a quiet path under it. The hostname configuration is created disabled, the routes land, then one last save applies the quiet paths and sets its enabled intent. Readiness is shown separately.</p>
-                </div>
+                </details>
                 {!allowed && <div className="panel panel-pad"><div className="eyebrow">Denied</div><p className="dim" style={{ marginBottom: 0 }}>This identity has no access to this surface, and the navigation would not show it.</p></div>}
                 {allowed && surface === 'vhosts' && <VhostsPage />}
                 {allowed && surface === 'upstreams' && <UpstreamsPage />}
