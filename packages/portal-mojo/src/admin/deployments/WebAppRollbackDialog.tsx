@@ -57,12 +57,14 @@ export function WebAppRollbackDialog({ app, release, onClose, onBusy, onChanged 
     const outcome = observation.value ?? tracked, notified = useRef(new Set<number>());
     useEffect(() => {
         if (!outcome?.terminal) return;
+        setTracked(current => current?.deployment === outcome.deployment && current !== outcome ? outcome : current);
         const receipt = receiptsFor(s.owner).find(r => r.kind === 'rollback' && r.app === app.id && r.deployment === outcome.deployment);
         if (receipt && !receipt.settled) settleReceipt(receipt);
         if (!notified.current.has(outcome.deployment)) { notified.current.add(outcome.deployment); onChanged(); }
     }, [outcome?.deployment, outcome?.terminal, onChanged]);
+    const succeeded = outcome?.terminal === true && outcome.success === true && outcome.status === 'live';
     const releases = (q.data?.releases.items ?? []) as Release[], eligible = releases.filter(r => rollbackEligible(r, q.data!.summary.current_release));
-    return <div className="modal-pad admin-deployments"><h2 className="modal-title">Roll back {app.display_name || app.slug}</h2><p className="modal-message">Choose a verified release to deploy. A failed rollout can leave mixed nodes.</p>
+    return <div className="modal-pad admin-deployments"><h2 className="modal-title">{succeeded ? 'Rollback complete' : tracked ? 'Rollback progress' : `Roll back ${app.display_name || app.slug}`}</h2>{!tracked && <p className="modal-message">Choose a verified release to deploy. A failed rollout can leave mixed nodes.</p>}
         {!tracked && <>
             {q.isError && <ErrorNotice>Release observation unavailable. Refresh before choosing a target.</ErrorNotice>}
             <label>Verified release<select value={target} disabled={w.busy || q.isFetching} onChange={e => { setSelection(releases.find(r => r.id === Number(e.target.value))); setConfirmation(''); }}><option value={0}>Choose a version</option>{selected && !eligible.some(r => r.id === target) && <option value={target}>{selected.version} · selected</option>}{eligible.map(r => <option key={r.id} value={r.id}>{r.version} · {r.status}</option>)}</select></label>
@@ -72,8 +74,9 @@ export function WebAppRollbackDialog({ app, release, onClose, onBusy, onChanged 
         </>}
         {uncertain && <div className="deployment-confirm"><p>A previous rollback may have persisted. Observe it before another decision.</p><button className="btn" disabled={w.busy} onClick={() => void reconcile()}>Observe uncertain rollback</button>{reconciled && <><p>No unique matching attempt was observed in bounded history. A new rollback can overlap the earlier operation. Acknowledge this unknown outcome, then review and type the app/version again to consent to a new operation.</p><label>Type {app.slug}/unknown-outcome<input value={acknowledgement} disabled={w.busy} onChange={e => setAcknowledgement(e.target.value)}/></label><button className="btn" disabled={w.busy || acknowledgement !== `${app.slug}/unknown-outcome`} onClick={acknowledge}>Acknowledge unknown outcome</button></>}</div>}
         {w.error && <ErrorNotice>{w.error}</ErrorNotice>}
-        {tracked && <p role="status">Deployment {tracked.deployment}: <Status value={outcome?.status ?? 'unknown'}/> · {observation.state}. {['error', 'stopped'].includes(observation.state) && 'Outcome unknown; Refresh only reads.'}</p>}
-        {outcome?.detail && <p>{outcome.detail}</p>}
-        <div className="modal-actions"><button className="btn" disabled={w.busy} onClick={onClose}>{tracked ? 'Close' : 'Cancel'}</button>{tracked ? <button className="btn" onClick={observation.refresh}>Refresh exact deployment</button> : <button className="btn btn-primary" disabled={w.busy || q.isFetching || q.isError || !q.data || !selected || !rollbackEligible(selected, q.data.summary.current_release) || confirmation !== `${app.slug}/${selected.version}`} onClick={() => void execute()}>Confirm rollback</button>}</div>
+        {succeeded ? <div className="deployment-result" role="status"><strong>{outcome.version || selected?.version || 'Selected release'}</strong> <Status value="live"/><p>Deployment completed.</p></div> : tracked && <p role="status">Deployment {tracked.deployment}: <Status value={outcome?.status ?? 'unknown'}/></p>}
+        {['error', 'stopped'].includes(observation.state) && <p className="text-warn">{succeeded ? 'Latest refresh unavailable. Showing the last observed result.' : 'Observation unavailable; outcome unconfirmed. Refresh only observes.'}</p>}
+        {!succeeded && outcome?.detail && <p>{outcome.detail}</p>}
+        <div className="modal-actions"><button className="btn" disabled={w.busy} onClick={onClose}>{tracked ? 'Close' : 'Cancel'}</button>{tracked ? <button className="btn" disabled={w.busy || observation.state === 'observing'} onClick={observation.refresh}>Refresh exact deployment</button> : <button className="btn btn-primary" disabled={w.busy || q.isFetching || q.isError || !q.data || !selected || !rollbackEligible(selected, q.data.summary.current_release) || confirmation !== `${app.slug}/${selected.version}`} onClick={() => void execute()}>Confirm rollback</button>}</div>
     </div>;
 }
