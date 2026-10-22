@@ -63,8 +63,8 @@ try {
     // at 6.480 MB, with the eager-runtime cap independently enforced.
     // Shared Dashboard/coordinator source remains unchanged.
     // Integrated main5930903 adds its separately reviewed dropdown sources;
-    // measured combined package: 6,483,104 bytes. Deployments contributes
-    // 45,998 bytes against that main baseline (6,437,106 bytes).
+    // measured combined package: 6,483,789 bytes. Deployments contributes
+    // 46,683 bytes against that main baseline (6,437,106 bytes).
     // Bound the combined source payload at 6.485 MB; no generated files added.
     // Content/consumer/style/export checks and the separate 530,000-byte
     // eager-runtime cap remain unchanged.

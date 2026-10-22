@@ -31,3 +31,5 @@
 .admin-deployments .deployment-form>label{margin:0}
 .deployment-dialog-header:has(>.modal-title){flex-direction:row}.deployment-dialog-header>.btn-icon{flex-shrink:0}
 @container(max-width:480px){.deployment-dialog [role="tablist"][aria-label="WebApp tasks"]{flex-wrap:wrap;overflow:visible}}
+
+@container(max-width:480px){.deployment-release-history th:nth-child(3),.deployment-release-history td:nth-child(3){display:none}.deployment-release-history th,.deployment-release-history td{padding-inline:.5rem}.deployment-release-history td .btn{white-space:nowrap;padding-inline:.65rem;font-size:12px}.deployment-release-history th,.deployment-release-history th button{font-size:10px;letter-spacing:.04em}.deployment-release-history table{table-layout:fixed;width:100%}.deployment-release-history th:first-child{width:25%}.deployment-release-history th:nth-child(2){width:42%}.deployment-release-history th:last-child{width:33%}}
