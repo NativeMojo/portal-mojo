@@ -1,3 +1,4 @@
+import { AdminRouteContext, useAdminRouteContext } from '../core/route-context';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     Badge, ModelTable, fmt, modal, type Column, type FilterDef,
@@ -44,9 +45,10 @@ const FILTERS: FilterDef[] = [
 
 export function SettingsPage() {
     const queryClient = useQueryClient();
+    const routeContext = useAdminRouteContext();
     const openDetail = (row: SettingRow) => {
         void SettingModel.fetchOne(queryClient, row.id).catch(() => undefined);
-        void modal.detail((close) => <SettingDetail id={row.id} onClose={() => close(null)} />);
+        void modal.detail((close) => <AdminRouteContext.Provider value={routeContext}><SettingDetail id={row.id} onClose={() => close(null)} /></AdminRouteContext.Provider>);
     };
     return (
         <ModelTable<SettingRow>

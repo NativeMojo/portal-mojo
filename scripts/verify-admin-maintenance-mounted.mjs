@@ -417,6 +417,8 @@ try {
     assert(document.querySelector('a[href="#/product/custom/admin/deployments"]'),'registered absolute route is linked');checks++;await unmount();
     await mount({route:{mount:'/product/custom/admin',paths:['/product/custom/admin/maintenance']}});await ready();
     assert(!document.querySelector('a[href="#/product/custom/admin/deployments"]'),'unregistered destination is suppressed');checks++;await unmount();
+    await mount({route:{mount:'/',paths:['/maintenance','/deployments']}});await ready();
+    assert(document.querySelector('a[href="#/deployments"]'),'root mount generates one slash');checks++;await unmount();
     console.log(`Maintenance mounted: ${checks} assertions passed`);
 } finally {
     await act(async () => root?.unmount());

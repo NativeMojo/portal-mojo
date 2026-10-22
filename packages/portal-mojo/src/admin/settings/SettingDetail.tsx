@@ -13,7 +13,7 @@ export function SettingDetail({ id, onClose }: { id: number; onClose: () => void
     const { can } = useCan(SETTINGS_PERMISSIONS);
     const route = useAdminRouteContext();
     const { data: me } = useMe();
-    const maintenanceHref = backendGlobalCan(me, ['view_platform','manage_platform','admin']) && route?.paths.includes(`${route.mount.replace(/\/$/, '')}/maintenance`) ? `#${route.mount}/maintenance?tab=framework` : undefined;
+    const maintenanceHref = backendGlobalCan(me, ['view_platform','manage_platform','admin']) && route?.paths.includes(`${route.mount.replace(/\/$/, '')}/maintenance`) ? `#${route.mount.replace(/\/$/, '')}/maintenance?tab=framework` : undefined;
     if (isPending) return <div className="modal-pad dim">Loading setting…</div>;
     if (!row || error) return <div className="modal-pad text-bad">{error?.message ?? 'Setting not found'}</div>;
 

@@ -56,7 +56,7 @@ export function MaintenancePage({
     const access = maintenanceAccess(auth.authenticated && String(me?.id) === auth.uid ? me : null);
     const location = useLocation(), route = useAdminRouteContext();
     const queryClient = useQueryClient();
-    const deploymentLink = deploymentsHref ?? (route ? route.paths.includes(`${route.mount.replace(/\/$/, '')}/deployments`) ? `#${route.mount}/deployments` : undefined : maintenanceDeploymentsHref(location.pathname));
+    const deploymentLink = deploymentsHref ?? (route ? route.paths.includes(`${route.mount.replace(/\/$/, '')}/deployments`) ? `#${route.mount.replace(/\/$/, '')}/deployments` : undefined : maintenanceDeploymentsHref(location.pathname));
     const [policy, setPolicy] = useState<Framework | null>(null), [progress, setProgress] = useState<string | null>(null);
     const [aws, setAWS] = useState<Evidence<Report>>({}),
         [framework, setFramework] = useState<Evidence<Framework>>({}),
