@@ -107,3 +107,5 @@
         flex-wrap: wrap;
     }
 }
+
+.admin-maintenance h1{font-size:26px;font-weight:750;line-height:1.2;letter-spacing:-.025em;color:var(--ink-strong)}.admin-maintenance h2,.maintenance-dialog h2{font-size:18px;font-weight:700;line-height:1.35;color:var(--ink-strong)}.admin-maintenance h3{font-size:16px;font-weight:650;line-height:1.4;color:var(--ink-strong)}

@@ -7,5 +7,5 @@ export function FleetPage(props: FleetOverviewProps = {}) {
         return <p>Checking fleet access…</p>;
     if (!auth.authenticated || !backendGlobalCan(me, [...FLEET_DASHBOARD_GRANTS, ...FLEET_CAPACITY_GRANTS]))
         return <div className="panel panel-pad">Fleet requires dashboard or capacity access.</div>;
-    return <div className="page"><header className="page-header"><h1>Fleet</h1></header><FleetOverview {...props}/></div>;
+    return <div className="page fleet-page"><header className="page-header"><h1>Fleet</h1></header><FleetOverview {...props}/></div>;
 }
