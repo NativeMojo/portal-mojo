@@ -15,7 +15,7 @@ globalThis.cancelAnimationFrame = clearTimeout;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const React = await import('react'), { act } = React, { createRoot } = await import('react-dom/client');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query'), { MemoryRouter } = await import('react-router-dom');
-const fixture = globalThis.__webAppInspection = { user: { id: 7, is_active: true, permissions: { view_dns: true } }, auth: { authenticated: true, uid: '7' }, revision: 0, calls: [], changed: 0, loseProfileResponse: false, profileReauth: false };
+const fixture = globalThis.__webAppInspection = { user: { id: 7, is_active: true, permissions: { view_dns: true } }, auth: { authenticated: true, uid: '7' }, revision: 0, calls: [], changed: 0, loseProfileResponse: false, deferProfileCommit: false, lateProfile: null, failProfileRead: false, profileReauth: false };
 const runtime = `export const useMe=()=>({data:globalThis.__webAppInspection.user});export const useAuthSnapshot=()=>globalThis.__webAppInspection.auth;export const getAuthSessionRevision=()=>globalThis.__webAppInspection.revision;export const getAuthSnapshot=()=>globalThis.__webAppInspection.auth;export const getAccessToken=()=> 'x.'+btoa(JSON.stringify({uid:globalThis.__webAppInspection.auth.uid,exp:Date.now()/1000+3600,auth_time:Date.now()/1000}))+'.x';export const mojoCall=(...args)=>globalThis.__webAppInspection.call(...args);export const isReauthRequired=e=>e?.status===440;export const requestFreshAuth=async()=>false;export const registerNonFilterParams=()=>{};export const usingMockTransport=()=>false;export const downloadBlob=()=>{};`;
 const server = await createServer({ root: process.cwd(), appType: 'custom', logLevel: 'silent', server: { middlewareMode: true }, plugins: [{ name: 'webapp-inspection-fixture', enforce: 'pre', resolveId: id => id === '/__webAppInspection.ts' ? id : null, load: id => id === '/__webAppInspection.ts' ? runtime : null, transform(source, id) { if (id.includes('/admin/deployments/')) return source.replace(/from '\.\.\/\.\.\/client\/(?:runtime|auth)'/g, "from '/__webAppInspection.ts'"); } }] });
 const app = { id: 1, slug: 'example-app', display_name: 'Example', environment: 'production', github_repository: 'example/site', deployment_ref: 'main', build_output: 'dist', group: { id: 1, name: 'Workspace' } };
@@ -27,7 +27,8 @@ fixture.call = async (path, opts = {}) => {
     let data;
     if (path === '/api/edge/webapp/summary') data = summary();
     else if (path === '/api/edge/webapp/1') {
-        if (opts.method === 'POST') { if (fixture.profileReauth) throw Object.assign(new Error('Fresh auth'), { status: 440 }); Object.assign(app, opts.body); if (fixture.loseProfileResponse) throw Object.assign(new Error('Lost response'), { status: 503 }); }
+        if (opts.method !== 'POST' && fixture.failProfileRead) throw Object.assign(new Error('Read unavailable'), { status: 503 });
+        if (opts.method === 'POST') { if (fixture.profileReauth) throw Object.assign(new Error('Fresh auth'), { status: 440 }); if (fixture.deferProfileCommit) { fixture.lateProfile = structuredClone(opts.body); throw Object.assign(new Error('Lost response while server continues'), { status: 503 }); } Object.assign(app, opts.body); if (fixture.loseProfileResponse) throw Object.assign(new Error('Lost response'), { status: 503 }); }
         data = structuredClone(app);
     } else if (path === '/api/group/1/member') data = { permissions: {} };
     else if (path === '/api/edge/deployment') data = opts.params.id ? [structuredClone(attempt)] : [structuredClone(attempt)];
@@ -95,26 +96,55 @@ try {
     await click('Reload saved settings');
     assert.equal([...document.querySelectorAll('input')].find(node => node.closest('label')?.textContent.startsWith('Build output')).value, 'new-build-directory', 'Explicit reload presents the concurrent saved profile');
     await unmount();
-    fixture.calls = []; fixture.loseProfileResponse = true; let closed = 0;
-    await mount(WebAppEditDialog, { app: { ...app, repository: app.github_repository }, onClose() { closed++; }, onChanged() {}, onBusy() {} });
-    await input('input', 'Saved despite lost response'); await click('Save changes');
-    assert.equal(closed, 0, 'An uncertain profile save stays open');
-    assert(button('Save changes').disabled, 'Uncertain profile receipt blocks a duplicate save');
-    assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'Exactly one profile POST was attempted');
-    await click('Reload saved settings');
-    assert.equal(document.querySelector('input').value, 'Saved despite lost response', 'Explicit reload shows authoritative saved fields');
-    assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'Reload does not replay the profile POST');
-    assert(document.body.textContent.includes('Review them before making another change'), 'Reload makes a new review explicit without claiming prior save delivery');
-    await unmount();
+    const receipts = await server.ssrLoadModule(prefix + 'receipts.ts');
+    for (const delayed of [false, true]) {
+        fixture.calls = []; fixture.loseProfileResponse = true; fixture.deferProfileCommit = delayed; let closed = 0;
+        const priorName = app.display_name, lostName = delayed ? 'Save may finish later' : 'Saved despite lost response';
+        await mount(WebAppEditDialog, { app: { ...app, repository: app.github_repository }, onClose() { closed++; }, onChanged() {}, onBusy() {} });
+        await input('input', lostName); await click('Save changes');
+        assert.equal(closed, 0, 'An uncertain profile save stays open');
+        assert(button('Save changes').disabled, 'Uncertain profile receipt blocks a duplicate save');
+        assert(!button('Acknowledge unknown save'), 'Risk acknowledgement is unavailable before an authoritative reload');
+        assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'Exactly one profile POST was attempted');
+        fixture.failProfileRead = true; await click('Reload saved settings');
+        assert(!button('Acknowledge unknown save'), 'A failed read must not enable risk acknowledgement');
+        assert(document.querySelector('fieldset').disabled, 'A failed read keeps the submitted-unknown guard');
+        fixture.failProfileRead = false; await click('Reload saved settings');
+        assert.equal(document.querySelector('input').value, delayed ? priorName : lostName, 'Reload shows current fields without correlating the old write');
+        assert(document.querySelector('fieldset').disabled, 'A readback must not release the submitted-unknown guard');
+        assert(receipts.receiptsFor({ actor: '7', origin: window.location.origin }).some(receipt => receipt.kind === 'profile' && receipt.submitted && !receipt.settled), 'A submitted receipt remains unsettled after GET');
+        assert(document.body.textContent.includes('may still finish'), 'The late-write risk is explicit');
+        assert(button('Acknowledge unknown save').disabled, 'Unknown outcome requires exact typed acknowledgement');
+        await input('input[aria-label="Unknown save acknowledgement"]', 'wrong acknowledgement');
+        assert(button('Acknowledge unknown save').disabled, 'Wrong acknowledgement does not release the guard');
+        await input('input[aria-label="Unknown save acknowledgement"]', 'example-app/unknown-save');
+        await click('Acknowledge unknown save');
+        assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'Typed acknowledgement sends no POST');
+        assert(receipts.receiptsFor({ actor: '7', origin: window.location.origin }).some(receipt => receipt.kind === 'profile' && receipt.settled && receipt.acknowledged), 'Risk acknowledgement is recorded as consent rather than observed completion');
+        assert(button('Save changes').disabled, 'Acknowledgement requires a separate subsequent field change and save');
+        fixture.loseProfileResponse = false; fixture.deferProfileCommit = false;
+        if (delayed) {
+            await input('input', 'A new draft before the old save finishes');
+            Object.assign(app, fixture.lateProfile); fixture.lateProfile = null;
+            await click('Save changes');
+            assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'A late old save is caught by the next fresh stale-profile preflight');
+            assert(document.body.textContent.includes('Saved settings changed'), 'A late write requires another review');
+            await click('Reload saved settings');
+        }
+        await input('input', delayed ? 'Deliberate save after late completion' : 'Deliberate save after acknowledgement');
+        await click('Save changes');
+        assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 2, 'Only a separate changed-and-confirmed save sends the next POST');
+        assert.equal(closed, 1, 'The subsequent verified save closes after authoritative readback');
+        await unmount();
+    }
     fixture.calls = []; fixture.loseProfileResponse = false; fixture.profileReauth = true;
     await mount(WebAppEditDialog, { app: { ...app, repository: app.github_repository }, onClose() {}, onChanged() {}, onBusy() {} });
     await input('input', 'Auth gated draft'); await click('Save changes');
     assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'Fresh-auth refusal does not replay the save');
     assert(document.body.textContent.includes('nothing was replayed'), 'Fresh-auth refusal requires renewed explicit consent');
     await click('Reload saved settings');
-    const receipts = await server.ssrLoadModule(prefix + 'receipts.ts');
     assert(!receipts.receiptsFor({ actor: '7', origin: window.location.origin }).some(receipt => receipt.kind === 'profile' && !receipt.settled), 'Authoritative review does not leave a refused profile save blocking the app');
     assert.equal(fixture.calls.filter(call => call.method === 'POST').length, 1, 'Reconciliation after fresh auth is read-only');
     await unmount();
-    console.log('PASS WebApp mounted inspection (8 journey groups): viewer-safe desired/attempt separation, no SAVE-only viewer reads, paged release history beyond25, read-only action suppression, useful evidence tabs, terminal observer refresh/stop, exact privileged node evidence, stale profile refusal, uncertain profile save, fresh-auth no replay and read-only reconciliation.');
+    console.log('PASS WebApp mounted inspection (9 journey groups): viewer-safe desired/attempt separation, no SAVE-only viewer reads, paged release history beyond25, read-only action suppression, useful evidence tabs, terminal observer refresh/stop, exact privileged node evidence, stale profile refusal, submitted-unknown retention, typed risk acknowledgement without replay, delayed completion preflight, fresh-auth no replay and read-only reconciliation.');
 } finally { if (root) await unmount(); await server.close(); dom.window.close(); }
