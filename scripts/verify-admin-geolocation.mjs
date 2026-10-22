@@ -1,0 +1,83 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { geoHarness } from './verify-admin-geolocation-harness.mjs';
+const h = await geoHarness();
+try {
+    const api = await h.server.ssrLoadModule('/packages/portal-mojo/src/admin/geolocation/data.ts');
+    const auth = await h.server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');
+    auth.initAuth(); await auth.login('dns.platform@nativemojo.com', 'mojo'); auth.stopAutoRefresh();
+    h.reset('ready');
+    const root = { schema_version: 1, entries: [{ value: 'catalog-private' }], provider_setup: { ...h.mock.geoProviderSetupMock(), sms: { api_key: 'sms-private' }, surprise: 'unknown-private' } };
+    root.provider_setup.geoip.GEOIP_API_KEY_MOJO = 'stored-private';
+    const state = api.parseGeoLocation(root);
+    assert(!/catalog-private|sms-private|unknown-private|stored-private/.test(JSON.stringify(state)), 'Positive projection discards catalog, SMS, raw credentials and unknown fields');
+    assert.equal(api.geoWriteBlock(state), null);
+    for (const malformed of [{ ...root, schema_version: 2 }, { schema_version: 1 }, { ...root, provider_setup: { ...root.provider_setup, available: 'yes' } }, { ...root, provider_setup: { ...root.provider_setup, configuration_revision: 'oops' } }]) assert.throws(() => api.parseGeoLocation(malformed));
+    for (const scenario of ['unavailable', 'remote-error', 'missing-delegation']) { h.reset(scenario); assert(api.geoWriteBlock(api.parseGeoLocation({ schema_version: 1, provider_setup: h.mock.geoProviderSetupMock() }))); }
+    for (const scenario of ['unknown-provider', 'empty-registry']) {
+        h.reset(scenario); const loaded = await api.readGeoLocation(), draft = api.geoDraft(loaded.geoip);
+        assert(api.geoProviderOptions(loaded, draft).includes(draft.GEOIP_PRIMARY_PROVIDER));
+        const payload = api.buildGeoPayload('configure_providers', loaded.configuration_revision, draft);
+        assert.deepEqual(payload.providers.geoip.GEOIP_ADDITIONAL_PROVIDERS, draft.GEOIP_ADDITIONAL_PROVIDERS, 'Unknown/ordered identifiers roundtrip');
+    }
+    h.reset('ready'); const initial = await api.readGeoLocation(), draft = api.geoDraft(initial.geoip);
+    draft.GEOIP_ADDITIONAL_PROVIDERS.reverse();
+    assert.deepEqual(initial.geoip.GEOIP_ADDITIONAL_PROVIDERS, ['ipapi', 'maxmind'], 'Draft owns an independent array');
+    const payload = api.buildGeoPayload('configure_providers', null, draft, { mode: 'replace', value: '' });
+    assert.deepEqual(Object.keys(payload).sort(), ['action', 'providers', 'topic']);
+    assert.deepEqual(Object.keys(payload.providers).sort(), ['expected_revision', 'geoip']);
+    assert.equal(payload.providers.expected_revision, null);
+    assert.deepEqual(Object.keys(payload.providers.geoip).sort(), [...api.GEOLOCATION_KEYS].sort(), 'Blank replacement omits both credential fields');
+    assert.equal(api.buildGeoPayload('configure_providers', null, draft, { mode: 'clear', confirmed: true }).providers.geoip.clear_api_key, true);
+    assert.throws(() => api.buildGeoPayload('configure_providers', null, draft, { mode: 'clear', confirmed: false }));
+    assert.throws(() => api.buildGeoPayload('configure_providers', null, draft, { mode: 'replace', value: 'x'.repeat(4097) }));
+    for (const value of ['http://geo.invalid', 'https://user:pass@geo.invalid', 'https://geo.invalid/path', 'https://geo.invalid?q=x', 'https://geo.invalid?', 'https://geo.invalid/#', 'https://geo.invalid/#x', 'https://geo.invalid:444', 'https://geo.invalid/'.repeat(30)]) assert.throws(() => api.geoOrigin(value));
+    assert.equal(api.geoOrigin('https://geo.invalid:443/'), 'https://geo.invalid:443');
+    for (const extra of [['UPPER'], ['a', 'a'], Array.from({length:17}, (_, i) => `provider${i}`)]) assert.throws(() => api.geoDraft({ ...draft, GEOIP_ADDITIONAL_PROVIDERS: extra }));
+    assert.equal(api.geoFleetRoute('/custom/system/geolocation'), '/custom/system/fleet-configuration');
+    assert.equal(api.geoFleetRoute('/geolocation'), '/fleet-configuration');
+    for (const wrapped of [true, false]) {
+        h.reset('rejected-key'); h.fixture.mapReply = (reply, opts) => wrapped && opts.method === 'POST' && reply.status ? { status: true, data: reply } : reply;
+        const verdict = await api.testGeoLocation(initial.configuration_revision, draft, { mode: 'replace', value: 'fixture-only-rejected-key' });
+        assert.equal(verdict.success, false, 'Flat/wrapped negative diagnostics stay inline results');
+        assert.equal((await api.readGeoLocation()).verify_state.geoip.ok, true, 'A failed draft-key test does not change stored verification');
+    }
+    for (const reply of [{ success: true }, { tested: true, topic: 'sms', success: true, results: { geoip: { success: true, code: null, message: 'x' } } }, { tested: true, topic: 'geoip', success: true, results: { geoip: { success: false, code: null, message: 'x' } } }]) assert.throws(() => api.parseGeoTest(reply));
+    h.reset('ready');
+    await api.testGeoLocation(initial.configuration_revision, { ...draft, GEOIP_PRIMARY_PROVIDER: 'ipinfo' });
+    assert.equal(h.mock.getMockGeoProviderObservations().at(-1).stored_test, true, 'Provider-chain-only edits still test stored Mojo connection');
+    await api.testGeoLocation(initial.configuration_revision, { ...draft, GEOIP_MOJO_SYNC_ENABLED: true });
+    assert.equal(h.mock.getMockGeoProviderObservations().at(-1).stored_test, false, 'Changed sync is not a stored connection test');
+    h.reset('missing-sync-permission');
+    const missingPermission = await api.testGeoLocation(initial.configuration_revision, { ...draft, GEOIP_MOJO_SYNC_ENABLED: true });
+    assert.equal(missingPermission.success, false); assert.equal(missingPermission.code, 'insufficient_permission'); assert.match(missingPermission.message, /geoip_sync/);
+    h.reset('published-origin-pending'); const pending = await api.readGeoLocation();
+    const pendingVerdict = await api.testGeoLocation(pending.configuration_revision, api.geoDraft(pending.geoip));
+    assert.equal(pendingVerdict.success, false, 'Unchanged displayed desired origin cannot reuse a key against a different node-loaded origin');
+    assert.equal(h.mock.getMockGeoProviderObservations().at(-1).stored_test, false);
+    assert.equal((await api.readGeoLocation()).verify_state.geoip.ok, true);
+    assert.equal((await api.testGeoLocation(pending.configuration_revision, api.geoDraft(pending.geoip), { mode: 'replace', value: 'fixture-only-new-origin-key' })).success, true);
+    h.reset('ready'); let sawReplacement = false;
+    h.fixture.onSend = opts => { if (opts.method === 'POST') { assert.equal(opts.body.providers.geoip.GEOIP_API_KEY_MOJO, 'fixture-only-DISTINCT-4f2e'); sawReplacement = true; } };
+    const result = await api.saveGeoLocation(initial.configuration_revision, api.geoDraft(initial.geoip), { mode: 'replace', value: 'fixture-only-DISTINCT-4f2e' });
+    assert(sawReplacement); assert.equal(result.unchanged, true); assert.equal(result.published, false, 'A database-key-only save need not publish static settings');
+    assert.equal((await api.readGeoLocation()).geoip.GEOIP_API_KEY_MOJO_HINT, '4f2e');
+    assert(!JSON.stringify(h.mock.getMockGeoProviderObservations()).includes('fixture-only-DISTINCT-4f2e'));
+    h.fixture.onSend = null;
+    const clear = await api.saveGeoLocation(result.revision, api.geoDraft(initial.geoip), { mode: 'clear', confirmed: true });
+    assert.equal(clear.results.geoip.code, 'clear_requested'); assert.equal((await api.readGeoLocation()).geoip.GEOIP_API_KEY_MOJO_CONFIGURED, false);
+    h.reset('ready'); const changed = await api.saveGeoLocation(initial.configuration_revision, { ...api.geoDraft(initial.geoip), GEOIP_PRIMARY_PROVIDER: 'ipinfo' });
+    assert.equal(changed.published, true); assert.equal(changed.pending_restart, true);
+    h.reset('stale-revision'); await assert.rejects(api.saveGeoLocation(initial.configuration_revision, api.geoDraft(initial.geoip)), error => error.kind === 'conflict', 'Backend stale revision is a 400 requiring refresh');
+    h.reset('save-uncertain'); await assert.rejects(api.saveGeoLocation(initial.configuration_revision, api.geoDraft(initial.geoip)), error => error.kind === 'uncertain');
+    h.reset('fresh-auth'); await assert.rejects(api.testGeoLocation(initial.configuration_revision, api.geoDraft(initial.geoip)), error => error.kind === 'fresh'); assert.equal(h.fixture.posts.length, 1, '440 is not replayed');
+    h.reset('ready'); const base = api.buildGeoPayload('test_providers', initial.configuration_revision, api.geoDraft(initial.geoip));
+    assert.equal(h.mock.geoProviderMock(api.GEOLOCATION_ENDPOINT, 'POST', { ...base, group: 1 }, true).code, 400);
+    assert.equal(h.mock.geoProviderMock(api.GEOLOCATION_ENDPOINT, 'POST', { ...base, providers: { ...base.providers, sms: {} } }, true).code, 400);
+    assert.equal(h.mock.geoProviderMock(api.GEOLOCATION_ENDPOINT, 'POST', { ...base, providers: { ...base.providers, geoip: { ...base.providers.geoip, GEOIP_API_KEY_MOJO_HINT: 'leak' } } }, true).code, 400);
+    assert.equal(h.mock.geoProviderMock(api.GEOLOCATION_ENDPOINT, 'POST', base, false).code, 403);
+    const source = await readFile('packages/portal-mojo/src/admin/geolocation/data.ts', 'utf8');
+    assert.doesNotMatch(source, /useMutation|withFreshAuth|console\.|localStorage|sessionStorage/);
+    assert.match(source, /beforeSend/); assert.match(source, /finally/);
+    console.log('GeoLocation contract: positive projection, exact payloads, credential states, provider order, loaded-origin/stored-test predicates, refusal, stale revision and no-replay checks passed');
+} finally { await h.close(); }
