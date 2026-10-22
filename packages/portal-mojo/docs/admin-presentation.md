@@ -3,14 +3,17 @@
 Use intuitive, simple screens with clean spacing. Keep only important data and
 short action-oriented copy on the primary surface. Use tabs for distinct jobs,
 modals for record inspection/confirmation, and keyboard-accessible help popovers
-for explanations. Keep action-specific errors, unknown outcomes and concrete
+for explanations. On pages that already scroll, use modals/popovers rather
+than collapsible detail sections. Compact disclosures such as Maintenance are
+fine; this is contextual. Preserve Admin Dashboard as-is unless Ian explicitly
+requests a change; separate Fleet work must not alter it. Keep action-specific errors, unknown outcomes and concrete
 interruptions visible where the operator needs them. Permission/consent/session
 and no-replay checks are behavioral requirements, not prose to remove.
 
 Both applications import `portal-mojo/styles.css`. Never add app-local copies of
 package component CSS: unlayered stale copies override the canonical layer.
 Showcase owns only tokens, chrome and demo-only styling. Test fixture controls
-stay in closed Demo controls disclosures; they are not the product's UI.
+are demo-only, separate from the product's UI.
 
 ## Required acceptance
 

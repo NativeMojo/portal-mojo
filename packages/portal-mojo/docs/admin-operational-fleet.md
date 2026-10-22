@@ -22,6 +22,9 @@ only; Fleet Configuration remains its separate advanced superuser destination.
 Use `showConfigurationLink={false}` when that destination is not mounted.
 `FleetOverview` also accepts `headingLevel` (`1 | 2`, default `2`); use `1` when
 rendering it as a standalone page. `FleetPage` supplies level `1` automatically.
+`capacityDetails="modal"` replaces the capacity disclosure with a button and a
+read-only modal. `FleetPage` and its Showcase demo select this mode. The reusable
+overview defaults to `"inline"` to preserve the current Admin Dashboard.
 
 ## Authority and evidence
 

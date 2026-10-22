@@ -28,7 +28,8 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
   file — read it before building. Summaries under-build (charts/filters were
   rebuilt once for exactly this reason).
 - **KISS presentation:** clean spacing, one clear primary action, only important
-  data/text visible. Use tabs, modals and accessible help popovers for depth.
+  data/text visible. On pages that already scroll, use modals/popovers instead
+  of collapsible details; compact Maintenance disclosures are fine.
 - **Visual QA before done:** inspect loaded screenshots in light AND dark at
   desktop and 390px, including opened dialogs. Confirm computed spacing,
   typography and styles in BOTH portal and Showcase; DOM presence is not visual
@@ -75,6 +76,5 @@ web-mojo (now maintenance-mode). Keep this file under 80 lines.
 ## Model guidance
 Fable for foundations/review; Opus 5 (`/fast`) for volume UI porting.
 ## Responses
-- Short and plain. Lead with the answer; detail only if asked.
-- Explain reasoning only when useful; no unnecessary tool calls to prove a point.
+- Preserve Admin Dashboard as-is; isolate separate Fleet page work (Ian, 2026-10-22).
 - Ask before acting on anything beyond the literal request.
