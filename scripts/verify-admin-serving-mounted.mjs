@@ -1,11 +1,10 @@
-// Mounted native Serving wizard: committed writes whose responses are lost
-// must never be replayed as creates or described as definite refusals.
+// Actual mounted Serving flows. JSDOM proves drafts, requests and dismissal;
+// the browser QA is separately required for native layout and focus.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost' });
-for (const key of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','Node']) globalThis[key] = dom.window[key];
+for (const key of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','Node','Element']) globalThis[key] = dom.window[key];
 Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
@@ -16,132 +15,63 @@ const React = await import('react');
 const { act } = React;
 const { createRoot } = await import('react-dom/client');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
-const state = globalThis.__serving = { calls: [], mode: 'create-lost', stored: null, routes: [], finish: null };
-state.save = async (id, body) => {
-    state.calls.push({ id, body });
+const { MemoryRouter } = await import('react-router-dom');
+const state = globalThis.__serving = { calls: [], mode: 'success', stored: null, routes: [], finish: null, revision:1, auth:{authenticated:true,uid:'1'}, listeners:new Set(),preflight:null };
+const host = changes => ({ id:44,kind:'site',domain:{id:1,name:'example.test'},label:'',certificate:{id:2,common_name:'example.test',status:'active'},pool:'default',is_enabled:false,spa:false,body_size_mb:50,quiet_paths:[],serve_static:false,server_name:'example.test',created:1,modified:1,...changes });
+state.save = async (id, body, guard) => {
+    guard?.(); state.calls.push({ id, body });
     if (state.mode === 'hold') return new Promise((resolve,reject)=>{state.release={resolve,reject};});
-    state.stored = { ...body, id: id ?? 9127, domain: { id: 1, name: 'example.test' }, certificate: { id: 2, common_name: 'example.test' }, server_name: 'example.test' };
+    state.stored = host({ ...state.stored, ...body, id: id ?? 9127, domain:{id:1,name:'example.test'},certificate:{id:2,common_name:'example.test'} });
     if ((id == null && state.mode === 'create-lost') || (id != null && state.mode === 'enable-lost')) throw new TypeError('response connection dropped');
     return state.mode === 'create-malformed' ? {...state.stored,id:undefined} : state.stored;
 };
-state.route = async (id, body) => { state.calls.push({ route: true, id, body }); const row = { ...body, id: 72, upstream: { id: body.upstream, name: 'api' } }; state.routes.push(row); if (state.mode === 'route-lost') throw new TypeError('response connection dropped'); return row; };
+state.route = async (id, body, guard) => { guard?.();state.calls.push({ route:true,id,body });const row={...body,id:id??72,upstream:{id:body.upstream,name:'api'},vhost:{id:body.vhost??44}};state.routes.push(row);if(state.mode==='route-lost')throw new TypeError('response connection dropped');return row; };
 const virtual = {
-    '/__serving_api.ts': `export * from '/packages/portal-mojo/src/admin/edge/api.ts'; export const saveVhost = (id, body) => globalThis.__serving.save(id, body); export const saveVhostRoute = (id, body) => globalThis.__serving.route(id, body); export const listVhostRoutes = async () => globalThis.__serving.routes;`,
-    '/__serving_runtime.ts': `export * from '/packages/portal-mojo/src/client/runtime.ts'; export const useMe = () => ({data:{id:1,is_superuser:true}});`,
-    '/__serving_ui.ts': `export * from '/packages/portal-mojo/src/ui/index.ts'; import React from 'react'; export function CollectionSelect(p) { const certificate=p.model.endpoint.includes('certificate'); const upstream=p.model.endpoint.includes('upstream'); const row=certificate?{id:2,common_name:'example.test',sans:[]} :upstream?{id:3,name:'api'}:{id:1,name:'example.test'};return React.createElement('button',{type:'button',disabled:p.disabled||p.readOnly,onClick:()=>p.onChange(row.id,row)},p.label||'Upstream…'); }`,
+ '/__serving_hooks.ts': `export * from '/packages/portal-mojo/src/client/hooks.ts';import {useMemo} from 'react';export const useModelList=(endpoint,params)=>{const s=globalThis.__serving;if(endpoint!=='/api/edge/route')throw new Error('Unexpected table endpoint '+endpoint);if(params.vhost!==44)throw new Error('Route table lost its fixed parent');const data=useMemo(()=>({rows:s.routes.slice(Number(params.start)||0,(Number(params.start)||0)+(Number(params.size)||25)),count:s.routes.length,start:Number(params.start)||0,size:Number(params.size)||25}),[s.routes,JSON.stringify(params)]);return {data,status:'success',isPending:false,isLoading:false,isFetching:false,isPlaceholderData:false,error:null,refetch:async()=>{},isError:false};};`,
+ '/__serving_api.ts': `export * from '/packages/portal-mojo/src/admin/edge/api.ts'; export const saveVhost=(id,body,guard)=>globalThis.__serving.save(id,body,guard);export const saveVhostRoute=(id,body,guard)=>globalThis.__serving.route(id,body,guard);export const listVhostRoutes=async()=>{const s=globalThis.__serving;if(s.preflight)await s.preflight;return s.routes;};export const deleteVhostRoute=async(id,guard)=>{guard?.();const s=globalThis.__serving;s.calls.push({removeRoute:id});s.routes=s.routes.filter(row=>row.id!==id);};`,
+ '/__serving_runtime.ts': `export * from '/packages/portal-mojo/src/client/runtime.ts';import {useSyncExternalStore} from 'react';const s=globalThis.__serving;export const useMe=()=>({data:{id:1,is_superuser:true}});export const useCan=()=>({can:true});export const useAuthSnapshot=()=>useSyncExternalStore(fn=>{s.listeners.add(fn);return()=>s.listeners.delete(fn)},()=>s.auth);export const getAuthSnapshot=()=>s.auth;export const getAuthSessionRevision=()=>s.revision;`,
+ '/__serving_ui.ts': `export * from '/packages/portal-mojo/src/ui/index.ts';import React from 'react';export function CollectionSelect(p){const cert=p.model.endpoint.includes('certificate'),up=p.model.endpoint.includes('upstream');const row=cert?{id:2,common_name:'example.test',sans:[]}:up?{id:3,name:'api',group:null}:{id:1,name:'example.test',group:1};return React.createElement('button',{type:'button',disabled:p.disabled||p.readOnly,onClick:()=>p.onChange(row.id,row)},p.label||'Upstream…');}`,
 };
-const server = await createServer({ root: process.cwd(), appType:'custom', logLevel:'silent', server:{middlewareMode:true}, plugins:[{name:'serving-mounted-fixtures',enforce:'pre',resolveId:id=>id in virtual?id:null,load:id=>virtual[id]??null,transform(source,id){if(!id.endsWith('/admin/edge/VhostWizard.tsx'))return;const text = process.env.SERVING_REGRESSION_REF ? execFileSync('git',['show',`${process.env.SERVING_REGRESSION_REF}:${id.replace(`${process.cwd()}/`,'')}`],{encoding:'utf8'}) : source;return text.replace("from './api'","from '/__serving_api.ts'").replace("from '../../client/runtime'","from '/__serving_runtime.ts'").replace("from '../../ui'","from '/__serving_ui.ts'");}}] });
-const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
-const root = createRoot(document.getElementById('root'));
-const settle = () => act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});
-const button = name => [...document.querySelectorAll('button')].find(n=>n.textContent.trim()===name);
-const click = async name => { assert(button(name),`button ${name} exists`);await act(async()=>button(name).click());await settle(); };
-const type = async (input,value) => act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});
-try {
-    const { VhostWizard, openVhostWizard } = await server.ssrLoadModule('/packages/portal-mojo/src/admin/edge/VhostWizard.tsx');
-    const models = await server.ssrLoadModule('/packages/portal-mojo/src/admin/edge/models.ts');
-    const dns = await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/models.ts');
-    models.EdgeVhostModel.invalidate = models.EdgeRouteModel.invalidate = async()=>{};
-    models.EdgeVhostModel.fetchOne = async()=>state.stored;
-    dns.CertificateModel.fetchOne = async()=>({id:2,common_name:'example.test',sans:[]});
-    async function mount(kind) {
-        state.calls=[]; state.stored=null; state.routes=[]; state.finish=null;
-        await act(async()=>root.render(React.createElement(QueryClientProvider,{client},React.createElement(VhostWizard,{key:Math.random(),onDone:value=>{state.finish=value;}}))));
-        await act(async()=>document.querySelectorAll('.edge-kind-card input')[kind==='site'?1:2].click());
-        // Current and simplified wizard both keep the native navigation.
-        if(!button('Domain')) await click('Next');
-        await click('Domain');
-        if(button('Next')) await click('Next');
-        if(kind==='site_api') {
-            if(button('Configure API paths')) await click('Configure API paths');
-            await click('Add route');
-            await type(document.querySelector('[aria-label="Path prefix"]'),'/api');
-            await click('Upstream…');
-        }
-        // Advance to certificate when it isn't on the initial basic surface.
-        if(!button('Certificate')) await click('Next');
-        await click('Certificate');
-        while(button('Next')) await click('Next');
-    }
-    if (!process.env.SERVING_REGRESSION_CASE) {
-    await mount('site');
-    await click(button('Add hostname')?'Add hostname':'Create vhost');
-    assert.equal(state.calls.length,1);
-    assert.match(document.body.textContent,/unconfirmed|unknown|not confirmed/i,'a committed create with a lost response is explicitly unconfirmed');
-    await click(button('Add hostname')?'Add hostname':'Create vhost');
-    assert.equal(state.calls.length,1,'unacknowledged create is never blindly replayed');
-    }
-    for (const mode of (process.env.SERVING_REGRESSION_CASE ? [process.env.SERVING_REGRESSION_CASE] : ['route-lost', 'enable-lost'])) {
-        state.mode=mode;
-        await mount('site_api');
-        await click(button('Add hostname')?'Add hostname':'Create vhost');
-        assert.match(document.body.textContent,/outcome unconfirmed/i);
-        assert.doesNotMatch(document.querySelector('.form-alert').textContent,/refused|still disabled/i,'unknown outcome is never called refused or still disabled');
-        const writes=state.calls.length;
-        assert.equal(state.calls.filter(call=>call.id===null&&!call.route).length,1);
-        await click(button('Add hostname')?'Add hostname':'Create vhost'); // observation only
-        assert.equal(state.calls.length,writes,'first finish after uncertainty only observes');
-        state.mode='success';
-        await click(button('Add hostname')?'Add hostname':'Create vhost');
-        assert.equal(state.calls.filter(call=>call.id===null&&!call.route).length,1,'acknowledged create is retained');
-        assert.equal(state.calls.filter(call=>call.route).length,1,'observed route is not posted twice');
-        assert.equal(state.finish?.is_enabled,true);
-    }
-
-    if (!process.env.SERVING_REGRESSION_REF) {
-        state.mode='create-malformed';await mount('site');await click('Add hostname');assert.match(document.body.textContent,/Create outcome unconfirmed/);await click('Add hostname');assert.equal(state.calls.length,1,'malformed create receipt is not acknowledged or replayed');
-        async function initial(kind, row=null) {
-            state.calls=[];state.mode='success';state.finish=null;state.routes=[];
-            await act(async()=>root.render(React.createElement(QueryClientProvider,{client},React.createElement(VhostWizard,{key:Math.random(),row,onDone:value=>{state.finish=value;}}))));
-            if(!row){
-                assert(button('Domain') && button('Certificate'),'hostname naming and certificate are on the first surface');
-                assert.equal(document.querySelector('.edge-advanced').open,false,'Advanced starts closed');
-                await act(async()=>document.querySelectorAll('.edge-kind-card input')[['api','site','site_api','redirect'].indexOf(kind)].click());
-                await click('Domain');await click('Certificate');
-            }
-        }
-        for(const kind of ['api','site_api']) {
-            await initial(kind);
-            await click('Next');
-            assert.equal(document.querySelector('.edge-advanced').open,true,'missing required hidden destination opens Advanced');
-            assert(document.querySelector('.edge-advanced').contains(document.activeElement),'validation focuses Advanced destination control');
-            assert.equal(state.calls.length,0);
-        }
-        for(const kind of ['api','site','redirect']) {
-            await initial(kind);
-            if(kind==='api'){await click('Configure API destination');await click('Upstream');}
-            if(kind==='redirect')await type(document.querySelector('input[placeholder="www.example.com"]'),'target.example.test');
-            const enabled=[...document.querySelectorAll('input[type="checkbox"]')].find(node=>node.parentElement.textContent.includes('Enabled'));
-            await act(async()=>enabled.click());
-            await click('Next');await click('Add hostname');
-            assert.equal(state.calls.length,1);assert.equal(state.calls[0].body.kind,kind);assert.equal(state.calls[0].body.is_enabled,false,'disabled staging is preserved');
-            assert.equal(state.calls[0].body.upstream,kind==='api'?3:null);
-            assert.equal(state.calls[0].body.redirect_to,kind==='redirect'?'target.example.test':null);
-        }
-        const row={id:44,kind:'site',domain:{id:1,name:'example.test'},label:'',certificate:{id:2,common_name:'example.test'},pool:'custom',is_enabled:false,spa:true,body_size_mb:250,quiet_paths:[],serve_static:false};
-        await initial('site',row);assert.equal(document.querySelector('.edge-advanced').open,true,'nondefault edit settings open Advanced');
-        await act(async()=>document.querySelectorAll('.edge-kind-card input')[2].click());
-        await click('Save changes');assert.equal(state.calls.length,1);assert.equal(state.calls[0].body.kind,'site_api','route-less supported conversion remains available');assert.equal(state.calls[0].body.pool,'custom');assert.equal(state.calls[0].body.body_size_mb,250);
-        await initial('site');
-        await act(async()=>{document.querySelector('.edge-advanced').open=true;document.querySelector('.edge-advanced').dispatchEvent(new Event('toggle'));});
-        const pool=[...document.querySelectorAll('label.field')].find(node=>node.textContent.startsWith('Pool')).querySelector('input');await type(pool,'custom');
-        await act(async()=>{document.querySelector('.edge-advanced').open=false;document.querySelector('.edge-advanced').dispatchEvent(new Event('toggle'));});
-        await click('Next');await click('Add hostname');assert.equal(state.calls[0].body.pool,'custom','collapsing Advanced retains controlled values');
-        // Explicit backend rejection remains retryable at the failed step.
-        const {MojoError}=await server.ssrLoadModule('/packages/portal-mojo/src/client/runtime.ts');
-        const originalRoute=state.route;
-        let rejectOnce=true;
-        state.route=async(id,body)=>{if(rejectOnce){rejectOnce=false;state.calls.push({route:true,id,body});throw new MojoError('selected upstream is disabled',400);}return originalRoute(id,body);};
-        state.mode='success';await mount('site_api');await click('Add hostname');assert.match(document.querySelector('.form-alert').textContent,/route.*refused.*selected upstream is disabled/);await click('Add hostname');assert.equal(state.calls.filter(call=>call.id===null&&!call.route).length,1);assert.equal(state.finish?.is_enabled,true);state.route=originalRoute;
-        // Real modal opener + real native cancellation path while a write is held.
-        const ui=await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
-        await act(async()=>root.render(React.createElement(QueryClientProvider,{client},React.createElement(ui.ModalHost))));
-        let done=false;
-        await act(async()=>{void openVhostWizard().then(()=>{done=true;});});
-        await act(async()=>document.querySelectorAll('.edge-kind-card input')[1].click());await click('Domain');await click('Certificate');await click('Next');state.mode='hold';await click('Add hostname');
-        await act(async()=>{document.querySelector('dialog').dispatchEvent(new Event('cancel',{cancelable:true}));document.querySelector('dialog').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));});
-        assert.equal(done,false);assert(document.querySelector('dialog'));assert.equal(button('Cancel').disabled,true);
-        await act(async()=>state.release.reject(new TypeError('response connection dropped')));await settle();assert.equal(button('Cancel').disabled,false);await click('Cancel');assert.equal(done,true);
-    }
-    console.log('verify-admin-serving-mounted: create, route and final-enable response loss require observation; acknowledged progress is retained without duplicate creates or routes.');
-} finally { await act(async()=>root.unmount());await server.close(); }
+const server=await createServer({root:process.cwd(),appType:'custom',logLevel:'silent',server:{middlewareMode:true},plugins:[{name:'serving-mounted-fixtures',enforce:'pre',resolveId:id=>id in virtual?id:null,load:id=>virtual[id]??null,transform(source,id){if(id.endsWith('/ui/ModelTable.tsx'))return source.replace("from '../client/hooks'","from '/__serving_hooks.ts'");if(!/\/admin\/edge\/(VhostWizard|VhostDetail)\.tsx$/.test(id))return;return source.replace("from './api'","from '/__serving_api.ts'").replace("from '../../client/runtime'","from '/__serving_runtime.ts'").replace("from '../../ui'","from '/__serving_ui.ts'");}}]});
+const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+const root=createRoot(document.getElementById('root'));
+const settle=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,0));});
+const button=name=>[...document.querySelectorAll('button')].find(node=>node.textContent.trim()===name);
+const click=async name=>{assert(button(name),`button ${name} exists`);await act(async()=>button(name).click());await settle();};
+const type=async(input,value)=>act(async()=>{assert(input,'input exists');Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});
+const selectKind=async kind=>act(async()=>document.querySelectorAll('.edge-kind-option input')[['api','site','site_api','redirect'].indexOf(kind)].click());
+let key=0;
+try{
+ const {VhostWizard,openVhostWizard}=await server.ssrLoadModule('/packages/portal-mojo/src/admin/edge/VhostWizard.tsx');
+ const {VhostDetail}=await server.ssrLoadModule('/packages/portal-mojo/src/admin/edge/VhostDetail.tsx');
+ const ui=await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');
+ const models=await server.ssrLoadModule('/packages/portal-mojo/src/admin/edge/models.ts');
+ const dns=await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/models.ts');
+ models.EdgeVhostModel.invalidate=models.EdgeRouteModel.invalidate=async()=>{};
+ models.EdgeVhostModel.fetchOne=async()=>state.stored;
+ dns.CertificateModel.fetchOne=async()=>({id:2,common_name:'example.test',sans:[]});
+ dns.DomainModel.fetchOne=async()=>({id:1,name:'example.test',group:1});
+ const render=async node=>{await act(async()=>root.render(React.createElement(QueryClientProvider,{client},React.createElement(MemoryRouter,null,node))));await settle();};
+ async function mount(kind,row=null){state.calls=[];state.routes=[];state.finish=null;state.stored=row;await render(React.createElement(VhostWizard,{key:++key,row,onDone:value=>{state.finish=value;}}));if(!row){assert(button('Domain'),'create begins with Address');await click('Domain');await type(document.querySelector('[aria-label="Hostname label"]'),'');await click('Next');await selectKind(kind);if(kind==='api')await click('Upstream');if(kind==='site_api'){await click('Add route');await type(document.querySelector('[aria-label="Path prefix"]'),'/api');await click('Upstream');}if(kind==='redirect')await type(document.querySelector('[placeholder="www.example.com"]'),'target.example.test');await click('Next');await click('Certificate');}}
+ async function review(){await click('Next');assert.match(document.body.textContent,/Review/);}
+ for(const kind of ['api','site','site_api','redirect']){state.mode='success';await mount(kind);const checkbox=[...document.querySelectorAll('input[type="checkbox"]')].find(node=>node.parentElement.textContent.startsWith(' Enabled'));assert(checkbox);await act(async()=>checkbox.click());await review();await click('Add hostname');assert.equal(state.finish.kind,kind);assert.equal(state.finish.is_enabled,false);assert.equal(state.calls.filter(call=>call.id===null&&!call.route).length,1);if(kind==='site_api'){assert.equal(state.calls[0].body.is_enabled,false);assert.equal(state.calls[1].route,true);assert.equal(state.calls.at(-1).body.kind,'site_api');}}
+ for(const mode of ['create-lost','create-malformed']){state.mode=mode;await mount('site');await review();await click('Add hostname');assert.match(document.body.textContent,/Create outcome unconfirmed/);assert(button('Observe outcome').disabled,'uncertain unacknowledged create cannot be replayed');assert.equal(state.calls.length,1);}
+ for(const mode of ['route-lost','enable-lost']){state.mode=mode;await mount('site_api');await review();await click('Add hostname');assert.match(document.body.textContent,/outcome unconfirmed/);assert.doesNotMatch(document.querySelector('.form-alert').textContent,/refused|still disabled/);assert(button('Inspect saved hostname'),'acknowledged partial create is inspectable');const writes=state.calls.length;await click('Observe outcome');assert.equal(state.calls.length,writes,'uncertainty reconciliation is observation only');state.mode='success';await click('Add hostname');assert.equal(state.calls.filter(call=>call.id===null&&!call.route).length,1);assert.equal(state.calls.filter(call=>call.route).length,1);assert.equal(state.finish.is_enabled,true);}
+ // Editing retains one draft across real task tabs and focuses validation.
+ state.mode='success';await mount('redirect',host({kind:'redirect',redirect_to:'old.example.test',pool:'custom'}));assert.deepEqual([...document.querySelectorAll('[role="tab"]')].map(node=>node.textContent),['Address','Routing','Certificate','Settings']);await click('Routing');await type(document.querySelector('[placeholder="www.example.com"]'),'new.example.test');await click('Settings');await click('Routing');assert.equal(document.querySelector('[placeholder="www.example.com"]').value,'new.example.test');await type(document.querySelector('[placeholder="www.example.com"]'),'bad/path');await click('Certificate');await click('Save changes');assert.equal(document.querySelector('[role="tab"][aria-selected="true"]').textContent,'Routing');assert.equal(document.activeElement,document.querySelector('[placeholder="www.example.com"]'),'redirect validation focuses the actual invalid text field');assert.equal(state.calls.length,0);await type(document.querySelector('[placeholder="www.example.com"]'),'new.example.test');await click('Save changes');assert.equal(state.calls[0].body.redirect_to,'new.example.test');assert.equal(state.calls[0].body.pool,'custom');
+ // A supported route-less conversion preserves settings.
+ await mount('site',host({pool:'custom',body_size_mb:250}));await click('Routing');await selectKind('site_api');await click('Save changes');assert.equal(state.calls[0].body.kind,'site_api');assert.equal(state.calls[0].body.body_size_mb,250);
+ // Held modal submission keeps active panel and refuses native close paths.
+ await render(React.createElement(ui.ModalHost));let done=false;await act(async()=>{void openVhostWizard(host({kind:'redirect',redirect_to:'target.example.test'}),{initialTab:'routing'}).then(()=>{done=true;});});state.mode='hold';await click('Save changes');assert(document.querySelector('[placeholder="www.example.com"]'),'saving retains active task panel');assert(document.querySelector('[placeholder="www.example.com"]').disabled);await act(async()=>{document.querySelector('dialog').dispatchEvent(new Event('cancel',{cancelable:true}));document.querySelector('dialog').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));});assert.equal(done,false);await act(async()=>state.release.reject(new TypeError('response lost')));await settle();assert(button('Observe outcome'));await click('Cancel');assert.equal(done,true);
+ // Detail is a real task modal, destination first, with no one-item rail.
+ models.EdgeVhostModel.useOne=()=>({data:state.stored,isPending:false,error:null,refetch:async()=>{}});
+ state.stored=host({kind:'redirect',redirect_to:'target.example.test'});await render(React.createElement(VhostDetail,{id:44,onClose:()=>{}}));assert.equal(document.querySelector('.flat-row').textContent,'Redirects totarget.example.test');assert.equal(document.querySelector('.detail-nav'),null);assert.deepEqual([...document.querySelectorAll('[role="tab"]')].map(node=>node.textContent),['Overview','Certificate','Settings']);
+ // Route inspection is paginated, edits use focused modals and quiet paths cannot be stranded.
+ const detail=async(quiet=[])=>{state.calls=[];state.mode='success';state.preflight=null;state.stored=host({kind:'site_api',quiet_paths:quiet});await render(React.createElement(React.Fragment,null,React.createElement(VhostDetail,{key:++key,id:44,onClose:()=>{state.closed=true;}}),React.createElement(ui.ModalHost)));await click('Routes');};
+ const dialogClick=async name=>{const node=[...document.querySelectorAll('dialog button')].find(node=>node.textContent.trim()===name);assert(node,`dialog button ${name}`);await act(async()=>node.click());await settle();};
+ state.routes=[{id:71,path_prefix:'/api',upstream:{id:3,name:'api'},vhost:{id:44}}];await detail(['/api/health']);await click('Remove');assert.match(document.querySelector('.form-alert').textContent,/quiet path \/api\/health/);assert.equal(state.calls.length,0,'last covering route removal is blocked before mutation');
+ state.routes=[];await detail();await click('Add route');await type(document.querySelector('dialog [aria-label="Path prefix"]'),'/api');await dialogClick('Upstream');state.mode='route-lost';await dialogClick('Add route');assert.match(document.querySelector('dialog').textContent,/Outcome unconfirmed/);assert.equal(state.calls.filter(call=>call.route).length,1);await dialogClick('Close');await click('Observe outcome');assert.equal(state.calls.filter(call=>call.route).length,1,'detail route observation never replays a create');assert.equal(document.querySelector('.form-alert'),null);
+ // Escape during route preflight must not dispose a form then submit later.
+ state.routes=[];await detail();await click('Add route');await type(document.querySelector('dialog [aria-label="Path prefix"]'),'/api');await dialogClick('Upstream');let releasePreflight;state.preflight=new Promise(resolve=>{releasePreflight=resolve;});await dialogClick('Add route');await act(async()=>document.querySelector('dialog').dispatchEvent(new Event('cancel',{cancelable:true})));assert(document.querySelector('dialog'),'native dismissal is guarded throughout preflight');await act(async()=>{state.revision++;state.auth={...state.auth};for(const listener of state.listeners)listener();});await act(async()=>releasePreflight());await settle();assert.equal(state.calls.length,0,'session replacement during preflight cannot start a late route write');assert.equal(document.querySelector('dialog'),null,'owner replacement disposes the nested editor');state.preflight=null;
+ console.log('verify-admin-serving-mounted: four create shapes, disabled staging, exact no-replay recovery, partial inspection, retained edit tabs, validation routing and native pending dismissal passed.');
+}finally{await act(async()=>root.unmount());await server.close();}

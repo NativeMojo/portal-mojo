@@ -93,11 +93,11 @@ export function AdminEdgeDemo() {
                     <div className="eyebrow">{identity.label}</div>
                     <p className="dim">{identity.note}</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {canChangeVhosts && <button type="button" className="btn" onClick={() => void openVhostWizard()}><i className="bi bi-magic" /> Add hostname: name, shape and certificate first</button>}
+                        {canChangeVhosts && <button type="button" className="btn" onClick={() => void openVhostWizard()}><i className="bi bi-magic" /> Add hostname</button>}
                         {leg === 'platform' && <button type="button" className="btn" onClick={() => void openDeclareUpstream()}><i className="bi bi-hdd-rack" /> Declare upstream</button>}
                         {leg === 'security' && <button type="button" className="btn" onClick={() => void openBlocklistEditor()}><i className="bi bi-slash-circle" /> New blocklist entry: log first</button>}
                     </div>
-                    <p className="dim" style={{ marginBottom: 0 }}>To see the create order for a site with API paths: open the wizard, choose “Site + API”, add a route and a quiet path under it. The hostname configuration is created disabled, the routes land, then one last save applies the quiet paths and sets its enabled intent. Readiness is shown separately.</p>
+                    <p className="dim" style={{ marginBottom: 0 }}>To see the create order for a site with API paths: open Add hostname, choose the domain and label, choose “Site + API” in Routing and add a route. Choose a certificate, then review. Other settings holds quiet paths. The hostname configuration is created disabled, the routes land, then one last save applies the quiet paths and sets its enabled intent. Readiness is shown separately.</p>
                 </details>
                 {!allowed && <div className="panel panel-pad"><div className="eyebrow">Denied</div><p className="dim" style={{ marginBottom: 0 }}>This identity has no access to this surface, and the navigation would not show it.</p></div>}
                 {allowed && surface === 'vhosts' && <VhostsPage />}

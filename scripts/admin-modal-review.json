@@ -362,9 +362,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard:modal.open:0",
-      "fingerprint": "a7af7da6605ca262ea69",
+      "fingerprint": "84c4b3e9c6fd54aac1b1",
       "category": "editor",
-      "purpose": "Configure hostname and shape with retained Advanced values, guarded staged writes and uncertain-outcome reconciliation"
+      "purpose": "Address/Routing/Certificate/Settings retained edit draft and four-step create; native pending guard, per-send owner fence, partial-record inspection and observation-only unknown recovery. Runtime: verify-admin-serving-mounted.mjs."
     },
     {
       "id": "packages/portal-mojo/src/admin/edge/UpstreamsPage.tsx:openDeclareUpstream:modal.open:0",
@@ -500,9 +500,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
-      "fingerprint": "b9170da4ccaf90279e96",
+      "fingerprint": "632747d857f43b96425a",
       "category": "confirmation",
-      "purpose": "Confirm local intent to remove the stored Mojo GeoIP credential on the next explicit Save"
+      "purpose": "Confirm local stored-key removal on the next Save; no remote revoke. Owner-fenced and same-flight; cancel preserves the key. Runtime: verify-admin-geolocation-mounted.mjs."
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx:openRecovery:modal.open:0",
@@ -551,6 +551,42 @@
       "fingerprint": "bcb835928b55d1fd8f8b",
       "category": "editor",
       "purpose": "Save changed Route53 registrar booleans and observe authoritative domain warnings"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:details:modal.open:0",
+      "fingerprint": "c6d9f9f8b0730045805b",
+      "category": "record",
+      "purpose": "Inspect one already-admitted Fleet source, observation age and optional independently gated registered destination; no mutation. Runtime: verify-admin-operations-mounted.mjs."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openCapacity:modal.open:0",
+      "fingerprint": "b066450fdaf48544146d",
+      "category": "record",
+      "purpose": "Inspect admitted capacity/address facts only. Exact global manage_aws gate and owner abort on scope loss; no capacity mutation. Runtime: verify-admin-operational-fleet-mounted.mjs."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:confirmRemoval:modal.open:0",
+      "fingerprint": "987127b152059cb637a1",
+      "category": "confirmation",
+      "purpose": "Exact hostname cascade or route-prefix removal confirmation under owner AbortSignal; cancel preserves configuration. Parent single-flight serializes confirmation/preflight/write. Runtime: verify-admin-serving-mounted.mjs and actual mock browser cancellation."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:openRoute:modal.open:0",
+      "fingerprint": "7c184834b239aae45173",
+      "category": "editor",
+      "purpose": "Focused prefix/upstream editor. Current complete route preflight and quiet-path guard run under shared single flight; exact owner/shared choices and per-send fence. Native dismissal guarded throughout preflight/write; uncertain outcome is observed without replay."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx:showDetails:modal.open:0",
+      "fingerprint": "fa934e8c250318cbe69f",
+      "category": "record",
+      "purpose": "Read-only bounded saved-configuration checks, timestamps/coverage and honest unverified serving semantics; owner abort. Runtime: verify-admin-serving-mounted-evidence.mjs."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open:modal.open:0",
+      "fingerprint": "49582f9eb0e018f36eb7",
+      "category": "record",
+      "purpose": "Compact hostname inspection with horizontal Overview/conditional Routes/Certificate/Settings. Header lifecycle and focused child editors; owner signal and native canDismiss pending guard. Runtime: verify-admin-serving-mounted.mjs and actual Admin shell layouts."
     }
   ],
   "lifecycle": [

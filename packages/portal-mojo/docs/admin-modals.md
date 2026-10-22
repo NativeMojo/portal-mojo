@@ -11,6 +11,13 @@ or rename an action pane to disguise it. Genuine autosave fields remain content.
 A nested child may have its own contextual actions. Evidence such as a firewall
 log's Action **column** describes the event and is not an operation section.
 
+Serving hostname inspection uses a compact `modal.open` with horizontal task
+tabs instead of a side rail: Overview, conditional Routes, Certificate and
+Settings. Its Address/Routing/Certificate/Settings editor and four-step create
+flow keep one draft. The launcher guards native dismissal while any write or
+route preflight is pending; focused child editors retain the same owner lifetime.
+This is scoped to Serving and does not change the shared DetailView contract.
+
 Use `modal-pad`, `modal-title`, `modal-message`, grouped fields and `modal-actions`.
 Cancel precedes the primary button. Pending operations disable repeat submission;
 `canDismiss` also protects native Escape/backdrop dismissal during a write.

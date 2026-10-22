@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { MojoError, useMe } from '../../client/runtime';
-import { CollectionSelect, FormWizard, modal, type FormWizardSection } from '../../ui';
-import type { FormWizardSectionContext } from '../../ui/FormWizard';
+import { getAuthSessionRevision, getAuthSnapshot, MojoError, useAuthSnapshot, useCan, useMe } from '../../client/runtime';
+import { CollectionSelect, Tabs, modal } from '../../ui';
+import { EdgeHelp } from './EdgeHelp';
 import { CertificateModel, DomainModel, type CertificateRow, type DomainRow } from '../dns/models';
 import { listVhostRoutes, saveVhostRoute, saveVhost } from './api';
 import {
-    EdgeRouteModel, EdgeUpstreamModel, EdgeVhostModel, VHOST_KIND_CARDS,
+    EDGE_MANAGE_PERMS, EdgeRouteModel, EdgeUpstreamModel, EdgeVhostModel, VHOST_KIND_CARDS,
     buildVhostPayload, certificateCovers, deriveServerName, quietPathUncovered,
     validateBodySizeMb, validatePoolName, validateRedirectTarget, validateRequestPath,
     validateRouteDrafts, validateVhostLabel, vhostKindTitle,
@@ -33,16 +33,28 @@ function PathListEditor({ label, help, paths, onChange, disabled }: { label: str
 }
 
 export interface VhostWizardProps {
+    initialTab?: string;
+    signal?: AbortSignal;
     /** Omit to create; pass the `default` graph row to edit. */
     row?: EdgeVhostRow | null;
     onDone: (saved: EdgeVhostRow | null) => void;
     onBusyChange?: (busy: boolean) => void;
 }
 
-export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardProps) {
+export function VhostWizard({ row = null, onDone, onBusyChange, initialTab = 'address', signal }: VhostWizardProps) {
     const queryClient = useQueryClient();
     const { data: me } = useMe();
     const superuser = me?.is_superuser === true;
+    const canManage = useCan(EDGE_MANAGE_PERMS).can;
+    const authority = useRef(canManage); authority.current = canManage;
+    const auth = useAuthSnapshot();
+    const scope = `${auth.uid}:${getAuthSessionRevision()}`;
+    const openedScope = useRef(scope);
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+    const current = () => mounted.current && !signal?.aborted && `${getAuthSnapshot().uid}:${getAuthSessionRevision()}` === openedScope.current;
+    const guard = () => { if (!current() || !authority.current) throw new MojoError('Session or permission changed. Reopen Serving before changing this hostname.', 403); };
+
     const editing = row != null;
 
     const [kind, setKind] = useState<VhostKind | null>((row?.kind as VhostKind | undefined) ?? null);
@@ -66,42 +78,50 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
     // here and skipped: never a second vhost, never a duplicate route.
     const progress = useRef<{ vhostId: number | null; routes: Map<string, number> }>({ vhostId: null, routes: new Map() });
     const [createdId, setCreatedId] = useState<number | null>(null);
-    const [advanced, setAdvanced] = useState(!!row && (row.pool !== 'default' || row.body_size_mb !== 50 || !!row.serve_static || !!row.quiet_paths?.length || !!row.upstream || row.kind === 'site_api'));
-    const advancedBody = useRef<HTMLDivElement>(null);
-    const uncertain = useRef<{ step: 'create' | 'route' | 'finish'; prefix?: string } | null>(null);
+    const [active, setActive] = useState(initialTab);
+    const [busy, setBusy] = useState(false);
+    const pending = useRef(false);
+    const body = useRef<HTMLDivElement>(null);
+    const [error, setError] = useState('');
+    const [domainOwner, setDomainOwner] = useState<{ id: number; group: number | null } | null>(null);
+    const [ownerError, setOwnerError] = useState('');
+    const uncertain = useRef<{ step: 'create' | 'route' | 'finish' | 'edit'; prefix?: string } | null>(null);
     const [unconfirmed, setUnconfirmed] = useState('');
-    const reveal = (message: string): never => {
-        setAdvanced(true);
-        setTimeout(() => advancedBody.current?.querySelector<HTMLElement>('input:not(:disabled),button:not(:disabled)')?.focus(), 0);
+    const reveal = (message: string, tab = 'settings', selector = 'input:not(:disabled):not([readonly]):not([type=radio]):not([type=checkbox]),select:not(:disabled),textarea:not(:disabled)'): never => {
+        setActive(tab);
+        setTimeout(() => body.current?.querySelector<HTMLElement>(selector)?.focus(), 0);
         throw new Error(message);
     };
     // A server 4xx / explicit envelope rejection proves refusal. Network,
     // malformed responses and 5xx responses cannot prove the write did not land.
     const refused = (error: unknown) => error instanceof MojoError && (error.status === 200 || (error.status >= 400 && error.status < 500));
-    const unknown = (step: 'create' | 'route' | 'finish', prefix?: string): never => {
+    const unknown = (step: 'create' | 'route' | 'finish' | 'edit', prefix?: string): never => {
         uncertain.current = { step, prefix };
         const text = step === 'create'
             ? 'Create outcome unconfirmed. The hostname may already exist. Close this wizard and inspect Serving before starting another create; this wizard will not replay it.'
-            : `Hostname #${progress.current.vhostId}: ${step === 'route' ? `route ${prefix}` : 'final save / enablement'} outcome unconfirmed. Observe the saved configuration before continuing. It may already have applied.`;
+            : `Hostname #${progress.current.vhostId ?? row?.id}: ${step === 'route' ? `route ${prefix}` : 'final save / enablement'} outcome unconfirmed. Observe the saved configuration before continuing. It may already have applied.`;
         setUnconfirmed(text);
         throw new Error(text);
     };
     const observe = async () => {
         const pending = uncertain.current;
-        if (!pending || pending.step === 'create' || progress.current.vhostId == null) return;
+        if (!pending || pending.step === 'create') return;
+        const observedId = progress.current.vhostId ?? row?.id;
+        if (observedId == null) return;
         try {
             // Observation belongs to Finish's existing single-flight lifecycle.
             if (pending.step === 'route') {
-                const observed = await listVhostRoutes(progress.current.vhostId);
+                const observed = await listVhostRoutes(observedId);
                 const expected = routes.find(route => route.path_prefix === pending.prefix);
                 const match = observed.find(route => route.path_prefix === pending.prefix && route.upstream?.id === expected?.upstream);
                 if (!match) throw new Error('The submitted route was not found in this bounded observation. Inspect the hostname’s routes before starting another create; no route is replayed here.');
                 progress.current.routes.set(match.path_prefix, match.id);
             } else {
                 await EdgeVhostModel.invalidate(queryClient);
-                const observed = await EdgeVhostModel.fetchOne(queryClient, progress.current.vhostId);
-                setUnconfirmed(`Observed configuration intent: ${observed.is_enabled ? 'enabled' : 'disabled'}. Finish again to save the requested configuration. Readiness remains separate.`);
+                const observed = await EdgeVhostModel.fetchOne(queryClient, observedId);
+                setUnconfirmed(`Observed configuration intent: ${observed.is_enabled ? 'enabled' : 'disabled'}. Review the observed intent, then Save again only if you still need the change. Readiness remains separate.`);
             }
+            if (!current()) return;
             uncertain.current = null;
             if (pending.step === 'route') setUnconfirmed('Route observed. Finish again to continue from acknowledged progress.');
         } catch (error) { throw new Error(`Observation unavailable: ${reason(error)}. No write was replayed.`); }
@@ -134,46 +154,46 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
     });
 
     const checkShape = () => {
-        if (!kind) throw new Error('Choose what this address serves.');
+        if (!kind) reveal('Choose what this address serves.', 'routing', 'input[type=radio]');
         if (editing && row.kind === 'site_api' && kind !== 'site_api' && (storedRoutes?.length ?? 0) > 0) {
-            throw new Error(`This hostname has ${storedRoutes!.length} route${storedRoutes!.length === 1 ? '' : 's'}. Delete them in the detail view before changing what it serves.`);
+            reveal(`This hostname has ${storedRoutes!.length} route${storedRoutes!.length === 1 ? '' : 's'}. Delete them in the detail view before changing what it serves.`, 'routing', 'input[type=radio]');
         }
     };
     const checkName = () => {
-        if (!domain) throw new Error('Choose a domain.');
+        if (!domain) reveal('Choose a domain.', 'address', 'input[role=combobox]');
         const refusal = validateVhostLabel(label);
-        if (refusal) throw new Error(refusal);
+        if (refusal) reveal(refusal, 'address', '[aria-label="Hostname label"]');
     };
     const checkKnobs = () => {
         if (kind === 'redirect') {
             const refusal = validateRedirectTarget(redirectTo.trim().toLowerCase());
-            if (refusal) throw new Error(refusal);
+            if (refusal) reveal(refusal, 'routing', '[placeholder="www.example.com"]');
             return;
         }
         const size = validateBodySizeMb(/^\d+$/.test(bodySize) ? Number(bodySize) : bodySize);
-        if (size) reveal(size);
-        if (kind === 'api' && upstream == null) reveal('Choose the declared upstream in Advanced.');
+        if (size) reveal(size, 'settings', '[aria-label="Maximum request body (MB)"]');
+        if (kind === 'api' && upstream == null) reveal('Choose an upstream.', 'routing', 'input[role=combobox]');
         if (kind === 'site_api' && !editing) {
             const refusal = validateRouteDrafts(routes);
-            if (refusal) reveal(refusal);
+            if (refusal) reveal(refusal, 'routing', '[aria-label="Path prefix"],input[role=combobox]');
         }
         if (kind === 'api' || kind === 'site_api') {
             for (const path of cleanQuietPaths) {
                 const refusal = validateRequestPath(path, 'A quiet path');
-                if (refusal) reveal(refusal);
+                if (refusal) reveal(refusal, 'settings', '[aria-label^="Quiet paths"]');
             }
-            if (new Set(cleanQuietPaths).size !== cleanQuietPaths.length) reveal('A quiet path is listed twice.');
+            if (new Set(cleanQuietPaths).size !== cleanQuietPaths.length) reveal('A quiet path is listed twice.', 'settings', '[aria-label^="Quiet paths"]');
             // Stored routes not read yet, or unreadable: the server checks.
             if (kind === 'site_api' && !(editing && storedRoutes == null)) {
                 const uncovered = quietPathUncovered(cleanQuietPaths, routePrefixes);
-                if (uncovered) reveal(`Quiet path ${uncovered} is not under any route prefix.`);
+                if (uncovered) reveal(`Quiet path ${uncovered} is not under any route prefix.`, 'settings', '[aria-label^="Quiet paths"]');
             }
         }
     };
     const checkCertificate = () => {
-        if (certificateId == null) throw new Error('Choose a certificate.');
+        if (certificateId == null) reveal('Choose a certificate.', 'certificate', 'input[role=combobox]');
         const refusal = validatePoolName(pool.trim());
-        if (refusal) reveal(refusal);
+        if (refusal) reveal(refusal, 'settings', '[aria-label="Fleet pool"]');
     };
     const checkAll = () => { checkShape(); checkName(); checkKnobs(); checkCertificate(); };
 
@@ -183,18 +203,22 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
             await observe();
             return;
         }
+        guard();
         checkAll();
         const values = draft();
         if (editing) {
-            const saved = await saveVhost(row.id, buildVhostPayload(values, { create: false }));
+            let saved: EdgeVhostRow;
+            try { saved = await saveVhost(row.id, buildVhostPayload(values, { create: false }), guard); }
+            catch (error) { if (!refused(error)) unknown('edit'); throw error; }
+            if (saved.id !== row.id || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('edit');
             await EdgeVhostModel.invalidate(queryClient);
-            onDone(saved);
+            if (current()) onDone(saved);
             return;
         }
         const state = progress.current;
         let saved: EdgeVhostRow | null = null;
         if (values.kind !== 'site_api') {
-            try { saved = await saveVhost(null, buildVhostPayload(values, { create: true })); }
+            try { saved = await saveVhost(null, buildVhostPayload(values, { create: true }), guard); }
             catch (error) { if (!refused(error)) unknown('create'); throw error; }
             if (!Number.isSafeInteger(saved.id) || saved.id <= 0 || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('create');
         } else {
@@ -204,17 +228,19 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
             // carries the quiet paths and the real enablement.
             if (state.vhostId == null) {
                 let created: EdgeVhostRow;
-                try { created = await saveVhost(null, buildVhostPayload({ ...values, quiet_paths: [], is_enabled: false }, { create: true })); }
+                try { created = await saveVhost(null, buildVhostPayload({ ...values, quiet_paths: [], is_enabled: false }, { create: true }), guard); }
                 catch (error) { if (!refused(error)) unknown('create'); throw error; }
                 if (!Number.isSafeInteger(created.id) || created.id <= 0 || created.kind !== 'site_api' || created.is_enabled !== false) unknown('create');
+                guard();
                 state.vhostId = created.id;
                 setCreatedId(created.id);
             }
             for (const route of routes) {
                 if (state.routes.has(route.path_prefix)) continue;
                 try {
-                    const stored = await saveVhostRoute(null, { vhost: state.vhostId, path_prefix: route.path_prefix, upstream: route.upstream! });
+                    const stored = await saveVhostRoute(null, { vhost: state.vhostId, path_prefix: route.path_prefix, upstream: route.upstream! }, guard);
                     if (!Number.isSafeInteger(stored.id) || stored.id <= 0 || stored.path_prefix !== route.path_prefix || stored.upstream?.id !== route.upstream) unknown('route', route.path_prefix);
+                    guard();
                     state.routes.set(route.path_prefix, stored.id);
                 } catch (error) {
                     await Promise.allSettled([EdgeVhostModel.invalidate(queryClient), EdgeRouteModel.invalidate(queryClient)]);
@@ -223,7 +249,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
                 }
             }
             try {
-                saved = await saveVhost(state.vhostId, buildVhostPayload(values, { create: false }));
+                saved = await saveVhost(state.vhostId, buildVhostPayload(values, { create: false }), guard);
                 if (saved.id !== state.vhostId || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('finish');
             } catch (error) {
                 await Promise.allSettled([EdgeVhostModel.invalidate(queryClient), EdgeRouteModel.invalidate(queryClient)]);
@@ -232,113 +258,85 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
             }
         }
         await Promise.allSettled([EdgeVhostModel.invalidate(queryClient), EdgeRouteModel.invalidate(queryClient)]);
-        onDone(saved);
+        if (current()) onDone(saved);
     };
 
+    useEffect(() => {
+        if (!domain) { setDomainOwner(null); return; }
+        let live = true;
+        setDomainOwner(null); setOwnerError('');
+        DomainModel.fetchOne(queryClient, domain.id).then(full => {
+            if (!live) return;
+            const group = typeof full.group === 'number' ? full.group : full.group?.id ?? null;
+            setDomainOwner({ id: full.id, group });
+        }).catch(cause => { if (live) setOwnerError(reason(cause)); });
+        return () => { live = false; };
+    }, [domain?.id, queryClient]);
+    const ownerReady = domainOwner?.id === domain?.id;
+    const upstreamParams = { is_enabled: true, sort: 'name', ...(domainOwner?.group != null ? { group: domainOwner.group } : { group__isnull: true }) };
     const locked = createdId != null || !!uncertain.current;
-    const sections = useMemo<FormWizardSection[]>(() => {
-        const shape: FormWizardSection = {
-            key: 'shape', label: 'Hostname', fields: [], description: 'Choose a hostname and what it serves.',
-            content: ({ busy }) => <div className="edge-kind-cards" role="radiogroup" aria-label="What this address serves">
-                {VHOST_KIND_CARDS.map((card) => <label key={card.value} className={`edge-kind-card${kind === card.value ? ' is-selected' : ''}`}>
-                    <input type="radio" name="edge-vhost-kind" checked={kind === card.value} disabled={busy || locked} onChange={() => setKind(card.value)} />
-                    <i className={`bi ${card.icon}`} />
-                    <b>{card.title}</b>
-                    <span>{card.description}</span>
-                </label>)}
-            </div>,
-            onNext: checkShape,
-        };
-        const name: FormWizardSection = {
-            key: 'name', label: 'Name', fields: [], description: 'The address is the label joined to a domain you hold. It is never typed whole.',
-            content: ({ busy }) => <div className="edge-form-grid">
-                <CollectionSelect<DomainRow> model={DomainModel} value={domain} onChange={(_id, picked) => { setDomain(picked ? { id: picked.id, name: picked.name } : null); setCertificate(null); setCertificateId(null); }} label="Domain" required readOnly={editing || locked} disabled={busy || !!uncertain.current} placeholder="Search active domains…"
-                    // A house domain would dead-end at the server's platform gate for anyone else.
-                    defaultParams={{ status: 'active', sort: 'name', ...(superuser ? {} : { group__isnull: false }) }}
-                    help={editing ? 'A hostname cannot be moved to another domain.' : undefined} />
-                <label className="field"><span className="field-label">Label</span><input className="input" value={label} disabled={busy || !!uncertain.current} onChange={(event) => setLabel(event.target.value.trim().toLowerCase())} placeholder="www" autoComplete="off" /><span className="field-help">Empty serves the bare domain. * serves every one-label subdomain.</span></label>
-                <div className="edge-server-name" aria-live="polite"><span>Hostname preview</span><code>{serverName || '—'}</code></div>
-            </div>,
-            onNext: checkName,
-        };
-        const knobs: FormWizardSection = {
-            key: 'knobs', label: 'Settings', fields: [], description: kind ? `Settings for: ${vhostKindTitle(kind)}.` : undefined,
-            content: ({ busy }) => <div className="edge-form-grid">
-                {kind === 'api' && <CollectionSelect<EdgeUpstreamRow> model={EdgeUpstreamModel} value={upstream} onChange={(id) => setUpstream(id == null ? null : Number(id))} label="Upstream" required disabled={busy || !!uncertain.current} placeholder="Search enabled upstreams…" defaultParams={{ is_enabled: true, sort: 'name' }} help="Every request on this address goes here. Upstreams are declared by a platform administrator." />}
-                {kind === 'site_api' && (editing
-                    ? <div className="edge-note"><b>Routes</b><span>{storedRoutes == null ? (routesUnread ? 'Could not be read.' : 'Loading…') : storedRoutes.length ? storedRoutes.join(', ') : 'None yet.'} Manage routes in the detail view.</span></div>
-                    : <div className="field edge-route-list">
-                        <span className="field-label">Routes <em>*</em></span>
-                        {routes.map((route) => <div className="edge-route-row" key={route.key}>
-                            <input className="input" value={route.path_prefix} disabled={busy || progress.current.routes.has(route.path_prefix)} placeholder="/api" aria-label="Path prefix" onChange={(event) => setRoutes((rows) => rows.map((item) => item.key === route.key ? { ...item, path_prefix: event.target.value.trim() } : item))} />
-                            <CollectionSelect<EdgeUpstreamRow> model={EdgeUpstreamModel} value={route.upstream == null ? null : { id: route.upstream, name: route.upstreamName ?? '' }} onChange={(id, picked) => setRoutes((rows) => rows.map((item) => item.key === route.key ? { ...item, upstream: id == null ? null : Number(id), upstreamName: picked?.name } : item))} disabled={busy || progress.current.routes.has(route.path_prefix)} placeholder="Upstream…" defaultParams={{ is_enabled: true, sort: 'name' }} />
-                            <button type="button" className="btn btn-compact" disabled={busy || progress.current.routes.has(route.path_prefix)} aria-label={`Remove route ${route.path_prefix}`} onClick={() => setRoutes((rows) => rows.filter((item) => item.key !== route.key))}><i className="bi bi-x-lg" /></button>
-                        </div>)}
-                        <div><button type="button" className="btn btn-compact" disabled={busy || !!uncertain.current} onClick={() => setRoutes((rows) => [...rows, { key: nextRouteKey.current++, path_prefix: '', upstream: null }])}><i className="bi bi-plus-lg" /> Add route</button></div>
-                        <span className="field-help">Requests under each prefix go to its upstream; everything else is served from the site. At least one is required.</span>
-                    </div>)}
-                {(kind === 'api' || kind === 'site_api') && <label className="field switch-field"><input type="checkbox" checked={serveStatic} disabled={busy || !!uncertain.current} onChange={(event) => setServeStatic(event.target.checked)} /> Serve the fleet's static files at /static/ instead of proxying them</label>}
-                {(kind === 'api' || kind === 'site_api') && <PathListEditor label="Quiet paths" help={kind === 'site_api' ? 'Exact paths kept out of the access log, such as health checks. Each must sit under a route prefix.' : 'Exact paths kept out of the access log, such as health checks.'} paths={quietPaths} onChange={setQuietPaths} disabled={busy || !!uncertain.current} />}
-                {kind !== 'redirect' && <label className="field"><span className="field-label">Largest request body (MB)</span><input className="input" inputMode="numeric" value={bodySize} disabled={busy || !!uncertain.current} onChange={(event) => setBodySize(event.target.value.trim())} /><span className="field-help">1 to 4096. The default is 50.</span></label>}
-            </div>,
-            onNext: checkKnobs,
-        };
-        const serving: FormWizardSection = {
-            key: 'certificate', label: 'Certificate', fields: [],
-            content: ({ busy }) => <div className="edge-form-grid">
-                <CollectionSelect<CertificateRow> key={domain?.id ?? 'none'} model={CertificateModel} labelField="common_name" value={certificateId == null ? null : { id: certificateId, common_name: certificate?.id === certificateId ? certificate.common_name : row?.certificate?.common_name ?? '' }} onChange={(id, picked) => { setCertificateId(id == null ? null : Number(id)); setCertificate(picked ?? null); }} label="Certificate" required disabled={busy || !domain} placeholder={domain ? 'Search this domain’s certificates…' : 'Choose a domain first'} defaultParams={domain ? { domain__exact: domain.id } : {}} />
-                {covered === false && <div className="edge-warning" role="status"><i className="bi bi-exclamation-triangle" /> This certificate does not cover <code>{serverName}</code>. The hostname will not enable until it does. Save it disabled to stage it.</div>}
-                <label className="field switch-field"><input type="checkbox" checked={enabled} disabled={busy || !!uncertain.current} onChange={(event) => setEnabled(event.target.checked)} /> Enabled · readiness shown separately</label>
-            </div>,
-            onNext: checkCertificate,
-        };
-        const review: FormWizardSection = {
-            key: 'review', label: 'Review', fields: [],
-            content: <dl className="edge-review">
-                <dt>Address</dt><dd><code>{serverName || '—'}</code></dd>
-                <dt>Serves</dt><dd>{kind ? vhostKindTitle(kind) : '—'}</dd>
-                {kind === 'redirect' && <><dt>Redirects to</dt><dd><code>{redirectTo || '—'}</code></dd></>}
-                {kind === 'site_api' && !editing && <><dt>Routes</dt><dd>{routes.length ? routes.map((route) => `${route.path_prefix} → ${route.upstreamName ?? `#${route.upstream}`}`).join(', ') : 'None'}</dd></>}
-                {(kind === 'site' || kind === 'site_api') && <><dt>Single-page app</dt><dd>{spa ? 'Yes' : 'No'}</dd></>}
-                {(kind === 'api' || kind === 'site_api') && <><dt>Static files</dt><dd>{serveStatic ? 'Served at /static/' : 'Not served here'}</dd><dt>Quiet paths</dt><dd>{cleanQuietPaths.length ? cleanQuietPaths.join(', ') : 'None'}</dd></>}
-                {kind !== 'redirect' && <><dt>Largest body</dt><dd>{bodySize} MB</dd></>}
-                <dt>Pool</dt><dd>{pool}</dd>
-                <dt>State</dt><dd>{enabled ? 'Enabled' : 'Disabled'}{covered === false && enabled ? ' — the certificate does not cover this address, so the save will be refused' : ''}</dd>
-                {createdId != null && <><dt>Progress</dt><dd>Hostname #{createdId} was created disabled. Finishing again continues from acknowledged progress.</dd></>}
-                {unconfirmed && <><dt>Observation</dt><dd>{unconfirmed}</dd></>}
-            </dl>,
-        };
-        const render = (section: FormWizardSection, context: FormWizardSectionContext) => typeof section.content === 'function' ? section.content(context) : section.content;
-        const basic: FormWizardSection = { key: 'hostname', label: 'Hostname', fields: [], description: 'Name the address, choose what it serves, then choose its certificate.',
-            content: (context) => { const { busy } = context; return <div className="edge-form-grid">
-                <div><h3>Hostname</h3>{render(name, context)}</div>
-                {render(shape, context)}
-                {kind === 'redirect' && <label className="field"><span className="field-label">Redirect to <em>*</em></span><input className="input" value={redirectTo} disabled={busy || !!uncertain.current} onChange={(event) => setRedirectTo(event.target.value)} placeholder="www.example.com" autoComplete="off" /><span className="field-help">A host name only: no https://, path or port.</span></label>}
-                {(kind === 'site' || kind === 'site_api') && <label className="field switch-field"><input type="checkbox" checked={spa} disabled={busy || !!uncertain.current} onChange={(event) => setSpa(event.target.checked)} /> Single-page app: unknown paths return index.html instead of a 404</label>}
-                {render(serving, context)}
-                {(kind === 'api' || kind === 'site_api') && <button type="button" className="btn" disabled={busy || !!uncertain.current} onClick={() => { setAdvanced(true); setTimeout(() => advancedBody.current?.querySelector<HTMLElement>('input:not(:disabled),button:not(:disabled)')?.focus(), 0); }}>{kind === 'api' ? 'Configure API destination' : 'Configure API paths'}</button>}
-                <details className="edge-advanced" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}>
-                    <summary aria-disabled={busy || !!uncertain.current} onClick={event => { if (busy) event.preventDefault(); }}>Advanced</summary>
-                    <div className="edge-form-grid" ref={advancedBody}>
-                        {render(knobs, context)}
-                <label className="field"><span className="field-label">Pool</span><input className="input" value={pool} disabled={busy || !!uncertain.current} onChange={(event) => setPool(event.target.value)} autoComplete="off" /><span className="field-help">Which group of edge nodes serves this address. It must be a pool this deployment declares; the server validates the declared pool.</span></label>
-                    </div>
-                </details>
-                {unconfirmed && <div className="edge-warning" role="status">{unconfirmed}{uncertain.current?.step !== 'create' && uncertain.current && <span> Finish now observes only; it does not replay the write.</span>}</div>}
-            </div>; }, onNext: checkAll };
-        return editing ? [basic] : [basic, review];
-        // The check* closures read the same state listed here.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [advanced, unconfirmed, bodySize, certificate, certificateId, covered, createdId, domain, editing, enabled, kind, label, locked, pool, quietPaths, redirectTo, routes, routesUnread, serveStatic, serverName, spa, storedRoutes, superuser, upstream]);
-
-    return <FormWizard mode={editing ? 'tabs' : 'wizard'} sections={sections} onBusyChange={onBusyChange} onCancel={() => onDone(null)} onFinish={finish} finishText="Add hostname" saveText="Save changes" busyText="Saving…" />;
+    const disabled = busy || !!uncertain.current || !canManage || scope !== openedScope.current;
+    const proxies = kind === 'api' || kind === 'site_api';
+    const tabs = editing ? ['address', 'routing', 'certificate', 'settings'] : ['address', 'routing', 'certificate', 'review'];
+    const titles: Record<string, string> = { address: 'Address', routing: 'Routing', certificate: 'Certificate', settings: 'Settings', review: 'Review' };
+    const submit = async () => {
+        if (pending.current || !current()) return;
+        pending.current = true; setBusy(true); onBusyChange?.(true); setError('');
+        try { await finish(); }
+        catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : 'The configuration could not be saved.'); }
+        finally { pending.current = false; if (mounted.current) { setBusy(false); onBusyChange?.(false); } }
+    };
+    const next = () => {
+        try {
+            if (active === 'address') checkName();
+            if (active === 'routing') { checkShape(); checkKnobs(); }
+            if (active === 'certificate') checkCertificate();
+            setError(''); setActive(tabs[tabs.indexOf(active) + 1]!);
+        } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check these fields.'); }
+    };
+    const settings = <div className="edge-form-grid">
+        <label className="field"><span className="field-label">Pool <EdgeHelp label="About fleet pools">The server must declare this pool. The default is <code>default</code>.</EdgeHelp></span><input className="input" aria-label="Fleet pool" value={pool} disabled={disabled} onChange={event => setPool(event.target.value)} autoComplete="off" /></label>
+        {kind !== 'redirect' && <label className="field"><span className="field-label">Maximum request body (MB)</span><input className="input" aria-label="Maximum request body (MB)" inputMode="numeric" value={bodySize} disabled={disabled} onChange={event => setBodySize(event.target.value.trim())} /><span className="field-help">1–4096 MB</span></label>}
+        {proxies && <><label className="field switch-field"><input type="checkbox" checked={serveStatic} disabled={disabled} onChange={event => setServeStatic(event.target.checked)} /> Serve static files <EdgeHelp label="About static files">Serve the fleet's files at /static/ rather than proxying them.</EdgeHelp></label><PathListEditor label="Quiet paths" help={kind === 'site_api' ? 'Each exact path must be under a route prefix.' : 'Exact paths omitted from the access log.'} paths={quietPaths} onChange={setQuietPaths} disabled={disabled} /></>}
+    </div>;
+    const panels: Record<string, ReactNode> = {
+        address: <div className="edge-form-grid">
+            <CollectionSelect<DomainRow> model={DomainModel} value={domain} onChange={(_id, picked) => { setDomain(picked ? { id: picked.id, name: picked.name } : null); setCertificate(null); setCertificateId(null); setUpstream(null); setRoutes([]); }} label="Domain" required readOnly={editing || locked} disabled={disabled} placeholder="Search active domains…" defaultParams={{ status: 'active', sort: 'name', ...(superuser ? {} : { group__isnull: false }) }} />
+            <label className="field"><span className="field-label">Label <EdgeHelp label="About hostname labels">Leave empty for the bare domain. Use * for every one-label subdomain.</EdgeHelp></span><input className="input" aria-label="Hostname label" value={label} disabled={disabled || locked} onChange={event => setLabel(event.target.value.trim().toLowerCase())} placeholder="www" autoComplete="off" /></label>
+            <div className="edge-server-name" aria-live="polite"><span>Hostname</span><code>{serverName || 'Choose a domain'}</code></div>
+        </div>,
+        routing: <div className="edge-form-grid">
+            <fieldset className="edge-kind-picker" disabled={disabled || locked}><legend className="field-label">Serves <EdgeHelp label="About serving types">API proxies every request. Site serves published files. Site + API proxies chosen prefixes. Redirect sends requests to another hostname.</EdgeHelp></legend><div className="edge-kind-options">{VHOST_KIND_CARDS.map(card => <label key={card.value} className={`edge-kind-option${kind === card.value ? ' is-selected' : ''}`}><input type="radio" name="edge-vhost-kind" checked={kind === card.value} onChange={() => setKind(card.value)} /><i className={`bi ${card.icon}`} aria-hidden="true" />{card.title}</label>)}</div></fieldset>
+            {ownerError && proxies && <div className="form-alert" role="alert">Could not load the domain's upstream scope: {ownerError}</div>}
+            {kind === 'api' && <CollectionSelect<EdgeUpstreamRow> model={EdgeUpstreamModel} value={upstream} onChange={id => setUpstream(id == null ? null : Number(id))} label="Upstream" required disabled={disabled || !ownerReady} placeholder="Search enabled upstreams…" defaultParams={upstreamParams} />}
+            {kind === 'redirect' && <label className="field"><span className="field-label">Redirect to <em>*</em> <EdgeHelp label="About redirect destinations">Enter a hostname only, without https://, a path or port. The redirect preserves the request path.</EdgeHelp></span><input className="input" value={redirectTo} disabled={disabled} onChange={event => setRedirectTo(event.target.value)} placeholder="www.example.com" autoComplete="off" /></label>}
+            {kind === 'site_api' && (editing ? <div className="edge-note"><b>API routes</b><span>{storedRoutes == null ? routesUnread ? 'Unavailable. The server will validate existing routes.' : 'Loading…' : storedRoutes.length ? storedRoutes.join(', ') : 'No routes yet.'} Add or change routes from the hostname's Routes tab after saving.</span></div> : <div className="field edge-route-list"><span className="field-label">API routes <em>*</em></span>{routes.map(route => <div className="edge-route-row" key={route.key}><input className="input" value={route.path_prefix} disabled={disabled || progress.current.routes.has(route.path_prefix)} placeholder="/api" aria-label="Path prefix" onChange={event => setRoutes(rows => rows.map(item => item.key === route.key ? { ...item, path_prefix: event.target.value.trim() } : item))} /><CollectionSelect<EdgeUpstreamRow> model={EdgeUpstreamModel} value={route.upstream == null ? null : { id: route.upstream, name: route.upstreamName ?? '' }} onChange={(id, picked) => setRoutes(rows => rows.map(item => item.key === route.key ? { ...item, upstream: id == null ? null : Number(id), upstreamName: picked?.name } : item))} disabled={disabled || !ownerReady || progress.current.routes.has(route.path_prefix)} label="Upstream" placeholder="Upstream…" defaultParams={upstreamParams} /><button type="button" className="btn btn-compact" disabled={disabled || progress.current.routes.has(route.path_prefix)} aria-label={`Remove route ${route.path_prefix}`} onClick={() => setRoutes(rows => rows.filter(item => item.key !== route.key))}><i className="bi bi-x-lg" /></button></div>)}<div><button type="button" className="btn btn-compact" disabled={disabled} onClick={() => setRoutes(rows => [...rows, { key: nextRouteKey.current++, path_prefix: '', upstream: null }])}><i className="bi bi-plus-lg" /> Add route</button></div></div>)}
+            {(kind === 'site' || kind === 'site_api') && <label className="field switch-field"><input type="checkbox" checked={spa} disabled={disabled} onChange={event => setSpa(event.target.checked)} /> Single-page app <EdgeHelp label="About single-page apps">Unknown paths return index.html instead of a 404.</EdgeHelp></label>}
+        </div>,
+        certificate: <div className="edge-form-grid"><CollectionSelect<CertificateRow> key={domain?.id ?? 'none'} model={CertificateModel} labelField="common_name" value={certificateId == null ? null : { id: certificateId, common_name: certificate?.id === certificateId ? certificate.common_name : row?.certificate?.common_name ?? '' }} onChange={(id, picked) => { setCertificateId(id == null ? null : Number(id)); setCertificate(picked ?? null); }} label="Certificate" required disabled={disabled || !domain} placeholder={domain ? 'Search this domain’s certificates…' : 'Choose a domain first'} defaultParams={domain ? { domain__exact: domain.id } : {}} />
+            <p className={covered === false ? 'text-warn' : 'dim'} role="status">{covered == null ? 'Certificate coverage unknown.' : covered ? 'Certificate covers this hostname.' : 'This certificate does not cover the hostname. Save disabled to stage it.'}</p>
+            <label className="field switch-field"><input type="checkbox" checked={enabled} disabled={disabled} onChange={event => setEnabled(event.target.checked)} /> Enabled <EdgeHelp label="About enabled configuration">Enabled is saved intent. It does not prove that the fleet has applied this configuration.</EdgeHelp></label>
+        </div>,
+        settings,
+        review: <div className="edge-form-grid"><dl className="edge-review"><dt>Hostname</dt><dd><code>{serverName}</code></dd><dt>Serves</dt><dd>{kind ? vhostKindTitle(kind) : '—'}</dd>{kind === 'redirect' && <><dt>Destination</dt><dd>{redirectTo}</dd></>}{kind === 'api' && <><dt>Upstream</dt><dd>{upstream == null ? 'None' : `#${upstream}`}</dd></>}{kind === 'site_api' && <><dt>Routes</dt><dd>{routes.map(route => `${route.path_prefix} → ${route.upstreamName ?? `#${route.upstream}`}`).join(', ')}</dd></>}<dt>Certificate</dt><dd>{certificate?.common_name ?? row?.certificate?.common_name ?? 'Unknown'}</dd><dt>State</dt><dd>{enabled ? 'Enabled intent' : 'Disabled'}</dd></dl><button type="button" className="btn edge-settings-button" disabled={busy} onClick={() => setActive('settings')}>Other settings <i className="bi bi-sliders" /></button></div>,
+    };
+    const inspect = async () => {
+        if (pending.current || createdId == null) return;
+        pending.current = true; setBusy(true); onBusyChange?.(true);
+        try { await EdgeVhostModel.invalidate(queryClient); const observed = await EdgeVhostModel.fetchOne(queryClient, createdId); if (current()) onDone(observed); }
+        catch (cause) { setError(`Could not inspect saved hostname #${createdId}: ${reason(cause)}`); }
+        finally { pending.current = false; if (mounted.current) { setBusy(false); onBusyChange?.(false); } }
+    };
+    return <div className="edge-vhost-editor" aria-busy={busy || undefined}>
+        {error && <div className="form-alert" role="alert">{error}</div>}
+        {unconfirmed && <div className="edge-warning" role="status">{unconfirmed}</div>}
+        {editing ? <Tabs ariaLabel="Hostname settings" activeKey={active} onActiveKeyChange={key => { if (!busy) { setActive(key); setError(''); } }} items={tabs.map(key => ({ key, label: titles[key], disabled: busy && key !== active, panel: <div className="edge-editor-panel" ref={body}>{panels[key]}</div> }))} /> : <><ol className="edge-create-progress" aria-label="Setup progress">{tabs.map((key, index) => <li key={key} aria-current={key === active ? 'step' : undefined}><span>{index + 1}</span>{titles[key]}</li>)}</ol><div className="edge-editor-panel" ref={body}>{active === 'settings' ? <><button type="button" className="btn btn-compact" onClick={() => setActive('review')}>Back to review</button>{settings}</> : panels[active]}</div></>}
+        <div className="modal-actions edge-editor-actions"><button type="button" className="btn" disabled={busy} onClick={() => onDone(null)}>Cancel</button>{createdId != null && <button type="button" className="btn" disabled={busy} onClick={() => void inspect()}>Inspect saved hostname</button>}{!editing && tabs.indexOf(active) > 0 && <button type="button" className="btn" disabled={busy} onClick={() => { setError(''); setActive(tabs[tabs.indexOf(active) - 1]!); }}>Back</button>}{!editing && active !== 'review' && active !== 'settings' && !uncertain.current ? <button type="button" className="btn btn-primary" disabled={busy} onClick={next}>Next</button> : <button type="button" className="btn btn-primary" disabled={busy || uncertain.current?.step === 'create'} onClick={() => { if (active === 'settings' && !editing && !uncertain.current) { try { checkKnobs(); checkCertificate(); setActive('review'); } catch (cause) { setError(reason(cause)); } } else void submit(); }}>{busy ? 'Saving…' : uncertain.current ? 'Observe outcome' : editing ? 'Save changes' : active === 'settings' ? 'Back to review' : 'Add hostname'}</button>}</div>
+    </div>;
 }
 
-/** Opens the wizard in a modal; resolves with the saved row, or null when cancelled. */
-export function openVhostWizard(row: EdgeVhostRow | null = null): Promise<EdgeVhostRow | null> {
+/** Native focused editor; no generic record rail. */
+export function openVhostWizard(row: EdgeVhostRow | null = null, options: { initialTab?: string; signal?: AbortSignal } = {}): Promise<EdgeVhostRow | null> {
     let pending = false;
-    return modal.open<EdgeVhostRow | null>((close) => <div className="modal-pad edge-vhost-wizard">
-        <h2 className="modal-title">{row ? `Edit ${row.server_name ?? 'hostname'}` : 'Add hostname'}</h2>
-        <VhostWizard row={row} onBusyChange={(busy) => { pending = busy; }} onDone={(saved) => close(saved)} />
-    </div>, { size: 'lg', canDismiss: () => !pending }).then((value) => value ?? null);
+    return modal.open<EdgeVhostRow | null>(close => <div className="modal-pad edge-vhost-wizard"><h2 className="modal-title">{row ? `Edit ${row.server_name ?? 'hostname'}` : 'Add hostname'}</h2><VhostWizard row={row} initialTab={options.initialTab} signal={options.signal} onBusyChange={value => { pending = value; }} onDone={saved => { if (!pending) close(saved); else if (saved) close(saved); }} /></div>, { size: 'md', canDismiss: () => !pending, signal: options.signal }).then(value => value ?? null);
 }

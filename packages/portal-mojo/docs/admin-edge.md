@@ -13,8 +13,7 @@ The same names are on `portal-mojo/admin/infrastructure`.
 `EDGE_ADMIN_SECTION` contributes Infrastructure routes at `edge/vhosts` and
 `edge/upstreams` (or the same paths under an embedded `/system` mount). The
 fleet blocklist is a route of Network Security, at
-`security/network/edge-blocklist`. There are no record routes: a vhost opens in
-`modal.detail`.
+`security/network/edge-blocklist`. There are no record routes: a hostname opens in a focused native `modal.open` with horizontal task tabs.
 
 Consumer contract: django-mojo `mojo/apps/edge/`. The mock in
 `client/mock.ts` returns the same graphs and the same refusals, word for word
@@ -58,11 +57,15 @@ refused at Finish.
 
 ## The four kinds
 
-Serving keeps the `/edge/vhosts` route, public `Vhost*` exports and persisted table key `admin:edge:vhosts`. Add hostname begins with the managed domain and one DNS label, four shape cards, certificate and explicit enabled intent. Apex (empty label) and wildcard (`*`) remain supported. Redirect target and SPA behavior remain basic controls.
+Serving keeps the `/edge/vhosts` route, public `Vhost*` exports and persisted table key `admin:edge:vhosts`. The page has a compact configuration-check summary and a Domain picker backed by URL filter state. Search remains label/type/pool; it does not pretend the backend searches derived full hostnames.
 
-Advanced starts closed on create and holds declared upstreams, explicit API routes, pool, body limit, quiet paths and static files. Configure API destination / Configure API paths opens it; required hidden destination validation opens and focuses it. Collapsing retains the controlled draft. Edit opens Advanced for nondefault settings and preserves them. The server validates the entered pool against its declared pools; there is no client pool catalog.
+Add hostname has four steps: **Address → Routing → Certificate → Review**. Address chooses a managed domain and label; Routing uses a compact four-kind selector and only that kind's destination controls; Certificate selects TLS and enabled intent; Review previews the saved configuration. Other settings opens the pool, body, static and quiet-path fields without an accordion. Cancel and the current primary action remain in the footer.
 
-| Kind | Card | Needs | May carry | Refuses |
+Edit is one retained controlled draft across **Address / Routing / Certificate / Settings** tabs. Validation selects the relevant task and focuses its first editable control. The active task remains rendered while saving. No shared Tabs or DetailView behavior is changed. Short explanations use accessible info-icon popovers.
+
+Upstream choices resolve the domain's owner, then request that owner's enabled rows plus shared rows (`group`); platform domains request shared rows only (`group__isnull`). Failure to resolve the owner keeps the picker disabled. Certificate coverage stays Unknown until the certificate's own graph is read.
+
+| Kind | Type | Needs | May carry | Refuses |
 |---|---|---|---|---|
 | `api` | API | `upstream` | `quiet_paths`, `serve_static` | `spa`, `redirect_to` |
 | `site` | Site | — | `spa` | `upstream`, `quiet_paths`, `serve_static`, `redirect_to` |
@@ -132,12 +135,13 @@ wizard does not judge quiet paths against them and leaves that to the server.
 
 ## Vhost detail
 
-Basic hostname, shape, enabled intent and certificate summary come first. Detailed pool/body/quiet/static and evidence-policy facts are in Advanced. The detail follows the admin modal contract (`admin-modals.md`). The header
-switch enables and disables. Edit and Delete are in the header menu, shown
-only with the manage grant. Delete asks for confirmation, names the address,
-says its routes go with it, and points at Disable as the choice that can be
-undone. A refused enable shows the server's message in the overview. Routes
-are content: the Routes section lists them and owns add, change and delete.
+The native detail modal has **Overview / Routes / Certificate / Settings**. Routes appears only for Site + API. Overview puts the redirect target or API upstream first; it does not repeat the hostname and type already in the header. Certificate shows the stored status and expiry, with Change certificate for managers. Settings holds pool/body/static/quiet paths, timestamps and read-only evidence-policy information. Header actions own enable/disable, Edit and the focused Delete confirmation.
+
+A successful create opens the saved hostname. An acknowledged partial Site + API create offers **Inspect saved hostname**, preserving its real disabled/saved state. An unacknowledged create is never replayed. Explicit backend refusals remain actionable; lost/malformed/5xx outcomes require **Observe outcome** before another mutation. Observation never writes or automatically retries.
+
+Routes uses a paginated local table with focused Add/Edit dialogs. Rename and removal inspect the complete bounded route inventory and current quiet paths first. A change that would strand a quiet path is blocked with the exact path and points to Settings; remove or repair the quiet path before changing the route. There is no pretend atomic multi-row transaction. Safety inspection paginates up to 2,000 routes and refuses changing/incomplete inventories rather than treating a partial page as complete.
+
+Detail edits, route writes, enablement and deletion share the detail's pending state. Native Escape/backdrop/X are locked during submitted writes and preflight. Owned dialogs close on scope loss; before each write and every fresh-auth attempt, a guard verifies the original session and current permission. A closed or replaced editor cannot continue the staged create's later writes. Unknown outcomes stay visibly unconfirmed; closing a dialog does not cancel a server operation or establish its outcome.
 
 ## Serving evidence
 
@@ -214,8 +218,8 @@ demo (Develop → Components → Admin → Edge) runs the shipped pages against 
 mock under five identities: platform administrator, DNS manager, DNS viewer,
 security manager and security viewer.
 
-`npm run verify:admin-edge` retains the existing endpoint contract. `node scripts/verify-admin-serving-mounted.mjs` mounts the native wizard and modal to check basic/Advanced validation, payloads, route-less conversion, busy dismissal and committed-response-loss recovery. `node scripts/verify-admin-serving-mounted-evidence.mjs` mounts evidence for DTO bounds, exact gates, unknown posture, refresh failures and auth replacement.
+`npm run verify:admin-edge` retains the existing endpoint contract. `node scripts/verify-admin-serving-mounted.mjs` mounts the native wizard and modal to check all four create shapes, disabled staging, retained edit drafts, invalid-tab selection, supported route-less conversion, busy dismissal, partial inspection and committed-response-loss recovery. `node scripts/verify-admin-serving-mounted-evidence.mjs` mounts evidence for DTO bounds, exact gates, unknown posture, refresh failures and auth replacement.
 
 ### KISS presentation
 
-The Serving table defaults to hostname/domain, serving shape and enabled intent. Pool and created time remain in record inspection. HTTP/readiness summaries keep technical coverage and timestamps in separate details; configuration checks never claim fleet application. See [visual QA](admin-presentation.md).
+The Serving table defaults to hostname/domain, serving shape and enabled intent. Pool and created time remain in record inspection. HTTP/readiness summaries keep the observed timestamp and partial-report warning visible, with technical evidence in Check details; configuration checks never claim fleet application. See [visual QA](admin-presentation.md).

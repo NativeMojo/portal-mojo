@@ -9,6 +9,8 @@ window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventL
 HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
 HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+globalThis.requestAnimationFrame = callback => setTimeout(callback, 0);
+globalThis.cancelAnimationFrame = clearTimeout;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const React = await import('react'), { act } = React, { createRoot } = await import('react-dom/client');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
@@ -29,7 +31,11 @@ try {
     const requests = [];
     globalThis.fetch = async (input, options = {}) => {
         const url = new URL(String(input)); requests.push(url.pathname); assert.equal(url.origin, 'http://operations-mock.invalid');
-        const result = url.pathname === '/api/user/me' ? { status: true, data: actor } : fleet.handleOperationalFleetMock(url.pathname, options.method ?? 'GET', undefined, Object.fromEntries(url.searchParams), actor, Date.now() / 1000);
+        const originalPanel = url.pathname === '/api/metrics/value/get' ? { status: true, data: { total_users: 57, total_groups: 23 } }
+            : url.pathname === '/api/metrics/fetch' ? { status: true, data: {}, labels: [] }
+            : ['/api/incident/incident', '/api/jobs/job', '/api/aws/email/sent', '/api/account/logins/summary'].includes(url.pathname) ? { status: true, data: [], count: 0 }
+            : undefined;
+        const result = url.pathname === '/api/user/me' ? { status: true, data: actor } : originalPanel ?? fleet.handleOperationalFleetMock(url.pathname, options.method ?? 'GET', undefined, Object.fromEntries(url.searchParams), actor, Date.now() / 1000);
         assert.notEqual(result, undefined, `Unexpected request ${url.pathname}`);
         return new Response(JSON.stringify(result), { status: 200 });
     };
@@ -63,7 +69,17 @@ try {
     assert.equal(document.querySelector('.admin-dashboard-kpis'), null, 'Unadmitted metric panels stay absent');
     assert.equal(document.querySelector('.dashboard-login-map'), null, 'Unadmitted login panel stays absent');
     assert.equal(requests.some(path => path.startsWith('/api/account/admin/')), false, 'Dashboard issues no Fleet/capacity requests');
+    assert.equal(requests.some(path => path.startsWith('/api/aws/capacity')), false, 'Dashboard issues no capacity requests');
     assert.equal(requests.some(path => path.startsWith('/api/metrics/')), false, 'Denied metric panels issue no requests');
+    await unmount();
+    actor = { id: 1, is_active: true, is_superuser: true, permissions: {} };
+    requests.length = 0;
+    await mount([], true);
+    await wait(() => document.querySelector('.admin-dashboard-kpi-value')?.textContent === '57');
+    assert(document.querySelector('.dashboard-login-map'), 'Original login map remains available');
+    assert.equal(document.querySelectorAll('.admin-dashboard-attention').length, 3, 'Original attention cards remain');
+    assert.equal(document.querySelector('.operational-fleet'), null, 'Even a Fleet-authorized superuser gets the original Dashboard');
+    assert.equal(requests.some(path => path.startsWith('/api/account/admin/') || path.startsWith('/api/aws/capacity')), false, 'Original Dashboard does not fetch Fleet even when the actor may read it');
     await unmount();
     console.log('PASS mounted operations integration: partial roster suppresses absent links; admitted sibling links preserve arbitrary embedded mount; original Dashboard excludes Fleet and denied reads');
 } finally { if (root) await act(async () => root.unmount()); client?.clear(); memoryRouter?.dispose(); await server.close(); dom.window.close(); }

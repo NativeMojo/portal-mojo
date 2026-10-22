@@ -8,25 +8,39 @@ import {
 // Every call goes through the one client boundary; a refused write rejects
 // with the server's own message.
 
-export async function saveVhost(id: number | null, changes: Record<string, unknown>): Promise<EdgeVhostRow> {
-    return sanitizeEdgeVhostRow(await withFreshAuth(() => mojoSave<EdgeVhostRow>(EdgeVhostModel.endpoint, id, changes)));
+export async function saveVhost(id: number | null, changes: Record<string, unknown>, beforeWrite?: () => void): Promise<EdgeVhostRow> {
+    return sanitizeEdgeVhostRow(await withFreshAuth(() => { beforeWrite?.(); return mojoSave<EdgeVhostRow>(EdgeVhostModel.endpoint, id, changes); }));
 }
 
-export async function deleteVhost(id: number): Promise<void> {
-    await withFreshAuth(() => mojoDelete(EdgeVhostModel.endpoint, id));
+export async function deleteVhost(id: number, beforeWrite?: () => void): Promise<void> {
+    await withFreshAuth(() => { beforeWrite?.(); return mojoDelete(EdgeVhostModel.endpoint, id); });
 }
 
 export async function listVhostRoutes(vhost: number): Promise<EdgeRouteRow[]> {
-    const page = await mojoList<EdgeRouteRow>(EdgeRouteModel.endpoint, normalizeRouteListParams({ vhost, sort: 'path_prefix', size: 200 }));
-    return page.rows.map(sanitizeEdgeRouteRow);
+    const rows: EdgeRouteRow[] = [];
+    const seen = new Set<number>();
+    let total: number | null = null;
+    while (rows.length < 2000) {
+        const page = await mojoList<EdgeRouteRow>(EdgeRouteModel.endpoint, normalizeRouteListParams({ vhost, sort: 'path_prefix', start: rows.length, size: 200 }));
+        if (!Number.isSafeInteger(page.count) || page.count < rows.length + page.rows.length || total != null && total !== page.count) throw new Error('The route inventory changed or was incomplete. Refresh before changing routes.');
+        total = page.count;
+        for (const raw of page.rows) {
+            const row = sanitizeEdgeRouteRow(raw);
+            if (!Number.isSafeInteger(row.id) || row.id <= 0 || seen.has(row.id)) throw new Error('The route list changed or was incomplete. Refresh before changing routes.');
+            seen.add(row.id); rows.push(row);
+        }
+        if (rows.length === total) return rows;
+        if (!page.rows.length) throw new Error('The route inventory was incomplete. No route was changed.');
+    }
+    throw new Error('The route list exceeds the safe inspection limit. No route was changed.');
 }
 
-export async function saveVhostRoute(id: number | null, changes: { vhost?: number; path_prefix?: string; upstream?: number }): Promise<EdgeRouteRow> {
-    return sanitizeEdgeRouteRow(await withFreshAuth(() => mojoSave<EdgeRouteRow>(EdgeRouteModel.endpoint, id, changes)));
+export async function saveVhostRoute(id: number | null, changes: { vhost?: number; path_prefix?: string; upstream?: number }, beforeWrite?: () => void): Promise<EdgeRouteRow> {
+    return sanitizeEdgeRouteRow(await withFreshAuth(() => { beforeWrite?.(); return mojoSave<EdgeRouteRow>(EdgeRouteModel.endpoint, id, changes); }));
 }
 
-export async function deleteVhostRoute(id: number): Promise<void> {
-    await withFreshAuth(() => mojoDelete(EdgeRouteModel.endpoint, id));
+export async function deleteVhostRoute(id: number, beforeWrite?: () => void): Promise<void> {
+    await withFreshAuth(() => { beforeWrite?.(); return mojoDelete(EdgeRouteModel.endpoint, id); });
 }
 
 /** The only field a `manage_dns` holder can write on an upstream. */

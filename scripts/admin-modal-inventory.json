@@ -248,51 +248,6 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:import:0",
-      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
-      "owner": "openScale",
-      "launcher": "import",
-      "body": [],
-      "category": "dependency",
-      "parent": "openScale",
-      "target": null,
-      "fingerprint": "00209b8f5811d19e8cb3",
-      "categories": [
-        "dependency"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
-      "owner": "openScale",
-      "launcher": "modal.open",
-      "body": [
-        "ScaleFleetDialog"
-      ],
-      "category": "action",
-      "parent": "openScale",
-      "target": null,
-      "fingerprint": "8ad911eb2279355348a1",
-      "categories": [
-        "action"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:FleetOverview:openScale:0",
-      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
-      "owner": "FleetOverview",
-      "launcher": "openScale",
-      "body": [],
-      "category": "nested-flow",
-      "parent": "FleetOverview",
-      "target": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale",
-      "fingerprint": "1cc51d0da58c51e42d49",
-      "categories": [
-        "action",
-        "dependency"
-      ]
-    },
-    {
       "id": "packages/portal-mojo/src/admin/bouncer/signals.tsx:BouncerSignalDetail:DetailView:0",
       "file": "packages/portal-mojo/src/admin/bouncer/signals.tsx",
       "owner": "BouncerSignalDetail",
@@ -5844,6 +5799,8 @@
         "div",
         "Facts",
         "Status",
+        "details",
+        "summary",
         "p",
         "button",
         "h3",
@@ -5852,7 +5809,7 @@
       "category": "record",
       "parent": "ApiDeploymentDetail",
       "target": null,
-      "fingerprint": "3c2af58afa0df2c97d4f",
+      "fingerprint": "e4c70bade6be85969d75",
       "categories": [
         "record"
       ]
@@ -6271,7 +6228,7 @@
       "category": "confirmation",
       "parent": "chooseKeyMode",
       "target": null,
-      "fingerprint": "b9170da4ccaf90279e96",
+      "fingerprint": "632747d857f43b96425a",
       "categories": [
         "confirmation"
       ]
@@ -6900,6 +6857,8 @@
         "i",
         "Eyebrow",
         "FlatRow",
+        "details",
+        "summary",
         "code",
         "SharedValidationPanel",
         "DnsRecordsPanel",
@@ -6908,7 +6867,7 @@
       "category": "record",
       "parent": "DomainDetail",
       "target": null,
-      "fingerprint": "1d3070af0e0ef70b1104",
+      "fingerprint": "0c66c0963b01eaf51c59",
       "categories": [
         "record"
       ]
@@ -8119,9 +8078,28 @@
       "category": "editor",
       "parent": "openVhostWizard",
       "target": null,
-      "fingerprint": "a7af7da6605ca262ea69",
+      "fingerprint": "84c4b3e9c6fd54aac1b1",
       "categories": [
         "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:confirmRemoval:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "confirmRemoval",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "confirmRemoval",
+      "target": null,
+      "fingerprint": "987127b152059cb637a1",
+      "categories": [
+        "confirmation"
       ]
     },
     {
@@ -8133,48 +8111,53 @@
       "category": "editor",
       "parent": "edit",
       "target": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard",
-      "fingerprint": "c7100e8c5d470d1708dc",
+      "fingerprint": "c01bcc550a655c5a4849",
       "categories": [
         "editor"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:remove:modal.confirm:0",
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:remove:confirmRemoval:0",
       "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
       "owner": "remove",
-      "launcher": "modal.confirm",
+      "launcher": "confirmRemoval",
       "body": [],
       "category": "confirmation",
       "parent": "remove",
-      "target": null,
-      "fingerprint": "bc0d0db091876d367345",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:confirmRemoval",
+      "fingerprint": "c45e3884e90addda4ecb",
       "categories": [
         "confirmation"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:DetailView:0",
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:openRoute:modal.open:0",
       "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
-      "owner": "VhostDetail",
-      "launcher": "DetailView",
+      "owner": "openRoute",
+      "launcher": "modal.open",
       "body": [
-        "DetailView",
-        "div",
-        "Eyebrow",
-        "FlatRow",
-        "code",
-        "p",
-        "details",
-        "summary",
-        "span",
-        "VhostRoutes"
+        "RouteEditor"
       ],
-      "category": "record",
-      "parent": "VhostDetail",
+      "category": "editor",
+      "parent": "openRoute",
       "target": null,
-      "fingerprint": "ca9c37f1c066ce5af839",
+      "fingerprint": "7c184834b239aae45173",
       "categories": [
-        "record"
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:removeRoute:confirmRemoval:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "removeRoute",
+      "launcher": "confirmRemoval",
+      "body": [],
+      "category": "confirmation",
+      "parent": "removeRoute",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:confirmRemoval",
+      "fingerprint": "a8c3aabb2e55ad6d4993",
+      "categories": [
+        "confirmation"
       ]
     },
     {
@@ -8206,17 +8189,109 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open:modal.detail:0",
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:openRoute:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "openRoute",
+      "body": [],
+      "category": "editor",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:openRoute",
+      "fingerprint": "c3dd2b80d981ec74531a",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:removeRoute:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "removeRoute",
+      "body": [],
+      "category": "confirmation",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:removeRoute",
+      "fingerprint": "25c620ae93dcdeea8eb7",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:edit:1",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "edit",
+      "body": [],
+      "category": "editor",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:edit",
+      "fingerprint": "cfe49bd0bfa908732c5f",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:VhostDetail:edit:2",
+      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
+      "owner": "VhostDetail",
+      "launcher": "edit",
+      "body": [],
+      "category": "editor",
+      "parent": "VhostDetail",
+      "target": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx:edit",
+      "fingerprint": "598e1ce9fde6dd3e0568",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx:showDetails:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx",
+      "owner": "showDetails",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "FlatRow",
+        "p",
+        "time",
+        "b",
+        "button"
+      ],
+      "category": "record",
+      "parent": "showDetails",
+      "target": null,
+      "fingerprint": "fa934e8c250318cbe69f",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx:ServingReadiness:showDetails:0",
+      "file": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx",
+      "owner": "ServingReadiness",
+      "launcher": "showDetails",
+      "body": [],
+      "category": "record",
+      "parent": "ServingReadiness",
+      "target": "packages/portal-mojo/src/admin/edge/ServingReadiness.tsx:showDetails",
+      "fingerprint": "4a243a5085906082c80c",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open:modal.open:0",
       "file": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx",
       "owner": "open",
-      "launcher": "modal.detail",
+      "launcher": "modal.open",
       "body": [
         "VhostDetail"
       ],
       "category": "record",
       "parent": "open",
       "target": null,
-      "fingerprint": "d22b0ad844930e3ca221",
+      "fingerprint": "49582f9eb0e018f36eb7",
       "categories": [
         "record"
       ]
@@ -8230,9 +8305,23 @@
       "category": "editor",
       "parent": "create",
       "target": "packages/portal-mojo/src/admin/edge/VhostWizard.tsx:openVhostWizard",
-      "fingerprint": "bcf7835a242b77cdf7ef",
+      "fingerprint": "57cd1bb091a878164668",
       "categories": [
         "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:create:open:0",
+      "file": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx",
+      "owner": "create",
+      "launcher": "open",
+      "body": [],
+      "category": "record",
+      "parent": "create",
+      "target": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:open",
+      "fingerprint": "9c588796f4e814a1d115",
+      "categories": [
+        "record"
       ]
     },
     {
@@ -8241,12 +8330,13 @@
       "owner": "VhostsPage",
       "launcher": "create",
       "body": [],
-      "category": "editor",
+      "category": "nested-flow",
       "parent": "VhostsPage",
       "target": "packages/portal-mojo/src/admin/edge/VhostsPage.tsx:create",
       "fingerprint": "da73b28054b799b0a6d6",
       "categories": [
-        "editor"
+        "editor",
+        "record"
       ]
     },
     {
@@ -8333,6 +8423,120 @@
       "fingerprint": "0bfcf4acc0422c1c897a",
       "categories": [
         "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:details:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "details",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "time",
+        "Link",
+        "button"
+      ],
+      "category": "record",
+      "parent": "details",
+      "target": null,
+      "fingerprint": "c6d9f9f8b0730045805b",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:EvidenceRow:details:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "EvidenceRow",
+      "launcher": "details",
+      "body": [],
+      "category": "record",
+      "parent": "EvidenceRow",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:details",
+      "fingerprint": "63f68d78e89ed4be8a94",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openCapacity:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "openCapacity",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "CapacityFactsContent",
+        "button"
+      ],
+      "category": "record",
+      "parent": "openCapacity",
+      "target": null,
+      "fingerprint": "b066450fdaf48544146d",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:import:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "openScale",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "openScale",
+      "target": null,
+      "fingerprint": "00209b8f5811d19e8cb3",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "openScale",
+      "launcher": "modal.open",
+      "body": [
+        "ScaleFleetDialog"
+      ],
+      "category": "action",
+      "parent": "openScale",
+      "target": null,
+      "fingerprint": "8ad911eb2279355348a1",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:FleetOverview:openScale:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "FleetOverview",
+      "launcher": "openScale",
+      "body": [],
+      "category": "nested-flow",
+      "parent": "FleetOverview",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openScale",
+      "fingerprint": "1cc51d0da58c51e42d49",
+      "categories": [
+        "action",
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:FleetOverview:openCapacity:0",
+      "file": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx",
+      "owner": "FleetOverview",
+      "launcher": "openCapacity",
+      "body": [],
+      "category": "record",
+      "parent": "FleetOverview",
+      "target": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:openCapacity",
+      "fingerprint": "ef3d64d3cfd8f8215fd3",
+      "categories": [
+        "record"
       ]
     },
     {
@@ -11253,7 +11457,7 @@
       "owner": "ApiDeploymentDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "85f76f94b01a6f5dfdce"
+      "fingerprint": "af64e595416712dcbf9f"
     },
     {
       "file": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx",
@@ -11323,7 +11527,7 @@
       "owner": "DomainDetail",
       "key": "'overview'",
       "label": "Overview",
-      "fingerprint": "25695509ffef91969279"
+      "fingerprint": "803a4ce2c6f2a2ff3fcd"
     },
     {
       "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
@@ -11422,20 +11626,6 @@
       "key": "'files'",
       "label": "Files",
       "fingerprint": "94976f11921ef583e1b7"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
-      "owner": "VhostDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "80c733beb854abb6aafb"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/edge/VhostDetail.tsx",
-      "owner": "VhostDetail",
-      "key": "'routes'",
-      "label": "Routes",
-      "fingerprint": "07898153834d5d32f602"
     },
     {
       "file": "packages/portal-mojo/src/admin/shortlinks/ShortlinkDetail.tsx",

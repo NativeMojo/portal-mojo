@@ -198,7 +198,7 @@ export function normalizeRouteListParams(params: Params): Params {
 }
 
 export function normalizeUpstreamListParams(params: Params): Params {
-    return normalizeListParams(params, new Set(['is_enabled', 'kind']), new Set(['name', 'kind', 'created', 'is_enabled']), 'default');
+    return normalizeListParams(params, new Set(['is_enabled', 'kind', 'group', 'group__isnull']), new Set(['name', 'kind', 'created', 'is_enabled']), 'default');
 }
 
 export function normalizeBlocklistListParams(params: Params): Params {
