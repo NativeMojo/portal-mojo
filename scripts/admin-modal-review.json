@@ -506,9 +506,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDeploySetup.tsx:loadUpload:modal.open:0",
-      "fingerprint": "7589768947b62530f752",
+      "fingerprint": "3432f60affae865e554c",
       "category": "action",
-      "purpose": "Register immutable manifest, anonymous checksum-bound file upload and exact rollout observation; native pending dismissal guard and terminal owner refresh."
+      "purpose": "Focused upload task with one compact header close: immutable manifest, anonymous checksum-bound storage upload and exact rollout observation; native pending dismissal guard, terminal owner refresh and concise success without replay controls."
     },
     {
       "id": "packages/portal-mojo/src/admin/deployments/WebAppDetail.tsx:launchRollback:modal.open:0",

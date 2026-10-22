@@ -81,10 +81,10 @@ try{
   await click('Create WebApp');await flush();
   const creates=fixture.calls.filter(c=>c.path.endsWith('/onboarding/create'));assert.equal(creates.length,1);assert.equal(creates[0].body.group_intent,'new');assert.equal(creates[0].body.group,undefined);
   const groupRead=fixture.calls.find(c=>c.path.endsWith('/onboarding/options')&&Number(c.params?.group)>0);assert(groupRead,'Continuation resolves options for the exact newly created group');
-  assert(button('Continue address').disabled,'No domain is borrowed to make a new workspace look ready');
+  assert(button('Apply address').disabled,'No domain is borrowed to make a new workspace look ready');
   assert(document.querySelector('a[href="/dns/domains"]'),'The supported Domains prerequisite is reachable');
   let saved=receipts.receiptsFor(owner).find(r=>r.kind==='create'&&r.target===''&&r.profile?.slug==='new-workspace-app');assert.equal(saved.onboardingGroup,Number(groupRead.params.group));assert(saved.app>0);assert.equal(saved.profile.group_intent,'new');
-  mock.setDeploymentMockScenario('new-workspace-domain-ready');await click('Refresh workspace address options');await flush();await setValue('input','new-workspace-app.apps.example.test');await click('Check public address');await flush();await click('Continue address');await flush();
+  mock.setDeploymentMockScenario('new-workspace-domain-ready');await click('Refresh workspace address options');await flush();await setValue('input','new-workspace-app.apps.example.test');await click('Check public address');await flush();await click('Apply address');await flush();
   const choice=fixture.calls.find(c=>c.path.endsWith('/onboarding/choose'));assert.equal(choice.body.operation,saved.operation);assert.equal(choice.body.step,'address');assert.deepEqual(choice.body.choice,{domain:10,label:'new-workspace-app'});assert(!fixture.calls.some(c=>c.path.endsWith('/onboarding/precheck')&&c.params.group_intent==='new'));
   await unmount();saved=receipts.receiptsFor(owner).find(r=>r.operation===saved.operation);fixture.calls=[];await mount(WebAppOnboardingDialog,{resume:saved,onClose(){},onBusy(){},destinations:{domains:'/dns/domains'}});assert(fixture.calls.some(c=>c.path.endsWith('/onboarding/detail')&&c.params.operation===saved.operation));assert(!fixture.calls.some(c=>c.path.endsWith('/onboarding/create')));await unmount();fixture.call=previousCall;mock.setDeploymentMockScenario('failed-newer');
  }

@@ -29,3 +29,5 @@
 @container(max-width:560px){.deployment-dialog-header{flex-direction:column}.deployment-summary-grid{grid-template-columns:minmax(0,1fr)}.deployment-attempt-summary{text-align:left}.deployment-dialog .modal-actions{display:flex;flex-wrap:wrap;gap:.65rem}.deployment-dialog .modal-actions>*{margin:0}.deployment-dialog .deployment-facts>div{grid-template-columns:minmax(0,1fr);gap:.25rem}}
 
 .admin-deployments .deployment-form>label{margin:0}
+.deployment-dialog-header:has(>.modal-title){flex-direction:row}.deployment-dialog-header>.btn-icon{flex-shrink:0}
+@container(max-width:480px){.deployment-dialog [role="tablist"][aria-label="WebApp tasks"]{flex-wrap:wrap;overflow:visible}}

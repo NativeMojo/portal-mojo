@@ -5941,14 +5941,12 @@
       "owner": "loadUpload",
       "launcher": "modal.open",
       "body": [
-        "div",
-        "h2",
-        "WebAppUploadPanel"
+        "UploadDialog"
       ],
       "category": "action",
       "parent": "loadUpload",
       "target": null,
-      "fingerprint": "7589768947b62530f752",
+      "fingerprint": "3432f60affae865e554c",
       "categories": [
         "action"
       ]

@@ -58,6 +58,19 @@ try{
  mock.setDeploymentMockScenario('reported-only');const reported=sanitize.projectPlatform(mock.deploymentsMock('/api/account/admin/platform',{params:{sections:'deployments,api'}},ctx).data).deployments.data.items.find(x=>x.id==='22222222-2222-4222-8222-222222222222');assert.equal(reported.node_summary.proven,0);assert(state.platformProof(reported).includes('2 reported'));
  mock.setDeploymentMockScenario('revision-conflict');const op=crypto.randomUUID();const created=mock.deploymentsMock('/api/edge/webapp/onboarding/create',{method:'POST',body:{operation_id:op,group:1,slug:'x'}},ctx);assert.equal(created.data.operation.operation_id,op);assert.equal(mock.deploymentsMock('/api/edge/webapp/onboarding/choose',{method:'POST',body:{operation:op,revision:1,step:'app',choice:{}}},ctx).code,409);
 
+
+ // A created app becomes inspectable in its owner's summary inventory without
+ // borrowing the seed app's release or deployment history.
+ const createdId=created.data.operation.resources.webapp;
+ const createdInventory=mock.deploymentsMock('/api/edge/webapp/summaries',{},ctx).data;
+ const createdSummary=createdInventory.items.find(row=>row.webapp.id===createdId);
+ assert(createdSummary,'Created WebApp is visible after list refresh');
+ assert.equal(createdSummary.webapp.slug,'x');
+ assert.equal(createdSummary.current_release,null);
+ assert.equal(createdSummary.latest_deployment,null);
+ assert.equal(createdSummary.onboarding.status,'waiting');
+ const anotherActorInventory=mock.deploymentsMock('/api/edge/webapp/summaries',{}, {...ctx,user:{...ctx.user,id:88}}).data;
+ assert(!anotherActorInventory.items.some(row=>row.webapp.id===createdId),'Created mock operations are actor-owned');
  if(!regression||regression==='completion-mock-parity'){
   mock.resetDeploymentMock();mock.setDeploymentMockScenario('rolled-back');
   const registered=mock.deploymentsMock('/api/edge/release',{method:'POST',body:{webapp:1,group:1,version:'terminal-first-attempt',manifest}},ctx).data;

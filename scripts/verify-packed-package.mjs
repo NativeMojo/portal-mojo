@@ -57,10 +57,10 @@ try {
     // measured 628 intended files, 6,429,996 unpacked bytes (1,731,687 packed).
     // No generated files or dependencies added; bound source growth at 6.440 MB.
     // Deployments9243, measured against 02313ef (6,433,280 bytes), adds two
-    // source modules and grows 16 existing source/docs/style/mock files by
-    // 39,669 bytes total: 630 intended files, 6,472,949 unpacked bytes.
-    // No generated files or dependencies added. Preserve roughly the previous
-    // 6.7 KB headroom with a 6.480 MB source budget.
+    // source modules and grows 17 existing source/docs/style/mock files by
+    // 45,072 bytes total: 630 intended files, 6,478,352 unpacked bytes.
+    // No generated files or dependencies added. Bound audited source growth
+    // at 6.480 MB, with the eager-runtime cap independently enforced.
     // Shared Dashboard/coordinator source remains unchanged.
     // Content/consumer/style/export checks and the separate 530,000-byte
     // eager-runtime cap remain unchanged.

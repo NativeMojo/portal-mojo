@@ -98,7 +98,16 @@ function platformAttempt(id = B) { let status = scenario === 'partial' ? 'partia
             runner: 'node-b', status: 'failed', detail: 'Process failed before restart proof; last convergence remains unchanged.'
         }] : [], detail: { message: 'Bounded mock observation' }, current_commits: [shaA], desired_commit: shaB
 }; }
-function summary(id = 1, full = false) { const current = releases.find(r => r.id === currentReleaseId) ?? releases[1]!; return {
+function summary(id = 1, full = false) {
+    const created = [...operations.values()].find(entry => entry.app === id);
+    if (created) return {
+        schema_version: 1,
+        webapp: { id, slug: String(created.profile.slug ?? `app-${id}`), display_name: String(created.profile.display_name ?? ''), environment: String(created.profile.environment ?? 'production'), deployment_ref: String(created.profile.deployment_ref ?? 'main'), repository: String(created.profile.github_repository ?? ''), build_output: String(created.profile.build_output ?? 'dist'), ...profiles.get(id) },
+        address: { hostname: `${created.profile.slug ?? `app-${id}`}.apps.example.test`, certificate: { status: created.status === 'succeeded' ? 'active' : 'pending', not_after: '' }, aliases: [] },
+        current_release: null, latest_deployment: null,
+        onboarding: { status: created.status, cursor: created.cursor }, deployment_key: { linked: false, active: false }
+    };
+    const current = releases.find(r => r.id === currentReleaseId) ?? releases[1]!; return {
     schema_version: 1, webapp: {
         id, slug: id === 1 ? 'example-app' : `app-${id}`, display_name: id === 1 ? 'Example WebApp' : `New WebApp ${id}`, environment: 'production', deployment_ref: 'main', repository: 'NativeMojo/example', build_output: 'dist', ...profiles.get(id)
     }, address: {
@@ -167,7 +176,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
     }
     if (path === '/api/edge/webapp/summaries' && method === 'GET')
         return ok({
-            schema_version: 1, items: [summary()], count: 1, limit: 50, truncated: false, fleet: { live: 1 }
+            schema_version: 1, items: [summary(), ...[...operations.values()].filter(entry => entry.actor === u.id).map(entry => summary(entry.app))], count: 1 + [...operations.values()].filter(entry => entry.actor === u.id).length, limit: 50, truncated: false, fleet: { live: 1 }
         });
     if (path === '/api/edge/webapp/summary' && method === 'GET') {
         const id = Number(p.webapp);
@@ -180,7 +189,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         if (id !== 1 && ![...operations.values()].some(x => x.app === id))
             return no('Unknown app', 404);
         return ok({
-            ...summary(id).webapp, group: { id: 1, name: 'Example workspace' }, bucket: 'must-be-stripped', prefix: 'must-be-stripped'
+            ...summary(id).webapp, group: { id: [...operations.values()].find(entry => entry.app === id)?.group ?? 1, name: 'Example workspace' }, bucket: 'must-be-stripped', prefix: 'must-be-stripped'
         });
     }
     if (/^\/api\/edge\/webapp\/\d+$/.test(path) && method === 'POST') {
@@ -191,7 +200,7 @@ export function deploymentsMock(path: string, opts: Opts, context: DeploymentMoc
         if (Object.keys(b).some(key => !allowed.includes(key)) || Object.values(b).some(value => typeof value !== 'string')) return no('Unsupported profile fields', 400);
         const current = profiles.get(id) ?? {};
         profiles.set(id, { ...current, ...Object.fromEntries(Object.entries(b).map(([key, value]) => [key === 'github_repository' ? 'repository' : key, String(value)])) });
-        return ok({ ...summary(id).webapp, group: { id: 1, name: 'Example workspace' } });
+        return ok({ ...summary(id).webapp, group: { id: [...operations.values()].find(entry => entry.app === id)?.group ?? 1, name: 'Example workspace' } });
     }
     if (path === '/api/edge/release' && method === 'GET') {
         const items = releases.filter(r => r.webapp === Number(p.webapp) && (p.id === undefined || r.id === Number(p.id)));
