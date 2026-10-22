@@ -5,221 +5,207 @@ import {
     EDGE_ADMIN_SECTION, VhostsPage, VhostDetail, VhostWizard, openVhostWizard,
     UpstreamsPage, BlocklistPage, EdgeVhostModel, EdgeRouteModel,
     EdgeUpstreamModel, EdgeBlocklistModel, buildVhostPayload,
-} from 'portal-mojo/admin';
+} from 'portal-mojo/admin'; // also portal-mojo/admin/infrastructure
 ```
 
-The same names are on `portal-mojo/admin/infrastructure`.
+`EDGE_ADMIN_SECTION` contributes Infrastructure routes `edge/vhosts` and
+`edge/upstreams`, relative to the standalone or embedded `/system` mount.
+Network Security owns `security/network/edge-blocklist`. Records open in
+native modals, not record routes. Consumer source: django-mojo `mojo/apps/edge/`;
+`client/mock.ts` mirrors its graphs and refusals, with wording limits below.
 
-`EDGE_ADMIN_SECTION` contributes Infrastructure routes at `edge/vhosts` and
-`edge/upstreams` (or the same paths under an embedded `/system` mount). The
-fleet blocklist is a route of Network Security, at
-`security/network/edge-blocklist`. There are no record routes: a hostname opens in a focused native `modal.open` with horizontal task tabs.
+## Permissions and ownership
 
-Consumer contract: django-mojo `mojo/apps/edge/`. The mock in
-`client/mock.ts` returns the same graphs and the same refusals, word for word
-where the server has words.
+All clauses are global; section and route gates both apply.
 
-## Permissions
+| Resource/action | Authority |
+|---|---|
+| Vhost, route, upstream view | `sys.view_dns OR sys.manage_dns OR sys.security` |
+| Vhost/route change or delete; upstream enabled switch | `sys.manage_dns OR sys.security` |
+| Upstream declare/retire | Literal `me.is_superuser`; server `require_platform_admin` also refuses API keys |
+| Blocklist view | `sys.view_security OR sys.manage_security OR sys.security` |
+| Blocklist change/delete | `sys.manage_security OR sys.security` |
 
-- Vhosts, routes, upstreams — view: `sys.view_dns | sys.manage_dns | sys.security`.
-- Vhosts, routes — change or delete: `sys.manage_dns | sys.security`.
-- Upstreams — switch on or off: `sys.manage_dns | sys.security`.
-- Upstreams — declare or retire: `me.is_superuser === true`. The server gate
-  is `require_platform_admin`, which also refuses API keys.
-- Blocklist — view: `sys.view_security | sys.manage_security | sys.security`
-  (`EDGE_BLOCKLIST_VIEW_PERMS`). This is wider than `SECURITY_VIEW_PERMS`: the
-  server lets `manage_security` view, and manage does not imply view on the
-  client, so the clause is spelled out.
-- Blocklist — change or delete: `sys.manage_security | sys.security`.
+`EDGE_BLOCKLIST_VIEW_PERMS` deliberately includes `manage_security`: manage does
+not imply view in the client. Security-only operators cannot enter DNS-gated
+Edge, hence the separate blocklist route. Member grants and `?group=` do not
+open the fleet-wide blocklist.
 
-A section gate and a route gate both apply. A security-only operator is denied
-every DNS-gated section, which is why the blocklist does not live under Edge.
-The blocklist has no group: a member-scoped grant and `?group=` open nothing.
-
-**House rows.** A vhost on a group-less domain is platform property. It never
-appears in a non-superuser's list, even with a global grant, and its detail,
-its routes and creating one are refused to everyone else. The vhost graphs
-carry `domain: basic`, which has no `group`, so house-ness cannot be read off a
-vhost row. The wizard's domain picker passes `group__isnull: false` for
-non-superusers so a house domain is never offered to someone who would be
-refused at Finish.
+A vhost on a group-less domain is a **house row**: non-superusers cannot list,
+inspect or create it or its routes, even with global DNS grants. Vhost graphs'
+`domain: basic` omits group, so never infer ownership there. Non-superuser domain
+choices use `group__isnull: false`. Resolve the domain's own graph before offering
+enabled upstreams: `group=<owner>` includes owned and shared rows; platform domains
+use `group__isnull: true`. Unresolved ownership disables selection.
 
 ## Endpoints
 
-| Address | Verbs | Notes |
-|---|---|---|
-| `/api/edge/vhost` (+`/<id>`) | list, read, create, update, delete | `list` graph for tables, `default` for one row |
-| `/api/edge/route` (+`/<id>`) | list, read, create, update, delete | `site_api` vhosts only; filter `vhost` |
-| `/api/edge/upstream` (+`/<id>`) | list, read, update | update writes `is_enabled` only; no create, no delete |
-| `/api/edge/upstream/declare` | POST | `{name, kind, host+port \| socket_path, group?}`; platform administrators |
-| `/api/edge/upstream/retire` | POST | `{upstream}`; disables, keeps the row; platform administrators |
-| `/api/edge/blocklist` (+`/<id>`) | list, read, create, update, delete | fleet-wide |
+| `/api/edge/…` | Contract |
+|---|---|
+| `vhost`, `vhost/<id>` | list/read/create/update/delete; table graph `list`, record graph `default` |
+| `route`, `route/<id>` | list/read/create/update/delete; `site_api` only; filter `vhost` |
+| `upstream`, `upstream/<id>` | list/read/update `is_enabled`; no collection create/delete |
+| `upstream/declare` | POST `{name, kind, host+port OR socket_path, group?}` |
+| `upstream/retire` | POST `{upstream}`; disables and retains row |
+| `blocklist`, `blocklist/<id>` | list/read/create/update/delete; fleet-wide |
 
-## The four kinds
+Refused saves reject at the one client boundary. Public save/delete helpers
+accept an optional `beforeWrite` guard, invoked before **every** fresh-auth attempt.
 
-Serving keeps the `/edge/vhosts` route, public `Vhost*` exports and persisted table key `admin:edge:vhosts`. The page has a compact configuration-check summary and a Domain picker backed by URL filter state. Search remains label/type/pool; it does not pretend the backend searches derived full hostnames.
+## Serving tasks
 
-Add hostname has four steps: **Address → Routing → Certificate → Review**. Address chooses a managed domain and label; Routing uses a compact four-kind selector and only that kind's destination controls; Certificate selects TLS and enabled intent; Review previews the saved configuration. Other settings opens the pool, body, static and quiet-path fields without an accordion. Cancel and the current primary action remain in the footer.
+The lean table shows hostname/domain, type and enabled intent. Pool and timestamps
+belong in inspection. The Domain picker writes URL filter state; search supports
+label/type/pool, not derived full hostnames. Persisted key remains
+`admin:edge:vhosts`; public `Vhost*` exports and `/edge/vhosts` remain compatible.
 
-Edit is one retained controlled draft across **Address / Routing / Certificate / Settings** tabs. Validation selects the relevant task and focuses its first editable control. The active task remains rendered while saving. No shared Tabs or DetailView behavior is changed. Short explanations use accessible info-icon popovers.
+- **Add hostname:** Address → Routing → Certificate → Review. Compact type choice,
+  only relevant destination controls, visible action footer. Other settings holds
+  pool/body/static/quiet paths without an accordion. Success opens the saved row.
+- **Edit:** Address / Routing / Certificate / Settings share one controlled draft.
+  Validation selects the relevant tab and focuses the invalid input. Saving retains
+  the active panel. Domain is immutable. Info-icon popovers carry secondary help.
+- **Inspect:** Overview / Routes / Certificate / Settings; Routes only for Site + API.
+  Overview shows actual redirect/API destination first. Certificate shows stored
+  status/expiry and Change certificate. Settings holds other knobs, timestamps and
+  read-only platform policy. Header owns enable/disable, Edit and Delete.
+- **Routes:** paginated local table, focused Add/Edit dialogs and explicit removal
+  confirmation. Before rename/removal, inspect current quiet paths and complete
+  bounded routes. Block orphaning a quiet path and identify what to repair in
+  Settings first; no atomic multi-row operation is implied.
 
-Upstream choices resolve the domain's owner, then request that owner's enabled rows plus shared rows (`group`); platform domains request shared rows only (`group__isnull`). Failure to resolve the owner keeps the picker disabled. Certificate coverage stays Unknown until the certificate's own graph is read.
+Styles are scoped to these surfaces; shared Tabs/DetailView and Dashboard behavior
+are unchanged. See [presentation QA](admin-presentation.md).
 
-| Kind | Type | Needs | May carry | Refuses |
-|---|---|---|---|---|
-| `api` | API | `upstream` | `quiet_paths`, `serve_static` | `spa`, `redirect_to` |
-| `site` | Site | — | `spa` | `upstream`, `quiet_paths`, `serve_static`, `redirect_to` |
-| `site_api` | Site + API | explicit routes on create | `spa`, `serve_static`, `quiet_paths` | whole-host `upstream`, `redirect_to` |
-| `redirect` | Redirect | `redirect_to` | — | everything else |
+## Kinds, payloads and validation
 
-`buildVhostPayload(draft, { create })` is the one place a draft becomes a
-request. It sends each knob the chosen kind does not carry as its empty value,
-so a draft that visited another shape cannot leak that shape's settings, and
-an edit that changes kind clears what the old kind held. It never sends
-`mojosec_policy`. A vhost that carries an edge evidence policy therefore cannot
-change kind, or its single-page-app switch on a `site`, from here: the server
-requires the policy's response class to match and refuses, and its message is
-shown.
+| Kind | Required | Supported options | Refused |
+|---|---|---|---|
+| `api` | `upstream` | quiet paths, static files | SPA, redirect |
+| `site` | — | SPA | upstream, quiet paths, static, redirect |
+| `site_api` | explicit routes on create | SPA, quiet paths, static | whole-host upstream, redirect |
+| `redirect` | `redirect_to` | — | other kind-specific knobs |
 
-Shared rules, each mirrored by a validator in `edge/models.ts`:
+`buildVhostPayload(draft, {create})` allowlists the chosen kind and sends empty
+values for its unsupported knobs, clearing values from a former kind. It never
+sends `mojosec_policy`. The server can refuse kind/SPA changes that conflict with
+that policy's response class; show its refusal.
 
-- `label`: empty serves the bare domain, `*` the wildcard, otherwise one DNS
-  label. The address (`server_name`) is derived, never typed.
-- `body_size_mb`: whole number, 1 to 4096, default 50. Not offered for a
-  redirect.
-- `pool`: must be one the deployment declares (`EDGE_POOLS`, default
-  `["default"]`). The refusal names the declared set.
-- `domain`: set once. An edit shows it read-only and never sends it.
-- `redirect_to`: a host name. No scheme, path, port or wildcard.
-- A route prefix or quiet path starts with `/`, uses letters, digits, `.`,
-  `_`, `-` and `/`, and has no `//` or `..`. A route prefix cannot be `/`.
+Client mirrors in `edge/models.ts`; server remains authoritative:
 
-## What is checked when
+- Label: empty apex, `*` wildcard or one lowercase DNS label. Derive `server_name`.
+- Body: integer 1–4096 MB, default 50; absent for redirect.
+- Pool: deployment-declared `EDGE_POOLS`, default `["default"]`; no client catalog.
+- Redirect: hostname only; no scheme/path/port/wildcard.
+- Route/quiet path: leading `/`, letters/digits/`._-/`, at most 128 characters,
+  no `//` or `..` segment. A route cannot be `/`.
 
-The server checks most things on every save. Two things are checked **only
-when the row is enabled**:
+Only enabled rows require a certificate belonging to the domain and covering the
+address, and a unique enabled domain/label. Stage a replacement disabled, disable
+the old row, then enable the replacement. `certificateCovers` knows a wildcard
+covers one label and never the apex. Coverage stays Unknown until the full
+certificate graph (including SANs) is read; disabled staging remains available.
 
-- the certificate belongs to the vhost's domain and covers its address;
-- no other enabled row has the same domain and label.
+## Staging and uncertain writes
 
-So a disabled row may hold a certificate that does not cover it yet, and may
-share a name with a live row. That is how a replacement is staged: create it
-disabled, then disable the old one and enable the new one. The wizard warns
-when the chosen certificate does not cover the address (`certificateCovers`,
-which knows that a wildcard covers exactly one label and never the apex) and
-still lets the row be saved disabled.
+`site_api` quiet paths require stored route prefixes, so create in this order:
 
-## The create order for `site_api`
+1. Vhost disabled, without quiet paths.
+2. Routes sequentially.
+3. Final vhost save with quiet paths and chosen enabled intent; always perform this
+   step so enable-time validation runs last.
 
-A quiet path on a `site_api` vhost must sit under one of its route prefixes,
-and the server reads those prefixes from the stored row. A create that carries
-quiet paths is therefore always refused with "none declared". The only order
-that works is:
+The wizard requires at least one valid create route, though the server accepts
+route-less enabled rows. Edits and Site → Site + API conversion may remain
+route-less; author routes in detail. Existing routes block conversion away from
+Site + API. Unread routes defer quiet-path validation to the server.
 
-1. create the vhost, **disabled** and without quiet paths;
-2. create its routes, one at a time;
-3. save the vhost once more with the quiet paths and the enablement the user
-   chose.
+Retain acknowledged steps on explicit refusals. Transport loss, malformed receipts
+and 5xx may follow committed writes and stay **unconfirmed**, never “refused” or
+“still disabled”. An unacknowledged create cannot replay: close and inspect Serving.
+An acknowledged partial create offers **Inspect saved hostname**.
 
-The wizard does exactly this. Step 3 always runs, so the enable-time checks
-happen at the end and a failure part-way never leaves a live vhost with no
-routes. An explicit server refusal stays visible and retains acknowledged progress. A transport error, malformed response or 5xx response can follow a committed write: the outcome is unconfirmed. An unacknowledged create is blocked from replay; close and inspect Serving before starting another create. For an uncertain route or final save, select **Observe outcome**. Observation does not write. An observed matching route is acknowledged before continuing; a missing route remains blocked. After observation, explicitly select **Add hostname** or **Save changes** to continue. No unknown enable outcome is called refused or still disabled.
+**Observe outcome** reads only. Route continuation requires the matching stored
+prefix/upstream; absence stays blocked. Edit/final-save observation compares the
+exact normalized submitted payload, including FK IDs and arrays; unchanged or
+conflicting fields retain the guard and show differences. Only an exact match
+clears it. Continuing requires explicit **Add hostname** or **Save changes**;
+observation never automatically replays a mutation.
 
-The server will store an enabled `site_api` hostname with no routes. The create wizard requires at least one explicit valid route. This is a create-only requirement: route-less edits and supported Site → Site + API conversion remain available, then routes can be authored in detail.
+Detail edits, route writes, enablement and deletion serialize through one pending
+state. Lock Escape/backdrop/X during preflight and writes. Before each write and
+fresh-auth attempt, check original session/current permission; owner disposal
+closes nested dialogs and prevents later staged writes. Closing cannot cancel an
+already submitted server operation or prove its outcome.
 
-In edit mode routes are read-only, with a pointer to the detail view, which
-owns adding, changing and deleting them. Changing a `site_api` vhost to
-another kind while it has routes is blocked with the count; the server refuses
-it too. Until the stored routes have been read, or if that read fails, the
-wizard does not judge quiet paths against them and leaves that to the server.
+Route safety reads paginate to at most 2,000 rows and reject changed counts,
+duplicate IDs, incomplete pages and excess inventory. Same-count concurrent edits
+cannot all be detected; there is no atomic snapshot guarantee.
 
-## Vhost detail
-
-The native detail modal has **Overview / Routes / Certificate / Settings**. Routes appears only for Site + API. Overview puts the redirect target or API upstream first; it does not repeat the hostname and type already in the header. Certificate shows the stored status and expiry, with Change certificate for managers. Settings holds pool/body/static/quiet paths, timestamps and read-only evidence-policy information. Header actions own enable/disable, Edit and the focused Delete confirmation.
-
-A successful create opens the saved hostname. An acknowledged partial Site + API create offers **Inspect saved hostname**, preserving its real disabled/saved state. An unacknowledged create is never replayed. Explicit backend refusals remain actionable; lost/malformed/5xx outcomes require **Observe outcome** before another mutation. Observation never writes or automatically retries.
-
-Routes uses a paginated local table with focused Add/Edit dialogs. Rename and removal inspect the complete bounded route inventory and current quiet paths first. A change that would strand a quiet path is blocked with the exact path and points to Settings; remove or repair the quiet path before changing the route. There is no pretend atomic multi-row transaction. Safety inspection paginates up to 2,000 routes and rejects changed counts, duplicate IDs, incomplete pages or inventories exceeding 2,000 routes rather than treating a partial page as complete. Same-count concurrent edits cannot all be detected.
-
-Detail edits, route writes, enablement and deletion share the detail's pending state. Native Escape/backdrop/X are locked during submitted writes and preflight. Owned dialogs close on scope loss; before each write and every fresh-auth attempt, a guard verifies the original session and current permission. A closed or replaced editor cannot continue the staged create's later writes. Unknown outcomes stay visibly unconfirmed; closing a dialog does not cancel a server operation or establish its outcome.
+Delete confirms the address, stopped serving and route cascade, warns linked sites
+can stop serving, retains domain/certificate and offers Disable as reversible.
 
 ## Serving evidence
 
-`ServingReadiness.tsx` and `serving-data.ts` are internal, read-only helpers. Bootstrap is requested independently through `GET /api/account/admin/bootstrap` only for an authenticated global identity admitted by `view_admin | manage_users | manage_settings | admin` (literal superuser bypass). DNS access alone never starts that read. A positive projection retains only matching user id/superuser boolean, setup boolean and the edge available/HTTP/issuance fields; unrelated bootstrap data never enters Query or local state.
+Read-only `ServingReadiness.tsx`/`serving-data.ts` keep positive projections outside
+Query. `GET /api/account/admin/bootstrap` requires an authenticated matching global
+identity with `view_admin OR manage_users OR manage_settings OR admin` (literal
+superuser bypass); DNS grants alone never request it. Retain only matching user
+ID/superuser, setup capability and edge available/HTTP/issuance fields.
 
-Hosting readiness calls `GET /api/account/admin/setup/readiness?section=hosting_vhosts` only after that same identity successfully bootstraps with `capabilities.setup === true`, and both current Me and bootstrap report literal superuser. The server still rejects key-backed/noninteractive sessions. The client invents no key provenance flag. The schema-1 parser finds the selected section by code, validates status/time/count/coverage bounds, caps checks at 64 and scalar details at 16 keys, and drops unrelated response fields.
+`GET /api/account/admin/setup/readiness?section=hosting_vhosts` additionally requires
+successful same-identity bootstrap with setup capability and literal superuser in
+both Me and bootstrap. Server still refuses key-backed/noninteractive sessions;
+client invents no provenance flag. Schema 1 validates status/time/count/coverage,
+keeps the selected section only, caps checks at 64 and scalar details at 16 keys.
 
-Certificate serving posture shows HTTP enabled/disabled as informational file rendering configuration. DNS-01 identifies issuance method. Hosting readiness checks enabled rows' domain and certificate status only: pass does not prove certificate expiry/coverage/material installation, fleet convergence, expected nodes or running generation. Absence from bounded failing-row details is no per-host verdict. Enabled badges and saved notices express configuration intent.
+The compact summary keeps timestamp and partial-report warning visible; Check
+details holds technical evidence. HTTP is a file-rendering setting; DNS-01 is an
+issuance method. Checks cover enabled rows' domain/certificate status, **not** live
+serving, expiry/coverage/material installation, fleet convergence/nodes/generation.
+An omitted hostname has no individual verdict. Enabled/saved is configuration intent.
 
-Errors, denied reads, old-backend 404s and malformed data are visible as Unavailable/Unknown with manual refresh; a failed refresh clears prior evidence instead of leaving a current-looking pass. Auth uid plus session revision fences requests and clears projections on replacement/logout. Reads happen only while mounted and admitted; there is no polling. Completed configuration actions refresh the panel, and list/detail CRUD retains its existing freshness helpers.
+Errors, denied reads, old-backend 404s and malformed responses show Unavailable or
+Unknown. Failed refresh clears old evidence. UID/session revision fence reads;
+same-session loss of admission/bootstrap/superuser/setup authority disposes report
+modals. Reads occur only while mounted/admitted, without polling; configuration
+changes refresh the panel.
 
-## Upstreams
+## Upstreams and blocklist
 
-An upstream is a destination a vhost may proxy to. Only `is_enabled` can be
-written on one; its name and destination are fixed when it is declared. The
-list shows the active group's upstreams and the shared ones. Retiring disables
-the row and keeps it: vhosts and routes that reach it stop being served and
-are not repointed. The retire control names that consequence before it acts.
-The wizard's upstream pickers list enabled upstreams only.
+An upstream's name/destination are fixed at declaration; only enabled is editable.
+Lists include owned and shared rows. Retiring disables and retains it: reaching
+vhosts/routes stop serving and are not repointed. Confirm that consequence.
 
-## Blocklist
+Blocklist modes: `log` (default, still served), `enforce` (refused), `allow`
+(exemption), `off` (retained inactive). Start in log, inspect the watch log, then
+enforce. Propagation takes about ten minutes. Save IPs as canonical networks:
+`10.1.2.3/8` becomes `10.0.0.0/8`; show the returned value. Declare and blocklist
+editors guard native dismissal; blocklist save/delete share pending state.
 
-An entry matches an IP network or a user-agent pattern, in one of four modes:
-`log` (recorded, still served — the default), `enforce` (refused), `allow` (an
-exemption) and `off`. Create an entry in `log`, watch the edge watch log for
-it, then switch it to `enforce`. A change reaches the fleet in about ten
-minutes.
+## Boundaries and pitfalls
 
-An `ip` value is stored as its network: `10.1.2.3/8` is saved as `10.0.0.0/8`.
-The editor shows the saved value from the response.
-
-## Not built here
-
-- **Claim-reserved.** The plan for this page asked for a superuser control to
-  claim a reserved name. django-mojo removed the reserved-name mechanism, its
-  field and its action (commit `bc2c57b1`, in every release since v1.7.1), so
-  there is nothing for such a control to call.
-- **`mojosec_policy`.** Shown read-only on the vhost detail. It is set by the
-  platform and never sent from here.
-- **Web apps, releases and alias addresses.** An alias address appears in the
-  vhost list like any other row; `alias_of` is in no graph, so it cannot be
-  told apart, and a refused edit shows the server's message.
-
-## Pitfalls
-
-- Do not send `quiet_paths` on a `site_api` create. See the create order.
-- Do not treat a saved, enabled row as proof the certificate covers it from
-  the client check alone; the server's answer on save is the proof.
-- The mock's messages for database uniqueness (a second enabled vhost on one
-  name, a repeated route prefix, a repeated blocklist value, a repeated
-  upstream name) are the mock's own words. The server reports these from a
-  database constraint, and its wording was not measured.
-- The server parses a blocklist address with Python's `ipaddress` and compiles
-  a user-agent pattern with Python's `re`, and the mock follows Python, not
-  JavaScript: `010.1.2.3` and `\q` are refused, `10.0.0.0/255.0.0.0`,
-  `(?i)bot` and `a*+` are accepted. The reason after "does not compile" is the
-  mock's own wording. The editor's own check is only a first pass and never
-  compiles the pattern; the server's answer on save is the verdict.
-- A vhost update that names an upstream or certificate that does not exist is
-  refused by the mock with the same words as a missing one. The server's
-  wording for an unknown id was not measured.
-- The declare-upstream dialog and the blocklist editor refuse Escape and the
-  backdrop while their write is in flight, and the editor's save and delete
-  share one pending state. `npm run verify:admin-edge` holds each write open
-  and checks this.
+- No claim-reserved action: django-mojo removed it in `bc2c57b1` (v1.7.1 onward).
+  Platform-owned `mojosec_policy` is read-only; never send it.
+- No owning-WebApp/alias graph, pool catalog, route-disable flag, atomic multi-route
+  write or per-host live readiness. Aliases look like other rows; show refusals.
+- Mock uniqueness wording (enabled hostname, route prefix, blocklist value,
+  upstream name) and missing-relation wording were not measured on the server.
+- Blocklist parsing follows Python `ipaddress`/`re`, not JS RegExp: reject
+  `010.1.2.3` and `\q`; accept `10.0.0.0/255.0.0.0`, `(?i)bot`, `a*+`.
+  Compilation reason text is mock-specific; local validation is only a first pass.
+- Client certificate checks are advisory; only the server validates a save.
 
 ## Themes and showcase
 
-Styles live in `src/styles/components/admin-edge.css` and ship in
-`portal-mojo/styles.css`; the app declares the tokens. They are built from
-tokens only, so both themes render from one sheet. Both Admin and Showcase
-import the canonical package stylesheet. The showcase
-demo (Develop → Components → Admin → Edge) runs the shipped pages against the
-mock under five identities: platform administrator, DNS manager, DNS viewer,
-security manager and security viewer.
+Canonical token-only `src/styles/components/admin-edge.css` ships through
+`portal-mojo/styles.css`, imported by Admin and Showcase. Demo: Components → Admin
+→ Edge, under platform administrator, DNS manager/viewer and security manager/viewer.
+Verify both themes, desktop/390px, opened dialogs, keyboard/help, busy and error states.
 
-`npm run verify:admin-edge` retains the existing endpoint contract. `node scripts/verify-admin-serving-mounted.mjs` mounts the native wizard and modal to check all four create shapes, disabled staging, retained edit drafts, invalid-tab selection, supported route-less conversion, busy dismissal, partial inspection and committed-response-loss recovery. `node scripts/verify-admin-serving-mounted-evidence.mjs` mounts evidence for DTO bounds, exact gates, unknown posture, refresh failures and auth replacement.
-
-### KISS presentation
-
-The Serving table defaults to hostname/domain, serving shape and enabled intent. Pool and created time remain in record inspection. HTTP/readiness summaries keep the observed timestamp and partial-report warning visible, with technical evidence in Check details; configuration checks never claim fleet application. See [visual QA](admin-presentation.md).
+Contracts: `npm run verify:admin-edge` (API plus held dialog writes),
+`node scripts/verify-admin-serving-mounted.mjs` (all shapes, staging, draft/focus,
+conversion, partial inspection, uncertainty, route guards/session races),
+`node scripts/verify-admin-serving-mounted-evidence.mjs` (DTO bounds, exact gates,
+unknown evidence, failed refresh, auth/permission replacement). Mounted tests do
+not establish native layout; actual browser QA remains required.
