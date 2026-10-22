@@ -42,16 +42,15 @@ try {
     const artifact = packed[0];
     assert.equal(artifact.name, 'portal-mojo', 'packed package name must be portal-mojo');
     assert.match(artifact.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'package version must be SemVer');
-    // Audited #8984 baseline: 549 intended source/docs/style files total
-    // 5,730,628 unpacked bytes. #8988 adds 5 private lazy operator files and
-    // grows 13 existing source/docs/style files by 79,025 bytes: 554 files,
-    // 5,809,653 bytes (1,567,792 compressed). The per-file diff accounts for
-    // credential/connection parsers and forms, role-aware links, central mock,
-    // scoped narrow styles and human docs only; no generated repository payload.
-    // 5.843 MB leaves 33,347 bytes (0.574%) headroom, within the
-    // reviewed budget. All content/consumer/style/export assertions below
-    // and the separate 530,000-byte eager-runtime cap remain unchanged.
-    assert.ok(artifact.unpackedSize <= 5_843_000, `unpacked package exceeds 5.843 MB budget (${artifact.unpackedSize})`);
+    // Audited operations baseline 95905e8: 554 intended files, 5,831,061
+    // unpacked bytes. The six workflows add 63 files (440,653 bytes) and
+    // grow 34 existing files by 21,803 bytes: 617 files, 6,293,517 unpacked
+    // (1,699,010 compressed). Only source, docs, styles and mock fixtures
+    // account for this growth; no generated repository payload is included.
+    // 6.330 MB preserves the prior reviewed ~0.574% source-size headroom.
+    // Content/consumer/style/export checks and the separate 530,000-byte
+    // eager-runtime cap remain unchanged.
+    assert.ok(artifact.unpackedSize <= 6_330_000, `unpacked package exceeds 6.330 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).
