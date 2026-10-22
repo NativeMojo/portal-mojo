@@ -36,7 +36,8 @@ try{
  assert.match(document.body.textContent,/Public HTTP vhosts on this node: disabled/);
  assert.match(document.body.textContent,/DNSMAN issuance: DNS-01/);
  assert.match(document.body.textContent,/does not prove expiry/);
- assert.doesNotMatch(document.body.textContent,/Healthy|Live|PRIVATE|convergence/);
+ assert.match(document.body.textContent,/fleet convergence is unverified/,'readiness keeps fleet convergence explicitly unproven');
+ assert.doesNotMatch(document.body.textContent,/Healthy|Live|PRIVATE|(?:fleet )?convergence (?:is )?(?:verified|proven|complete|confirmed)/,'configuration checks must not claim serving or convergence proof');
  const partial=report();partial.truncated=true;partial.sections[1].coverage=coverage(3,1);state.report=partial;await refresh();assert.match(document.body.textContent,/1 of 3 checks · 2 omitted · truncated/);
  state.bootstrap={...bootstrap(),edge:{available:true,http_enabled:true,dnsman_issuance:'other'}};await refresh();assert.match(document.body.textContent,/DNSMAN issuance: unknown/);
  for(const error of ['403 key-backed session refused','404 old backend','network error']){state.fail=error;await refresh();assert.match(document.body.textContent,/Unavailable/);assert.match(document.body.textContent,new RegExp(error));assert.doesNotMatch(document.body.textContent,/Domain and certificate status checks passed/,'failed refresh clears previous pass');}state.fail='';
