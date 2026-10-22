@@ -89,7 +89,7 @@ export function DomainPurchaseWizard({ onDone, onBusyChange }: { onDone?: () => 
                 inFlight.current = true; attempted.current = true; const accepted = ++generation.current;
                 const token = transient.token; quoteRef.current = null;
                 try {
-                    const acknowledgement = await purchaseDomain({ group: transient.identity.group, purchase: transient.identity.purchase, confirm_token: token });
+                    const acknowledgement = await purchaseDomain({ group: transient.identity.group, purchase: transient.identity.purchase, confirm_token: token, confirm_domain: transient.identity.domain, confirm_price: transient.identity.price });
                     const settled = await pollPurchaseLedger({ purchase: acknowledgement.purchase, isCurrent: () => generation.current === accepted, fetch: fetchPurchaseDetail });
                     if (!settled) setTerminalMessage(`Purchase acknowledgement was received, but bounded polling did not settle. ${PURCHASE_MAY_HAVE_MOVED}`);
                     else { setReceipt(settled); setTerminalMessage(settled.status === 'completed' ? 'Registration completed.' : `${redactRegistrarError(settled.error)} ${PURCHASE_MAY_HAVE_MOVED}`); }

@@ -37,6 +37,8 @@ domain includes registration/hosted-zone presence, safe zone metadata,
 tracking/adoption state, and a reason. `untracked=true` returns only untracked
 rows; discovery and assignment remain interactive-superuser operations.
 
+The everyday inventory and three onboarding actions are documented in [admin-dns-domains.md](admin-dns-domains.md).
+
 The operator registrar workflow is documented in [admin-dns-registrar.md](admin-dns-registrar.md). It does not use discovery: House adoption is manual exact-name only. Purchase tokens remain transient, all post-confirmation outcomes reconcile through the read-only ledger, and contact PII remains imperative/local.
 
 These responses require local call-flow handling and must never enter Query or
@@ -87,9 +89,9 @@ rotation remains write-only and imperative. Built-in credential Delete is absent
 
 ## Shared wildcard validation
 
-The existing Domains header offers **Shared validation setup** to global DNS
+Domains offers **Advanced → Shared validation setup** to global DNS
 managers even when server setup needs an operator. Domain detail includes
-read-only **Validation**; its header action and Certificate Delegation compose
+read-only **Advanced validation**; its context action and Certificate Delegation compose
 the same focused flow. See [the human walkthrough and exact
 contracts](admin-dns-certificates.md#shared-validation-setup).
 

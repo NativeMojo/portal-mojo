@@ -123,8 +123,8 @@ without separate operator authorization.
 
 ## Shared validation setup
 
-Use **Domains → Shared validation setup**, or **Set up shared validation** in a
-group-managed Domain or Certificate header menu. Domain **Validation** and
+Use **Domains → Advanced → Shared validation setup**, or **Set up shared validation** in a
+group-managed Domain or Certificate header menu. Domain **Advanced validation** and
 Certificate **Delegation** show the same read-only facts. No new route or sidebar
 resource is added. The flow never reads certificate material.
 
@@ -143,7 +143,7 @@ resource is added. The flow never reads certificate material.
    stays available after copy/share denial or cancellation. The canonical file is
    at most 2048 UTF-8 bytes and has exactly `version:1`, `consumer_project_uuid`,
    `client_ref`, `domain`, `allocation_ref`, with no wrapper, key, token or scope.
-5. The controller opens their deployment’s **Domains → Shared validation setup →
+5. The controller opens their deployment’s **Domains → Advanced → Shared validation setup →
    Controller review**, checks access and uses **Import request**. There is no JSON
    editor or controller URL. Empty, oversized, malformed, noncanonical or extra-field
    files are refused before installation. Import alone grants nothing. The named
