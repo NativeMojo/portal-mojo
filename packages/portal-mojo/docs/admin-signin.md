@@ -12,9 +12,11 @@ The page has two parts:
   layout/appearance/accent color, hero panel, sign-in heading/copy/methods,
   registration, custom CSS. It edits the same keys a group admin edits in the
   group **Configure Auth** dialog; a group's own settings still override these.
-- **Providers** — one card each for Google, Apple and GitHub: an Enabled
+- **Providers** — one card per provider the server lists (Google, Apple,
+  GitHub and, from django-mojo's Microsoft sign-in, Microsoft): an Enabled
   switch, a read-only callback URL with a Copy button, the credential fields,
-  a Ready / Needs setup badge, and a link to the provider's console.
+  a Ready / Needs setup badge, any server notices, and a link to the
+  provider's console.
 
 KISS by design: trusted admins, no step-up auth, no confirmation beyond a
 browser `confirm()` before clearing a stored value.
@@ -38,6 +40,14 @@ One endpoint, both methods, django-mojo envelope.
   multiline, configured, source, value, hint}`. `source` is `admin`,
   `deployment` (shown as "Set in server config") or `none`. Secret fields
   never carry `value`; `hint` (e.g. `…a1b2`) is shown when present.
+- Optional `notices[]` on a provider: `{tone, text}`, `tone` one of `info`,
+  `warning` or `danger` (for example a Microsoft client secret nearing or past
+  its recorded expiry). Each renders as its own `role="status"` note under
+  the Needs setup note, in order; any other tone renders as `info`. An absent
+  or empty list renders nothing, so older backends are unaffected.
+- Provider `name` tokens with a built-in label and icon: `google`, `apple`,
+  `github`, `microsoft` (`bi-microsoft`). Any other name falls back to the
+  server's `label` and a key icon.
 
 `POST /api/account/admin/signin` returns the same full payload, which the page
 writes straight into its query cache (`SIGNIN_QUERY_KEY`).
