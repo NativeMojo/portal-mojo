@@ -67,13 +67,20 @@ export function parseGeoLocation(value: unknown): GeoLocationState {
         verify_state: stored ? { geoip: { ok: flag(stored.ok), code: nullable(stored.code, v => text(v, 64)), message: text(stored.message, 200), at: text(stored.at, 40) } } : {},
     };
 }
-export function geoWriteBlock(state: GeoLocationState): string | null {
-    if (state.remote_error) return 'The published configuration could not be read. Resolve the remote read failure and Refresh.';
+/** Credential diagnostics need the provider schema, independently of Fleet publishing. */
+export function geoTestBlock(state: GeoLocationState): string | null {
     const types = ['string', 'string', 'list', 'origin', 'boolean'];
     if (!GEOLOCATION_KEYS.every((key, i) => state.delegated_keys.includes(key) && state.fleet_fields.some(f => f.key === key && f.value_type === types[i]))) return 'All five GeoIP fields must be registered and delegated before provider setup can change.';
+    return null;
+}
+export function geoWriteBlock(state: GeoLocationState): string | null {
+    if (state.remote_error) return 'The published configuration could not be read. Resolve the remote read failure and Refresh.';
+    const schema = geoTestBlock(state); if (schema) return schema;
     if (!state.available || !state.bucket_configured || !state.restart_configured || !state.object_key) return 'Fleet publishing is unavailable. Configure its exact bucket and object, all provider delegations, KMS encryption and config-sync restart in deployment settings.';
     return null;
 }
+const providerLabels: Record<string, string> = { mojo: 'MojoVerify', ipinfo: 'IPinfo', ipstack: 'IPstack', 'ip-api': 'IP-API', maxmind: 'MaxMind' };
+export const geoProviderLabel = (provider: string): string => providerLabels[provider] ?? provider;
 export function geoProviderOptions(state: GeoLocationState, draft: GeoDraft): string[] {
     return [...new Set([...state.geoip_providers, draft.GEOIP_PRIMARY_PROVIDER, draft.GEOIP_FALLBACK_PROVIDER, ...draft.GEOIP_ADDITIONAL_PROVIDERS])];
 }

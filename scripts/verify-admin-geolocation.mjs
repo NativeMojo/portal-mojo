@@ -13,7 +13,18 @@ try {
     assert(!/catalog-private|sms-private|unknown-private|stored-private/.test(JSON.stringify(state)), 'Positive projection discards catalog, SMS, raw credentials and unknown fields');
     assert.equal(api.geoWriteBlock(state), null);
     for (const malformed of [{ ...root, schema_version: 2 }, { schema_version: 1 }, { ...root, provider_setup: { ...root.provider_setup, available: 'yes' } }, { ...root, provider_setup: { ...root.provider_setup, configuration_revision: 'oops' } }]) assert.throws(() => api.parseGeoLocation(malformed));
-    for (const scenario of ['unavailable', 'remote-error', 'missing-delegation']) { h.reset(scenario); assert(api.geoWriteBlock(api.parseGeoLocation({ schema_version: 1, provider_setup: h.mock.geoProviderSetupMock() }))); }
+    for (const scenario of ['unavailable', 'remote-error', 'missing-delegation']) {
+        h.reset(scenario); const setup = api.parseGeoLocation({ schema_version: 1, provider_setup: h.mock.geoProviderSetupMock() });
+        assert(api.geoWriteBlock(setup)); assert.equal(!!api.geoTestBlock(setup), scenario === 'missing-delegation');
+        if (scenario !== 'missing-delegation') assert.equal((await api.testGeoLocation(setup.configuration_revision, api.geoDraft(setup.geoip))).success, true, 'Diagnostics do not require fleet publishing');
+    }
+    h.reset('ready'); assert.deepEqual(h.mock.geoProviderSetupMock().geoip_providers, ['maxmind','ipinfo','ipstack','ip-api','mojo']);
+    h.reset('no-key'); const noKey = await api.readGeoLocation();
+    assert.equal(noKey.geoip.GEOIP_API_KEY_MOJO_CONFIGURED, false); assert.equal(noKey.verify_state.geoip, undefined);
+    assert.equal((await api.testGeoLocation(noKey.configuration_revision, api.geoDraft(noKey.geoip))).success, false);
+    await assert.rejects(api.saveGeoLocation(noKey.configuration_revision, { ...api.geoDraft(noKey.geoip), GEOIP_PRIMARY_PROVIDER: 'maxmind' }), error => error.kind === 'validation', 'Current backend still verifies Mojo for non-Mojo chain saves');
+    assert.equal((await api.testGeoLocation(noKey.configuration_revision, api.geoDraft(noKey.geoip), {mode:'replace',value:'fixture-first-key-1234'})).success, true);
+    assert.equal((await api.readGeoLocation()).geoip.GEOIP_API_KEY_MOJO_CONFIGURED, false, 'Testing never installs the candidate');
     for (const scenario of ['unknown-provider', 'empty-registry']) {
         h.reset(scenario); const loaded = await api.readGeoLocation(), draft = api.geoDraft(loaded.geoip);
         assert(api.geoProviderOptions(loaded, draft).includes(draft.GEOIP_PRIMARY_PROVIDER));
@@ -22,7 +33,7 @@ try {
     }
     h.reset('ready'); const initial = await api.readGeoLocation(), draft = api.geoDraft(initial.geoip);
     draft.GEOIP_ADDITIONAL_PROVIDERS.reverse();
-    assert.deepEqual(initial.geoip.GEOIP_ADDITIONAL_PROVIDERS, ['ipapi', 'maxmind'], 'Draft owns an independent array');
+    assert.deepEqual(initial.geoip.GEOIP_ADDITIONAL_PROVIDERS, ['ip-api', 'maxmind'], 'Draft owns an independent array');
     const payload = api.buildGeoPayload('configure_providers', null, draft, { mode: 'replace', value: '' });
     assert.deepEqual(Object.keys(payload).sort(), ['action', 'providers', 'topic']);
     assert.deepEqual(Object.keys(payload.providers).sort(), ['expected_revision', 'geoip']);

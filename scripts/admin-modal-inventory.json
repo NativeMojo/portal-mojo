@@ -6215,6 +6215,25 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:requestRefresh:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "requestRefresh",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "p",
+        "button"
+      ],
+      "category": "confirmation",
+      "parent": "requestRefresh",
+      "target": null,
+      "fingerprint": "0d0b58b73636dcb14d33",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
       "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
       "owner": "chooseKeyMode",
@@ -6228,7 +6247,44 @@
       "category": "confirmation",
       "parent": "chooseKeyMode",
       "target": null,
-      "fingerprint": "632747d857f43b96425a",
+      "fingerprint": "4078afcaab5be6ee0097",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:details:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "details",
+      "launcher": "modal.open",
+      "body": [
+        "div",
+        "h2",
+        "dl",
+        "dt",
+        "dd",
+        "code",
+        "p",
+        "button"
+      ],
+      "category": "record",
+      "parent": "details",
+      "target": null,
+      "fingerprint": "cabe98c20990a27b96a5",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:GeoLocationContent:requestRefresh:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "GeoLocationContent",
+      "launcher": "requestRefresh",
+      "body": [],
+      "category": "confirmation",
+      "parent": "GeoLocationContent",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:requestRefresh",
+      "fingerprint": "52bbac3e927524424109",
       "categories": [
         "confirmation"
       ]
@@ -6273,6 +6329,22 @@
       "fingerprint": "ebebb1f634aa996e96c3",
       "categories": [
         "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:GeoLocationContent:handler:0",
+      "file": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx",
+      "owner": "GeoLocationContent",
+      "launcher": "details",
+      "body": [
+        "details"
+      ],
+      "category": "record",
+      "parent": "onClick",
+      "target": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:details",
+      "fingerprint": "79bf9551498fc0bc828e",
+      "categories": [
+        "record"
       ]
     },
     {

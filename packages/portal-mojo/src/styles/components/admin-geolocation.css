@@ -1,37 +1,43 @@
-.geo-admin { display: grid; gap: 20px; min-width: 0; overflow-wrap: anywhere; container-type: inline-size; }
-.geo-admin .page-header { margin: 0; align-items: start; flex-wrap: wrap; gap: 12px; }
+.geo-admin { display: grid; max-width: 880px; margin-inline: auto; gap: 20px; min-width: 0; overflow-wrap: anywhere; container-type: inline-size; }
+.geo-admin .page-header { display: flex; justify-content: space-between; margin: 0; align-items: start; flex-wrap: wrap; gap: 12px; }
+.geo-admin h1 { font-size: 26px; font-weight: 750; line-height: 1.2; letter-spacing: -.025em; color: var(--ink-strong); margin: 4px 0 8px; }
+.geo-admin h2 { font-size: 16px; font-weight: 700; line-height: 1.35; color: var(--ink-strong); margin: 0; }
 .geo-admin-setup, .geo-admin-status { min-width: 0; }
-.geo-admin-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 18px; }
+.geo-admin-tabs { display: flex; gap: 24px; padding: 0 24px; border-bottom: 1px solid var(--line); }
+.geo-admin-tabs [role=tab] { appearance: none; border: 0; border-bottom: 2px solid transparent; background: none; padding: 17px 0 14px; color: var(--mute); font: inherit; font-weight: 600; cursor: pointer; }
+.geo-admin-tabs [aria-selected=true] { color: var(--ink-strong); border-bottom-color: var(--accent); }
+.geo-admin-tabs [role=tab]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 2px; }
+.geo-admin-tabpanel { padding: 24px; }
+.geo-admin-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 22px; }
+.geo-admin .field { display: grid; gap: 8px; min-width: 0; }
+.geo-admin .field-label, .geo-admin-key-heading, .geo-admin-sharing { display: flex; gap: 8px; align-items: center; }
 .geo-admin .input { width: 100%; box-sizing: border-box; min-width: 0; }
 .geo-admin [hidden] { display: none !important; }
 .geo-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .geo-admin-actions .btn { white-space: normal; }
-.geo-admin-key { display: grid; gap: 10px; padding: 16px; background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
-.geo-admin-key p { margin: 0; }
-.geo-admin-advanced { border-top: 1px solid var(--line); padding-top: 16px; }
-.geo-admin-advanced summary { cursor: pointer; font-weight: 650; color: var(--ink-strong); padding: 4px 0; }
-.geo-admin-advanced[open] > .geo-admin-fields { padding-top: 18px; }
-.geo-admin-provider-list { padding: 0; margin: 0; list-style-position: inside; display: grid; gap: 8px; }
-.geo-admin-provider-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
-.geo-admin-status dl { display: grid; gap: 8px; }
-.geo-admin-status dl > div { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr); gap: 12px; }
-.geo-admin-status dt { color: var(--mute); }
-.geo-admin-status dd { margin: 0; min-width: 0; }
-.geo-admin-notice { border: 1px solid var(--line); background: var(--accent-soft); border-radius: 8px; padding: 12px; margin: 0; }
+.geo-admin-key { display: grid; gap: 12px; padding: 16px; background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.geo-admin-key p, .geo-admin-result p, .geo-admin-status p, .geo-admin-notice p { margin: 0; }
+.geo-admin-provider-list { padding: 0; margin: 0; list-style: none; display: grid; gap: 8px; }
+.geo-admin-provider-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.geo-admin-provider-list small { display: block; }
+.geo-admin-provider-list .btn { padding: 5px 8px; }
+.geo-admin-context, .geo-admin-result { margin: 0 24px 20px; }
+.geo-admin-result { display: grid; gap: 8px; }
+.geo-admin-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--line); }
+.geo-admin-status { padding: 18px 24px; display: grid; gap: 10px; }
+.geo-admin-status-heading, .geo-admin-activation { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.geo-admin-status-heading .btn { font-size: 12px; padding: 5px 8px; }
+.geo-admin-notice { border: 1px solid var(--line); background: var(--accent-soft); border-radius: 8px; padding: 12px; margin: 0; display: grid; gap: 6px; }
+.geo-admin-dialog dl { display: grid; gap: 14px; }
+.geo-admin-dialog dt { color: var(--mute); font-size: 12px; margin-bottom: 4px; }
+.geo-admin-dialog dd { margin: 0; overflow-wrap: anywhere; }
 @container (max-width: 420px) {
-    .geo-admin-status dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .geo-admin-tabs { padding-inline: 18px; }
+    .geo-admin-tabpanel, .geo-admin-status { padding: 18px; }
     .geo-admin-key { padding: 12px; }
+    .geo-admin-provider-list li { flex-wrap: wrap; }
     .geo-admin-actions { gap: 6px; }
+    .geo-admin-footer { padding: 16px 18px; }
+    .geo-admin-context, .geo-admin-result { margin-inline: 18px; }
+    .geo-admin-sharing { align-items: start; }
 }
-
-.geo-admin .page-header{display:flex;justify-content:space-between}.geo-admin h1{font-size:26px;font-weight:750;line-height:1.2;letter-spacing:-.025em;color:var(--ink-strong);margin:4px 0 8px}.geo-admin h2{font-size:18px;font-weight:700;line-height:1.35;color:var(--ink-strong);margin:0 0 10px}.geo-admin-configuration{margin:14px 0}.geo-admin-configuration summary{cursor:pointer;font-weight:600}.geo-admin-configuration[open] summary{margin-bottom:10px}
-
-.geo-admin { max-width: 880px; margin-inline: auto; gap: 24px; }
-.geo-admin-setup { padding: 24px; }
-.geo-admin-setup > h2 { margin-bottom: 24px; }
-.geo-admin-fields > .field { display: grid; gap: 8px; }
-.geo-admin-fields .field-label { display: flex; align-items: center; gap: 6px; }
-.geo-admin-status { padding: 18px 24px; }
-.geo-admin-verification { margin: 0 0 6px; }
-.geo-admin-status .geo-admin-configuration { margin-bottom: 0; }
-@container (max-width: 420px) { .geo-admin-setup, .geo-admin-status { padding: 18px; } }

@@ -1,117 +1,97 @@
 # GeoLocation provider setup
 
-`GeoLocationPage` is the global Operations → GeoLocation setup surface. It is
-separate from GeoIP Cache (IP inspection) and Fleet Configuration (application
-and node health). A literal `is_superuser === true` and current authenticated
-session are required before mounting any setup reader. Global `admin`, settings
-grants, group membership and API keys do not substitute. The backend additionally
-rejects key-backed sessions and requires active interactive superuser authority,
-same-origin POSTs, and authentication within 600 seconds.
+`GeoLocationPage` (`portal-mojo/admin/operations`) is the global Operations →
+GeoLocation surface. GeoIP Cache inspects IPs; Fleet Configuration applies
+published settings. Dashboard is unchanged. Hosts may override the mount-derived Fleet link with
+`fleetConfigurationPath`; Showcase targets its Runtime settings demo.
 
-```tsx
-import { GeoLocationPage } from 'portal-mojo/admin/operations';
-// mount-relative section; an embedded host may prefix /custom/system
-const section = {
-  id: 'geolocation', title: 'GeoLocation', icon: 'bi-geo-alt',
-  navigationGroup: 'operations', permissions: [],
-  routes: [{ path: '', requireSuperuser: true,
-    loadComponent: () => import('./geolocation/GeoLocationPage')
-      .then(({ GeoLocationPage }) => ({ default: GeoLocationPage })) }],
-};
-```
+Admission requires literal `is_superuser === true` and a current interactive
+session. The backend also rejects key-backed sessions, requires same-origin
+POSTs and authentication within 600 seconds. Global/group grants do not replace
+these checks. `usePrivateOperator` remounts on session change, aborts requests and
+owned dialogs, and rechecks authority before sending and accepting responses.
 
-Main setup shows primary provider and the write-only MojoVerify key. MojoVerify
-always uses `https://api.mojoverify.com`; the URL is supplied automatically and
-has no setup control. The wire provider identifier remains `mojo`, displayed as
-MojoVerify. Older custom origins remain readable as evidence, while this setup
-stages the standard URL and shows a replacement-key warning before switching.
-Advanced holds fallback, ordered additional providers (add/remove/up/down), and
-threat-signal sharing. Labels, descriptions and constraints come from the
-server's explicit five-key descriptor layout. Unknown configured provider IDs
-remain selectable; an empty registry never invents or drops values. All five
-static settings are submitted even when Advanced is collapsed.
+## Tasks
 
-`readGeoLocation()` reads `/api/account/admin/settings`, requires catalog
-`schema_version:1`, and positively projects only `provider_setup` GeoIP fields.
-Catalog settings, SMS, unknown keys and raw credentials are discarded. Local
-imperative state holds this small private form; the page adds no Query or
-Mutation cache entries. Session changes remount and abort the form using the
-existing `usePrivateOperator` fence. Final authority is rechecked after auth
-gating and before sending. Late responses cannot restore a former session.
+**Provider** contains primary provider, MojoVerify key and threat sharing.
+**Failover** contains fallback and ordered additional providers, with add,
+remove and move controls. One retained draft spans both tabs. Page-local hidden
+panels preserve the same uncontrolled password element; shared Tabs is unchanged.
+Arrow/Home/End navigation and `aria-controls` connect task tabs to their panels.
+
+MojoVerify always uses `https://api.mojoverify.com`; no URL control is shown.
+Older origins remain readable, but this page stages the hosted URL and warns
+that switching requires a replacement key. Provider names are human-readable;
+unknown configured identifiers are retained. New additional rows exclude primary,
+fallback and existing rows. Runtime deduplicates the chain; existing overlaps are
+not silently rewritten. Non-Mojo credentials are configured outside this endpoint.
+The server's values are authoritative: setup defaults differ from runtime defaults.
+
+No key shows **Add key**; a configured key shows **Replace key** and **Remove
+key**. Test key sits with the credential. Blank replacement preserves the stored
+key; confirmed removal is staged until Save changes and does not revoke remotely.
+Save/Discard reflect actual draft changes. Refresh confirms before discarding an
+unsaved draft. Info popovers hold secondary explanations; Configuration information
+opens a focused native dialog for revision and publication facts. No disclosure
+sections or sidebar modal are used.
+
+Last stored-key check shows its historical outcome and timestamp separately from
+the draft result. Pending activation and Open Fleet Configuration remain visible.
+A false pending flag concerns only this request node, never proves fleet health.
+
+## Private protocol
+
+`readGeoLocation()` positively projects only `provider_setup` from schema-v1
+`/api/account/admin/settings`. Catalog, SMS, unknown fields and raw credentials
+are discarded. Form state is imperative, outside Query/Mutation caches.
 
 `buildGeoPayload(action, configuration_revision, draft, keyEdit)` sends exactly
-`{action,topic:'geoip',providers:{expected_revision,geoip}}`. The revision is
-included even when null. The GeoIP section includes the five static values and
-only one optional credential action: untouched omits credential fields; nonempty
-replacement adds `GEOIP_API_KEY_MOJO`; confirmed removal adds
-`clear_api_key:true`. Blank replacement preserves the existing key. Removal has a
-native confirmation and a separate Save; it never presents as a successful
-connection test. Additional providers are unique, ordered, and bounded to 16;
-provider identifiers follow `^[a-z][a-z0-9_-]{0,31}$`. Origins must be HTTPS,
-at most 512 characters, no credentials/path/query/fragment and port absent or
-443; trailing slash is normalized. Replacement keys are at most 4096 characters.
+`{action,topic:'geoip',providers:{expected_revision,geoip}}`. The revision is sent
+even when null. The five static keys are primary, fallback, additional, Mojo URL
+and sync. Untouched/blank replacement omits credentials; nonempty replacement
+adds `GEOIP_API_KEY_MOJO`; confirmed removal adds `clear_api_key:true`.
+Additional providers are unique and ordered, at most16. Identifiers match
+`^[a-z][a-z0-9_-]{0,31}$`. HTTPS origins permit no credentials, path, query,
+fragment or alternate port (443 allowed); keys are at most4096 characters.
 
-Secrets stay in an uncontrolled mounted password input and a short-lived
-imperative request object. They never enter Query/Mutation variables, URLs,
-browser storage, mock observations or logs. Request objects remove the raw key
-in `finally`. Successful Save, cancellation, fresh-auth refusal, session change
-and unmount clear the input. Writes are single-flight. A 440 invokes existing
-fresh authentication but never replays the request; Refresh and a deliberate
-retry are required. The actual stale-token backend refusal is a 400 containing
-“changed; reload before publishing”; 409 is also recognized. Network-uncertain
-saves disable further writes until a successful explicit Refresh.
+Secrets stay only in the password DOM and short-lived request objects, whose
+raw key is deleted in `finally`. They never enter React/Query/Mutation state,
+URLs, storage, logs or mock observations. Tabs retain the element and candidate;
+Save attempts, explicit discard, fresh-auth refusal, session change and unmount
+clear it. Writes are single-flight. A440 invokes fresh authentication without
+replaying; Refresh and a deliberate retry are required. Stale revisions
+(400 “changed; reload before publishing”, or409), unreadable state and uncertain
+saves require authoritative Refresh before another write.
 
-`testGeoLocation()` opts into `refusal:'return'` because the flat
-`success:false` diagnostic is an inline verdict, then requires `tested:true`,
-`topic:'geoip'` and a typed `results.geoip`. Test verifies **Mojo credentials
-only**, regardless of primary provider. Sharing requires the remote key's
-`geoip_sync` permission. Changing origin requires a replacement; the backend
-will never send the stored key to an origin different from its node-loaded
-origin. A published desired origin can differ from that loaded origin, even
-when the user has not edited the displayed origin. Failed verification retains
-the draft and directs the operator to apply/refetch Fleet Configuration or use
-a replacement.
+Test verifies **only MojoVerify credentials**, regardless of primary. It requires
+the five delegated descriptor keys but not Fleet bucket/object/KMS/restart
+availability; Save requires the publishing plane. Sharing requires the remote
+key's `geoip_sync` permission. The current backend also verifies Mojo on every
+Save except explicit removal: selecting another primary does not enable an
+independent no-Mojo setup. This page does not invent provider-chain testing,
+other-provider key editing, provisioning, revocation or an Apply endpoint.
 
-Draft verdict and stored `verify_state.geoip` are separate. Any edit invalidates
-the local verdict. A draft-key failure does not rewrite stored verification.
-The backend's stored-test predicate is **no typed replacement + node-loaded
-Mojo origin + loaded sync value**; provider-chain changes do not affect it.
-After a test the page rereads stored verification without rebasing the draft or
-its original edit token. A concurrently changed token or unavailable authority
-requires Refresh/review.
+A draft-key test does not rewrite stored verification. The backend's stored-test
+predicate is no replacement plus the node-loaded origin and sync value; chain
+changes do not affect it. Tests reread stored evidence without rebasing the
+draft's revision. Revision changes or lost normalization authority block retry;
+publishing-only unavailability does not block diagnostics. Loaded/desired origin
+drift can prevent stored-key reuse until Fleet apply or explicit replacement.
 
-Save clears secrets and rereads authoritative configuration. `published:true`
-means published with restart pending. `unchanged:true` means provider static
-values were unchanged; the database credential can still have changed. A false
-`pending_restart` describes this request node's loaded/published relationship
-only, never fleet health. The mount-derived Fleet Configuration link provides
-the existing apply workflow; this page has no Apply action. Reads that fail,
-unsupported/incompatible responses, unavailable publishing, remote read errors,
-and incomplete delegation or five-field metadata disable writes visibly.
+Save rereads authoritative configuration. `published:true` means static
+publication with restart pending; `unchanged:true` can still mean the database
+credential changed. Neither result proves activation. Failed, stale and uncertain
+requests keep errors actionable and never become successful saves.
 
-The isolated mock exports `geoProviderSetupMock()`,
-`geoProviderMock(path,method,body,superuser)`, `mockGeoProviderScenarios`,
-`setMockGeoProviderScenario()`, `getMockGeoProviderScenario()` and safe observation
-controls. The central mock owns session/key/fresh/same-origin gates. The handler
-returns undefined outside its route/topic. GET returns a schema-v1 catalog root;
-when a larger catalog exists, merge `geoProviderSetupMock()` into its
-superuser-only `provider_setup`. POST replies use the backend's flat diagnostic
-and publication shapes. Observations contain only action, key action, whether
-the stored-test predicate matched, and expected revision; submitted keys are
-never retained. Fixtures cover unknown providers, empty registry, failed reads,
-unavailable delegation, rejected keys, stale revision, published-vs-loaded
-origins, pending restart, fresh auth and uncertain saves.
+## Verification
 
-`AdminGeoLocationDemo` mounts the actual page with those scenarios and existing
-interactive-superuser/ordinary-manager fixture identities. Run
-`node scripts/verify-admin-geolocation.mjs` and
-`node scripts/verify-admin-geolocation-mounted.mjs` for protocol and mounted
-StrictMode evidence; central integration also runs settings/fleet/devices/nav,
-typecheck, release/build and both-theme 390px browser verification. JSDOM checks
-behavior only and does not replace browser layout, focus or native-dialog proof.
-
-The owned component stylesheet is `styles/components/admin-geolocation.css`; it is included by `portal-mojo/styles.css` with the other Admin component styles.
-
-### KISS presentation
-
-Provider descriptions use accessible help popovers. Stored verification remains visible; timestamps, revision facts and Fleet Configuration are under Configuration details. Pending restart and operation errors stay visible. See [visual QA](admin-presentation.md).
+`geo-provider-mock.ts` supplies isolated safe observations (action, key action,
+stored-test predicate, expected revision), with no submitted key retained.
+Scenarios include no-key setup, real registry names, unknown/empty registry,
+publishing unavailable, stale/fresh-auth/uncertain outcomes and loaded-origin drift.
+Showcase's GeoLocation demo mounts the actual page. Run
+`npm run verify:admin-geolocation` and `npm run verify:admin-geolocation-mounted`;
+JSDOM behavior does not establish native focus or layout. Inspect both apps,
+light/dark, desktop/390px, opened dialogs and error recovery per
+[Admin presentation](admin-presentation.md). The scoped stylesheet is included
+through `portal-mojo/styles.css`.

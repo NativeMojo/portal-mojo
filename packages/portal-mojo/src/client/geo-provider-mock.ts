@@ -1,10 +1,10 @@
 /** Fixture-only GeoLocation provider setup. No submitted credential is retained or observed. */
 import type { GeoDraft, GeoLocationState, GeoVerdict, StoredGeoVerification } from '../admin/geolocation/data';
-export const mockGeoProviderScenarios = ['ready', 'unknown-provider', 'empty-registry', 'unavailable', 'remote-error', 'rejected-key', 'missing-sync-permission', 'changed-origin', 'stale-revision', 'pending-restart', 'published-origin-pending', 'missing-delegation', 'old-api', 'malformed', 'fresh-auth', 'save-uncertain'] as const;
+export const mockGeoProviderScenarios = ['ready', 'no-key', 'unknown-provider', 'empty-registry', 'unavailable', 'remote-error', 'rejected-key', 'missing-sync-permission', 'changed-origin', 'stale-revision', 'pending-restart', 'published-origin-pending', 'missing-delegation', 'old-api', 'malformed', 'fresh-auth', 'save-uncertain'] as const;
 export type MockGeoProviderScenario = typeof mockGeoProviderScenarios[number];
 const endpoint = '/api/account/admin/settings';
 const keys = ['GEOIP_PRIMARY_PROVIDER', 'GEOIP_FALLBACK_PROVIDER', 'GEOIP_ADDITIONAL_PROVIDERS', 'GEOIP_MOJO_PROVIDER_URL', 'GEOIP_MOJO_SYNC_ENABLED'];
-const defaults: GeoDraft = { GEOIP_PRIMARY_PROVIDER: 'mojo', GEOIP_FALLBACK_PROVIDER: 'ipinfo', GEOIP_ADDITIONAL_PROVIDERS: ['ipapi', 'maxmind'], GEOIP_MOJO_PROVIDER_URL: 'https://api.mojoverify.com', GEOIP_MOJO_SYNC_ENABLED: false };
+const defaults: GeoDraft = { GEOIP_PRIMARY_PROVIDER: 'mojo', GEOIP_FALLBACK_PROVIDER: 'ipinfo', GEOIP_ADDITIONAL_PROVIDERS: ['ip-api', 'maxmind'], GEOIP_MOJO_PROVIDER_URL: 'https://api.mojoverify.com', GEOIP_MOJO_SYNC_ENABLED: false };
 const metadata = [
     ['Primary GeoIP provider', 'Provider queried first for IP intelligence.', 'string', 'Provider identifier'],
     ['Fallback GeoIP provider', 'Provider used when the primary cannot answer.', 'string', 'Provider identifier'],
@@ -22,6 +22,7 @@ export function setMockGeoProviderScenario(value: MockGeoProviderScenario): void
     scenario = value; usedFault = false; sequence = 1; publishedVersion = 1; configurationRevision = publishedRevision = loadedRevision = '1'.repeat(32);
     values = structuredClone(defaults); loadedOrigin = defaults.GEOIP_MOJO_PROVIDER_URL; loadedSync = false; keyConfigured = true; keyHint = '9f2c'; observations.length = 0;
     stored = { ok: true, code: null, message: 'Connection verified', at: '2026-10-21T12:00:00Z' };
+    if (value === 'no-key') { keyConfigured = false; keyHint = ''; stored = undefined; }
     if (value === 'unknown-provider') { values.GEOIP_PRIMARY_PROVIDER = 'custom_geo'; values.GEOIP_ADDITIONAL_PROVIDERS = ['custom_extra', 'maxmind']; }
     if (['pending-restart', 'published-origin-pending', 'changed-origin'].includes(value)) { publishedRevision = configurationRevision = '2'.repeat(32); }
     if (['published-origin-pending', 'changed-origin'].includes(value)) loadedOrigin = 'https://legacy-geo.example.invalid';
@@ -34,7 +35,7 @@ export function geoProviderSetupMock(): GeoLocationState {
         delegated_keys: keys.filter(key => scenario !== 'missing-delegation' || key !== keys[2]), fleet_fields: keys.map((key, i) => ({ key, label: metadata[i]![0]!, description: metadata[i]![1]!, value_type: metadata[i]![2]!, constraints: metadata[i]![3]! })),
         loaded_revision: loadedRevision, published_revision: publishedRevision, configuration_revision: configurationRevision, published_version: `fixture-version-${publishedVersion}`, pending_restart: publishedRevision !== loadedRevision,
         remote_error: scenario === 'remote-error' ? 'FixtureRemoteReadError' : null, geoip: { ...structuredClone(values), GEOIP_API_KEY_MOJO_CONFIGURED: keyConfigured, GEOIP_API_KEY_MOJO_HINT: keyHint },
-        geoip_providers: scenario === 'empty-registry' ? [] : ['ipapi', 'ipinfo', 'maxmind', 'mojo'], verify_state: stored ? { geoip: { ...stored } } : {} };
+        geoip_providers: scenario === 'empty-registry' ? [] : ['maxmind', 'ipinfo', 'ipstack', 'ip-api', 'mojo'], verify_state: stored ? { geoip: { ...stored } } : {} };
 }
 const fail = (error: string, code = 400) => ({ status: false, code, error_code: code, error });
 const provider = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9_-]{0,31}$/.test(v);

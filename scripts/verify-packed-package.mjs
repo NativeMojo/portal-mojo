@@ -47,10 +47,12 @@ try {
     // grow 34 existing files by 21,803 bytes: 617 files, 6,293,517 unpacked
     // (1,699,010 compressed). Only source, docs, styles and mock fixtures
     // account for this growth; no generated repository payload is included.
-    // 6.330 MB preserves the prior reviewed ~0.574% source-size headroom.
+    // GeoLocation9240 adds retained task panels, guarded dialogs and SVG info
+    // help: measured 621 intended files, 6,333,534 bytes (no new files or
+    // generated payload). Bound that source-only growth at 6.340 MB.
     // Content/consumer/style/export checks and the separate 530,000-byte
     // eager-runtime cap remain unchanged.
-    assert.ok(artifact.unpackedSize <= 6_330_000, `unpacked package exceeds 6.330 MB budget (${artifact.unpackedSize})`);
+    assert.ok(artifact.unpackedSize <= 6_340_000, `unpacked package exceeds 6.340 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).

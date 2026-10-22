@@ -499,12 +499,6 @@
       "purpose": "Review server capacity plan, submit its stored identity, and observe exact batch evidence"
     },
     {
-      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
-      "fingerprint": "632747d857f43b96425a",
-      "category": "confirmation",
-      "purpose": "Confirm local stored-key removal on the next Save; no remote revoke. Owner-fenced and same-flight; cancel preserves the key. Runtime: verify-admin-geolocation-mounted.mjs."
-    },
-    {
       "id": "packages/portal-mojo/src/admin/deployments/ApiDeploymentDetail.tsx:openRecovery:modal.open:0",
       "fingerprint": "fc529513535ae357daf9",
       "category": "action",
@@ -587,6 +581,24 @@
       "fingerprint": "49582f9eb0e018f36eb7",
       "category": "record",
       "purpose": "Compact hostname inspection with horizontal Overview/conditional Routes/Certificate/Settings. Header lifecycle and focused child editors; owner signal and native canDismiss pending guard. Runtime: verify-admin-serving-mounted.mjs and actual Admin shell layouts."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:requestRefresh:modal.open:0",
+      "fingerprint": "0d0b58b73636dcb14d33",
+      "category": "confirmation",
+      "purpose": "Confirm discarding the unsaved local draft and entered key before authoritative Refresh. Owner-fenced and single-flight; Keep editing/Escape preserves draft. Runtime: verify-admin-geolocation-mounted.mjs."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:chooseKeyMode:modal.open:0",
+      "fingerprint": "4078afcaab5be6ee0097",
+      "category": "confirmation",
+      "purpose": "Confirm stored key removal on next Save changes; no remote revoke. Owner-fenced and single-flight; Cancel/Escape retains candidate and stored key. Runtime: verify-admin-geolocation-mounted.mjs."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/geolocation/GeoLocationPage.tsx:details:modal.open:0",
+      "fingerprint": "cabe98c20990a27b96a5",
+      "category": "record",
+      "purpose": "Inspect nonsecret configuration revisions and historical diagnostic evidence in a focused information dialog. No sidebar, mutation or raw credential. Owner session signal closes it."
     }
   ],
   "lifecycle": [
