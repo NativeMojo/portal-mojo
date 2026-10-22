@@ -196,6 +196,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
         if (values.kind !== 'site_api') {
             try { saved = await saveVhost(null, buildVhostPayload(values, { create: true })); }
             catch (error) { if (!refused(error)) unknown('create'); throw error; }
+            if (!Number.isSafeInteger(saved.id) || saved.id <= 0 || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('create');
         } else {
             // The server checks a quiet path against the routes of a STORED
             // row, and an enabled row is live at once. So: create disabled
@@ -205,6 +206,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
                 let created: EdgeVhostRow;
                 try { created = await saveVhost(null, buildVhostPayload({ ...values, quiet_paths: [], is_enabled: false }, { create: true })); }
                 catch (error) { if (!refused(error)) unknown('create'); throw error; }
+                if (!Number.isSafeInteger(created.id) || created.id <= 0 || created.kind !== 'site_api' || created.is_enabled !== false) unknown('create');
                 state.vhostId = created.id;
                 setCreatedId(created.id);
             }
@@ -212,6 +214,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
                 if (state.routes.has(route.path_prefix)) continue;
                 try {
                     const stored = await saveVhostRoute(null, { vhost: state.vhostId, path_prefix: route.path_prefix, upstream: route.upstream! });
+                    if (!Number.isSafeInteger(stored.id) || stored.id <= 0 || stored.path_prefix !== route.path_prefix || stored.upstream?.id !== route.upstream) unknown('route', route.path_prefix);
                     state.routes.set(route.path_prefix, stored.id);
                 } catch (error) {
                     await Promise.allSettled([EdgeVhostModel.invalidate(queryClient), EdgeRouteModel.invalidate(queryClient)]);
@@ -221,6 +224,7 @@ export function VhostWizard({ row = null, onDone, onBusyChange }: VhostWizardPro
             }
             try {
                 saved = await saveVhost(state.vhostId, buildVhostPayload(values, { create: false }));
+                if (saved.id !== state.vhostId || saved.kind !== values.kind || saved.is_enabled !== values.is_enabled) unknown('finish');
             } catch (error) {
                 await Promise.allSettled([EdgeVhostModel.invalidate(queryClient), EdgeRouteModel.invalidate(queryClient)]);
                 if (!refused(error)) unknown('finish');

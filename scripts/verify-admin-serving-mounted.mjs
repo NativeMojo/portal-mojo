@@ -22,7 +22,7 @@ state.save = async (id, body) => {
     if (state.mode === 'hold') return new Promise((resolve,reject)=>{state.release={resolve,reject};});
     state.stored = { ...body, id: id ?? 9127, domain: { id: 1, name: 'example.test' }, certificate: { id: 2, common_name: 'example.test' }, server_name: 'example.test' };
     if ((id == null && state.mode === 'create-lost') || (id != null && state.mode === 'enable-lost')) throw new TypeError('response connection dropped');
-    return state.stored;
+    return state.mode === 'create-malformed' ? {...state.stored,id:undefined} : state.stored;
 };
 state.route = async (id, body) => { state.calls.push({ route: true, id, body }); const row = { ...body, id: 72, upstream: { id: body.upstream, name: 'api' } }; state.routes.push(row); if (state.mode === 'route-lost') throw new TypeError('response connection dropped'); return row; };
 const virtual = {
@@ -89,6 +89,7 @@ try {
     }
 
     if (!process.env.SERVING_REGRESSION_REF) {
+        state.mode='create-malformed';await mount('site');await click('Add hostname');assert.match(document.body.textContent,/Create outcome unconfirmed/);await click('Add hostname');assert.equal(state.calls.length,1,'malformed create receipt is not acknowledged or replayed');
         async function initial(kind, row=null) {
             state.calls=[];state.mode='success';state.finish=null;state.routes=[];
             await act(async()=>root.render(React.createElement(QueryClientProvider,{client},React.createElement(VhostWizard,{key:Math.random(),row,onDone:value=>{state.finish=value;}}))));
