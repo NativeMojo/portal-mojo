@@ -67,12 +67,22 @@ try {
     assert.equal(admin.ADMIN_SECTIONS[0].id, 'dashboard');
     const packagedMenu = admin.adminSectionsMenu(admin.ADMIN_SECTIONS, { mount: '/system', grouped: true });
     const operations = packagedMenu.items.find(item => item.id === 'admin:operations');
-    assert.deepEqual(operations.children.slice(0, 4).map(item => item.label), ['Fleet', 'Maintenance', 'Deployments', 'GeoLocation']);
-    const infrastructure = packagedMenu.items.find(item => item.id === 'admin:infrastructure');
+    assert.deepEqual(operations.children.slice(0, 4).map(item => item.label), ['Fleet', 'Maintenance', 'Deployments', 'Fleet Configuration']);
+    const infrastructure = packagedMenu.items.find(item => item.id === 'admin:hosting');
+    const configuration = packagedMenu.items.find(item => item.id === 'admin:configuration');
+    assert.deepEqual(configuration.children.map(item => item.label), ['GeoLocation', 'Settings']);
+    assert(packagedMenu.items.some(item => item.id === 'admin:storage'));
+    assert.deepEqual(operations.children.filter(item => !item.searchOnly).map(item => item.label), ['Fleet', 'Maintenance', 'Deployments', 'Jobs Dashboard']);
+    assert.deepEqual(infrastructure.children.filter(item => !item.searchOnly).map(item => item.label), ['Domains', 'Certificates', 'Serving']);
+    assert(operations.children.find(item => item.label === 'Fleet Configuration').requireSuperuser);
+    assert(operations.children.find(item => item.label === 'Fleet Configuration').searchOnly);
     assert(infrastructure.children.some(item => item.label === 'Domains' && item.route === '/system/dns/domains'));
     assert(infrastructure.children.some(item => item.label === 'Serving' && item.route === '/system/edge/vhosts'));
-    assert(infrastructure.children.some(item => item.route === '/system/dns/records'));
-    assert(infrastructure.children.some(item => item.route === '/system/edge/upstreams'));
+    assert(infrastructure.children.some(item => item.route === '/system/dns/records' && item.searchOnly));
+    assert(infrastructure.children.some(item => item.route === '/system/edge/upstreams' && item.searchOnly));
+    for (const path of ['system/dns/records', 'system/dns/purchases', 'system/dns/registrant', 'system/dns/credentials', 'system/edge/upstreams', 'system/fleet-configuration', 'system/jobs/runners', 'system/jobs/list', 'system/jobs/scheduled-tasks']) {
+        assert(admin.adminSectionRoutes(admin.ADMIN_SECTIONS, { mount: '/system' }).some(route => route.path === path), `Secondary route ${path} remains registered and guarded`);
+    }
     assert(admin.ADMIN_SECTIONS.includes(admin.CLOUDWATCH_ADMIN_SECTION));
     assert(admin.ADMIN_SECTIONS.includes(admin.ASSISTANT_ADMIN_SECTION));
     assert(admin.adminSectionRoutes([admin.CLOUDWATCH_ADMIN_SECTION], { mount: '/system' })

@@ -30,7 +30,7 @@ try {
     assert.deepEqual(models.BUCKET_MANAGE_PERMS, ['sys.manage_aws', 'sys.files']);
     const section = admin.STORAGE_ADMIN_SECTION;
     assert.equal(section.id, 'storage');
-    assert.equal(section.navigationGroup, 'infrastructure');
+    assert.equal(section.navigationGroup, 'storage');
     assert.deepEqual(section.routes.map((route) => route.path), ['buckets', 'backends', 'files', 'rendering']);
     // #7729: Media rendering edits Setting rows, so it carries the Settings page's gate and widens the section audience.
     assert.deepEqual(section.routes.map((route) => route.permissions), [models.BUCKET_MANAGE_PERMS, models.STORAGE_VIEW_PERMS, models.STORAGE_VIEW_PERMS, ['sys.manage_settings', 'sys.groups']]);

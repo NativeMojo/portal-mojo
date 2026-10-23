@@ -115,6 +115,7 @@
 .edge-vhost-editor .edge-route-row { align-items: end; }
 .edge-hostname-detail .edge-route-actions .btn { white-space: nowrap; }
 
+.edge-serving-actions { display:flex;flex-wrap:wrap;gap:8px; }
 .edge-serving-heading.page-header { align-items: flex-start; }
 .edge-serving-heading.page-header > div { min-width: 0; }
 .edge-serving-evidence .edge-row-actions { align-items: center; gap: 6px; }

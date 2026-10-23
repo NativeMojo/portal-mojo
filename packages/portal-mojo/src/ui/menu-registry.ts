@@ -29,6 +29,8 @@ export interface MenuItem {
     label?: string;
     /** Extra quick-navigation terms that are never rendered. */
     keywords?: string[];
+    /** In accordion menus, show only in search or while this destination is active. */
+    searchOnly?: boolean;
     icon?: string;
     /** Absolute route within the hash router, e.g. '/users'. */
     route?: string;

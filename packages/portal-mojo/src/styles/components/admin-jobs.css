@@ -3,6 +3,7 @@
    because it names a token rather than a color. */
 
 /* ── Page shell ─────────────────────────────────────────────────── */
+.jobs-page-links { display:flex;flex-wrap:wrap;gap:8px; }
 .jobs-dashboard { display: grid; gap: 14px; }
 .jobs-page-head {
     display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;

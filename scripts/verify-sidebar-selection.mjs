@@ -43,6 +43,29 @@ try {
     await act(async () => dashboard.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
     assert.equal(document.querySelectorAll('.nav-active').length, 1, 'returning to Dashboard still selects exactly one page');
     assert(dashboard.classList.contains('nav-active') && dashboard.getAttribute('aria-current') === 'page');
+    const links = () => [...document.querySelectorAll('a')];
+    assert(!links().some(node => node.textContent.trim() === 'Provider Credentials'), 'secondary tools do not fill ordinary navigation');
+    const input = document.querySelector('input[type="search"]');
+    const search = async value => { await act(async () => {
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }); };
+    await search('Provider Credentials');
+    let secondary = links().find(node => node.textContent.trim() === 'Provider Credentials');
+    assert(secondary, 'navigation search discovers the exact secondary destination');
+    await act(async () => secondary.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
+    await search('');
+    secondary = links().find(node => node.textContent.trim() === 'Provider Credentials');
+    assert(secondary?.classList.contains('nav-active'), 'a secondary deep link stays visible and selected after clearing search');
+    assert.equal(document.querySelectorAll('[aria-current="page"]').length, 1);
+    const hosting = [...document.querySelectorAll('.nav-parent')].find(node => node.textContent.includes('Domains & Hosting'));
+    assert.equal(hosting.getAttribute('aria-expanded'), 'true', 'secondary navigation expands its owning group');
+    const home = links().find(node => node.textContent.trim() === 'Dashboard');
+    await act(async () => home.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
+    assert(!links().some(node => node.textContent.trim() === 'Provider Credentials'), 'leaving secondary tools restores the compact sidebar');
+    await search('no-such-destination');
+    assert(document.querySelector('[role="status"]').textContent.includes('No admin pages found'));
+    await search('');
     console.log('Sidebar selection: mounted root, one highlighted leaf, matching ARIA, automatic parent expansion, return navigation verified.');
 } finally {
     if (root) await act(async () => root.unmount());

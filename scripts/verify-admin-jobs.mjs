@@ -88,7 +88,7 @@ try {
     assert.equal(section.navigationGroup, 'operations');
     assert.deepEqual(section.routes.map((route) => route.path), ['', 'runners', 'list', 'scheduled-tasks']);
     assert.deepEqual(section.routes.map((route) => route.label),
-        ['Dashboard', 'Runners', 'Jobs', 'Scheduled Tasks']);
+        ['Jobs Dashboard', 'Job Runners', 'Jobs', 'Scheduled Tasks']);
     // Route gates are NOT uniform — that is the point.
     const gateOf = (path) => section.routes.find((route) => route.path === path).permissions;
     for (const path of ['', 'runners', 'list']) {
@@ -127,7 +127,7 @@ try {
     const viewerCtx = ctx({ view_jobs: true });          // the mock's jobs.viewer
     const tasksCtx = ctx({ view_scheduled_tasks: true });
     const catchAllCtx = ctx({ jobs: true });             // the mock's showcase.operator
-    for (const label of ['Dashboard', 'Runners', 'Jobs']) {
+    for (const label of ['Jobs Dashboard', 'Job Runners', 'Jobs']) {
         assert.equal(menus.itemVisible(itemFor(label), viewerCtx), true, `view_jobs reveals ${label}`);
         assert.equal(menus.itemVisible(itemFor(label), tasksCtx), false,
             `view_scheduled_tasks alone does not reveal ${label}`);
@@ -135,7 +135,7 @@ try {
     assert.equal(menus.itemVisible(itemFor('Scheduled Tasks'), viewerCtx), false,
         'view_jobs must NOT reveal Scheduled Tasks — it cannot read the system list');
     assert.equal(menus.itemVisible(itemFor('Scheduled Tasks'), tasksCtx), true);
-    for (const label of ['Dashboard', 'Runners', 'Jobs', 'Scheduled Tasks']) {
+    for (const label of ['Jobs Dashboard', 'Job Runners', 'Jobs', 'Scheduled Tasks']) {
         assert.equal(menus.itemVisible(itemFor(label), catchAllCtx), true, `the jobs catch-all reveals ${label}`);
         assert.equal(menus.itemVisible(itemFor(label), { me: null, member: null, group: null }), false,
             `${label} is fail-closed while anonymous`);

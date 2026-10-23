@@ -115,6 +115,15 @@ function countDestinations(items: MenuItem[]): number {
         + countDestinations(item.children ?? []), 0);
 }
 
+/** Keep secondary tools searchable without filling the everyday navigation. */
+function primaryTree(item: MenuItem, pathname: string): MenuItem | null {
+    if (item.searchOnly && !treeOwnsRoute(item, pathname)) return null;
+    if (!item.children) return item;
+    const children = item.children.map(child => primaryTree(child, pathname))
+        .filter((child): child is MenuItem => child != null);
+    return !item.route && children.length === 0 ? null : { ...item, children };
+}
+
 function treeOwnsRoute(item: MenuItem, pathname: string): boolean {
     if (item.route && routesMatch(item.route, pathname, item.exact)) return true;
     return (item.children ?? []).some((child) => treeOwnsRoute(child, pathname));
@@ -299,7 +308,7 @@ export function SidebarNav({ collapsed = false, onRequestExpand }: SidebarNavPro
     const normalizedQuery = query.trim().toLocaleLowerCase();
     const filteredItems = useMemo(() => normalizedQuery
         ? retainRunDividers(items, items.map((item) => filterTree(item, normalizedQuery)))
-        : items, [items, normalizedQuery]);
+        : retainRunDividers(items, items.map(item => primaryTree(item, pathname))), [items, normalizedQuery, pathname]);
     const resultCount = countDestinations(filteredItems);
 
     if (!menu) return null;

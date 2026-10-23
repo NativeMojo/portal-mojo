@@ -619,7 +619,7 @@ const groupOf = (key: string): string | undefined =>
 export function ComponentsPage() {
     const [sp, setSp] = useSearchParams();
     const { pathname } = useLocation(); const navigate = useNavigate();
-    const linkedDemo = pathname.startsWith('/dns/') ? 'admin-domains' : pathname === '/edge/vhosts' ? 'admin-edge' : null;
+    const linkedDemo = pathname.startsWith('/dns/') ? 'admin-domains' : pathname.startsWith('/edge/') ? 'admin-edge' : pathname.startsWith('/jobs/') ? 'admin-jobs' : null;
     const activeKey = sp.get('demo') ?? linkedDemo ?? SECTIONS[0]!.key;
     const active = SECTIONS.find((s) => s.key === activeKey) ?? SECTIONS[0]!;
     const [remountNonce, setRemountNonce] = useState(0);

@@ -62,6 +62,29 @@ share one `/system` landing instead of emitting duplicate index routes.
 Generated Admin destinations are exact matched, so an embedded mount’s root
 Dashboard cannot remain selected on every nested page.
 
+### Everyday Admin navigation
+
+The built-in menu keeps the existing top-level Dashboard. Operations contains
+Fleet, Maintenance, Deployments and Jobs Dashboard. Domains & Hosting contains
+Domains, Certificates and Serving. Storage has its own group. Configuration
+contains GeoLocation and Settings. Purpose-specific dashboards are welcome;
+their labels identify the task and their content should not duplicate Admin
+Dashboard. These menu changes do not change Dashboard content.
+
+`AdminRoute.searchOnly` is presentation metadata, carried to `MenuItem.searchOnly`.
+Accordion menus show these secondary tools in navigation search and while that
+exact destination is active. Static menus keep all entries. Permission filtering
+happens before search; section/route clauses and literal-superuser gates still
+apply. All routes remain registered, including embedded mounts and direct links.
+
+Fleet exposes Configuration beside its capacity controls. Domains exposes
+Purchases and a More menu for DNS records, provider credentials and registrant
+contact; individual domain records retain their focused tasks. Serving links to
+Upstreams. Jobs Dashboard links to Jobs, Runners and Scheduled tasks, each with
+its own permission check. These contextual links are omitted when their target
+is absent from an embedded Admin mount. Secondary tools remain searchable by
+their full names without filling the ordinary sidebar.
+
 Import the route/menu machinery from `portal-mojo/admin/core`, then import only
 the registry domains the shell installs. The stable domains are `identity`,
 `security`, `observability`, `operations`, `infrastructure`, `communications`,

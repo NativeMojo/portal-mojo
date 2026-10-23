@@ -41,6 +41,7 @@ import {
     type RunnerRow,
     type ScheduledTaskRow,
 } from 'portal-mojo/admin/operations';
+import { Link, useLocation } from 'react-router-dom';
 import { Guarded } from 'portal-mojo/ui';
 
 type Surface =
@@ -76,8 +77,7 @@ function DashboardDemo() {
             </p>
             <p className="dim">
                 Clicking a channel row navigates to <code>&lt;mount&gt;/list?channel=…</code>.
-                In the portal that is the jobs table; here in the showcase the demo is not routed,
-                so use the <strong>Jobs table</strong> tab instead.
+                That opens the jobs table in both the portal and this showcase.
             </p>
             <JobDashboardPage />
         </div>
@@ -438,6 +438,9 @@ function DeniedDemo() {
 
 export function AdminJobsDemo() {
     const [surface, setSurface] = useState<Surface>('dashboard');
+    const { pathname } = useLocation();
+    const LinkedPage = pathname === '/jobs/list' ? JobsTablePage : pathname === '/jobs/runners' ? JobRunnersPage : pathname === '/jobs/scheduled-tasks' ? ScheduledTasksPage : null;
+    if (LinkedPage) return <div className="flex flex-col gap-3"><Link className="btn" to="/?demo=admin-jobs">Back to Jobs dashboard</Link><LinkedPage /></div>;
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Jobs admin surface">

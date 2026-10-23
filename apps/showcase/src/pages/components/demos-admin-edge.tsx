@@ -2,7 +2,7 @@
 // stable identities a reviewer needs to see each permission split.
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { BlocklistPage, UpstreamsPage, VhostsPage, openBlocklistEditor, openDeclareUpstream, openVhostWizard } from 'portal-mojo/admin/infrastructure';
 import { getAuthSnapshot, login, mojoGet, type Me } from 'portal-mojo/client';
 
@@ -23,6 +23,7 @@ const LEGS: Array<{ key: Leg; label: string; email: string; opens: Surface[]; no
 ];
 
 export function AdminEdgeDemo() {
+    const location = useLocation();
     const [leg, setLeg] = useState<Leg>('platform');
     const [surface, setSurface] = useState<Surface | null>(null);
     const [pendingSurface, setPendingSurface] = useState<Surface | null>('vhosts');
@@ -70,6 +71,8 @@ export function AdminEdgeDemo() {
     }, [identity.email, queryClient]);
 
     useEffect(() => () => { void login('showcase.operator@nativemojo.com', 'mojo'); }, []);
+
+    if (location.pathname === '/edge/upstreams') return <div className="flex flex-col gap-3"><Link className="btn" to="/?demo=admin-edge">Back to Serving</Link>{switching ? <p>Switching identity…</p> : <UpstreamsPage />}</div>;
 
     const shown = surface ?? pendingSurface;
     const allowed = surface !== null && identity.opens.includes(surface);
