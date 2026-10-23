@@ -725,6 +725,12 @@
       "fingerprint": "0bdc4287fa2edf974d99",
       "category": "record",
       "purpose": "Read-only exact purchase ledger detail with deliberate Refresh and completed domain handoff"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/assistant/AssistantSetupPage.tsx:SetupDialog:dialog:0",
+      "fingerprint": "7cdb3cc1ce407de3ec5a",
+      "category": "editor",
+      "purpose": "Page-owned Assistant model, credential, safety and triage task editors with an optional nested confirmation body. Live owner/session boundary owns state; native Escape/backdrop/close and tabs lock during operations, confirmation initially focuses Cancel, cancellation performs no write, duplicate confirmation submits once. Runtime: verify-admin-assistant-setup plus both-theme desktop and 390px browser flows."
     }
   ],
   "lifecycle": [

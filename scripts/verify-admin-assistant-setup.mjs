@@ -3,8 +3,10 @@ import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 import { readFile } from 'node:fs/promises';
 const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'https://portal.example.test/' });
-for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'Event', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
+for (const name of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLDialogElement', 'Element', 'Event', 'Node', 'localStorage', 'sessionStorage']) globalThis[name] = dom.window[name];
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const React = await import('react');
 const { createRoot } = await import('react-dom/client');
@@ -169,18 +171,32 @@ try {
         assert(predicate(), message);
     };
     const button = (label) => [...document.querySelectorAll('button')].find((element) => element.textContent.trim() === label);
-    const ready = () => document.body.textContent.includes('Owner access required') || (document.getElementById('assistant-replacement-key') && !button('Refresh setup')?.disabled);
+    const ready = () => document.body.textContent.includes('Owner access required') || ((document.querySelector('.assistant-setup-overview, .assistant-setup-mcp') || document.getElementById('assistant-replacement-key')) && !button('Refresh setup')?.disabled);
+    const openTask = async (label) => {
+        if (button('Done')) await React.act(async () => button('Done').click());
+        assert(button(label), `Missing task ${label}`);
+        await React.act(async () => button(label).click());
+    };
     const render = async (key = 0) => {
         await React.act(async () => root.render(React.createElement(QueryClientProvider, { client: qc }, React.createElement(page.AssistantSetupPage, { key }))));
         await waitFor(ready, 'Setup finishes its initial read or renders owner denial');
+        if (!document.body.textContent.includes('Owner access required')) {
+            assert(!document.querySelector('input[type=password]'), 'Overview keeps credential editing in a focused dialog');
+            assert.equal(document.querySelectorAll('details').length, 0, 'Setup does not stack expandable controls');
+            await openTask('Manage keys');
+        }
     };
     const click = async (label, wait = true) => {
+        if (label === 'Open Platform credential') { await openTask('Manage keys'); await React.act(async () => [...document.querySelectorAll('[role=tab]')].find(el => el.textContent === 'Platform key').click()); return; }
+        if (label === 'Acknowledge deployed policy' && !button(label)) await openTask('Review safety');
+        if (['Disable Assistant', 'Enable Assistant'].includes(label) && button('Done')) await React.act(async () => button('Done').click());
+        if (label === 'Refresh provider catalogue' && !button(label)) await openTask(button('Configure model') ? 'Configure model' : 'View model');
         const element = button(label); assert(element, `Missing button ${label}`); assert(!element.disabled, `Disabled button ${label}`);
         await React.act(async () => element.click());
         if (wait) await waitFor(ready, `Operation ${label} settles`);
     };
-    const input = async (id, value) => { const element = document.getElementById(id); assert(element, `Missing input ${id}`); await React.act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); }); };
-    const select = async (value) => { const element = document.getElementById('assistant-model-mode'); assert(element); await React.act(async () => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); }); };
+    const input = async (id, value) => { if (!document.getElementById(id)) await openTask(id.includes('model') ? (button('Configure model') ? 'Configure model' : 'View model') : 'Manage keys'); const element = document.getElementById(id); assert(element, `Missing input ${id}`); await React.act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); }); };
+    const select = async (value) => { if (!document.getElementById('assistant-model-mode')) await openTask(button('Configure model') ? 'Configure model' : 'View model'); const element = document.getElementById('assistant-model-mode'); assert(element); await React.act(async () => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); }); };
     const cacheSafe = () => {
         assert(!JSON.stringify(qc.getQueryCache().getAll().map((query) => query.state.data)).includes(SENTINEL));
         assert.equal(qc.getMutationCache().getAll().length, 0);
@@ -191,26 +207,26 @@ try {
     await signIn(); mock.setMockAssistantSetupScenario('missing-key'); await render(1);
     assert.match(document.body.textContent, /model and key selection are unavailable/);
     await input('assistant-replacement-key', SENTINEL); cacheSafe();
-    await click('Check and save key'); assert.equal(document.getElementById('assistant-replacement-key').value, ''); assert.match(document.body.textContent, /Configuration saved/); cacheSafe();
+    await click('Check and save key'); assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', ''); assert.match(document.body.textContent, /Configuration saved/); cacheSafe();
     await input('assistant-replacement-key', SENTINEL);
     await React.act(async () => { await auth.refreshTokens(); }); await settle();
     assert.equal(document.getElementById('assistant-replacement-key').value, SENTINEL, 'Same-tab token renewal preserves draft');
     await React.act(async () => window.dispatchEvent(new dom.window.StorageEvent('storage', { key: 'access_token', newValue: auth.getAccessToken() }))); await waitFor(ready, 'Cross-tab replacement reload finishes');
-    assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Cross-tab auth change conservatively clears draft');
+    assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', '', 'Cross-tab auth change conservatively clears draft');
     await input('assistant-replacement-key', SENTINEL);
     await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await waitFor(ready, 'Replacement session reload finishes');
-    assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Explicit same-person replacement clears draft');
+    assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', '', 'Explicit same-person replacement clears draft');
     await input('assistant-replacement-key', SENTINEL); await React.act(async () => root.render(null)); await render(2);
-    assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Leaving setup destroys drafts');
+    assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', '', 'Leaving setup destroys drafts');
     mock.setMockAssistantSetupScenario('handler'); await render(3); await click('Open Platform credential');
-    assert.equal(document.querySelector('details').open, true); assert.equal(document.activeElement.textContent, 'Platform credential');
+    assert.equal(document.querySelector('dialog').open, true); assert.equal(document.querySelector('dialog [role=tab][aria-selected=true]').textContent, 'Platform key');
     await input('handler-replacement-key', SENTINEL); await click('Check and save Platform key'); assert.equal(document.getElementById('handler-replacement-key').value, '');
     mock.setMockAssistantSetupScenario('rejected-key'); await render(4); await click('Check current key'); assert.match(document.body.textContent, /Anthropic rejected this key/);
     await input('assistant-replacement-key', SENTINEL); await click('Check and save key'); assert.match(document.body.textContent, /rejected|could not be confirmed/); cacheSafe();
     mock.setMockAssistantSetupScenario('ready'); await render(5);
     await input('assistant-replacement-key', SENTINEL); await click('Acknowledge deployed policy', false);
     assert(button('Confirm operation')); assert.equal(document.activeElement.textContent, 'Cancel');
-    await click('Cancel', false); assert(!button('Confirm operation')); assert.equal(document.getElementById('assistant-replacement-key').value, SENTINEL);
+    await click('Cancel', false); assert(!button('Confirm operation')); assert.equal(document.querySelector('input[type=password]'), null, 'Leaving key editor clears its secret draft');
     await click('Acknowledge deployed policy', false); const postCount = () => mock.getMockRequestHistory().filter((row) => row.path === path && row.method === 'POST').length;
     const countBeforeRevoke = postCount();
     await React.act(async () => qc.setQueryData(['me', auth.getAuthSnapshot().uid], { ...owner.user, is_superuser: false })); await settle();
@@ -219,7 +235,7 @@ try {
     let releaseAuth; auth.setFreshAuthHandler(() => new Promise((resolve) => { releaseAuth = resolve; }));
     await input('assistant-replacement-key', SENTINEL); mock.armMockReauth('POST', path); await click('Check and save key', false);
     await waitFor(() => typeof releaseAuth === 'function', '440 opens the registered fresh-auth UI');
-    assert.equal(document.getElementById('assistant-replacement-key').value, '', '440 clears draft before fresh-auth UI'); assert.match(document.body.textContent, /re-enter any key/);
+    assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', '', '440 clears draft before fresh-auth UI'); assert.match(document.body.textContent, /re-enter any key/);
     const challengedCount = postCount(); await React.act(async () => qc.setQueryData(['me', auth.getAuthSnapshot().uid], { ...owner.user, is_superuser: false })); await React.act(async () => releaseAuth(true)); await settle();
     assert.equal(postCount(), challengedCount, 'Fresh-auth completion cannot replay old credentials after revocation');
     await signIn(); mock.setMockAssistantSetupScenario('ready'); await render(7); await input('assistant-replacement-key', SENTINEL);
@@ -238,11 +254,9 @@ try {
     cacheSafe();
     // Mounted model lifecycle: drafts, explicit actions, cache verdicts, and security fences.
     auth.initAuth(); auth.stopAutoRefresh(); await signIn(); mock.setMockAssistantSetupScenario('ready'); await render(20);
+    await openTask('Configure model');
     assert.equal(document.getElementById('assistant-model-mode').value, 'auto'); assert.match(document.body.textContent, /fixture-sonnet-2099-01/);
-    const basicSetup = document.querySelector('.assistant-setup > section');
-    const advancedPolicy = [...document.querySelectorAll('details')].find((element) => element.querySelector('summary').textContent === 'Deployed policy and safety');
-    assert.doesNotMatch(basicSetup.textContent, /Guarded request admission|Deployed policy model/);
-    assert.match(advancedPolicy.textContent, /Guarded request admission.*Allowed to attempt/); assert.match(advancedPolicy.textContent, /Deployed policy model.*auto:sonnet/);
+    assert.doesNotMatch(document.querySelector('.assistant-setup-overview').textContent, /Guarded request admission|Deployed policy model/);
     const beforeDraft = postCount(); await select('pinned'); await input('assistant-model-pin', 'fixture-mounted-pin'); assert.equal(postCount(), beforeDraft, 'Changing selection edits only the draft');
     await click('Save model selection'); assert.equal(document.getElementById('assistant-model-mode').value, 'pinned'); assert.match(document.body.textContent, /source: admin/);
     state = await api.getAssistantSetup(); assert.equal(state.model.effective, 'fixture-mounted-pin'); assert.deepEqual(baseline(state), [true, true, false, false]);
@@ -252,7 +266,7 @@ try {
     assert.match(document.body.textContent, /fixture-sonnet-2099-02/); state = await api.getAssistantSetup(); assert.equal(state.model.selected, ''); assert.equal(state.model.capability.mode, 'auto'); assert.equal(state.enabled, false);
     await click('Refresh setup'); state = await api.getAssistantSetup(); assert.equal(state.model.capability.refresh.ok, null);
     for (const [index, scenario] of ['fixed-policy', 'bedrock', 'missing-policy', 'legacy-server', 'malformed-capability', 'deployment-pin', 'admin-over-deployment-pin'].entries()) {
-        mock.setMockAssistantSetupScenario(scenario); await render(30 + index);
+        mock.setMockAssistantSetupScenario(scenario); await render(30 + index); await openTask(button('Configure model') ? 'Configure model' : 'View model');
         if (scenario.includes('deployment-pin')) {
             assert.equal(document.getElementById('assistant-model-mode').value, 'pinned'); assert(document.querySelector('#assistant-model-mode option[value=auto]').disabled); assert(!button('Save model selection').disabled); assert.match(document.body.textContent, /remove the deployment pin/);
         } else {
@@ -262,7 +276,7 @@ try {
     }
     for (const [index, scenario] of ['fresh-failure', 'stale-failure', 'unavailable-model', 'throttled', 'in-progress'].entries()) {
         mock.setMockAssistantSetupScenario(scenario); await render(40 + index); await click('Refresh provider catalogue');
-        assert.doesNotMatch(document.querySelector('[role=status]').textContent, /refreshed|latest/i, 'Failed discovery never announces successful/latest resolution');
+        assert.doesNotMatch((document.querySelector('[role=status]')?.textContent ?? ''), /refreshed|latest/i, 'Failed discovery never announces successful/latest resolution');
         assert.match(document.querySelector('[role=alert]').textContent, /not confirmed|already in progress|temporarily limited/);
         assert.match(document.body.textContent, scenario === 'stale-failure' ? /Stale cache/ : scenario === 'unavailable-model' ? /no usable automatic resolution/ : /Fresh cache/);
     }
@@ -272,13 +286,13 @@ try {
     await waitFor(() => postCount() === beforeHeldModel + 1, 'One model action is sent'); assert(button('Refresh provider catalogue').disabled); await waitFor(ready, 'Held model operation completes before the next action'); assert.equal(postCount(), beforeHeldModel + 1, 'Repeat clicks cannot send overlapping selection actions');
     mock.armMockResponseOnce('GET', path, { extraDelayMs: 450 }); await click('Refresh provider catalogue', false);
     await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await waitFor(ready, 'Replacement page loads'); await settle(650);
-    assert.doesNotMatch(document.querySelector('[role=status]').textContent, /refreshed/, 'Held refresh cannot announce success after session replacement');
+    assert.doesNotMatch((document.querySelector('[role=status]')?.textContent ?? ''), /refreshed/, 'Held refresh cannot announce success after session replacement');
     mock.setMockAssistantSetupScenario('ready'); await render(51); await select('pinned'); await input('assistant-model-pin', 'fixture-preflight-pin');
     gateCount = 0; client.installAuthHooks({ preRequest: () => gateCount++ === 0 ? new Promise((resolve) => { releaseGate = resolve; }) : Promise.resolve(), authHeader: () => `Bearer ${auth.getAccessToken()}` });
     const beforeModelGate = postCount(); await click('Save model selection', false); await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await React.act(async () => releaseGate()); await waitFor(ready, 'Replacement read finishes'); assert.equal(postCount(), beforeModelGate, 'Held auth preflight cannot transmit an obsolete model action');
     auth.initAuth(); auth.stopAutoRefresh(); mock.setMockAssistantSetupScenario('ready'); await render(52); await input('assistant-replacement-key', SENTINEL); await select('pinned'); await input('assistant-model-pin', 'fixture-reauth-pin');
     releaseAuth = undefined; auth.setFreshAuthHandler(() => new Promise((resolve) => { releaseAuth = resolve; })); mock.armMockReauth('POST', path); await click('Save model selection', false); await waitFor(() => typeof releaseAuth === 'function', 'Model 440 opens fresh auth');
-    assert.equal(document.getElementById('assistant-replacement-key').value, ''); assert.equal(document.getElementById('assistant-model-mode').value, '');
+    assert.equal(document.querySelector('input[type=password]'), null); assert.equal(document.getElementById('assistant-model-mode').value, '');
     const beforeModelAuth = postCount(); await React.act(async () => releaseAuth(true)); await waitFor(ready, 'Model fresh auth settles'); assert.equal(postCount(), beforeModelAuth, 'A challenged model action is never replayed'); cacheSafe();
 
     mock.setMockAssistantSetupScenario('ready'); await render(53); await select('pinned'); await input('assistant-model-pin', 'fixture-unmounted-pin');
@@ -288,10 +302,61 @@ try {
     await React.act(async () => qc.setQueryData(['me', auth.getAuthSnapshot().uid], { ...owner.user, is_superuser: false })); await settle(650);
     assert.match(document.body.textContent, /Owner access required/); assert(!document.body.textContent.includes('Provider catalogue refreshed'), 'Held catalogue response cannot revive a revoked page'); cacheSafe();
 
+    await signIn();
+    // A single recovery button opens the task that can address the reported blocker.
+    for (const [index, [scenario, heading]] of [['missing-policy', 'Safety & usage'], ['missing-key', 'API keys'], ['unavailable-model', 'Model'], ['static-stop', 'Safety & usage']].entries()) {
+        mock.setMockAssistantSetupScenario(scenario); await render(80 + index); await click('Done');
+        await click('Review setup'); assert.equal(document.querySelector('dialog h2').textContent, heading, `${scenario} recovery opens ${heading}`);
+        assert.doesNotMatch(document.body.textContent, /advanced controls/);
+    }
+    // MCP is independent from AI configuration, the chat switch, and LLM stops.
+    const tab = label => [...document.querySelectorAll('[role=tab]')].find(el => el.textContent === label);
+    for (const [index, scenario] of ['missing-key', 'missing-policy', 'static-stop'].entries()) {
+        mock.setMockAssistantSetupScenario(scenario); await render(60 + index); await click('Done');
+        const baselineState = await api.getAssistantSetup();
+        mock.clearMockRequestHistory();
+        await React.act(async () => tab('MCP connections').click());
+        assert(document.getElementById('assistant-connect-address'));
+        assert(!document.querySelector('input[type=password]'));
+        assert(!button('Configure model')); assert(!button('Enable Assistant')); assert(!button('Acknowledge deployed policy'));
+        assert(!document.querySelector('.assistant-setup-overview')); assert.equal(document.querySelectorAll('[role=alert]').length, 0, 'AI blockers are absent from MCP');
+        assert.equal(mock.getMockRequestHistory().length, 0, 'Changing areas performs no provider probe or write');
+        await click('Pause remote access', false); assert.equal(document.activeElement.textContent, 'Cancel');
+        assert.equal(tab('AI Assistant').disabled, true, 'Area cannot change under an owned confirmation');
+        await click('Cancel', false); assert.equal(mock.getMockRequestHistory().filter(row => row.method === 'POST').length, 0);
+        await click('Pause remote access', false); await click('Confirm operation');
+        state = await api.getAssistantSetup();
+        assert.equal(state.mcp.enabled, false); assert.equal(state.enabled, baselineState.enabled);
+        assert.equal(state.emergency_stop, baselineState.emergency_stop); assert.equal(state.key.source, baselineState.key.source);
+        assert.equal(state.model.selected, baselineState.model.selected);
+        await click('Enable remote access', false); await click('Confirm operation'); state = await api.getAssistantSetup(); assert.equal(state.mcp.enabled, true);
+        await React.act(async () => tab('AI Assistant').click()); assert(document.querySelector('.assistant-setup-overview'));
+    }
+    mock.setMockAssistantSetupScenario('ready'); await render(70);
+    await input('assistant-replacement-key', SENTINEL);
+    await React.act(async () => tab('Platform key').click()); assert.equal(document.getElementById('handler-replacement-key').value, '');
+    await React.act(async () => tab('Assistant key').click()); assert.equal(document.getElementById('assistant-replacement-key').value, '', 'Changing credential type destroys unsaved keys');
+    await click('Done'); await select('pinned'); await input('assistant-model-pin', 'fixture-cancelled-model'); await click('Done');
+    await openTask('Configure model'); assert.equal(document.getElementById('assistant-model-mode').value, 'auto', 'Closing model dialog discards unsaved selection');
+    await click('Done'); await openTask('Review safety'); await click('Acknowledge deployed policy', false);
+    const countBeforeCancel = postCount();
+    await React.act(async () => document.querySelector('dialog.assistant-setup-dialog-confirm').dispatchEvent(new Event('cancel', { cancelable: true })));
+    assert(!button('Confirm operation')); assert.equal(postCount(), countBeforeCancel, 'Native Escape cancels without submitting');
+    await click('Acknowledge deployed policy', false); mock.armMockResponseOnce('POST', path, { extraDelayMs: 450 });
+    const beforeDoubleConfirm = postCount(), confirmButton = button('Confirm operation');
+    await React.act(async () => { confirmButton.click(); confirmButton.click(); });
+    const taskDialog = document.querySelector('dialog');
+    await React.act(async () => taskDialog.dispatchEvent(new Event('cancel', { cancelable: true })));
+    assert(taskDialog.open, 'Native dismissal stays locked while a write is pending');
+    await React.act(async () => { taskDialog.close(); taskDialog.dispatchEvent(new Event('close')); });
+    assert(taskDialog.open, 'Non-cancelable native close reopens the pending task');
+    await waitFor(ready, 'Confirmed write settles'); assert.equal(postCount(), beforeDoubleConfirm + 1, 'Double confirmation submits once');
+    cacheSafe();
+
     const [source, release] = await Promise.all([readFile('packages/portal-mojo/src/admin/assistant/AssistantSetupPage.tsx', 'utf8'), readFile('package.json', 'utf8')]);
     assert.doesNotMatch(source, /withFreshAuth|useMutation|useQuery\(|defineModel|localStorage|sessionStorage|console\./);
     assert(JSON.parse(release).scripts['verify:release'].includes('verify:admin-assistant-setup'));
-    console.log('Assistant setup: exact schema/actions, owner gates, safe projections, automatic/manual runtime selection, honest catalogue verdicts, legacy compatibility, route truth, static stops, credential provenance, bounded connections, and mounted session/confirmation/fresh-auth/transport/cache lifecycle passed.');
+    console.log('Assistant setup: exact schema/actions, owner gates, safe projections, automatic/manual runtime selection, honest catalogue verdicts, legacy compatibility, route truth, static stops, credential provenance, bounded connections, MCP independence from missing AI keys/policy and static stops, area/key tabs, draft cancellation, native dismissal and duplicate-confirm protection, and mounted session/fresh-auth/transport/cache lifecycle passed.');
 } finally {
     await React.act(async () => root.unmount());
     auth?.stopAutoRefresh(); auth?.setFreshAuthHandler(null); qc.clear(); await server.close(); dom.window.close();

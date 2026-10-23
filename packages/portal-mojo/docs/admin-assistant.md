@@ -15,24 +15,44 @@ Assistant permissions and member/group grants cannot satisfy it. The server
 also rejects confined ApiKey/GroupScopedToken sessions and enforces person
 ownership; the client does not invent a broader per-user-key ban.
 
-The basic section shows deployment readiness, exact provider/model/key
-selection, Automatic — latest Sonnet or an explicit manual pin, credential source and optional server hint, blank replacement input,
-Check and save key, Check current key and enable/disable. A configured key and
-an enabled switch do not prove readiness. `route.ready` describes configuration,
-not current provider health. Unknown routes remain unknown: a missing
-credential can cause the backend to omit the entire route. Only an explicit
-`handler` route points to the Platform credential section. Bedrock uses AWS
-identity from deployment. Assistant, Platform and AWS credentials never
-substitute for one another. Missing Assistant/realtime applications are also
-reported. Runtime model identifiers preserve provider punctuation, including
-Bedrock colons; only a manual pin uses the backend's restricted pin syntax.
+The page separates **AI Assistant** from **MCP connections** with two task
+tabs. AI Assistant is the built-in provider-backed chat and incident processing;
+MCP serves tools to external agents that bring their own AI. MCP does not
+require an Assistant provider key, model selection, policy acknowledgement or
+enabled chat switch. The MCP tab shows its address, independent access switch,
+public discovery check and connections directly; AI readiness warnings remain
+in the AI tab. Ordinary reads probe neither provider nor public discovery.
 
-Advanced native details separate Platform credentials, deployed policy/safety,
-remote access/connections and incident triage. Policy activation acknowledges
-the deployed policy on this node, does not edit it and never establishes
-fleet-wide agreement. Static, database and effective emergency stops are
-separate; only the database switch is writable. Activation and breaker reset
-cannot release a stop.
+The AI tab starts with a compact status overview: the enabled switch, current
+provider/model and selected connection, followed by Safety & usage and Incident
+triage. Configure model and Manage keys open focused native dialogs. The API
+keys dialog separates Assistant and Platform keys with two task tabs; Safety &
+usage separates Policy & stops from Usage & recovery. Incident triage is a
+direct dialog. Keyboard-accessible info icons hold catalogue metadata,
+credential explanations, policy/admission diagnostics, connection dates and
+the triage watermark. Errors, failed checks, emergency stops and operation
+consequences stay visible beside their actions. No expandable sections or
+single-item side navigation are used.
+
+A configured key and enabled switch do not prove readiness. `route.ready`
+describes configuration, not current provider health. Unknown routes remain
+unknown: a missing credential can cause the backend to omit the entire route.
+A handler route opens Manage keys on Platform key. Bedrock uses deployment AWS
+identity; the key dialog explains that browser keys cannot configure it.
+Assistant, Platform and AWS credentials never substitute for one another.
+Missing Assistant/realtime applications are reported. Runtime model identifiers
+preserve provider punctuation, including Bedrock colons; only a manual pin uses
+the backend's restricted pin syntax.
+
+Policy activation acknowledges the deployed policy on this node, does not edit
+it and never establishes fleet-wide agreement. Static, database and effective
+emergency stops are separate; only the database switch is writable. Activation
+and breaker reset cannot release a stop. Destructive and consequential actions
+use a nested confirmation, initially focused on Cancel. During an operation,
+repeat submission, task tabs and native Escape/backdrop/close are locked. Cancel
+returns to the task without making a request. Closing a task or changing key
+types clears unsaved secret drafts; reopening model selection restores the
+saved value. All dialogs unmount with the owner/session boundary.
 
 Model selection controls the protected runtime selection only when the backend
 returns a valid capability for the explicit Anthropic `auto:sonnet` policy.
@@ -42,8 +62,7 @@ unavailable until deployment removes that pin. Mode is authoritative even when
 a fixed route retains an inert legacy `selected` value.
 
 The exact resolved runtime identifier (`model.effective`) and source are
-separate from the selection draft and `route.ready`. Advanced → Deployed policy
-and safety contains the raw policy model and admission diagnostic. The additive
+separate from the selection draft and `route.ready`. Safety & usage → Policy & stops → the Deployed policy info icon contains the raw policy model and admission diagnostic. The additive
 `route.can_invoke` reports admission to the guarded request path: a cold
 automatic catalogue can admit a request while configuration readiness remains
 false. It does not prove that a usable model or healthy provider is ready.
@@ -78,7 +97,7 @@ changes conservatively discard it: the shared auth API cannot distinguish
 renewal from same-person replacement across tabs. A 440 uses the existing
 fresh-auth UI after clearing credential drafts; even successful reauthentication
 requires explicit re-entry/retry. No secret is silently replayed. Confirmation
-is page-local, focuses Cancel, and ends with the page/session scope.
+is a page-owned native dialog, focuses Cancel, and ends with the page/session scope.
 
 Protocol helpers are exported from `portal-mojo/admin/assistant`:
 `getAssistantSetup(options, probe?)`, `mutateAssistantSetup(action, options)`,
@@ -153,7 +172,7 @@ fake password `mojo`. No real credentials or deployment changes belong in demos.
 `verify:admin-assistant-setup` covers wire contracts, owner navigation/admission,
 projections and mounted auth/draft/confirmation/fresh-auth/transport/cache
 lifecycle; it is wired into `verify:release`. Browser checks separately establish
-both-theme layout, native details, keyboard controls and console behavior.
+both-theme layout, native dialogs, help popovers, keyboard controls and console behavior.
 
 ## Conversation transport
 
