@@ -31,6 +31,14 @@ contact and purchase-recovery dialogs guard their own pending operations. Read-o
 contact roles use tabs only when the returned contacts differ. This is scoped to
 Domains; the shared DetailView and Admin Dashboard remain unchanged.
 
+Assistant Setup separates AI Assistant and MCP connections as page tabs. Model,
+API keys, Safety & usage and Incident triage use focused page-owned native
+dialogs, with a nested confirmation for consequential actions. The page's live
+owner/session scope owns both layers, the single-flight operation lock guards
+native dismissal, and closing a task clears its unsaved secret drafts. MCP
+connection controls remain directly on their own page tab and do not depend on
+AI readiness. This changes neither shared DetailView nor Admin Dashboard.
+
 Use `modal-pad`, `modal-title`, `modal-message`, grouped fields and `modal-actions`.
 Cancel precedes the primary button. Pending operations disable repeat submission;
 `canDismiss` also protects native Escape/backdrop dismissal during a write.

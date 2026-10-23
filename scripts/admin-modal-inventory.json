@@ -10717,6 +10717,22 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/assistant/AssistantSetupPage.tsx:SetupDialog:dialog:0",
+      "file": "packages/portal-mojo/src/admin/assistant/AssistantSetupPage.tsx",
+      "owner": "SetupDialog",
+      "launcher": "dialog",
+      "body": [
+        "dialog"
+      ],
+      "category": "editor",
+      "parent": "SetupDialog",
+      "target": null,
+      "fingerprint": "7cdb3cc1ce407de3ec5a",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:ConversationInspect:DetailView:0",
       "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
       "owner": "ConversationInspect",
