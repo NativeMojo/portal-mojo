@@ -6,7 +6,7 @@ import { SETTINGS_PERMISSIONS } from '../settings/model';
 const navigationGroup = 'operations';
 
 export const SETTINGS_ADMIN_SECTION: AdminSection = {
-    id: 'settings', title: 'Settings', icon: 'bi-gear', navigationGroup, permissions: SETTINGS_PERMISSIONS,
+    id: 'settings', title: 'Settings', icon: 'bi-gear', navigationGroup: 'configuration', permissions: SETTINGS_PERMISSIONS,
     routes: [{ path: '', loadComponent: () => import('../settings/SettingsPage').then(namedPage('SettingsPage')), permissions: SETTINGS_PERMISSIONS }],
 };
 // Empty any-of permissions admit only the existing literal-superuser bypass.
@@ -14,15 +14,15 @@ export const SETTINGS_ADMIN_SECTION: AdminSection = {
 export const FLEET_CONFIGURATION_ADMIN_SECTION: AdminSection = {
     id: 'fleet-configuration', title: 'Fleet Configuration', icon: 'bi-hdd-network',
     navigationGroup, permissions: [],
-    routes: ['', 'shared-validation'].map((path) => ({ path, requireSuperuser: true, loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(namedPage('FleetConfigurationPage')) })),
+    routes: ['', 'shared-validation'].map((path) => ({ path, ...(path === '' ? { label: 'Fleet Configuration', searchOnly: true } : {}), requireSuperuser: true, loadComponent: () => import('../fleet-configuration/FleetConfigurationPage').then(namedPage('FleetConfigurationPage')) })),
 };
 export const JOBS_ADMIN_SECTION: AdminSection = {
     id: 'jobs', title: 'Jobs', icon: 'bi-cpu', navigationGroup, permissions: [...new Set([...JOBS_VIEW_PERMS, ...SCHEDULED_TASK_VIEW_PERMS])],
     routes: [
-        { path: '', label: 'Dashboard', loadComponent: () => import('../jobs/JobDashboardPage').then(namedPage('JobDashboardPage')), permissions: JOBS_VIEW_PERMS },
-        { path: 'runners', label: 'Runners', loadComponent: () => import('../jobs/JobRunnersPage').then(namedPage('JobRunnersPage')), permissions: JOBS_VIEW_PERMS },
-        { path: 'list', label: 'Jobs', loadComponent: () => import('../jobs/JobsTablePage').then(namedPage('JobsTablePage')), permissions: JOBS_VIEW_PERMS },
-        { path: 'scheduled-tasks', label: 'Scheduled Tasks', loadComponent: () => import('../jobs/ScheduledTasksPage').then(namedPage('ScheduledTasksPage')), permissions: SCHEDULED_TASK_VIEW_PERMS },
+        { path: '', label: 'Jobs Dashboard', loadComponent: () => import('../jobs/JobDashboardPage').then(namedPage('JobDashboardPage')), permissions: JOBS_VIEW_PERMS },
+        { path: 'runners', label: 'Job Runners', searchOnly: true, loadComponent: () => import('../jobs/JobRunnersPage').then(namedPage('JobRunnersPage')), permissions: JOBS_VIEW_PERMS },
+        { path: 'list', label: 'Jobs', searchOnly: true, loadComponent: () => import('../jobs/JobsTablePage').then(namedPage('JobsTablePage')), permissions: JOBS_VIEW_PERMS },
+        { path: 'scheduled-tasks', label: 'Scheduled Tasks', searchOnly: true, loadComponent: () => import('../jobs/ScheduledTasksPage').then(namedPage('ScheduledTasksPage')), permissions: SCHEDULED_TASK_VIEW_PERMS },
     ],
 };
 export const DEPLOYMENTS_ADMIN_SECTION: AdminSection = {
@@ -36,7 +36,7 @@ export const MAINTENANCE_ADMIN_SECTION: AdminSection = {
     routes: [{ path: '', label: 'Maintenance', loadComponent: () => import('../maintenance/MaintenancePage').then(namedPage('MaintenancePage')) }],
 };
 export const GEOLOCATION_ADMIN_SECTION: AdminSection = {
-    id: 'geolocation', title: 'GeoLocation', icon: 'bi-geo-alt', navigationGroup, permissions: [],
+    id: 'geolocation', title: 'GeoLocation', icon: 'bi-geo-alt', navigationGroup: 'configuration', permissions: [],
     routes: [{ path: '', label: 'GeoLocation', requireSuperuser: true, loadComponent: () => import('../geolocation/GeoLocationPage').then(namedPage('GeoLocationPage')) }],
 };
 export const OPERATIONS_ADMIN_SECTIONS = [SETTINGS_ADMIN_SECTION, FLEET_CONFIGURATION_ADMIN_SECTION, JOBS_ADMIN_SECTION, MAINTENANCE_ADMIN_SECTION, DEPLOYMENTS_ADMIN_SECTION, GEOLOCATION_ADMIN_SECTION] as const;

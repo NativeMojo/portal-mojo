@@ -18,6 +18,9 @@ export type AdminNavigationGroup =
     | 'observability'
     | 'operations'
     | 'infrastructure'
+    | 'hosting'
+    | 'storage'
+    | 'configuration'
     | 'communications'
     | 'assistant'
     | 'other';
@@ -31,6 +34,9 @@ export const ADMIN_NAVIGATION_GROUPS: Readonly<Record<AdminNavigationGroup, {
     observability: { id: 'admin:observability', label: 'Observability', icon: 'bi-activity', order: 30 },
     operations: { id: 'admin:operations', label: 'Operations', icon: 'bi-gear', order: 40 },
     infrastructure: { id: 'admin:infrastructure', label: 'Infrastructure', icon: 'bi-cloud', order: 50 },
+    hosting: { id: 'admin:hosting', label: 'Domains & Hosting', icon: 'bi-globe2', order: 51 },
+    storage: { id: 'admin:storage', label: 'Storage', icon: 'bi-hdd-stack', order: 55 },
+    configuration: { id: 'admin:configuration', label: 'Configuration', icon: 'bi-sliders', order: 65 },
     communications: { id: 'admin:communications', label: 'Communications', icon: 'bi-chat-dots', order: 60 },
     assistant: { id: 'admin:assistant', label: 'Assistant', icon: 'bi-stars', order: 70 },
     other: { id: 'admin:other', label: 'Other', icon: 'bi-grid', order: 80 },
@@ -40,6 +46,8 @@ type AdminRouteBase = {
     path: string;
     permissions?: PermSpec;
     label?: string;
+    /** Secondary destination: available through search, context links and direct URLs. */
+    searchOnly?: boolean;
     fallbackToFirstVisible?: boolean;
     /** Literal installation owner; permission and group grants cannot satisfy it. */
     requireSuperuser?: boolean;
@@ -219,7 +227,7 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
             const labeled = section.routes.filter((route) => route.label);
             const destinations: MenuItem[] = labeled.length > 0 ? labeled.map((route) => ({
                 id: `admin:${section.id}:${route.path || 'index'}`, label: route.label!, keywords: [section.title],
-                route: absolutePath(base, route.path), exact: true, requireSuperuser: route.requireSuperuser, permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
+                route: absolutePath(base, route.path), exact: true, searchOnly: route.searchOnly, requireSuperuser: route.requireSuperuser, permissionClauses: [section.permissions, ...(route.permissions ? [route.permissions] : [])],
             })) : [{ id: `admin:${section.id}`, label: section.title, keywords: [section.title], route: absolutePath(base), exact: true, permissionClauses: [section.permissions] }];
             if (section.navigationGroup === null) {
                 items.push(...destinations.map((destination) => ({ ...destination, icon: section.icon })));
@@ -240,7 +248,7 @@ export function adminSectionsMenu(sections: readonly AdminSection[], opts: {
         items.push({
             label: section.title, icon: section.icon, permissions: section.permissions,
             ...(base ? { route: absolutePath(base), exact: true } : {}),
-            children: labeled.map((route) => ({ label: route.label!, route: absolutePath(base, route.path), exact: true, permissions: route.permissions, requireSuperuser: route.requireSuperuser })),
+            children: labeled.map((route) => ({ label: route.label!, route: absolutePath(base, route.path), exact: true, searchOnly: route.searchOnly, permissions: route.permissions, requireSuperuser: route.requireSuperuser })),
         });
     }
     return { name: opts.name ?? 'admin', scope: 'admin', presentation: opts.presentation ?? 'static', items };

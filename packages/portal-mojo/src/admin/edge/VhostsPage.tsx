@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link, useLocation } from 'react-router-dom';
+import { useAdminRouteContext } from '../core/route-context';
 import { Badge, CollectionSelect, ModelTable, modal, toast, type Column, type FilterDef } from '../../ui';
 import { getAuthSessionRevision, useAuthSnapshot, useCan, useTableParams } from '../../client/runtime';
 import { DomainModel, type DomainRow } from '../dns/models';
@@ -19,6 +21,9 @@ const FILTERS: FilterDef[] = [
 ];
 
 export function VhostsPage() {
+    const route = useAdminRouteContext(), location = useLocation();
+    const upstreams = location.pathname === '/' ? '/edge/upstreams' : `${location.pathname.replace(/\/[^/]+\/?$/, '')}/upstreams`;
+    const upstreamsMounted = !route || route.paths.includes(upstreams);
     const queryClient = useQueryClient();
     const [revision, setRevision] = useState(0);
     const changed = () => setRevision(value => value + 1);
@@ -42,5 +47,5 @@ export function VhostsPage() {
         const saved = await openVhostWizard(null, { signal });
         if (saved && !signal?.aborted) { changed(); toast.success(`${saved.server_name ?? 'Hostname'} configuration saved${saved.is_enabled ? ', enabled intent' : ', disabled'}.`); await open(saved); }
     };
-    return <div className="edge-serving-page"><header className="page-header edge-serving-heading"><div><div className="eyebrow">Network &amp; hosting</div><h1>Serving</h1><ServingReadiness refreshRevision={revision} /></div>{canManage && <button type="button" className="btn btn-primary" onClick={() => void create()}><i className="bi bi-plus-lg" /> Add hostname</button>}</header><div className="edge-domain-filter"><CollectionSelect<DomainRow> model={DomainModel} value={domain ? Number(domain) : null} label="Domain" placeholder="All domains" defaultParams={{ sort: 'name' }} onChange={id => params.setFilter('domain', id == null ? null : String(id))} /></div><ModelTable<EdgeVhostRow> model={EdgeVhostModel} title="Hostnames" searchable searchPlaceholder="Search label, type or pool" columns={COLUMNS} filters={FILTERS} defaultSort="label" columnChooser persistState persistKey="admin:edge:vhosts" onRowClick={row => void open(row)} /></div>;
+    return <div className="edge-serving-page"><header className="page-header edge-serving-heading"><div><div className="eyebrow">Network &amp; hosting</div><h1>Serving</h1><ServingReadiness refreshRevision={revision} /></div><div className="edge-serving-actions">{upstreamsMounted && <Link className="btn" to={upstreams}>Upstreams</Link>}{canManage && <button type="button" className="btn btn-primary" onClick={() => void create()}><i className="bi bi-plus-lg" /> Add hostname</button>}</div></header><div className="edge-domain-filter"><CollectionSelect<DomainRow> model={DomainModel} value={domain ? Number(domain) : null} label="Domain" placeholder="All domains" defaultParams={{ sort: 'name' }} onChange={id => params.setFilter('domain', id == null ? null : String(id))} /></div><ModelTable<EdgeVhostRow> model={EdgeVhostModel} title="Hostnames" searchable searchPlaceholder="Search label, type or pool" columns={COLUMNS} filters={FILTERS} defaultSort="label" columnChooser persistState persistKey="admin:edge:vhosts" onRowClick={row => void open(row)} /></div>;
 }

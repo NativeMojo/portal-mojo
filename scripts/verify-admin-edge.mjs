@@ -42,7 +42,7 @@ try {
     // ── 2. Section and navigation registration ──
     const section = admin.EDGE_ADMIN_SECTION;
     assert(admin.ADMIN_SECTIONS.includes(section));
-    assert.deepEqual({ id: section.id, basePath: section.basePath, group: section.navigationGroup }, { id: 'edge', basePath: 'edge', group: 'infrastructure' });
+    assert.deepEqual({ id: section.id, basePath: section.basePath, group: section.navigationGroup }, { id: 'edge', basePath: 'edge', group: 'hosting' });
     assert.deepEqual(section.routes.map((route) => route.path), ['vhosts', 'upstreams']);
     assert.equal(admin.ADMIN_SECTIONS.indexOf(section), admin.ADMIN_SECTIONS.indexOf(admin.STORAGE_ADMIN_SECTION) + 1, 'Edge follows Storage');
     assert(admin.adminSectionRoutes([section]).some((route) => route.path === 'edge/vhosts'));

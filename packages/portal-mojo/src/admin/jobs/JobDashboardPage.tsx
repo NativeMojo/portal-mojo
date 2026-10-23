@@ -8,7 +8,10 @@
 // returning), and web-mojo's JobHealthView — the only consumer — was never
 // mounted. Stats already carries channels, runners, totals and the scheduler.
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { hasPermission, useMe } from '../../client/runtime';
+import { useAdminRouteContext } from '../core/route-context';
+import { JOBS_VIEW_PERMS, SCHEDULED_TASK_VIEW_PERMS } from './models';
 import { KPITile } from '../../charts';
 import { JobChannelsPanel } from './sections/JobChannelsPanel';
 import { JobOperationsSection } from './sections/JobOperationsSection';
@@ -21,18 +24,24 @@ export function JobDashboardPage() {
     const stats = useJobStats();
     const channelOptions = useChannelOptions();
     const navigate = useNavigate();
+    const { data: me } = useMe();
+    const route = useAdminRouteContext();
     const location = useLocation();
+    const base = location.pathname.replace(/\/+$/, '') || '/jobs';
+    const related = [
+        { path: 'list', label: 'Jobs', permissions: JOBS_VIEW_PERMS },
+        { path: 'runners', label: 'Runners', permissions: JOBS_VIEW_PERMS },
+        { path: 'scheduled-tasks', label: 'Scheduled tasks', permissions: SCHEDULED_TASK_VIEW_PERMS },
+    ].filter(item => hasPermission(me ?? null, item.permissions, null) && (!route || route.paths.includes(`${base}/${item.path}`)));
 
     const totals = stats.data?.totals;
     const refreshAll = () => { void queryClient.invalidateQueries({ queryKey: jobsKeys.root }); };
 
     /**
      * Open the jobs table already filtered to a channel. The path is derived
-     * from the CURRENT location rather than hardcoded, because an admin
-     * section never knows whether it is mounted at the root or under /system.
+     * from this dashboard location, including custom embedded base paths.
      */
     const openChannel = (channel: string) => {
-        const base = location.pathname.replace(/\/+$/, '');
         navigate({ pathname: `${base}/list`, search: `?channel=${encodeURIComponent(channel)}` });
     };
 
@@ -65,6 +74,7 @@ export function JobDashboardPage() {
                     <i className={`bi bi-arrow-clockwise${stats.isFetching ? ' spin' : ''}`} /> Refresh
                 </button>
             </header>
+            {related.length > 0 && <nav className="jobs-page-links" aria-label="Job tools">{related.map(item => <Link className="btn btn-compact" key={item.path} to={`${base}/${item.path}`}>{item.label}</Link>)}</nav>}
 
             {stats.isError && (
                 <div className="panel jobs-note jobs-note-bad">

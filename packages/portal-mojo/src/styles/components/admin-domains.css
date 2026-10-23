@@ -4,7 +4,8 @@
 .domains-header h1 { margin:4px 0 8px;font-size:26px;line-height:1.2;font-weight:750;letter-spacing:-.025em;color:var(--ink-strong); }
 .domains-header p { margin:0; }
 .domains-actions,.domains-overview-actions { flex-wrap:wrap; }
-.domains-action-menu { padding:6px; }
+.domains-action-menu { display:grid;gap:4px;padding:6px; }
+.domains-action-menu .btn { justify-content:flex-start; }
 .domains-page .toolbar-heading .panel-title { font-size:19px; }
 .domains-scope,.domains-detail code { overflow-wrap:anywhere; }
 .domains-narrow-scope,.domains-narrow-status { display:none; }

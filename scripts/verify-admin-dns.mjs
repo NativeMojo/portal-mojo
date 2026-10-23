@@ -38,7 +38,7 @@ try {
     assert.equal(me.hasPermission({ id: 1, permissions: {} }, models.DNS_VIEW_PERMISSIONS,
         { permissions: { view_dns: true } }), false, 'active-member grants cannot open global DNS Admin');
     assert.equal(admin.DNS_ADMIN_SECTION.id, 'dns');
-    assert.equal(admin.DNS_ADMIN_SECTION.navigationGroup, 'infrastructure');
+    assert.equal(admin.DNS_ADMIN_SECTION.navigationGroup, 'hosting');
     assert.deepEqual(admin.DNS_ADMIN_SECTION.routes.map((route) => route.path), ['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials']);
     assert(admin.ADMIN_SECTIONS.includes(admin.DNS_ADMIN_SECTION));
     assert(admin.adminSectionRoutes([admin.DNS_ADMIN_SECTION]).some((route) => route.path === 'dns/credentials'));
