@@ -8,7 +8,7 @@ import { dnsAdminMount } from './domain-navigation';
 import { PURCHASE_MAY_HAVE_MOVED, redactRegistrarError } from './purchase-data';
 import { DNS_VIEW_PERMISSIONS, type DomainPurchaseRow } from './models';
 
-export function DomainPurchaseDetail({ id, close, knownDomainId, privacyDowngraded = false }: { id: number; close: () => void; knownDomainId?: number; privacyDowngraded?: boolean }) {
+export function DomainPurchaseDetail({ id, close, knownDomainId, privacyDowngraded = false, onNavigate }: { id: number; close: () => void; knownDomainId?: number; privacyDowngraded?: boolean; onNavigate?: () => void }) {
     const { data: me } = useMe(); const auth = useAuthSnapshot();
     const revision = useSyncExternalStore(subscribeAuth, getAuthSessionRevision, getAuthSessionRevision);
     const canView = auth.authenticated && hasPermission(me ?? null, DNS_VIEW_PERMISSIONS, null);
@@ -27,8 +27,8 @@ export function DomainPurchaseDetail({ id, close, knownDomainId, privacyDowngrad
     useEffect(() => { flight.current = false; setLoaded(null); setError(''); setLoading(false); void refresh(); return () => { generation.current++; }; }, [refresh]);
     const openDomain = () => {
         if (!row || row.status !== 'completed') return;
-        if (knownDomainId && Number.isInteger(knownDomainId) && knownDomainId > 0) void import('./DomainDetail').then(({ showDomainDetails }) => { if (latest.current === owner && getAuthSnapshot().uid === auth.uid && getAuthSessionRevision() === revision) return showDomainDetails(knownDomainId); });
-        else { close(); navigate(`${dnsAdminMount(location.pathname)}/dns/domains?search=${encodeURIComponent(row.domain_name)}`); }
+        if (knownDomainId && Number.isInteger(knownDomainId) && knownDomainId > 0) { const accepted = generation.current; void import('./DomainDetail').then(({ showDomainDetails }) => { if (generation.current === accepted && latest.current === owner && getAuthSnapshot().uid === auth.uid && getAuthSessionRevision() === revision) { close(); onNavigate?.(); return showDomainDetails(knownDomainId); } }); }
+        else { close(); onNavigate?.(); navigate(`${dnsAdminMount(location.pathname)}/dns/domains?search=${encodeURIComponent(row.domain_name)}`); }
     };
     return <div className="modal-pad dns-purchase-detail"><div className="eyebrow">Purchase #{id}</div><h2 className="modal-title">{row?.domain_name ?? 'Domain purchase'}</h2>
         {!canView && <p className="dim" role="status">DNS viewing permission is required to inspect this purchase.</p>}

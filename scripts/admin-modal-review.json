@@ -710,13 +710,13 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseWizard:modal.open:0",
-      "fingerprint": "09b14f2e146b19d2fe2a",
+      "fingerprint": "11501ac71aefc744cd63",
       "category": "record",
       "purpose": "Exact-ID purchase ledger inspection and read-only refresh after a one-time purchase attempt"
     },
     {
       "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseRecovery:modal.open:0",
-      "fingerprint": "2ab7f47c97935cc039d5",
+      "fingerprint": "1785d1d23013832a3363",
       "category": "record",
       "purpose": "Exact-ID read-only purchase recovery after same-user session replacement; no buy replay"
     },

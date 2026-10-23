@@ -7511,7 +7511,7 @@
       "category": "record",
       "parent": "PurchaseWizard",
       "target": null,
-      "fingerprint": "09b14f2e146b19d2fe2a",
+      "fingerprint": "11501ac71aefc744cd63",
       "categories": [
         "record"
       ]
@@ -7527,7 +7527,7 @@
       "category": "record",
       "parent": "PurchaseRecovery",
       "target": null,
-      "fingerprint": "2ab7f47c97935cc039d5",
+      "fingerprint": "1785d1d23013832a3363",
       "categories": [
         "record"
       ]

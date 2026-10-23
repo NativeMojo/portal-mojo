@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { modal, toast } from '../../ui';
+import { OperationsHelp } from '../core/OperationsHelp';
 import { getAuthSessionRevision, subscribeAuth, useAuthSnapshot, useCan } from '../../client/runtime';
 import { deleteDnsRecordSet, fetchDnsCapabilities, useDnsCapabilities, useDnsRecordCoordinator, useDnsRecords } from './api';
 import { domainSession, requireDomainManager } from './domain-authority';
@@ -91,7 +92,7 @@ export function DnsRecordsPanel({ domain, recordType: controlledType, onRecordTy
 
     return <div className="dns-records-panel">
         <div className="dns-record-toolbar"><label className="field dns-record-filter"><span className="field-label">Record type</span><select className="input" value={recordType} onChange={(event) => changeType(event.target.value)}><option value="">All record types</option>{choices.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><div className="dns-toolbar-actions"><button type="button" className="btn" onClick={() => void records.refetch()}><i className={`bi ${records.isFetching ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`} /> Refresh</button>{canManage && <button type="button" className="btn btn-primary" onClick={() => openEditor()}><i className="bi bi-plus-lg" /> Add record set</button>}</div></div>
-        {domain.provider === 'godaddy' && <div className="dns-provider-note">GoDaddy DNS is managed here. Registrar purchase, renewal, privacy, and WHOIS remain in the provider account; refreshed TTLs have a 600-second floor and whole-set deletion is unavailable.</div>}
+        {domain.provider === 'godaddy' && <p className="dim domains-task-help">GoDaddy DNS <OperationsHelp label="GoDaddy DNS limits">Registration, renewal, privacy, and WHOIS remain in your GoDaddy account. TTLs have a 600-second minimum. Deleting whole record sets is unavailable.</OperationsHelp></p>}
         {visible.length === 0 ? <div className="dns-state dim">{rows.length ? 'No records match this type.' : 'The provider returned an empty zone.'}</div> : <div className="dns-table-wrap"><table className="tbl dns-record-table"><thead><tr><th>Type</th><th>Name</th><th>Values</th><th>TTL</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visible.map((record) => {
             const type = record.type.toUpperCase();
             const supported = !!capabilities.data?.allowed_record_types.map((entry) => entry.toUpperCase()).includes(type) && DNS_RECORD_TYPES.includes(type as typeof DNS_RECORD_TYPES[number]);
