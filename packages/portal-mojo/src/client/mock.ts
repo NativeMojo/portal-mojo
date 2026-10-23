@@ -6905,7 +6905,7 @@ export function setMockDnsAcmeMode(value: 'production' | 'staging' | 'unconfigur
 export function setMockDnsRegistrarMode(value: 'ready' | 'disabled' | 'contact-missing'): void { dnsRegistrarMode = value; }
 
 /** Verifier-only one-shot result after a confirmation token is consumed. */
-export function armMockRegistrarPurchaseFault(value: 'failed' | 'ambiguous'): void { dnsRegistrarFault = value; }
+export function armMockRegistrarPurchaseFault(value: 'failed' | 'ambiguous' | null): void { dnsRegistrarFault = value; }
 export function armMockDomainRegistrarSaveFault(value: 'warning' | 'ambiguous'): void { domainRegistrarSaveFault = value; }
 
 /** Verifier-only one-shot DNS transport outcomes; all state still lives in db.dnsRecords. */

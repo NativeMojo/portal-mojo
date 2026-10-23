@@ -17,7 +17,7 @@ import {
     type ComponentType,
     type ReactNode,
 } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 class DemoLoadBoundary extends Component<{ children: ReactNode; retry: () => void }, { failed: boolean }> {
     state = { failed: false };
@@ -618,7 +618,9 @@ const groupOf = (key: string): string | undefined =>
 
 export function ComponentsPage() {
     const [sp, setSp] = useSearchParams();
-    const activeKey = sp.get('demo') ?? SECTIONS[0]!.key;
+    const { pathname } = useLocation(); const navigate = useNavigate();
+    const linkedDemo = pathname.startsWith('/dns/') ? 'admin-domains' : pathname === '/edge/vhosts' ? 'admin-edge' : null;
+    const activeKey = sp.get('demo') ?? linkedDemo ?? SECTIONS[0]!.key;
     const active = SECTIONS.find((s) => s.key === activeKey) ?? SECTIONS[0]!;
     const [remountNonce, setRemountNonce] = useState(0);
 
@@ -652,7 +654,8 @@ export function ComponentsPage() {
         const next = new URLSearchParams(sp);
         setMobileNavigationOpen(false);
         next.set('demo', key);
-        setSp(next, { replace: true });
+        if (linkedDemo) navigate(`/?${next}`, { replace: true });
+        else setSp(next, { replace: true });
         setRemountNonce((n) => n + 1);
     };
 
