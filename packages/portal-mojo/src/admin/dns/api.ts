@@ -181,32 +181,33 @@ export interface LinkDnsCredentialInput {
     api_secret: string;
 }
 
-async function submitCredential(body: Record<string, unknown>): Promise<DnsCredentialRow> {
-    const response = await withFreshAuth(() => mojoCall('/api/dnsman/credential/link', {
-        method: 'POST', body,
-    }));
+async function submitCredential(body: Record<string, unknown>, beforeSend?: () => void): Promise<DnsCredentialRow> {
+    const response = await withFreshAuth(() => { return mojoCall('/api/dnsman/credential/link', {
+        method: 'POST', body, beforeSend,
+    }); });
     return sanitizeDnsCredentialRow(response.data as DnsCredentialRow);
 }
 
-export async function linkDnsCredential(input: LinkDnsCredentialInput): Promise<DnsCredentialRow> {
+export async function linkDnsCredential(input: LinkDnsCredentialInput, beforeSend?: () => void): Promise<DnsCredentialRow> {
     if (!Number.isInteger(input.group) || input.group < 1) throw new Error('Choose a group');
-    return submitCredential({ ...input });
+    return submitCredential({ ...input }, beforeSend);
 }
 
 export async function rotateDnsCredential(
     row: DnsCredentialRow,
     input: Pick<LinkDnsCredentialInput, 'name' | 'api_key' | 'api_secret'>,
+    beforeSend?: () => void,
 ): Promise<DnsCredentialRow> {
     const group = typeof row.group === 'number' ? row.group : row.group?.id;
     if (!group) throw new Error('This credential has no valid group');
     return submitCredential({
         group, provider: row.provider, credential: row.id,
         name: input.name ?? row.name, api_key: input.api_key, api_secret: input.api_secret,
-    });
+    }, beforeSend);
 }
 
-async function postData<T>(path: string, body: Record<string, unknown>): Promise<T> {
-    return (await mojoCall(path, { method: 'POST', body })).data as T;
+async function postData<T>(path: string, body: Record<string, unknown>, beforeSend?: () => void): Promise<T> {
+    return (await mojoCall(path, { method: 'POST', body, beforeSend })).data as T;
 }
 
 export function searchRegistrar(domain: string): Promise<RegistrarSearchRow> {
@@ -222,14 +223,14 @@ export function suggestRegistrar(input: { domain: string; count?: number; only_a
 }
 
 /** Returns a one-use token; consumers must keep it transient and uncached. */
-export function quoteDomain(input: { group: number; domain: string; years?: number }): Promise<RegistrarQuote> {
-    return postData('/api/dnsman/registrar/quote', input);
+export function quoteDomain(input: { group: number; domain: string; years?: number }, beforeSend?: () => void): Promise<RegistrarQuote> {
+    return postData('/api/dnsman/registrar/quote', input, beforeSend);
 }
 
-export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string; confirm_domain: string; confirm_price: string }): Promise<RegistrarPurchaseResult> {
+export async function purchaseDomain(input: { group: number; purchase: number; confirm_token: string; confirm_domain: string; confirm_price: string }, beforeSend?: () => void): Promise<RegistrarPurchaseResult> {
     // Snapshot once: the safe 440 continuation must use the identical quote.
     const body = Object.freeze({ ...input });
-    return sanitizePurchaseResult(await withFreshAuth(() => postData('/api/dnsman/registrar/purchase', body)));
+    return sanitizePurchaseResult(await withFreshAuth(() => postData('/api/dnsman/registrar/purchase', body, beforeSend)));
 }
 
 /** Detail and its error remain modal-local; neither enters Query cache. */
@@ -238,23 +239,23 @@ export async function fetchPurchaseDetail(id: number): Promise<DomainPurchaseRow
     return sanitizeDomainPurchaseRow(response.data);
 }
 
-export async function fetchRegistrantContact(group: number | null): Promise<RegistrantContactResponse> {
-    const response = await mojoCall('/api/dnsman/registrant', { ...(group == null ? {} : { params: { group } }) });
+export async function fetchRegistrantContact(group: number | null, beforeSend?: () => void): Promise<RegistrantContactResponse> {
+    const response = await mojoCall('/api/dnsman/registrant', { beforeSend, ...(group == null ? {} : { params: { group } }) });
     return sanitizeRegistrantResponse(response.data);
 }
 
-export async function saveRegistrantContact(contact: RegistrantContact, group: number | null = null): Promise<RegistrantContactResponse> {
-    const response = await mojoCall('/api/dnsman/registrant', { method: 'POST', body: { ...(group == null ? {} : { group }), contact } });
+export async function saveRegistrantContact(contact: RegistrantContact, group: number | null = null, beforeSend?: () => void): Promise<RegistrantContactResponse> {
+    const response = await mojoCall('/api/dnsman/registrant', { method: 'POST', beforeSend, body: { ...(group == null ? {} : { group }), contact } });
     return sanitizeRegistrantResponse(response.data);
 }
 
-export async function clearRegistrantContact(group: number | null): Promise<RegistrantContactResponse> {
-    const response = await mojoCall('/api/dnsman/registrant', { method: 'POST', body: { ...(group == null ? {} : { group }), clear: true } });
+export async function clearRegistrantContact(group: number | null, beforeSend?: () => void): Promise<RegistrantContactResponse> {
+    const response = await mojoCall('/api/dnsman/registrant', { method: 'POST', beforeSend, body: { ...(group == null ? {} : { group }), clear: true } });
     return sanitizeRegistrantResponse(response.data);
 }
 
-export async function registerExistingDomain(input: { group: number; domain: string; credential: number }): Promise<DomainRow> {
-    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/register-existing', input));
+export async function registerExistingDomain(input: { group: number; domain: string; credential: number }, beforeSend?: () => void): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/register-existing', input, beforeSend));
 }
 
 export async function discoverHouseDomains(untracked = false): Promise<RegistrarDiscoveryResponse> {
@@ -262,12 +263,12 @@ export async function discoverHouseDomains(untracked = false): Promise<Registrar
     return sanitizeRegistrarDiscoveryResponse(response.data);
 }
 
-export async function adoptHouseDomain(input: { domain: string; group?: number; create_zone?: boolean }): Promise<DomainRow> {
-    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/adopt', input));
+export async function adoptHouseDomain(input: { domain: string; group?: number; create_zone?: boolean }, beforeSend?: () => void): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/adopt', input, beforeSend));
 }
 
-export async function assignHouseDomain(input: { domain: number; group: number }): Promise<DomainRow> {
-    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/assign-group', input));
+export async function assignHouseDomain(input: { domain: number; group: number }, beforeSend?: () => void): Promise<DomainRow> {
+    return sanitizeDomainRow(await postData<DomainRow>('/api/dnsman/registrar/assign-group', input, beforeSend));
 }
 
 export function parseDnsRecordSetResponse(value: unknown): DnsRecordSetResponse {

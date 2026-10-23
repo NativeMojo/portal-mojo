@@ -212,9 +212,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor:modal.open:0",
-      "fingerprint": "356802aaea52ec550670",
+      "fingerprint": "5899e650a5007d6f07db",
       "category": "editor",
-      "purpose": "CredentialSecretForm: collect and save fields"
+      "purpose": "Scoped credential link/rotation: transient password refs, selected group, current-session replay fence and guarded provider verification"
     },
     {
       "id": "packages/portal-mojo/src/admin/storage/BucketDetail.tsx:confirmEmpty:modal.open:0",
@@ -542,9 +542,9 @@
     },
     {
       "id": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx:showDomainRegistrarSettings:modal.open:0",
-      "fingerprint": "bcb835928b55d1fd8f8b",
-      "category": "editor",
-      "purpose": "Save changed Route53 registrar booleans and observe authoritative domain warnings"
+      "fingerprint": "85922efdfd2ce92c1705",
+      "category": "action",
+      "purpose": "Explicit manager live registration read before opening proof-backed settings"
     },
     {
       "id": "packages/portal-mojo/src/admin/fleet/FleetOverview.tsx:details:modal.open:0",
@@ -683,6 +683,48 @@
       "fingerprint": "1051c37725e66dbefa73",
       "category": "record",
       "purpose": "Focused WebApp task dialog: desired/attempt identity, paged history, admitted deployment methods and settings; owner lifetime and independent action gates."
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx:openEditor:modal.open:0",
+      "fingerprint": "14e47fa30ed8dd0bb16b",
+      "category": "editor",
+      "purpose": "Registrar-evidence settings or all-role contact editor with exact preflight, pending native guard and no automatic replay"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainAssignment.tsx:showDomainAssignment:modal.open:0",
+      "fingerprint": "53671675cddc82d1e046",
+      "category": "action",
+      "purpose": "One-time Platform assignment: exact destination confirmation, current owner/authority preflight and unknown-outcome observation"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:showDomainDetails:modal.open:0",
+      "fingerprint": "750910432e34c27b15ba",
+      "category": "record",
+      "purpose": "Compact domain inspection with provider-applicable horizontal tasks and guarded registration operations"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:setupContact:modal.open:0",
+      "fingerprint": "42bd4c7c3fd928a5b847",
+      "category": "editor",
+      "purpose": "Contact setup locked to the explicit purchasing group; PII local, useful Contact/Address tabs, pending native guard"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseWizard:modal.open:0",
+      "fingerprint": "11501ac71aefc744cd63",
+      "category": "record",
+      "purpose": "Exact-ID purchase ledger inspection and read-only refresh after a one-time purchase attempt"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseRecovery:modal.open:0",
+      "fingerprint": "1785d1d23013832a3363",
+      "category": "record",
+      "purpose": "Exact-ID read-only purchase recovery after same-user session replacement; no buy replay"
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchasesPage.tsx:DomainPurchasesPage:modal.open:0",
+      "fingerprint": "0bdc4287fa2edf974d99",
+      "category": "record",
+      "purpose": "Read-only exact purchase ledger detail with deliberate Refresh and completed domain handoff"
     }
   ],
   "lifecycle": [
@@ -708,7 +750,7 @@
       "file": "packages/portal-mojo/src/admin/dns/api.ts",
       "symbol": "deleteDnsRecordSet",
       "expression": "deleteDnsRecordSet",
-      "fingerprint": "65314f579e7428e478b5",
+      "fingerprint": "9b4270a1fa82e6feae94",
       "permission": "DNS record mutation authority, live capability and coordinated zone revision",
       "rationale": "Compatibility alias only; low-level API remains exported and does not add a built-in UI affordance.",
       "runtimeCase": "dns-record-delete-coordinator"

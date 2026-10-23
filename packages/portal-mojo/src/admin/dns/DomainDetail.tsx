@@ -1,51 +1,68 @@
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { hasPermission, useMe } from '../../client/runtime';
-import { DetailView, Eyebrow, FlatRow, fmt } from '../../ui';
+import { useQueryClient } from '@tanstack/react-query';
+import { getAuthSessionRevision, hasPermission, subscribeAuth, useAuthSnapshot, useMe } from '../../client/runtime';
+import { Badge, FlatRow, Tabs, fmt, modal } from '../../ui';
+import { OperationsHelp } from '../core/OperationsHelp';
 import { useDnsCapabilities } from './api';
 import { providerLabel } from './data';
 import { useDnsDomainLinks } from './domain-links';
 import { DnsRecordsPanel } from './DnsRecordsPanel';
 import { DomainCertificatesSection } from './DomainCertificatesSection';
-import { SharedValidationPanel } from './SharedValidationPanel';
 import { openSharedValidation } from './SharedValidationDialog';
-import { useValidationPlan } from './shared-validation-api';
-import { domainRecordsHref, domainScopeLabel, dnsAdminMount, supportsDomainRecords } from './domain-navigation';
+import { domainScopeLabel, dnsAdminMount, supportsDomainRecords } from './domain-navigation';
 import { redactRegistrarError } from './purchase-data';
-import { DNS_MANAGE_PERMISSIONS, DNS_VIEW_PERMISSIONS, DomainModel } from './models';
+import { DNS_MANAGE_PERMISSIONS, DNS_VIEW_PERMISSIONS, DomainModel, type DomainRow } from './models';
+import { DomainRegistrationPanel } from './DomainRegistrationPanel';
+import { showDomainAssignment } from './DomainAssignment';
 
-export function DomainDetail({ id, onClose }: { id: number; onClose: () => void }) {
-    const query = DomainModel.useOne(id);
-    const { data: me } = useMe();
-    const links = useDnsDomainLinks();
-    const navigate = useNavigate();
-    const location = useLocation();
+export function showDomainDetails(id: number, initialTab = 'overview') {
+    let busy = false;
+    const onBusyChange = (value: boolean) => { busy = value; };
+    return modal.open(close => <DomainDetail id={id} initialTab={initialTab} onClose={() => close(null)} onBusyChange={onBusyChange} />, { size: 'lg', canDismiss: () => !busy });
+}
+
+export function DomainDetail({ id, initialTab = 'overview', onClose, onBusyChange }: { id: number; initialTab?: string; onClose: () => void; onBusyChange?: (busy: boolean) => void }) {
+    const { data: me } = useMe(); const auth = useAuthSnapshot();
+    const revision = useSyncExternalStore(subscribeAuth, getAuthSessionRevision, getAuthSessionRevision);
+    const canView = auth.authenticated && hasPermission(me, DNS_VIEW_PERMISSIONS, null);
+    const query = DomainModel.useOne(canView ? id : null);
     const domain = query.data;
-    const shared = useValidationPlan(domain ? { domain: domain.id } : null);
-    const group = typeof domain?.group === 'number' ? domain.group : domain?.group?.id ?? null;
-    const capabilities = useDnsCapabilities(group, { enabled: !!domain });
+    if (!canView) return <div className="modal-pad"><h2 className="modal-title">Domain unavailable</h2><button className="btn" onClick={onClose}>Close</button></div>;
     if (query.isPending) return <div className="modal-pad dim">Loading domain…</div>;
-    if (!domain || query.error) return <div className="modal-pad text-bad">{query.error?.message ?? 'Domain not found'}</div>;
-    const availableLinks = capabilities.data ? links.filter((link) => (!link.permissions || hasPermission(me, link.permissions)) && (!link.when || link.when(domain, capabilities.data!))) : [];
-    const navigateLink = (route: string) => {
-        const marker = location.pathname.indexOf('/dns/');
-        const mount = marker >= 0 ? location.pathname.slice(0, marker) : '';
-        onClose();
-        navigate(`${mount}/dns/${route.replace(/^\/?dns\//, '').replace(/^\//, '')}`);
-    };
-    const groupLabel = domainScopeLabel(domain.group);
-    const canManage = hasPermission(me ?? null, DNS_MANAGE_PERMISSIONS, null);
-    const openDestination = (href: string) => { onClose(); navigate(href); };
+    if (!domain || query.error) return <div className="modal-pad"><h2 className="modal-title">Could not load domain</h2><p className="text-bad">{query.error?.message ?? 'Domain not found'}</p><div className="modal-actions"><button className="btn" onClick={onClose}>Close</button><button className="btn" onClick={() => void query.refetch()}>Retry</button></div></div>;
+    return <DomainContent key={`${auth.uid}:${revision}:${domain.id}`} domain={domain} initialTab={initialTab} onClose={onClose} onBusyChange={onBusyChange} />;
+}
+
+function DomainContent({ domain, initialTab, onClose, onBusyChange }: { domain: DomainRow; initialTab: string; onClose: () => void; onBusyChange?: (busy: boolean) => void }) {
+    const { data: me } = useMe(); const qc = useQueryClient();
+    const location = useLocation(); const navigate = useNavigate(); const links = useDnsDomainLinks();
+    const [tab, setTab] = useState(initialTab); const [recordType, setRecordType] = useState(''); const [busy, setBusy] = useState(false);
+    const setPending = useCallback((value: boolean) => { setBusy(value); onBusyChange?.(value); }, [onBusyChange]);
+    const canManage = hasPermission(me, DNS_MANAGE_PERMISSIONS, null);
+    const group = typeof domain.group === 'number' ? domain.group : domain.group?.id ?? null;
+    // Catalog is read-only; manager prerequisites and legal contacts load only on deliberate actions.
+    const caps = useDnsCapabilities(group, { enabled: links.some(link => !['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials'].includes(link.key)) });
+    const customLinks = links.filter(link => !['domains', 'records', 'certificates', 'purchases', 'registrant', 'credentials'].includes(link.key) && (!link.permissions || hasPermission(me, link.permissions, null)) && (!link.when || caps.data && link.when(domain, caps.data)));
+    const go = (href: string) => { onClose(); navigate(href); };
+    const refresh = async () => { await DomainModel.invalidate(qc); };
     const credential = typeof domain.credential === 'object' ? domain.credential : null;
-    return <DetailView
-        icon="bi-globe2" title={domain.name} subtitle={providerLabel(domain.provider)}
-        chips={[{ text: domain.status, tone: fmt.inferTone(domain.status) }, ...(domain.verified ? [{ text: 'Verified', tone: 'success' as const }] : [])]}
-        sections={[
-            { key: 'overview', label: 'Overview', icon: 'bi-grid-1x2', render: () => <div className="dns-domain-overview"><div className="domains-overview-actions">{supportsDomainRecords(domain.provider) && <button className="btn btn-primary" onClick={() => openDestination(domainRecordsHref(location.pathname, domain.id))}>DNS Records <i className="bi bi-arrow-right" /></button>}{canManage && domain.provider === 'route53' && <button className="btn" onClick={() => void import('./DomainRegistrarSettings').then(({ showDomainRegistrarSettings }) => showDomainRegistrarSettings(domain))}>Registrar settings</button>}{hasPermission(me ?? null, DNS_VIEW_PERMISSIONS, null) && <button className="btn" onClick={() => openDestination(`${dnsAdminMount(location.pathname)}/edge/vhosts`)}>Serving <i className="bi bi-arrow-right" /></button>}</div><Eyebrow>Domain</Eyebrow><FlatRow label="Scope">{groupLabel}</FlatRow><FlatRow label="Expires">{fmt.date(domain.expires)}</FlatRow><FlatRow label="Auto-renew">{domain.auto_renew ? 'Enabled' : 'Disabled'}</FlatRow><FlatRow label="WHOIS privacy">{domain.privacy ? 'Enabled' : 'Disabled'}</FlatRow><details className="ops-details"><summary>Registration details</summary>{domain.hosted_zone_id && <FlatRow label="Hosted zone"><code>{domain.hosted_zone_id}</code></FlatRow>}<FlatRow label="Registered">{fmt.date(domain.registered_on)}</FlatRow><FlatRow label="Credential">{credential ? `${credential.name} · ${credential.is_active && credential.verified ? 'usable' : 'unavailable'}` : '—'}</FlatRow></details>{domain.last_error && <div className="dns-error">{redactRegistrarError(domain.last_error)}</div>}{domain.provider === 'godaddy' && <div className="dns-provider-note">DNS is managed here; purchase, renewal, privacy, and WHOIS remain in the GoDaddy account.</div>}{domain.provider === 'mojo' && <div className="dns-blocked">Mojo is certificate-only and cannot use generic DNS CRUD.</div>}{availableLinks.length > 0 && <><Eyebrow>Related</Eyebrow><div className="dns-domain-links">{availableLinks.filter((link) => link.key !== 'records' || supportsDomainRecords(domain.provider)).map((link) => <button className="btn" type="button" key={link.key} onClick={() => navigateLink(typeof link.route === 'function' ? link.route(domain) : link.route)}><i className={`bi ${link.icon}`} /> {link.label}</button>)}</div></>}</div> },
-            { key: 'validation', label: 'Advanced validation', icon: 'bi-diagram-2', render: () => <SharedValidationPanel domain={domain} /> },
-            { key: 'records', label: 'DNS Records', icon: 'bi-list-columns', render: () => <DnsRecordsPanel domain={domain} /> },
-            { key: 'certificates', label: 'Certificates', icon: 'bi-patch-check', render: () => <DomainCertificatesSection domain={domain} /> },
-        ]}
-        initialSection="overview" onClose={onClose}
-        contextMenu={canManage && shared.data?.capabilities.group_choices ? [{ label: 'Set up shared validation', icon: 'bi-diagram-2', onSelect: () => void openSharedValidation(domain) }] : []}
-    />;
+    const items = [
+        { key: 'overview', label: 'Overview', panel: <div className="domains-detail-panel">
+            {domain.last_error && <div className="form-alert" role="alert">{redactRegistrarError(domain.last_error)}</div>}
+            {domain.provider === 'godaddy' && <p className="dns-provider-note">Manage DNS here. Registration and renewals stay in your GoDaddy account.</p>}
+            {domain.provider === 'mojo' && <p className="dns-provider-note">Certificate-only domain. General DNS records are managed by its DNS provider.</p>}
+            {!supportsDomainRecords(domain.provider) && domain.provider !== 'mojo' && <p className="form-alert">This DNS provider is unavailable in this portal.</p>}
+            <FlatRow label="Scope"><span>{domainScopeLabel(domain.group)}</span>{canManage && me?.is_superuser === true && domain.group == null && <button className="btn btn-sm" onClick={() => void showDomainAssignment(domain)}>Assign to group</button>}</FlatRow>
+            <FlatRow label="Expires">{domain.expires ? fmt.date(domain.expires) : <span>Unknown <OperationsHelp label="domain expiry">A hosted zone does not prove that its registration never expires. Read live registration details or check its registrar.</OperationsHelp></span>}</FlatRow>
+            <FlatRow label="Ownership">{domain.verified ? 'Verified' : 'Not verified'}</FlatRow>
+            {domain.hosted_zone_id && <FlatRow label="Hosted zone"><code>{domain.hosted_zone_id}</code></FlatRow>}
+            {credential && <FlatRow label="Credential"><span>{credential.name} · {credential.is_active && credential.verified ? 'Verified' : 'Needs attention'}</span></FlatRow>}
+            <div className="domains-overview-actions"><button className="btn" onClick={() => go(`${dnsAdminMount(location.pathname)}/edge/vhosts`)}>Serving <i className="bi bi-arrow-right" /></button>{canManage && <span className="domains-task-help"><button className="btn" onClick={() => void openSharedValidation(domain)}>Shared validation</button><OperationsHelp label="shared validation">Connect shared wildcard validation or review controller trust for this domain.</OperationsHelp></span>}{customLinks.map(link => <button className="btn" key={link.key} onClick={() => go(`${dnsAdminMount(location.pathname)}/dns/${(typeof link.route === 'function' ? link.route(domain) : link.route).replace(/^\/?dns\//, '').replace(/^\//, '')}`)}>{link.label}</button>)}</div>
+        </div> },
+        ...(supportsDomainRecords(domain.provider) ? [{ key: 'records', label: 'DNS records', panel: <div className="domains-detail-panel"><DnsRecordsPanel domain={domain} recordType={recordType} onRecordTypeChange={setRecordType} onBusyChange={setPending} /></div> }] : []),
+        { key: 'certificates', label: 'Certificates', panel: <div className="domains-detail-panel"><DomainCertificatesSection domain={domain} /></div> },
+        ...(canManage && domain.provider !== 'mojo' ? [{ key: 'registration', label: 'Registration', panel: <div className="domains-detail-panel"><DomainRegistrationPanel domain={domain} onBusyChange={setPending} onChanged={refresh} /></div> }] : []),
+    ];
+    return <div className="domains-detail"><header className="domains-detail-header"><div><h2 className="modal-title">{domain.name}</h2><div className="domains-detail-subtitle"><span>{providerLabel(domain.provider)}</span><Badge tone={fmt.inferTone(domain.status)}>{domain.status}</Badge></div></div><button className="btn-icon" aria-label="Close domain" disabled={busy} onClick={onClose}><i className="bi bi-x-lg" /></button></header><Tabs ariaLabel="Domain details" activeKey={tab} onActiveKeyChange={setTab} items={items.map(item => ({ ...item, disabled: busy && item.key !== tab }))} /></div>;
 }

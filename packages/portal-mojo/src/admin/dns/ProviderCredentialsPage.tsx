@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCan } from '../../client/runtime';
 import {
     Badge,
@@ -22,6 +22,7 @@ import {
     useDnsCapabilities,
 } from './api';
 import { linkableProviders, providerLabel } from './data';
+import { domainSession, requireDomainManager } from './domain-authority';
 import {
     DNS_MANAGE_PERMISSIONS,
     DNS_VIEW_PERMISSIONS,
@@ -45,10 +46,13 @@ function verificationTone(row: DnsCredentialRow): Tone {
     return row.verified ? 'success' : row.last_error ? 'danger' : 'warning';
 }
 
-function CredentialSecretForm({ row, caps, close }: {
+function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy, signal }: {
     row?: DnsCredentialRow;
     caps: DnsCapabilities;
     close: (saved: DnsCredentialRow | null) => void;
+    fixedGroup?: DnsGroupChoice;
+    onBusy?: (busy: boolean) => void;
+    signal?: AbortSignal;
 }) {
     const queryClient = useQueryClient();
     const providers = linkableProviders(caps);
@@ -56,37 +60,45 @@ function CredentialSecretForm({ row, caps, close }: {
     const secretRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState(row?.name ?? '');
     const [provider, setProvider] = useState(row?.provider ?? providers[0]?.name ?? '');
-    const [group, setGroup] = useState<DnsGroupChoice | null>(null);
+    const [group, setGroup] = useState<DnsGroupChoice | null>(fixedGroup ?? null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const fixedGroup = row ? groupLabel(row.group) : null;
+    const scopeLabel = row ? groupLabel(row.group) : fixedGroup?.name;
+    const flight = useRef(false); const session = useRef(domainSession());
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
     const submit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (flight.current) return;
         const apiKey = keyRef.current?.value ?? '';
         const apiSecret = secretRef.current?.value ?? '';
         if (!apiKey || !apiSecret) { setError('Enter both the API key and API secret'); return; }
         if (!row && !group) { setError('Choose a group'); return; }
         if (!provider) { setError('Choose a provider'); return; }
-        setBusy(true);
+        flight.current = true; setBusy(true); onBusy?.(true);
         setError('');
         try {
+            await requireDomainManager(session.current);
+            const beforeSend = () => { if (!mounted.current || signal?.aborted || domainSession() !== session.current) throw new Error('Session changed. Reopen credential setup.'); };
             const saved = row
-                ? await rotateDnsCredential(row, { name, api_key: apiKey, api_secret: apiSecret })
+                ? await rotateDnsCredential(row, { name, api_key: apiKey, api_secret: apiSecret }, beforeSend)
                 : await linkDnsCredential({
                     group: group!.id, provider, name,
                     api_key: apiKey, api_secret: apiSecret,
-                });
+                }, beforeSend);
+            if (!mounted.current || signal?.aborted || domainSession() !== session.current) return;
             queryClient.setQueryData(DnsCredentialModel.keys.one(saved.id), saved);
             toast.success(row ? 'Credential rotated and verified' : 'Credential linked and verified');
             close(saved);
         } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'The provider rejected those credentials');
+            if (mounted.current && !signal?.aborted) setError(reason instanceof Error ? reason.message : 'The provider rejected those credentials');
         } finally {
             if (keyRef.current) keyRef.current.value = '';
             if (secretRef.current) secretRef.current.value = '';
             await invalidateDnsCredentials(queryClient);
             setBusy(false);
+            flight.current = false; onBusy?.(false);
         }
     };
 
@@ -101,15 +113,15 @@ function CredentialSecretForm({ row, caps, close }: {
                 <div className="col-12">
                     <label className="field">
                         <span className="field-label">Label</span>
-                        <input className="input" value={name} placeholder="Acme GoDaddy" onChange={(event) => setName(event.target.value)} />
+                        <input className="input" value={name} disabled={busy} placeholder="Acme GoDaddy" onChange={(event) => setName(event.target.value)} />
                     </label>
                 </div>
                 <div className="col-12">
-                    {row ? (
+                    {row || fixedGroup ? (
                         <div className="field">
                             <span className="field-label">Group</span>
-                            <div className="input" aria-readonly="true">{fixedGroup}</div>
-                            <span className="field-help">Rotation keeps the existing credential scope.</span>
+                            <div className="input" aria-readonly="true">{scopeLabel}</div>
+                            {row && <span className="field-help">Rotation keeps the existing credential scope.</span>}
                         </div>
                     ) : (
                         <CollectionSelect<DnsGroupChoice>
@@ -120,6 +132,7 @@ function CredentialSecretForm({ row, caps, close }: {
                             placeholder="Search eligible groups…"
                             help="Only active groups authorized for DNS credential assignment appear."
                             required
+                            disabled={busy}
                             maxItems={25}
                             defaultParams={{ start: 0 }}
                         />
@@ -131,7 +144,7 @@ function CredentialSecretForm({ row, caps, close }: {
                         {row ? (
                             <div className="input" aria-readonly="true">{providerLabel(provider)}</div>
                         ) : (
-                            <select className="input" value={provider} onChange={(event) => setProvider(event.target.value)}>
+                            <select className="input" value={provider} disabled={busy} onChange={(event) => setProvider(event.target.value)}>
                                 {providers.map((entry) => <option key={entry.name} value={entry.name}>{providerLabel(entry.name)}</option>)}
                             </select>
                         )}
@@ -140,13 +153,13 @@ function CredentialSecretForm({ row, caps, close }: {
                 <div className="col-12">
                     <label className="field">
                         <span className="field-label">API key <em>*</em></span>
-                        <input ref={keyRef} className="input" type="password" autoComplete="new-password" spellCheck={false} />
+                        <input ref={keyRef} className="input" type="password" disabled={busy} autoComplete="new-password" spellCheck={false} />
                     </label>
                 </div>
                 <div className="col-12">
                     <label className="field">
                         <span className="field-label">API secret <em>*</em></span>
-                        <input ref={secretRef} className="input" type="password" autoComplete="new-password" spellCheck={false} />
+                        <input ref={secretRef} className="input" type="password" disabled={busy} autoComplete="new-password" spellCheck={false} />
                     </label>
                 </div>
             </div>
@@ -160,10 +173,11 @@ function CredentialSecretForm({ row, caps, close }: {
     );
 }
 
-async function showCredentialEditor(caps: DnsCapabilities, row?: DnsCredentialRow): Promise<DnsCredentialRow | null> {
+export async function showCredentialEditor(caps: DnsCapabilities, row?: DnsCredentialRow, fixedGroup?: DnsGroupChoice, options: { signal?: AbortSignal; onBusyChange?: (busy: boolean) => void } = {}): Promise<DnsCredentialRow | null> {
+    let busy = false;
     return modal.open<DnsCredentialRow | null>((close) => (
-        <CredentialSecretForm caps={caps} row={row} close={close} />
-    ), { size: 'md' });
+        <CredentialSecretForm caps={caps} row={row} fixedGroup={fixedGroup} signal={options.signal} close={close} onBusy={value => { busy = value; options.onBusyChange?.(value); }} />
+    ), { signal: options.signal, size: 'md', canDismiss: () => !busy });
 }
 
 function CredentialDetail({ id, caps, close }: { id: number; caps: DnsCapabilities; close: () => void }) {

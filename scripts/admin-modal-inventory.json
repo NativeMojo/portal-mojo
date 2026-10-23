@@ -6790,6 +6790,116 @@
       ]
     },
     {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "showCredentialEditor",
+      "launcher": "modal.open",
+      "body": [
+        "CredentialSecretForm"
+      ],
+      "category": "editor",
+      "parent": "showCredentialEditor",
+      "target": null,
+      "fingerprint": "5899e650a5007d6f07db",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialDetail:DetailView:0",
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "CredentialDetail",
+      "launcher": "DetailView",
+      "body": [
+        "DetailView",
+        "div",
+        "FlatRow",
+        "code",
+        "p"
+      ],
+      "category": "record",
+      "parent": "CredentialDetail",
+      "target": null,
+      "fingerprint": "7a0cf3e54112fc2ffa6b",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialDetail:showCredentialEditor:0",
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "CredentialDetail",
+      "launcher": "showCredentialEditor",
+      "body": [],
+      "category": "editor",
+      "parent": "CredentialDetail",
+      "target": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor",
+      "fingerprint": "9b5f0b64ab229919d717",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:openDetail:modal.detail:0",
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "openDetail",
+      "launcher": "modal.detail",
+      "body": [
+        "CredentialDetail"
+      ],
+      "category": "record",
+      "parent": "openDetail",
+      "target": null,
+      "fingerprint": "c93a451d532231622548",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialsTable:showCredentialEditor:0",
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "CredentialsTable",
+      "launcher": "showCredentialEditor",
+      "body": [],
+      "category": "editor",
+      "parent": "CredentialsTable",
+      "target": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor",
+      "fingerprint": "14ffaf8dec81dc1024c8",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialsTable:handler:0",
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "CredentialsTable",
+      "launcher": "openDetail",
+      "body": [
+        "openDetail"
+      ],
+      "category": "record",
+      "parent": "onRowClick",
+      "target": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:openDetail",
+      "fingerprint": "fac7211628308949f13a",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx:repair:import:0",
+      "file": "packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx",
+      "owner": "repair",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "repair",
+      "target": null,
+      "fingerprint": "02d47b98feb4458ebab9",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
       "id": "packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx:openEditor:modal.open:0",
       "file": "packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx",
       "owner": "openEditor",
@@ -7185,74 +7295,255 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx:showDomainRegistrarSettings:modal.open:0",
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx:showDomainRegistrarSettings:import:0",
       "file": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx",
       "owner": "showDomainRegistrarSettings",
-      "launcher": "modal.open",
-      "body": [
-        "DomainRegistrarSettings"
-      ],
-      "category": "editor",
-      "parent": "showDomainRegistrarSettings",
-      "target": null,
-      "fingerprint": "bcb835928b55d1fd8f8b",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:DomainDetail:DetailView:0",
-      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "div",
-        "button",
-        "i",
-        "Eyebrow",
-        "FlatRow",
-        "details",
-        "summary",
-        "code",
-        "SharedValidationPanel",
-        "DnsRecordsPanel",
-        "DomainCertificatesSection"
-      ],
-      "category": "record",
-      "parent": "DomainDetail",
-      "target": null,
-      "fingerprint": "0c66c0963b01eaf51c59",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:DomainDetail:import:0",
-      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
       "launcher": "import",
       "body": [],
       "category": "dependency",
-      "parent": "DomainDetail",
+      "parent": "showDomainRegistrarSettings",
       "target": null,
-      "fingerprint": "6ab1b1baefa766950230",
+      "fingerprint": "4b96f533fc3d72fb1a78",
       "categories": [
         "dependency"
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:DomainDetail:openSharedValidation:0",
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx:showDomainRegistrarSettings:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainRegistrarSettings.tsx",
+      "owner": "showDomainRegistrarSettings",
+      "launcher": "modal.open",
+      "body": [
+        "Dialog"
+      ],
+      "category": "action",
+      "parent": "showDomainRegistrarSettings",
+      "target": null,
+      "fingerprint": "85922efdfd2ce92c1705",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx:openEditor:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx",
+      "owner": "openEditor",
+      "launcher": "modal.open",
+      "body": [
+        "RegistrationEditor"
+      ],
+      "category": "editor",
+      "parent": "openEditor",
+      "target": null,
+      "fingerprint": "14e47fa30ed8dd0bb16b",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx:DomainRegistrationPanel:openEditor:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx",
+      "owner": "DomainRegistrationPanel",
+      "launcher": "openEditor",
+      "body": [],
+      "category": "editor",
+      "parent": "DomainRegistrationPanel",
+      "target": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx:openEditor",
+      "fingerprint": "1ca6a9eb177f8799697e",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx:DomainRegistrationPanel:openEditor:1",
+      "file": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx",
+      "owner": "DomainRegistrationPanel",
+      "launcher": "openEditor",
+      "body": [],
+      "category": "editor",
+      "parent": "DomainRegistrationPanel",
+      "target": "packages/portal-mojo/src/admin/dns/DomainRegistrationPanel.tsx:openEditor",
+      "fingerprint": "1bf416bfbdc53115ff93",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainAssignment.tsx:showDomainAssignment:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainAssignment.tsx",
+      "owner": "showDomainAssignment",
+      "launcher": "modal.open",
+      "body": [
+        "DomainAssignment"
+      ],
+      "category": "action",
+      "parent": "showDomainAssignment",
+      "target": null,
+      "fingerprint": "53671675cddc82d1e046",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:showDomainDetails:modal.open:0",
       "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
+      "owner": "showDomainDetails",
+      "launcher": "modal.open",
+      "body": [
+        "DomainDetail"
+      ],
+      "category": "record",
+      "parent": "showDomainDetails",
+      "target": null,
+      "fingerprint": "750910432e34c27b15ba",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:DomainContent:showDomainAssignment:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
+      "owner": "DomainContent",
+      "launcher": "showDomainAssignment",
+      "body": [],
+      "category": "action",
+      "parent": "DomainContent",
+      "target": "packages/portal-mojo/src/admin/dns/DomainAssignment.tsx:showDomainAssignment",
+      "fingerprint": "82ba34d5d916713c535d",
+      "categories": [
+        "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:DomainContent:openSharedValidation:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
+      "owner": "DomainContent",
       "launcher": "openSharedValidation",
       "body": [],
       "category": "action",
-      "parent": "DomainDetail",
+      "parent": "DomainContent",
       "target": "packages/portal-mojo/src/admin/dns/SharedValidationDialog.tsx:openSharedValidation",
       "fingerprint": "d2410a90865b9fc8ca57",
       "categories": [
         "action"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseDetail.tsx:openDomain:import:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainPurchaseDetail.tsx",
+      "owner": "openDomain",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "openDomain",
+      "target": null,
+      "fingerprint": "97ab1c396e27962049b4",
+      "categories": [
+        "dependency"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx:clear:modal.confirm:0",
+      "file": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx",
+      "owner": "clear",
+      "launcher": "modal.confirm",
+      "body": [],
+      "category": "confirmation",
+      "parent": "clear",
+      "target": null,
+      "fingerprint": "90ee0b135e9faa58010f",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx:RegistrantContactPage:clear:0",
+      "file": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx",
+      "owner": "RegistrantContactPage",
+      "launcher": "clear",
+      "body": [],
+      "category": "confirmation",
+      "parent": "RegistrantContactPage",
+      "target": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx:clear",
+      "fingerprint": "1b1fa99b63a0026bf00c",
+      "categories": [
+        "confirmation"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:setupContact:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx",
+      "owner": "setupContact",
+      "launcher": "modal.open",
+      "body": [
+        "RegistrantContactPage"
+      ],
+      "category": "editor",
+      "parent": "setupContact",
+      "target": null,
+      "fingerprint": "42bd4c7c3fd928a5b847",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseWizard:setupContact:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx",
+      "owner": "PurchaseWizard",
+      "launcher": "setupContact",
+      "body": [],
+      "category": "editor",
+      "parent": "PurchaseWizard",
+      "target": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:setupContact",
+      "fingerprint": "af28809dd0426f3570cd",
+      "categories": [
+        "editor"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseWizard:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx",
+      "owner": "PurchaseWizard",
+      "launcher": "modal.open",
+      "body": [
+        "DomainPurchaseDetail"
+      ],
+      "category": "record",
+      "parent": "PurchaseWizard",
+      "target": null,
+      "fingerprint": "11501ac71aefc744cd63",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx:PurchaseRecovery:modal.open:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx",
+      "owner": "PurchaseRecovery",
+      "launcher": "modal.open",
+      "body": [
+        "DomainPurchaseDetail"
+      ],
+      "category": "record",
+      "parent": "PurchaseRecovery",
+      "target": null,
+      "fingerprint": "1785d1d23013832a3363",
+      "categories": [
+        "record"
+      ]
+    },
+    {
+      "id": "packages/portal-mojo/src/admin/dns/DomainRegisterExisting.tsx:DomainRegisterExisting:import:0",
+      "file": "packages/portal-mojo/src/admin/dns/DomainRegisterExisting.tsx",
+      "owner": "DomainRegisterExisting",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "DomainRegisterExisting",
+      "target": null,
+      "fingerprint": "02d47b98feb4458ebab9",
+      "categories": [
+        "dependency"
       ]
     },
     {
@@ -7286,22 +7577,6 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx:open:modal.detail:0",
-      "file": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx",
-      "owner": "open",
-      "launcher": "modal.detail",
-      "body": [
-        "DomainDetail"
-      ],
-      "category": "record",
-      "parent": "open",
-      "target": null,
-      "fingerprint": "b9b0fdf2093272c13d7f",
-      "categories": [
-        "record"
-      ]
-    },
-    {
       "id": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx:DomainsPage:import:0",
       "file": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx",
       "owner": "DomainsPage",
@@ -7316,17 +7591,15 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx:DomainsPage:handler:0",
+      "id": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx:DomainsPage:showDomainDetails:0",
       "file": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx",
       "owner": "DomainsPage",
-      "launcher": "open",
-      "body": [
-        "open"
-      ],
+      "launcher": "showDomainDetails",
+      "body": [],
       "category": "record",
-      "parent": "onRowClick",
-      "target": "packages/portal-mojo/src/admin/dns/DomainsPage.tsx:open",
-      "fingerprint": "2cb1a40fcf0d4332e661",
+      "parent": "DomainsPage",
+      "target": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx:showDomainDetails",
+      "fingerprint": "35ccd877fd15458a4c26",
       "categories": [
         "record"
       ]
@@ -7392,17 +7665,17 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/dns/DomainPurchasesPage.tsx:DomainPurchasesPage:modal.detail:0",
+      "id": "packages/portal-mojo/src/admin/dns/DomainPurchasesPage.tsx:DomainPurchasesPage:modal.open:0",
       "file": "packages/portal-mojo/src/admin/dns/DomainPurchasesPage.tsx",
       "owner": "DomainPurchasesPage",
-      "launcher": "modal.detail",
+      "launcher": "modal.open",
       "body": [
         "DomainPurchaseDetail"
       ],
       "category": "record",
       "parent": "DomainPurchasesPage",
       "target": null,
-      "fingerprint": "6ed4806dc0782cb7a160",
+      "fingerprint": "0bdc4287fa2edf974d99",
       "categories": [
         "record"
       ]
@@ -7419,130 +7692,6 @@
       "fingerprint": "b9b1f2a3fe7b87d970ec",
       "categories": [
         "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx:clear:modal.confirm:0",
-      "file": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx",
-      "owner": "clear",
-      "launcher": "modal.confirm",
-      "body": [],
-      "category": "confirmation",
-      "parent": "clear",
-      "target": null,
-      "fingerprint": "29dcf58687ba984c379f",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx:RegistrantContactPage:clear:0",
-      "file": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx",
-      "owner": "RegistrantContactPage",
-      "launcher": "clear",
-      "body": [],
-      "category": "confirmation",
-      "parent": "RegistrantContactPage",
-      "target": "packages/portal-mojo/src/admin/dns/RegistrantContactPage.tsx:clear",
-      "fingerprint": "1b1fa99b63a0026bf00c",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor:modal.open:0",
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "showCredentialEditor",
-      "launcher": "modal.open",
-      "body": [
-        "CredentialSecretForm"
-      ],
-      "category": "editor",
-      "parent": "showCredentialEditor",
-      "target": null,
-      "fingerprint": "356802aaea52ec550670",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialDetail:DetailView:0",
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "CredentialDetail",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "div",
-        "FlatRow",
-        "code",
-        "p"
-      ],
-      "category": "record",
-      "parent": "CredentialDetail",
-      "target": null,
-      "fingerprint": "7a0cf3e54112fc2ffa6b",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialDetail:showCredentialEditor:0",
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "CredentialDetail",
-      "launcher": "showCredentialEditor",
-      "body": [],
-      "category": "editor",
-      "parent": "CredentialDetail",
-      "target": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor",
-      "fingerprint": "9b5f0b64ab229919d717",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:openDetail:modal.detail:0",
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "openDetail",
-      "launcher": "modal.detail",
-      "body": [
-        "CredentialDetail"
-      ],
-      "category": "record",
-      "parent": "openDetail",
-      "target": null,
-      "fingerprint": "c93a451d532231622548",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialsTable:showCredentialEditor:0",
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "CredentialsTable",
-      "launcher": "showCredentialEditor",
-      "body": [],
-      "category": "editor",
-      "parent": "CredentialsTable",
-      "target": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:showCredentialEditor",
-      "fingerprint": "14ffaf8dec81dc1024c8",
-      "categories": [
-        "editor"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:CredentialsTable:handler:0",
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "CredentialsTable",
-      "launcher": "openDetail",
-      "body": [
-        "openDetail"
-      ],
-      "category": "record",
-      "parent": "onRowClick",
-      "target": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx:openDetail",
-      "fingerprint": "fac7211628308949f13a",
-      "categories": [
-        "record"
       ]
     },
     {
@@ -12027,6 +12176,13 @@
       "fingerprint": "e395a4df232223944101"
     },
     {
+      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
+      "owner": "CredentialDetail",
+      "key": "'overview'",
+      "label": "Overview",
+      "fingerprint": "e38868524077f5dc440b"
+    },
+    {
       "file": "packages/portal-mojo/src/admin/dns/CertificateDetail.tsx",
       "owner": "AllowedCertificateDetail",
       "key": "'overview'",
@@ -12053,41 +12209,6 @@
       "key": "'delegation'",
       "label": "Delegation",
       "fingerprint": "51932b73c15f08a92cf3"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "803a4ce2c6f2a2ff3fcd"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
-      "key": "'validation'",
-      "label": "Advanced validation",
-      "fingerprint": "86196e51dc0e5e59c6fc"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
-      "key": "'records'",
-      "label": "DNS Records",
-      "fingerprint": "20c726d700a79d30707d"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/dns/DomainDetail.tsx",
-      "owner": "DomainDetail",
-      "key": "'certificates'",
-      "label": "Certificates",
-      "fingerprint": "34fb74a8fa2d1fdda958"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/dns/ProviderCredentialsPage.tsx",
-      "owner": "CredentialDetail",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "e38868524077f5dc440b"
     },
     {
       "file": "packages/portal-mojo/src/admin/storage/BucketDetail.tsx",
