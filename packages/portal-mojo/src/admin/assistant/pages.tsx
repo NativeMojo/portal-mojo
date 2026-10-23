@@ -1,132 +1,146 @@
-import { useQuery } from '@tanstack/react-query';
-import type { MemberLike } from '../../client/me';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { getAuthSessionRevision, getAuthSnapshot, subscribeAuth } from '../../client/auth';
+import { hasPermission, memberHasPermission, useAuthSnapshot, useMe, type Me, type MemberLike } from '../../client/me';
 import type { FileReference } from '../../client/record-feed';
-import { memberHasPermission, mojoCall, mojoList, useCan, useMe, useRealtime, useRealtimeStatus } from '../../client/runtime';
-import { Badge, DetailView, FlatRow, fmt, modal } from '../../ui';
+import { mojoCall, type FetchOpts } from '../../client/client';
+import { useRealtime, useRealtimeStatus } from '../../client/realtime';
+import { useTableParams } from '../../client/params';
+import { Badge } from '../../ui/ui';
+import { CollectionSelect } from '../../ui/CollectionSelect';
+import { Popover } from '../../ui/Popover';
+import { Tabs } from '../../ui/Tabs';
+import { datetime } from '../../ui/format';
 import { AssistantFeed } from './AssistantFeed';
-import { ASSISTANT_PERMISSIONS } from './AssistantPanel';
+import { ASSISTANT_PERMISSIONS } from './permissions';
 import { deleteAssistantMemory, getAssistantConversation, getAssistantMemory, getAssistantSkill, listAssistantConversations, listAssistantSkills, saveAssistantMemory, sendAssistantMessage } from './api';
 import { setAssistantSkillActive } from './skill-lifecycle';
 import { AssistantOutcomeUnknownError, chooseAssistantTransport, startAssistantRealtimeTurn, type AssistantRealtimeTurn } from './streaming';
 import type { AssistantConversation, AssistantConversationSummary, AssistantSkill } from './types';
 
-function PageState({ loading, error, retry }: { loading: boolean; error: string; retry(): void }) { if (loading) return <div className="panel panel-pad dim">Loading…</div>; if (error) return <div className="panel panel-pad"><div className="form-alert" role="alert">{error}</div><button type="button" className="btn" onClick={retry}>Retry</button></div>; return null; }
-function Heading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) { return <header className="admin-page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div></header>; }
+type Scope = { me: Me; valid(permission?: string | string[]): boolean; options: Pick<FetchOpts, 'signal' | 'beforeSend'> };
+const ScopeContext = createContext<Scope | null>(null);
+function Access({ children, memory = false }: { children: ReactNode; memory?: boolean }) {
+    const { data: me } = useMe(), auth = useAuthSnapshot();
+    const revision = useSyncExternalStore(subscribeAuth, getAuthSessionRevision, getAuthSessionRevision);
+    const permission = memory ? 'sys.assistant' : ASSISTANT_PERMISSIONS;
+    if (!auth.authenticated || !me || String(me.id) !== auth.uid || !hasPermission(me, permission)) return <p className="panel panel-pad" role="alert">Assistant access required.</p>;
+    return <ScopeOwner key={`${auth.uid}:${revision}:${JSON.stringify([me.is_superuser, me.permissions])}`} me={me} revision={revision} permission={permission}>{children}</ScopeOwner>;
+}
+function ScopeOwner({ me, revision, permission, children }: { me: Me; revision: number; permission: string | string[]; children: ReactNode }) {
+    const qc = useQueryClient();
+    const live = useRef(true);
+    const valid = (required = permission) => { const auth = getAuthSnapshot(), current = qc.getQueryData<Me>(['me', auth.uid]); return live.current && revision === getAuthSessionRevision() && auth.authenticated && auth.uid === String(me.id) && !!current && current.id === me.id && hasPermission(current, required); };
+    useLayoutEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
+    const options = { beforeSend: () => { if (!valid()) throw new DOMException('Assistant scope ended', 'AbortError'); } };
+    return <ScopeContext.Provider value={{ me, valid, options }}>{children}</ScopeContext.Provider>;
+}
+function useScope() { return useContext(ScopeContext)!; }
+function Help({ label, children }: { label: string; children: ReactNode }) {
+    const ref = useRef<HTMLButtonElement>(null), id = useId(), [open, setOpen] = useState(false);
+    return <><button ref={ref} type="button" className="assistant-page-help" aria-label={`About ${label}`} aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}><i className="bi bi-info-circle" aria-hidden="true" /></button><Popover anchorRef={ref} open={open} onClose={() => setOpen(false)} id={id} aria-label={`About ${label}`} className="assistant-page-help-content">{children}</Popover></>;
+}
+function Dialog({ title, close, busy = false, children, wide = false, readOnly = false, footer }: { title: string; close(): void; busy?: boolean; children: ReactNode; wide?: boolean; readOnly?: boolean; footer?: ReactNode }) {
+    const ref = useRef<HTMLDialogElement>(null), id = useId();
+    useLayoutEffect(() => { const node = ref.current, opener = document.activeElement instanceof HTMLElement ? document.activeElement : null; node?.showModal(); node?.querySelector<HTMLElement>('[data-dialog-autofocus]')?.focus(); return () => { if (node?.open) node.close(); if (opener?.isConnected) opener.focus(); }; }, []);
+    const dismiss = () => { if (!busy) close(); };
+    return <dialog ref={ref} className={`assistant-page-dialog${wide ? ' assistant-page-dialog-conversation' : ''}${readOnly ? ' assistant-page-dialog-history' : ''}`} aria-labelledby={id} onCancel={event => { event.preventDefault(); dismiss(); }} onMouseDown={event => { if (event.target === ref.current) dismiss(); }} onClose={() => { if (ref.current && !ref.current.open) { if (busy) ref.current.showModal(); else close(); } }}><header><h2 id={id}>{title}</h2><button className="btn-icon" type="button" disabled={busy} aria-label="Close dialog" onClick={dismiss}><i className="bi bi-x-lg" aria-hidden="true" /></button></header><div className="assistant-page-dialog-body">{children}</div>{footer && <footer>{footer}</footer>}</dialog>;
+}
+function State({ loading, error, retry }: { loading: boolean; error: string; retry(): void }) { return loading ? <p className="assistant-page-empty" role="status">Loading…</p> : error ? <div className="assistant-page-empty"><p className="form-alert" role="alert">{error}</p><button type="button" className="btn" onClick={retry}>Retry</button></div> : null; }
+function Heading({ title, children, help }: { title: string; children?: ReactNode; help: ReactNode }) { return <header className="assistant-page-heading"><div><span className="eyebrow">Assistant</span><h1>{title} <Help label={title}>{help}</Help></h1></div><div className="assistant-page-actions">{children}</div></header>; }
+function Refresh({ load, disabled }: { load(): void; disabled: boolean }) { return <button type="button" className="btn assistant-page-refresh" aria-label="Refresh" title="Refresh" disabled={disabled} onClick={load}><i className="bi bi-arrow-clockwise" aria-hidden="true" /><span>Refresh</span></button>; }
+function Pager({ page, size, count, loading, change }: { page: number; size: number; count: number; loading: boolean; change(page: number): void }) { return count > size || page > 1 ? <nav className="assistant-page-pager" aria-label="Results pages"><span>{count ? `${(page - 1) * size + 1}–${Math.min(page * size, count)} of ${count}` : 'No results'}</span><button className="btn btn-compact" disabled={loading || page <= 1} onClick={() => change(page - 1)}>Previous</button><button className="btn btn-compact" disabled={loading || page * size >= count} onClick={() => change(page + 1)}>Next</button></nav> : null; }
+const audience = (tier: string) => tier === 'user' ? 'Personal' : tier === 'group' ? 'Group' : 'Global';
+const messageOf = (cause: unknown, fallback: string) => cause instanceof Error ? cause.message : fallback;
 
 function ConversationInspect({ id, close }: { id: number; close(): void }) {
-    const { data: me } = useMe(); const { can: canAssistant } = useCan(ASSISTANT_PERMISSIONS); const { can: canViewAdmin } = useCan('sys.view_admin');
-    const realtime = useRealtime(); const realtimeStatus = useRealtimeStatus();
-    const [data, setData] = useState<AssistantConversation | null>(null); const [loading, setLoading] = useState(true); const [responding, setResponding] = useState(false); const [error, setError] = useState('');
-    const stream = useRef<AssistantRealtimeTurn | null>(null); const seenMessageIds = useRef(new Set<number | string>());
-    const load = useCallback(async () => { setLoading(true); setError(''); try { const next = await getAssistantConversation(id); seenMessageIds.current = new Set(next.messages.map((message) => message.id)); setData(next); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Conversation unavailable'); } finally { setLoading(false); } }, [id]);
-    useEffect(() => { void load(); }, [load]);
-    useEffect(() => () => { stream.current?.cancel(); stream.current = null; }, []);
-    useEffect(() => { if (!canAssistant) { stream.current?.cancel(); stream.current = null; setResponding(false); close(); } }, [canAssistant, close]);
-    useEffect(() => { if (!canViewAdmin && stream.current) { stream.current.cancel(); stream.current = null; setResponding(false); void load(); } }, [canViewAdmin, load]);
-    if (loading || error || !data || !me) return <div className="modal-pad"><PageState loading={loading} error={error || (!data ? 'Conversation unavailable' : '')} retry={() => void load()} /><button type="button" className="btn" onClick={close}>Close</button></div>;
-    const owner = data.user.id === me.id;
+    const scope = useScope(), realtime = useRealtime(), realtimeStatus = useRealtimeStatus();
+    const [data, setData] = useState<AssistantConversation | null>(null), [loading, setLoading] = useState(true), [responding, setResponding] = useState(false), [error, setError] = useState('');
+    const stream = useRef<AssistantRealtimeTurn | null>(null), seen = useRef(new Set<number | string>()), live = useRef(true), flight = useRef(false), generation = useRef(0);
+    const valid = () => live.current && scope.valid();
+    const options = { ...scope.options, beforeSend: () => { if (!valid()) throw new DOMException('Conversation closed', 'AbortError'); } };
+    const load = async () => { const request = ++generation.current; setLoading(true); setError(''); try { const next = await getAssistantConversation(id, options); if (valid() && request === generation.current) { seen.current = new Set(next.messages.map(item => item.id)); setData(next); } } catch (cause) { if (valid() && request === generation.current) setError(messageOf(cause, 'Conversation unavailable')); } finally { if (valid() && request === generation.current) setLoading(false); } };
+    useEffect(() => { live.current = true; void load(); return () => { live.current = false; generation.current++; stream.current?.cancel(); }; }, []);
     const send = async (message: string, attachments: readonly FileReference[] = []) => {
-        if (!owner || responding) return;
-        setResponding(true); const now = Math.floor(Date.now() / 1000);
+        if (!valid() || !data || data.user.id !== scope.me.id || flight.current) throw new Error('This conversation cannot be continued.');
+        flight.current = true; setResponding(true); const now = Math.floor(Date.now() / 1000);
         const userMessage = { id: `inspect-user-${Date.now()}`, role: 'user' as const, content: message, created: now, blocks: attachments.length ? [{ type: 'attachment' as const, files: [...attachments] }] : [] };
-        setData((current) => current ? { ...current, messages: [...current.messages, userMessage] } : current);
+        const update = (apply: (current: AssistantConversation) => AssistantConversation) => { if (valid()) setData(current => current ? apply(current) : current); };
+        update(current => ({ ...current, messages: [...current.messages, userMessage] }));
         try {
-            const transport = chooseAssistantTransport({ owner, textOnly: attachments.length === 0, hasViewAdmin: canViewAdmin, realtimeStatus: realtimeStatus.status });
-            if (transport === 'websocket') {
-                const turn = startAssistantRealtimeTurn(realtime, { message, conversationId: data.id, seenMessageIds: seenMessageIds.current }, {
-                    onConversation: () => {},
-                    onText: (next) => setData((current) => current ? { ...current, messages: [...current.messages, next] } : current),
-                    onProgress: () => {},
-                    onResponse: (next) => setData((current) => current ? { ...current, modified: now, messages: current.messages.some((item) => item.id === next.id) ? current.messages : [...current.messages, next] } : current),
-                    onReconcile: setData,
-                    onUnknown: () => { window.dispatchEvent(new CustomEvent('portal-mojo:assistant-list-refresh')); },
-                });
-                stream.current = turn; await turn.promise; stream.current = null;
+            if (chooseAssistantTransport({ owner: true, textOnly: attachments.length === 0, hasViewAdmin: scope.valid('sys.view_admin'), realtimeStatus: realtimeStatus.status }) === 'websocket') {
+                const turn = startAssistantRealtimeTurn(realtime, { message, conversationId: data.id, seenMessageIds: seen.current }, {
+                    onConversation: () => {}, onText: next => update(current => ({ ...current, messages: [...current.messages, next] })), onProgress: () => {},
+                    onResponse: next => update(current => ({ ...current, modified: now, messages: current.messages.some(item => item.id === next.id) ? current.messages : [...current.messages, next] })),
+                    onReconcile: next => { if (valid()) setData(next); }, onUnknown: () => { if (valid()) window.dispatchEvent(new CustomEvent('portal-mojo:assistant-list-refresh')); },
+                }); stream.current = turn; await turn.promise;
             } else {
-                const reply = await sendAssistantMessage(message, data.id, attachments);
-                setData((current) => current ? { ...current, modified: now, messages: [...current.messages, { id: `inspect-assistant-${Date.now()}`, role: 'assistant', content: reply.response, created: now, blocks: reply.blocks }] } : current);
+                const reply = await sendAssistantMessage(message, data.id, attachments, options);
+                update(current => ({ ...current, modified: now, messages: [...current.messages, { id: `inspect-assistant-${Date.now()}`, role: 'assistant', content: reply.response, created: now, blocks: reply.blocks }] }));
             }
-        } catch (cause) {
-            if (!(cause instanceof AssistantOutcomeUnknownError)) setData((current) => current ? { ...current, messages: current.messages.filter((item) => item.id !== userMessage.id) } : current);
-            throw cause;
-        } finally { stream.current = null; setResponding(false); }
+            if (valid()) window.dispatchEvent(new CustomEvent('portal-mojo:assistant-list-refresh'));
+        } catch (cause) { if (!(cause instanceof AssistantOutcomeUnknownError)) update(current => ({ ...current, messages: current.messages.filter(item => item.id !== userMessage.id) })); throw cause; }
+        finally { stream.current = null; flight.current = false; if (valid()) setResponding(false); }
     };
-    return <DetailView title={data.title} subtitle={`Conversation #${data.id} · ${data.user.display_name} · updated ${fmt.datetime(data.modified)}`} icon="bi-chat-dots" onClose={close} sections={[{ key: 'conversation', label: 'Conversation', icon: 'bi-chat-text', render: () => <AssistantFeed messages={data.messages} user={{ id: me.id, display_name: me.display_name ?? 'You' }} onSend={send} responding={responding} disabled={!owner} attachmentKey={data.id} /> }]} />;
+    const owner = data?.user.id === scope.me.id;
+    return <Dialog title={data?.title || 'Conversation'} wide readOnly={!!data && !owner} busy={responding} close={close}><State loading={loading} error={error} retry={() => void load()} />{!loading && !error && data && <><p className="assistant-page-meta">{data.user.display_name} · {datetime(data.modified)} <Help label="Conversation details"><p>Conversation #{data.id}. Started {datetime(data.created)}.</p><p>Only its owner can send messages. Closing does not delete history.</p></Help></p>{!owner && <p className="assistant-page-readonly">Viewing history. Only {data.user.display_name} can continue this conversation.</p>}<AssistantFeed messages={data.messages} user={data.user} viewerId={scope.me.id} onSend={send} responding={responding} disabled={!owner} readOnly={!owner} attachmentKey={data.id} /></>}</Dialog>;
+}
+export function ConversationsPage() { return <Access><Conversations /></Access>; }
+function Conversations() {
+    const scope = useScope(), params = useTableParams({ size: 10, sort: '-modified' });
+    const [rows, setRows] = useState<AssistantConversationSummary[]>([]), [count, setCount] = useState(0), [loading, setLoading] = useState(true), [error, setError] = useState(''), [selected, setSelected] = useState<number | null>(null);
+    const generation = useRef(0), live = useRef(true);
+    const load = useCallback(async () => { const request = ++generation.current; setLoading(true); setError(''); try { const next = await listAssistantConversations({ start: (params.page - 1) * params.size, size: params.size, sort: '-modified', ...(params.search ? { title__icontains: params.search } : {}) }); if (live.current && scope.valid() && request === generation.current) { setRows(next.rows); setCount(next.count); } } catch (cause) { if (live.current && scope.valid() && request === generation.current) setError(messageOf(cause, 'Conversations unavailable')); } finally { if (live.current && scope.valid() && request === generation.current) setLoading(false); } }, [params.page, params.size, params.search]);
+    useEffect(() => { live.current = true; void load(); const refresh = () => void load(); window.addEventListener('portal-mojo:assistant-list-refresh', refresh); return () => { live.current = false; generation.current++; window.removeEventListener('portal-mojo:assistant-list-refresh', refresh); }; }, [load]);
+    return <main className="assistant-admin-page"><Heading title="Conversations" help={<p>Open a conversation to read its history or continue your own. Start a new conversation using the Assistant button in the app header.</p>}><Refresh load={() => void load()} disabled={loading} /></Heading><label className="assistant-page-search"><i className="bi bi-search" aria-hidden="true" /><input className="input" type="search" aria-label="Search conversation titles" placeholder="Search conversations…" value={params.search} onChange={event => params.setSearch(event.target.value)} /></label><section className="panel assistant-page-list"><State loading={loading} error={error} retry={() => void load()} />{!loading && !error && <>{rows.length ? <table><thead><tr><th>Conversation</th><th>Owner</th><th>Updated</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><button className="link-button" onClick={() => setSelected(row.id)}>{row.title || 'Untitled conversation'}</button></td><td>{row.user.display_name}{row.user.id === scope.me.id && <Badge tone="info">You</Badge>}</td><td>{datetime(row.modified)}</td></tr>)}</tbody></table> : <p className="assistant-page-empty">{params.search ? 'No matching conversations.' : 'No conversations yet. Open Assistant in the app header to start one.'}</p>}<Pager {...params} count={count} loading={loading} change={params.setPage} /></>}</section>{selected != null && <ConversationInspect key={selected} id={selected} close={() => setSelected(null)} />}</main>;
 }
 
-export function ConversationsPage() {
-    const { data: me } = useMe(); const [rows, setRows] = useState<AssistantConversationSummary[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-    const load = useCallback(async () => { setLoading(true); setError(''); try { setRows((await listAssistantConversations()).rows); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Conversations unavailable'); } finally { setLoading(false); } }, []);
-    useEffect(() => { void load(); }, [load]);
-    useEffect(() => { const refresh = () => { void load(); }; window.addEventListener('portal-mojo:assistant-list-refresh', refresh); return () => window.removeEventListener('portal-mojo:assistant-list-refresh', refresh); }, [load]);
-
-    return <div><Heading eyebrow="Assistant" title="Conversations" description="Inspect Assistant history. Only the owner may continue a conversation." /><PageState loading={loading} error={error} retry={() => void load()} />{!loading && !error && <div className="panel assistant-list"><table><thead><tr><th>Conversation</th><th>Owner</th><th>Updated</th><th /></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><button className="link-button" type="button" onClick={() => void modal.detail((close) => <ConversationInspect id={row.id} close={() => close(null)} />)}>{row.title}</button><small>#{row.id}</small></td><td>{row.user.display_name}{row.user.id === me?.id && <Badge tone="info">You</Badge>}</td><td>{fmt.datetime(row.modified)}</td></tr>)}</tbody></table>{rows.length === 0 && <p className="empty">No conversations.</p>}</div>}</div>;
+function SkillInspect({ id, close, changed }: { id: number; close(): void; changed(): void }) {
+    const scope = useScope(), [skill, setSkill] = useState<AssistantSkill | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
+    const live = useRef(true), flight = useRef(false);
+    const valid = () => live.current && scope.valid();
+    const options = { ...scope.options, beforeSend: () => { if (!valid()) throw new DOMException('Skill closed', 'AbortError'); } };
+    const load = async () => { setLoading(true); setError(''); try { const next = await getAssistantSkill(id, options); if (valid()) setSkill(next); } catch (cause) { if (valid()) setError(messageOf(cause, 'Skill unavailable')); } finally { if (valid()) setLoading(false); } };
+    useEffect(() => { live.current = true; void load(); return () => { live.current = false; }; }, []);
+    const toggle = async () => { if (!skill || !valid() || !scope.valid('sys.view_admin') || flight.current) return; flight.current = true; setBusy(true); setError(''); try { const next = await setAssistantSkillActive(id, !skill.is_active, { ...options, beforeSend: () => { options.beforeSend(); if (!scope.valid('sys.view_admin')) throw new DOMException('Skill authority ended', 'AbortError'); } }); if (valid()) { setSkill(next); changed(); } } catch (cause) { if (valid()) setError(messageOf(cause, 'Skill change failed. Refresh to check its status.')); } finally { flight.current = false; if (valid()) setBusy(false); } };
+    return <Dialog title={skill?.name ?? 'Skill'} close={close} busy={busy} footer={<>{scope.valid('sys.view_admin') && skill && <button className="btn" disabled={busy || loading} onClick={() => void toggle()}>{busy ? 'Saving…' : skill.is_active ? 'Deactivate skill' : 'Reactivate skill'}</button>}<button className="btn" disabled={busy} onClick={close}>Done</button></>}><State loading={loading} error={!skill ? error : ''} retry={() => void load()} />{skill && <div className="assistant-skill-content">{error && <p className="form-alert" role="alert">{error} <button className="link-button" disabled={busy} onClick={() => void load()}>Refresh status</button></p>}<p className="assistant-skill-description">{skill.description}</p><div className="assistant-page-chips"><Badge tone={skill.is_active ? 'success' : 'muted'}>{skill.is_active ? 'Active' : 'Inactive'}</Badge><Badge tone="muted">{audience(skill.tier)}</Badge><Help label="Skill details"><p>Skill #{skill.id}. Updated {datetime(skill.modified)}.</p><p>Skills are learned in Assistant conversations. Deactivation preserves their history.</p></Help></div>{skill.auto_execute && <p className="assistant-page-warning">Runs automatically when triggered, without asking for confirmation.</p>}<section><h3>When to use it</h3>{skill.triggers.length ? <ul className="assistant-skill-triggers">{skill.triggers.map(trigger => <li key={trigger}>{trigger}</li>)}</ul> : <p className="dim">No trigger phrases saved.</p>}</section><section><h3>Steps</h3>{skill.steps.length ? <ol className="assistant-skill-steps">{skill.steps.map((step, index) => <li key={index}><span>{step.description || step.tool}</span><Help label={`Step ${index + 1}`}><p>Tool: <code>{step.tool}</code></p>{step.condition && <p>Condition: {step.condition}</p>}</Help>{step.condition && <small>When: {step.condition}</small>}</li>)}</ol> : <p className="dim">No steps saved.</p>}</section></div>}</Dialog>;
+}
+export function SkillsPage() { return <Access><Skills /></Access>; }
+function Skills() {
+    const scope = useScope(), params = useTableParams({ size: 10, sort: 'name' });
+    const [rows, setRows] = useState<AssistantSkill[]>([]), [count, setCount] = useState(0), [loading, setLoading] = useState(true), [error, setError] = useState(''), [selected, setSelected] = useState<number | null>(null);
+    const generation = useRef(0), live = useRef(true);
+    const load = useCallback(async () => { const request = ++generation.current; setLoading(true); setError(''); try { const next = await listAssistantSkills({ start: (params.page - 1) * params.size, size: params.size, sort: 'name', ...(params.search ? { name__icontains: params.search } : {}) }); if (live.current && scope.valid() && request === generation.current) { setRows(next.rows); setCount(next.count); } } catch (cause) { if (live.current && scope.valid() && request === generation.current) setError(messageOf(cause, 'Skills unavailable')); } finally { if (live.current && scope.valid() && request === generation.current) setLoading(false); } }, [params.page, params.size, params.search]);
+    useEffect(() => { live.current = true; void load(); return () => { live.current = false; generation.current++; }; }, [load]);
+    return <main className="assistant-admin-page"><Heading title="Skills" help={<p>Reusable procedures learned through Assistant conversations. Open a skill to see its trigger phrases and steps, or deactivate it while keeping its history.</p>}><Refresh load={() => void load()} disabled={loading} /></Heading><label className="assistant-page-search"><i className="bi bi-search" aria-hidden="true" /><input className="input" type="search" aria-label="Search skill names" placeholder="Search skills…" value={params.search} onChange={event => params.setSearch(event.target.value)} /></label><section className="panel assistant-page-list"><State loading={loading} error={error} retry={() => void load()} />{!loading && !error && <>{rows.length ? <table><thead><tr><th>Skill</th><th>Audience</th><th>Status</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><button className="link-button" onClick={() => setSelected(row.id)}>{row.name}</button><small>{row.description}</small></td><td>{audience(row.tier)}</td><td><Badge tone={row.is_active ? 'success' : 'muted'}>{row.is_active ? 'Active' : 'Inactive'}</Badge></td></tr>)}</tbody></table> : <p className="assistant-page-empty">{params.search ? 'No matching skills.' : 'No skills yet. Ask Assistant to remember a reusable procedure.'}</p>}<Pager {...params} count={count} loading={loading} change={params.setPage} /></>}</section>{selected != null && <SkillInspect key={selected} id={selected} close={() => setSelected(null)} changed={() => void load()} />}</main>;
 }
 
-function SkillInspect({ id, close }: { id: number; close(): void }) {
-    const [skill, setSkill] = useState<AssistantSkill | null>(null);
-    const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
-    const canManage = useCan('sys.view_admin').can;
-    useEffect(() => { void getAssistantSkill(id).then(setSkill, cause => setError(cause instanceof Error ? cause.message : 'Skill unavailable')); }, [id]);
-    const toggle = async (next: boolean) => { if (!canManage || busy) return; setBusy(true); setError(''); try { setSkill(await setAssistantSkillActive(id, next)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'State change failed'); } finally { setBusy(false); } };
-    return <DetailView title={skill?.name ?? 'Skill'} subtitle={skill?.description || `Skill #${id}`} icon="bi-stars" onClose={close}
-        active={canManage && skill ? { value: skill.is_active, disabled: busy, onChange: next => void toggle(next) } : undefined}
-        contextMenu={canManage && skill ? [{ label: skill.is_active ? 'Deactivate' : 'Reactivate', disabled: busy, onSelect: () => void toggle(!skill.is_active) }] : []}
-        sections={[{ key: 'overview', label: 'Overview', icon: 'bi-info-circle', render: () => <div className="detail-section">{error && <div className="form-alert">{error}</div>}{skill ? <><FlatRow label="Tier">{skill.tier}</FlatRow><FlatRow label="Active">{skill.is_active ? 'Yes' : 'No'}</FlatRow><FlatRow label="Auto execute">{skill.auto_execute ? 'Yes' : 'No'}</FlatRow><h3>Triggers</h3><ul>{skill.triggers.map(trigger => <li key={trigger}>{trigger}</li>)}</ul><h3>Steps</h3><ol>{skill.steps.map((step, index) => <li key={index}><code>{JSON.stringify(step)}</code></li>)}</ol></> : <p>Loading…</p>}</div> }]} />;
-}
-
-export function SkillsPage() {
-    const [rows, setRows] = useState<AssistantSkill[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-    const load = useCallback(async () => { setLoading(true); setError(''); try { setRows((await listAssistantSkills()).rows); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Skills unavailable'); } finally { setLoading(false); } }, []);
-    useEffect(() => { void load(); }, [load]);
-    return <div><Heading eyebrow="Assistant" title="Skills" description="Inspect and manage the skill catalog without removing its history." /><PageState loading={loading} error={error} retry={() => void load()} />{!loading && !error && <div className="panel assistant-list"><table><thead><tr><th>Skill</th><th>Tier</th><th>Status</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><button className="link-button" onClick={() => void modal.detail(close => <SkillInspect id={row.id} close={() => { close(null); void load(); }} />)}>{row.name}</button><small>{row.description}</small></td><td>{row.tier}</td><td><Badge tone={row.is_active ? 'success' : 'muted'}>{row.is_active ? 'Active' : 'Inactive'}</Badge></td></tr>)}</tbody></table>{rows.length === 0 && <p className="empty">No skills.</p>}</div>}</div>;
-}
-
-interface GroupChoice { id: number; name: string }
 type MemoryTier = 'global' | 'user' | 'group';
-export function MemoriesPage() {
-    const { can: systemAllowed, me } = useCan('sys.assistant');
-    const [tier, setTier] = useState<MemoryTier>('user');
-    const [groups, setGroups] = useState<GroupChoice[]>([]); const [group, setGroup] = useState<number | null>(null);
-    const [entries, setEntries] = useState<Record<string, unknown>>({}); const [key, setKey] = useState(''); const [value, setValue] = useState('');
-    const [loading, setLoading] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-    const member = useQuery({ queryKey: ['assistant-memory-member', me?.id, group], enabled: systemAllowed && tier === 'group' && group != null && !me?.is_superuser, queryFn: async () => (await mojoCall(`/api/group/${group}/member`)).data as MemberLike });
-    const canManage = systemAllowed && (tier !== 'group' || group != null && (Boolean(me?.is_superuser) || memberHasPermission(member.data ?? null, 'assistant')));
-    const scopeKey = `${me?.id}:${tier}:${group ?? ''}`;
-    const scope = useRef({ key: scopeKey, allowed: canManage, mounted: true }); scope.current.key = scopeKey; scope.current.allowed = canManage;
-    const generation = useRef(0); const lock = useRef(false);
-    useEffect(() => { scope.current.mounted = true; return () => { scope.current.mounted = false; generation.current++; }; }, []);
-    useEffect(() => { if (!systemAllowed) { setGroups([]); return; } let cancelled = false; void mojoList<GroupChoice>('/api/group', { start: 0, size: 50, sort: 'name' }).then(page => { if (!cancelled) setGroups(page.rows.map(row => ({ id: Number(row.id), name: String(row.name) }))); }, () => { if (!cancelled) setGroups([]); }); return () => { cancelled = true; }; }, [systemAllowed]);
-    const load = useCallback(async () => {
-        const request = ++generation.current; const captured = scopeKey;
-        setEntries({}); setError('');
-        if (!systemAllowed || tier === 'group' && group == null) { setLoading(false); return; }
-        setLoading(true);
-        try { const next = await getAssistantMemory(tier, tier === 'group' ? group! : undefined); if (scope.current.mounted && request === generation.current && scope.current.key === captured) setEntries(next); }
-        catch (cause) { if (scope.current.mounted && request === generation.current && scope.current.key === captured) setError(cause instanceof Error ? cause.message : 'Memory unavailable'); }
-        finally { if (scope.current.mounted && request === generation.current && scope.current.key === captured) setLoading(false); }
-    }, [scopeKey, systemAllowed, tier, group]);
-    useEffect(() => { void load(); }, [load]);
-    const validKey = /^[a-z0-9:_-]{1,64}$/.test(key); const validValue = value.length > 0 && value.length <= 500;
-    const mutate = async (operation: () => Promise<void>, captured: string) => {
-        if (lock.current || !scope.current.mounted || !scope.current.allowed || scope.current.key !== captured) return;
-        lock.current = true; setBusy(true); setError('');
-        try { await operation(); if (scope.current.mounted && scope.current.key === captured) await load(); }
-        catch (cause) { if (scope.current.mounted && scope.current.key === captured) setError(cause instanceof Error ? cause.message : 'Memory change failed'); }
-        finally { lock.current = false; if (scope.current.mounted) setBusy(false); }
-    };
-    const save = async () => { if (!validKey || !validValue) return; await mutate(() => saveAssistantMemory(tier, key, value, tier === 'group' ? group! : undefined), scopeKey); };
-    const remove = async (entryKey: string) => {
-        const frozen = { tier, group: tier === 'group' ? group! : undefined, key: scopeKey };
-        if (!canManage) return;
-        const confirmed = await modal.confirm({ title: 'Remove memory key?', message: `Remove “${entryKey}” from ${frozen.tier} memory${frozen.group == null ? '' : ` for group #${frozen.group} (${groups.find(item => item.id === frozen.group)?.name ?? 'Unknown'})`}? The previous value cannot be restored by this action.`, confirmText: 'Remove key', danger: true });
-        if (confirmed) await mutate(() => deleteAssistantMemory(frozen.tier, entryKey, frozen.group), frozen.key);
-    };
-    return <div><Heading eyebrow="Assistant" title="Memory" description="Manage global, personal, or explicitly selected group memory without ambient group state." />
-        <div className="panel panel-pad assistant-memory-controls"><div className="seg">{(['global', 'user', 'group'] as MemoryTier[]).map(item => <button key={item} disabled={busy} className={`seg-btn${tier === item ? ' seg-active' : ''}`} onClick={() => setTier(item)}>{item}</button>)}</div>
-        {tier === 'group' && <label className="field"><span className="field-label">Group (bounded first 50)</span><select className="input" value={group ?? ''} disabled={busy} onChange={event => setGroup(event.target.value ? Number(event.target.value) : null)}><option value="">Choose a group</option>{groups.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
-        {!canManage && <p className="dim">Memory editing requires system Assistant permission and, for a selected group, inherited member Assistant authority or superuser access.</p>}
-        <div className="assistant-memory-form"><label className="field"><span className="field-label">Key</span><input className="input" disabled={!canManage || busy} maxLength={64} value={key} onChange={event => setKey(event.target.value)} placeholder="lowercase:key" /></label><label className="field"><span className="field-label">Value</span><textarea className="input" disabled={!canManage || busy} maxLength={500} rows={2} value={value} onChange={event => setValue(event.target.value)} /></label><button className="btn btn-primary" disabled={!canManage || busy || !validKey || !validValue || loading} onClick={() => void save()}>Save</button></div>{error && <div className="form-alert" role="alert">{error}</div>}</div>
-        <div className="panel assistant-list">{loading ? <p className="empty">Loading…</p> : Object.entries(entries).length ? <table><thead><tr><th>Key</th><th>Value</th><th /></tr></thead><tbody>{Object.entries(entries).slice(0, 100).map(([entryKey, entryValue]) => <tr key={entryKey}><td><code>{entryKey}</code></td><td>{String(entryValue).slice(0, 500)}</td><td>{canManage && <button className="btn-icon" disabled={busy} aria-label={`Remove ${entryKey}`} onClick={() => void remove(entryKey)}><i className="bi bi-trash" /></button>}</td></tr>)}</tbody></table> : <p className="empty">No {tier} memory.</p>}</div></div>;
+interface GroupChoice { id: number; name: string }
+const projectGroup = (row: GroupChoice): GroupChoice => ({ id: Number(row.id), name: String(row.name) });
+export function MemoriesPage() { return <Access memory><Memories /></Access>; }
+function Memories() {
+    const [tier, setTier] = useState<MemoryTier>('user'), [group, setGroup] = useState<GroupChoice | null>(null);
+    return <main className="assistant-admin-page"><Heading title="Memory" help={<p>Saved facts and preferences used by the AI Assistant. Personal memory belongs to you; Global memory is shared across the installation; Group memory applies only to the selected group.</p>} /><Tabs activeKey={tier} onActiveKeyChange={next => setTier(next as MemoryTier)} ariaLabel="Memory audience" items={(['user','global','group'] as MemoryTier[]).map(item => ({ key: item, label: audience(item), panel: <div className="assistant-memory-area">{item === 'group' && <div className="assistant-memory-group"><CollectionSelect<GroupChoice> endpoint="/api/group" sanitizeRow={projectGroup} label="Group" value={group as (GroupChoice & Record<string, unknown>) | null} onChange={(id, row) => setGroup(id != null && row ? projectGroup(row) : null)} placeholder="Find a group…" /></div>}<MemoryScope key={`${item}:${group?.id ?? ''}`} tier={item} group={item === 'group' ? group : null} /></div> }))} /></main>;
+}
+function MemoryScope({ tier, group }: { tier: MemoryTier; group: GroupChoice | null }) {
+    const scope = useScope(), qc = useQueryClient(), keyId = useId(), valueId = useId();
+    const memberKey = ['assistant-memory-member', scope.me.id, getAuthSessionRevision(), group?.id] as const;
+    const member = useQuery({ queryKey: memberKey, enabled: tier === 'group' && group != null && scope.me.is_superuser !== true, queryFn: async () => (await mojoCall(`/api/group/${group!.id}/member`, scope.options)).data as MemberLike, retry: false });
+    const canManage = () => scope.valid('sys.assistant') && (tier !== 'group' || !!group && (scope.me.is_superuser === true || memberHasPermission(qc.getQueryData<MemberLike>(memberKey), 'assistant')));
+    const [entries, setEntries] = useState<Record<string, unknown>>({}), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+    const [editor, setEditor] = useState<{ key: string; value: string; existing: boolean } | null>(null), [remove, setRemove] = useState<string | null>(null);
+    const live = useRef(true), flight = useRef(false), generation = useRef(0);
+    const valid = () => live.current && canManage();
+    const options = { ...scope.options, beforeSend: () => { if (!valid()) throw new DOMException('Memory scope ended', 'AbortError'); } };
+    const label = tier === 'group' ? `${group?.name ?? 'Selected group'} memory` : `${audience(tier)} memory`;
+    const permitted = canManage();
+    const load = async () => { const request = ++generation.current; setLoading(true); setError(''); try { const next = await getAssistantMemory(tier, group?.id, options); if (valid() && request === generation.current) setEntries(next); } catch (cause) { if (valid() && request === generation.current) setError(messageOf(cause, 'Memory unavailable')); } finally { if (live.current && request === generation.current) setLoading(false); } };
+    useEffect(() => { live.current = true; if (permitted) void load(); else { setEntries({}); setLoading(false); setEditor(null); setRemove(null); } return () => { live.current = false; generation.current++; }; }, [permitted]);
+    const change = async (operation: () => Promise<void>, success: string) => { if (!valid() || flight.current) return; flight.current = true; setBusy(true); setError(''); setNotice(''); try { await operation(); if (valid()) { setEditor(null); setRemove(null); setNotice(success); await load(); } } catch (cause) { if (valid()) setError(messageOf(cause, 'Memory change failed. Refresh before retrying.')); } finally { flight.current = false; if (live.current) setBusy(false); } };
+    if (tier === 'group' && !group) return <p className="panel assistant-page-empty">Choose a group to view its memory.</p>;
+    if (tier === 'group' && member.isLoading && scope.me.is_superuser !== true) return <p className="panel assistant-page-empty" role="status">Checking group access…</p>;
+    if (!permitted) return <div className="panel assistant-page-empty"><p role="alert">{member.isError ? 'Group access could not be checked.' : 'You need Assistant access in this group to manage its memory.'}</p>{member.isError && <button className="btn" onClick={() => void member.refetch()}>Retry access check</button>}</div>;
+    const pairs = Object.entries(entries), validKey = !!editor && /^[a-z0-9:_-]{1,64}$/.test(editor.key), validValue = !!editor && editor.value.trim().length > 0 && editor.value.length <= 500;
+    return <><div className="assistant-memory-toolbar"><span>{label} <Help label="Memory audience"><p>{tier === 'user' ? 'Only your Assistant conversations use these values.' : tier === 'global' ? 'These values affect Assistant conversations across this installation. Changes are shared.' : `These values apply to ${group?.name}. Every request explicitly selects this group.`}</p></Help></span><div className="assistant-page-actions"><Refresh load={() => void load()} disabled={busy || loading} /><button className="btn btn-primary" disabled={busy || loading || !!error} onClick={() => { setError(''); setEditor({ key: '', value: '', existing: false }); }}>Add memory</button></div></div>{notice && <p className="assistant-page-notice" role="status">{notice}</p>}<section className="panel assistant-page-list"><State loading={loading} error={!editor && !remove ? error : ''} retry={() => void load()} />{!loading && !error && (pairs.length ? <ul className="assistant-memory-list">{pairs.map(([key, value]) => <li key={key}><div><strong>{key}</strong><p>{String(value)}</p></div><div className="assistant-page-actions"><button className="btn-icon" disabled={busy} aria-label={`Edit ${key}`} onClick={() => { setError(''); setEditor({ key, value: String(value), existing: true }); }}><i className="bi bi-pencil" aria-hidden="true" /></button><button className="btn-icon" disabled={busy} aria-label={`Remove ${key}`} onClick={() => { setError(''); setRemove(key); }}><i className="bi bi-trash" aria-hidden="true" /></button></div></li>)}</ul> : <div className="assistant-page-empty"><p>No {audience(tier).toLowerCase()} memory yet.</p><p className="dim">Add a fact or preference for Assistant to remember.</p></div>)}</section>{editor && <Dialog title={editor.existing ? 'Edit memory' : 'Add memory'} busy={busy} close={() => { setEditor(null); setError(''); }} footer={<><button className="btn" disabled={busy} onClick={() => { setEditor(null); setError(''); }}>Cancel</button><button className="btn btn-primary" disabled={busy || !validKey || !validValue || !editor.existing && Object.hasOwn(entries, editor.key)} onClick={() => void change(() => saveAssistantMemory(tier, editor.key, editor.value, group?.id, options), 'Memory saved.')}>{busy ? 'Saving…' : 'Save memory'}</button></>}><p className="assistant-page-meta">{label}</p>{tier !== 'user' && <p className="assistant-page-warning">This change is shared with {tier === 'global' ? 'the entire installation' : group?.name}.</p>}{error && <p className="form-alert" role="alert">{error}</p>}<div className="field"><div className="field-label"><label htmlFor={keyId}>Key</label> <Help label="Memory key"><p>Use 1–64 lowercase letters, numbers, colons, underscores or hyphens. The key identifies this memory; it cannot change while editing.</p></Help></div><input id={keyId} data-dialog-autofocus={editor.existing ? undefined : true} className="input" value={editor.key} maxLength={64} disabled={busy || editor.existing} onChange={event => setEditor({ ...editor, key: event.target.value })} placeholder="preferred_format" /></div>{!editor.existing && Object.hasOwn(entries, editor.key) && <p className="field-error">This key already exists. Edit the existing memory instead.</p>}{editor.key && !validKey && <p className="field-error">Use lowercase letters, numbers, colons, underscores or hyphens.</p>}<label className="field" htmlFor={valueId}><span className="field-label">Value</span><textarea id={valueId} data-dialog-autofocus={editor.existing ? true : undefined} className="input" rows={4} maxLength={500} disabled={busy} value={editor.value} onChange={event => setEditor({ ...editor, value: event.target.value })} placeholder="Use concise answers with concrete examples." /></label><small className="dim">{editor.value.length}/500</small></Dialog>}{remove && <Dialog title="Remove memory?" busy={busy} close={() => { setRemove(null); setError(''); }} footer={<><button className="btn" data-dialog-autofocus disabled={busy} onClick={() => { setRemove(null); setError(''); }}>Cancel</button><button className="btn btn-danger" disabled={busy} onClick={() => void change(() => deleteAssistantMemory(tier, remove, group?.id, options), 'Memory removed.')}>{busy ? 'Removing…' : 'Remove memory'}</button></>}><p>Remove <strong>{remove}</strong> from {label}?</p><p className="dim">The saved value cannot be restored.{tier !== 'user' ? ' This affects everyone using this audience.' : ''}</p>{error && <p className="form-alert" role="alert">{error}</p>}</Dialog>}</>;
 }

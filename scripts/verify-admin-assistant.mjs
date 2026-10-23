@@ -178,6 +178,10 @@ try {
     const memberOnly = await login('assistant.member@nativemojo.com');
     assert.equal((await mock.mockFetch('/api/assistant', { method: 'POST', headers: memberOnly, body: { message: 'hello' } })).error_code, 403);
     assert.equal((await mock.mockFetch('/api/assistant', { method: 'POST', headers: assistantOnly, body: { message: 'REST fallback' } })).status, true, 'sys.assistant-only remains REST-capable');
+    assert.equal((await mock.mockFetch('/api/assistant/conversation/8101', { headers: assistantOnly })).error_code, 404, 'Assistant permission alone cannot inspect foreign history');
+    const ownedHistory = await mock.mockFetch('/api/assistant/conversation', { headers: assistantOnly });
+    const assistantCaller = JSON.parse(Buffer.from(assistantOnly.Authorization.slice(7).split('.')[1], 'base64url').toString());
+    assert(ownedHistory.data.every(row => String(row.user.id) === String(assistantCaller.uid)), 'Assistant-only lists remain owned');
     const created = await mock.mockFetch('/api/assistant', { method: 'POST', headers: operator, body: { message: 'export a file' } });
     assert.deepEqual(Object.keys(created.data).sort(), ['blocks', 'conversation_id', 'duration_ms', 'response', 'tool_calls_made']);
     const foreignContinuation = await mock.mockFetch('/api/assistant', { method: 'POST', headers: manager, body: { message: 'continue', conversation_id: created.data.conversation_id } });

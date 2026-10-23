@@ -39,6 +39,13 @@ native dismissal, and closing a task clears its unsaved secret drafts. MCP
 connection controls remain directly on their own page tab and do not depend on
 AI readiness. This changes neither shared DetailView nor Admin Dashboard.
 
+Assistant Conversations, Skills and Memory use focused page-owned native dialogs.
+History and skill details have no rail or gratuitous tabs. Memory's audience tabs
+remain on its page, with Add/Edit and named removal confirmation dialogs. The live
+person/session/permission and selected memory audience own their lifetime; pending
+writes block native dismissal. Foreign history has no composer and names the
+actual owner. This changes neither shared DetailView nor Admin Dashboard.
+
 Use `modal-pad`, `modal-title`, `modal-message`, grouped fields and `modal-actions`.
 Cancel precedes the primary button. Pending operations disable repeat submission;
 `canDismiss` also protects native Escape/backdrop dismissal during a write.
