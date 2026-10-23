@@ -121,7 +121,7 @@ function CredentialSecretForm({ row, caps, close, fixedGroup, onBusy, signal }: 
                         <div className="field">
                             <span className="field-label">Group</span>
                             <div className="input" aria-readonly="true">{scopeLabel}</div>
-                            <span className="field-help">Rotation keeps the existing credential scope.</span>
+                            {row && <span className="field-help">Rotation keeps the existing credential scope.</span>}
                         </div>
                     ) : (
                         <CollectionSelect<DnsGroupChoice>
