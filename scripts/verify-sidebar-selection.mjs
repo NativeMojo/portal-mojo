@@ -18,7 +18,7 @@ const server = await createServer({
     plugins: [{ name: 'sidebar-operator-fixture', enforce: 'pre', transform(source, id) {
         if (id.endsWith('/jobs/JobDashboardPage.tsx')) return source.replace('import { hasPermission, useMe }', 'import { hasPermission }').replace('export function JobDashboardPage()', 'const useMe = () => ({ data: { id: 1, is_superuser: true } });\nexport function JobDashboardPage()');
         if (!id.endsWith('/ui/SidebarNav.tsx')) return;
-        return source.replace("import { useMe } from '../client/me';", 'const useMe = () => ({ data: { id: 1, is_superuser: true } });');
+        return source.replace("import { useMe } from '../client/me';", 'const useMe = () => ({ data: globalThis.__sidebarActor ?? { id: 1, is_superuser: true } });');
     } }],
 });
 let root;
@@ -93,8 +93,15 @@ try {
         assert(pageLinks(VhostsPage, `${base}/vhosts`, [`${base}/upstreams`], '/system').includes(`${base}/upstreams`), 'Serving uses its registered sibling, not a hardcoded base');
     }
     assert(!pageLinks(VhostsPage, '/edge/vhosts', [], '').includes('/edge/upstreams'), 'unregistered Upstreams shortcut is omitted');
+    globalThis.__sidebarActor = { id: 2, permissions: { view_scheduled_tasks: true } };
+    const limitedMarkup = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ['/system-admin/unrelated'] }, React.createElement(SidebarNav)));
+    const limited = document.createElement('div'); limited.innerHTML = limitedMarkup;
+    assert(limited.querySelector('a[href="/system-admin/jobs/scheduled-tasks"]'), 'scheduled-task-only operators retain a discoverable primary entry away from that page');
+    assert(!limited.querySelector('a[href="/system-admin/jobs"]'), 'independent Jobs Dashboard grant is not widened');
+    delete globalThis.__sidebarActor;
     console.log('Sidebar selection: mounted root, one highlighted leaf, matching ARIA, automatic parent expansion, return navigation verified.');
 } finally {
+    delete globalThis.__sidebarActor;
     if (root) await act(async () => root.unmount());
     await server.close();
     dom.window.close();
