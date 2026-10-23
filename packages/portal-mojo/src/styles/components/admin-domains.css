@@ -46,8 +46,9 @@
  .domains-narrow-scope { display:inline; }
  .domains-narrow-status { display:block; }
  .domains-page .tbl { table-layout:fixed;width:100%; }
- .domains-page .tbl th:first-child { width:64%; }
- .domains-page .tbl th:last-child { width:36%; }
+ .domains-page .tbl th:first-child { width:auto; }
+ .domains-page .tbl th:last-child { width:128px; }
+ .domains-page .tbl td:last-child .btn { white-space:nowrap; }
  .domains-page .tbl th,.domains-page .tbl td { padding-left:12px;padding-right:12px;overflow-wrap:anywhere; }
 }
 .domains-registration .domains-overview-actions:first-child { margin-top:0; }
