@@ -22,8 +22,7 @@ const FILTERS: FilterDef[] = [
 
 export function VhostsPage() {
     const route = useAdminRouteContext(), location = useLocation();
-    const mount = route?.mount.replace(/\/$/, '') ?? (location.pathname.includes('/edge/') ? location.pathname.split('/edge/')[0] : '');
-    const upstreams = `${mount}/edge/upstreams`;
+    const upstreams = location.pathname === '/' ? '/edge/upstreams' : `${location.pathname.replace(/\/[^/]+\/?$/, '')}/upstreams`;
     const upstreamsMounted = !route || route.paths.includes(upstreams);
     const queryClient = useQueryClient();
     const [revision, setRevision] = useState(0);

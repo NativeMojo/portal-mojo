@@ -8,7 +8,7 @@
 // returning), and web-mojo's JobHealthView — the only consumer — was never
 // mounted. Stats already carries channels, runners, totals and the scheduler.
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission, useMe } from '../../client/runtime';
 import { useAdminRouteContext } from '../core/route-context';
 import { JOBS_VIEW_PERMS, SCHEDULED_TASK_VIEW_PERMS } from './models';
@@ -26,7 +26,8 @@ export function JobDashboardPage() {
     const navigate = useNavigate();
     const { data: me } = useMe();
     const route = useAdminRouteContext();
-    const base = route ? `${route.mount.replace(/\/$/, '')}/jobs` : '/jobs';
+    const location = useLocation();
+    const base = location.pathname.replace(/\/+$/, '') || '/jobs';
     const related = [
         { path: 'list', label: 'Jobs', permissions: JOBS_VIEW_PERMS },
         { path: 'runners', label: 'Runners', permissions: JOBS_VIEW_PERMS },
@@ -38,7 +39,7 @@ export function JobDashboardPage() {
 
     /**
      * Open the jobs table already filtered to a channel. The path is derived
-     * from the registered Admin mount, including an embedded /system mount.
+     * from this dashboard location, including custom embedded base paths.
      */
     const openChannel = (channel: string) => {
         navigate({ pathname: `${base}/list`, search: `?channel=${encodeURIComponent(channel)}` });
