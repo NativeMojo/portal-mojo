@@ -10,14 +10,14 @@ const matches=HTMLElement.prototype.matches;HTMLElement.prototype.matches=functi
 globalThis.ResizeObserver=class{observe(){}disconnect(){}};window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');const router=await import('react-router-dom');
 const server=await createServer({root:process.cwd(),appType:'custom',logLevel:'silent',server:{middlewareMode:true},plugins:[{name:'domains-mounted-peer',enforce:'pre',transform(source,id){if(!id.endsWith('/client/mock.ts'))return;return source.replace('export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> {','export async function mockFetch(path: string, opts: MockFetchOpts): Promise<unknown> { if ((globalThis as any).__domainsPeer) { const response = await (globalThis as any).__domainsPeer(path, opts); if(response !== undefined) return response; }');}}]});
-let root,qc;
+let root,qc,auth;
 const wait=async(predicate,label)=>{for(let i=0;i<100;i++){await act(async()=>new Promise(resolve=>setTimeout(resolve,15)));if(predicate())return;}assert.fail(`Timed out: ${label}`);};
 const button=(name)=>[...document.querySelectorAll('button')].find(node=>node.textContent.trim()===name);
 const click=async(name)=>{await wait(()=>button(name)&&!button(name).disabled,`${name} enabled`);await act(async()=>button(name).click());};
 const input=async(node,value)=>{assert(node);await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});};
 const field=(label)=>{const node=[...document.querySelectorAll('label')].find(node=>node.textContent.includes(label));return node?.querySelector('input')??document.getElementById(node?.htmlFor??'');};
 try{
- const auth=await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');auth.initAuth();await auth.login('dns.manager@nativemojo.com','mojo');
+ auth=await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');auth.initAuth();await auth.login('dns.manager@nativemojo.com','mojo');
  const ui=await server.ssrLoadModule('/packages/portal-mojo/src/ui/index.ts');ui.toast.success=()=>{};ui.toast.error=()=>{};
  const {DomainPurchaseWizard}=await server.ssrLoadModule('/packages/portal-mojo/src/admin/dns/DomainPurchaseWizard.tsx');
  const mount=async(Component,props={},path='/custom/system/dns/domains')=>{qc=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});root=createRoot(document.getElementById('root'));await act(async()=>root.render(React.createElement(QueryClientProvider,{client:qc},React.createElement(router.MemoryRouter,{initialEntries:[path]},React.createElement(Component,props),React.createElement(ui.ModalHost)))));};
@@ -89,6 +89,7 @@ try{
  delete globalThis.__domainsPeer;
  const {ComponentsPage}=await server.ssrLoadModule('/apps/showcase/src/pages/components/ComponentsPage.tsx');
  await mount(ComponentsPage,{},'/?demo=admin-domains');await wait(()=>button('Purchases'),'showcase inventory');await click('Purchases');await wait(()=>[...document.querySelectorAll('h1')].some(n=>n.textContent==='Domain Purchases'),'showcase purchase handoff');await click('Back to Domains');await wait(()=>button('Purchases')&&document.querySelector('tbody button'),'showcase inventory return');await act(async()=>document.querySelector('tbody button').click());await wait(()=>[...document.querySelectorAll('h1')].some(n=>n.textContent==='DNS Records'),'showcase records handoff');await click('Back to Domains');await wait(()=>button('Add domain'),'showcase direct inventory return');await unmount();
- console.log('PASS actual Showcase route facade: Purchases, Records and direct return to Domains');
+ await wait(()=>auth.getAuthSnapshot().email==='showcase.operator@nativemojo.com','showcase cleanup identity restored');
+ console.log('PASS actual Showcase route facade: Purchases, Records, direct return and settled identity cleanup');
  auth.stopAutoRefresh();
-}finally{delete globalThis.__domainsPeer;if(root)await act(async()=>root.unmount());qc?.clear();await server.close();dom.window.close();}
+}finally{delete globalThis.__domainsPeer;if(root)await act(async()=>root.unmount());qc?.clear();auth?.stopAutoRefresh();await server.close();dom.window.close();}

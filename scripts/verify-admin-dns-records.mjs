@@ -203,7 +203,10 @@ try {
     const panelSource = await read('packages/portal-mojo/src/admin/dns/DnsRecordsPanel.tsx');
     const detailSource = await read('packages/portal-mojo/src/admin/dns/DomainsPage.tsx');
     assert(!apiSource.includes('record_values?:'));
-    assert.match(detailSource, /modal\.detail/);
+    // Domains now launches the native task dialog through its shared helper.
+    // Mounted Domains journeys cover actual admission, tabs and dismissal.
+    assert.match(detailSource, /showDomainDetails\(row\.id\)/);
+    assert.match(await read('packages/portal-mojo/src/admin/dns/DomainDetail.tsx'), /modal\.open\(close => <DomainDetail/);
     assert(!JSON.stringify(dns.DNS_ADMIN_SECTION.routes).includes(':id'));
     assert.match(panelSource, /DNS_MANAGE_PERMISSIONS/);
     assert.match(await read('packages/portal-mojo/src/styles/index.css'), /@import "\.\/components\/admin-dns\.css" layer\(portal-mojo\);/);

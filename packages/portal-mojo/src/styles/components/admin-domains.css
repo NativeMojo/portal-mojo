@@ -61,6 +61,7 @@
 @media(max-width:560px) {
  .domains-registration .detail-grid>div,.domains-registration-contact .detail-grid>div { grid-template-columns:minmax(100px,.45fr) minmax(0,1fr);gap:10px; }
  .domains-registration-contact .col-6,.dns-registrant-scoped .col-6 { grid-column:1/-1; }
+ .dns-registrant-scoped .form-grid>.col-6:nth-child(-n+2) { grid-column:span 6; }
 }
 
 .dns-registrant-scoped .dns-contact-status { flex-direction:row;align-items:center;justify-content:flex-start; }
