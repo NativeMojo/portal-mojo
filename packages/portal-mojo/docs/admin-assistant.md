@@ -250,7 +250,7 @@ button.
 
 Skill details show trigger phrases and readable ordered steps. Tool identifiers,
 dates and secondary explanations use info popovers. Automatic execution remains
-visibly called out. The sole lifecycle action deactivates/reactivates through the
+visibly called out: read-only steps can run automatically; changes still require approval. The sole lifecycle action deactivates/reactivates through the
 existing endpoint, then reloads authoritative state; no create/delete UI is added.
 
 The page lifetime is keyed to person, auth-session revision and global permissions.
@@ -260,7 +260,7 @@ pending. Private history/memory stays component-local. The Dashboard is unchange
 
 ## Memory
 
-Global and user tiers require the global Assistant grant. Group memory first chooses from a searchable normal `/api/group` picker and supplies that id as normal request context (`?group=<id>`). A group id is never put in the memory body and ambient group state is never consulted. Keys are limited to 64 lowercase alphanumeric/colon/underscore/hyphen characters; values are limited to 500 characters.
+Global and user tiers require the global Assistant grant. Group memory first chooses from a searchable normal `/api/group` picker and supplies that id as normal request context (`?group=<id>`). A group id is never put in the memory body and ambient group state is never consulted. Keys start with a lowercase letter or number and are limited to 64 lowercase alphanumeric/colon/underscore/hyphen characters; values are limited to 500 characters.
 
 Memory uses Personal, Global and Group tabs because they select different
 Assistant audiences. Lists show saved values with Edit and Remove actions; Add
@@ -268,7 +268,8 @@ opens a focused Key/Value dialog. Existing keys are immutable, duplicate new key
 cannot overwrite a saved value, and changing audience/group discards unsaved
 drafts. The searchable group picker replaces the previous first-50 limit. Group
 membership checks remain explicit and inherited; missing/refused checks are
-visible. Shared edits name their audience, removal names its key and audience and
+visible. Members with the global Assistant grant can inspect group memory;
+editing additionally requires inherited member Assistant authority or superuser. Shared edits name their audience, removal names its key and audience and
 initially focuses Cancel. Writes keep errors in the dialog, retain drafts on
 refusal and never replay automatically. Refresh failures are distinct from empty
 memory. Saved entries are not silently truncated to the first 100.

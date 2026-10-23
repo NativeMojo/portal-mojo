@@ -38,7 +38,7 @@ try {
  const input = async(label,value)=>{const el=[...document.querySelectorAll('input,textarea')].find(x=>x.labels?.[0]?.textContent.includes(label)||x.getAttribute('aria-label')===label||x.getAttribute('placeholder')===label);assert(el,`Field ${label}`);await React.act(async()=>{Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));});};
  await mount(pages.MemoriesPage); await wait(()=>!document.body.textContent.includes('Loading…'),'Memory loaded');
  assert.equal(document.querySelector('textarea'),null,'Memory edits belong in a focused dialog, not an always-open form');
- await click('Add memory'); await input('Key','qa:preference');await input('Value','Concise answers');await click('Save memory');
+ await click('Add memory'); await input('Key','_meta');assert([...document.querySelectorAll('button')].find(x=>x.textContent==='Save memory').disabled,'Reserved or non-alphanumeric-leading keys cannot be submitted');await input('Key','qa:preference');await input('Value','Concise answers');await click('Save memory');
  await wait(()=>!document.querySelector('dialog') && [...document.querySelectorAll('button')].some(x=>x.getAttribute('aria-label')==='Edit qa:preference'),'Saved memory returns in list'); assert.equal((await memory('user'))['qa:preference'],'Concise answers');
  await click('Edit qa:preference'); await input('Value','Clear answers');await click('Save memory');await wait(()=>!document.querySelector('dialog') && document.body.textContent.includes('Clear answers'),'Edit returns saved value');assert.equal((await memory('user'))['qa:preference'],'Clear answers');
  await click('Add memory');await input('Key','draft');await click('Cancel');await click('Global');await wait(()=>!document.body.textContent.includes('Loading…'),'Global loaded');await click('Add memory');assert.equal(document.querySelector('input[maxlength="64"]').value,'','No draft crosses audiences');await click('Cancel');
@@ -62,8 +62,23 @@ try {
  await click('Save memory');assert(document.querySelector('dialog button[aria-label="Close dialog"]').disabled,'Pending native close locked');await click('Saving…');assert.equal(sends,1,'Synchronous duplicate guard');
  const person=qc.getQueryData(['me',uid]);await React.act(async()=>qc.setQueryData(['me',uid],{...person,is_superuser:false,permissions:{}}));await settle();assert(!document.querySelector('dialog'),'Permission loss disposes pending editor');
  await React.act(async()=>release());client.installAuthHooks(null);auth.initAuth();await React.act(async()=>qc.setQueryData(['me',uid],person));await settle();assert(!Object.hasOwn(await memory('user'),'qa:cancelled-scope'),'Ended scope does not write after auth wait');
+ // A real seeded membership without group Assistant authority permits reading, not editing.
+ let groupId,groupName;await React.act(async()=>{
+  const memberships=await client.mojoList('/api/group/member',{user:48,size:100});
+  const reader=memberships.rows.find(row=>row.is_active&&!row.permissions?.admin&&!row.permissions?.assistant);
+  assert(reader,'Seeded read-only member exists');groupId=reader.group.id;groupName=reader.group.name;
+  await api.saveAssistantMemory('group','qa:read','Shared read-only fixture',groupId);
+  await auth.login('assistant.operator@nativemojo.com','mojo');auth.stopAutoRefresh();
+  qc.setQueryData(['me',auth.getAuthSnapshot().uid],(await client.mojoCall('/api/user/me')).data);
+ });
+ await mount(pages.MemoriesPage);await click('Group');await input('Group',groupName);
+ let choices;await React.act(async()=>{choices=await client.mojoList('/api/group',{size:10,search:groupName});});const choiceIndex=choices.rows.findIndex(row=>row.id===groupId);assert(choiceIndex>=0,'Selected group reachable through normal picker');
+ await wait(()=>document.querySelectorAll('[role=option]').length===choices.rows.length,'Search options loaded');await React.act(async()=>document.querySelectorAll('[role=option]')[choiceIndex].click());
+ await wait(()=>document.body.textContent.includes('Shared read-only fixture'),'Read-only group memory is visible');assert(document.body.textContent.includes('Editing requires Assistant access in the group'));assert(![...document.querySelectorAll('button')].some(b=>b.textContent==='Add memory'||b.getAttribute('aria-label')?.startsWith('Edit ')),'Reader has no edit controls');
+ await assert.rejects(api.saveAssistantMemory('group','qa:write','not allowed',groupId));
+ await React.act(async()=>{await auth.login('assistant.owner@nativemojo.com','mojo');auth.stopAutoRefresh();qc.setQueryData(['me',auth.getAuthSnapshot().uid],(await client.mojoCall('/api/user/me')).data);});
  await mount(pages.ConversationsPage);await wait(()=>document.body.textContent.includes('Review deployment health'),'Conversations return');await click('Review deployment health');await wait(()=>document.querySelector('dialog'),'Dialog open before logout');
  // Session replacement unmounts the dialog and private data immediately.
  await React.act(async()=>auth.logout());await settle();assert(!document.querySelector('dialog'));assert(!document.body.textContent.includes('Review deployment health'));
- console.log('PASS Assistant pages: focused memory add/edit/cancel/delete, audience draft reset, readable skill lifecycle, foreign history attribution/composer, owned continuation, refusal recovery, duplicate submission, permission loss during auth wait, session teardown.');
+ console.log('PASS Assistant pages: focused memory add/edit/cancel/delete, audience draft reset, readable skill lifecycle, foreign history attribution/composer, owned continuation, refusal recovery, duplicate submission, permission loss during auth wait, read-only group membership, session teardown.');
 } finally { await React.act(async()=>root.unmount());qc.clear();auth?.stopAutoRefresh();await server.close();dom.window.close(); }

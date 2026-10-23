@@ -744,8 +744,8 @@
       "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
       "symbol": "deleteAssistantMemory",
       "expression": "deleteAssistantMemory",
-      "fingerprint": "00432ff6d5c455dc7f31",
-      "permission": "sys.assistant and explicit group inherited assistant membership or superuser",
+      "fingerprint": "577335915ec4618cf78d",
+      "permission": "Global Assistant plus inherited group membership to read; inherited member Assistant or superuser to edit",
       "rationale": "A named value is removed from a frozen memory tier and group; no record history is deleted.",
       "runtimeCase": "assistant-pages-memory-remove-cancel-session-permission-refusal"
     },
