@@ -114,7 +114,7 @@ export function assistantSetupReadiness(state: AssistantSetupState): string {
     if (!state.realtime_installed) return 'The realtime application is not installed. Install it before using the Assistant.';
     if (state.emergency_stop) return 'An emergency stop is blocking Assistant requests.';
     if (state.model.capability?.mode === 'auto' && state.route.provider && state.route.credential && !state.model.effective) return 'Automatic model resolution is unavailable. Refresh the provider catalogue and review its reported freshness. Request admission does not prove that a usable model is ready.';
-    if (!state.route.provider || !state.route.model || !state.route.credential) return 'The deployment’s model and key selection are unavailable. Review the deployed policy and its selected credential in advanced controls; adding an Assistant key alone may not resolve this.';
+    if (!state.route.provider || !state.route.model || !state.route.credential) return 'The deployment’s model and key selection are unavailable. Review the deployed policy and its selected credential in Safety & usage; adding an Assistant key alone may not resolve this.';
     if (!state.route.ready) return 'The deployment configuration needs attention. Review its selected key and policy.';
     if (!state.enabled) return 'The deployment configuration is ready. Enable the Assistant when you are ready.';
     return 'Assistant configuration is ready. Provider availability has not been checked.';

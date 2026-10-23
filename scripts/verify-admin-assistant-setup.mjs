@@ -303,6 +303,12 @@ try {
     assert.match(document.body.textContent, /Owner access required/); assert(!document.body.textContent.includes('Provider catalogue refreshed'), 'Held catalogue response cannot revive a revoked page'); cacheSafe();
 
     await signIn();
+    // A single recovery button opens the task that can address the reported blocker.
+    for (const [index, [scenario, heading]] of [['missing-policy', 'Safety & usage'], ['missing-key', 'API keys'], ['unavailable-model', 'Model'], ['static-stop', 'Safety & usage']].entries()) {
+        mock.setMockAssistantSetupScenario(scenario); await render(80 + index); await click('Done');
+        await click('Review setup'); assert.equal(document.querySelector('dialog h2').textContent, heading, `${scenario} recovery opens ${heading}`);
+        assert.doesNotMatch(document.body.textContent, /advanced controls/);
+    }
     // MCP is independent from AI configuration, the chat switch, and LLM stops.
     const tab = label => [...document.querySelectorAll('[role=tab]')].find(el => el.textContent === label);
     for (const [index, scenario] of ['missing-key', 'missing-policy', 'static-stop'].entries()) {
