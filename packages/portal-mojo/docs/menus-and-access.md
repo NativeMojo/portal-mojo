@@ -65,7 +65,8 @@ Dashboard cannot remain selected on every nested page.
 ### Everyday Admin navigation
 
 The built-in menu keeps the existing top-level Dashboard. Operations contains
-Fleet, Maintenance, Deployments and Jobs Dashboard. Domains & Hosting contains
+Fleet, Maintenance, Deployments, Jobs Dashboard and Scheduled Tasks. Scheduled
+Tasks stays primary because its audience can lack access to Jobs Dashboard. Domains & Hosting contains
 Domains, Certificates and Serving. Storage has its own group. Configuration
 contains GeoLocation and Settings. Purpose-specific dashboards are welcome;
 their labels identify the task and their content should not duplicate Admin

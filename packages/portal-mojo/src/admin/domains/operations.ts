@@ -22,7 +22,7 @@ export const JOBS_ADMIN_SECTION: AdminSection = {
         { path: '', label: 'Jobs Dashboard', loadComponent: () => import('../jobs/JobDashboardPage').then(namedPage('JobDashboardPage')), permissions: JOBS_VIEW_PERMS },
         { path: 'runners', label: 'Job Runners', searchOnly: true, loadComponent: () => import('../jobs/JobRunnersPage').then(namedPage('JobRunnersPage')), permissions: JOBS_VIEW_PERMS },
         { path: 'list', label: 'Jobs', searchOnly: true, loadComponent: () => import('../jobs/JobsTablePage').then(namedPage('JobsTablePage')), permissions: JOBS_VIEW_PERMS },
-        { path: 'scheduled-tasks', label: 'Scheduled Tasks', searchOnly: true, loadComponent: () => import('../jobs/ScheduledTasksPage').then(namedPage('ScheduledTasksPage')), permissions: SCHEDULED_TASK_VIEW_PERMS },
+        { path: 'scheduled-tasks', label: 'Scheduled Tasks', loadComponent: () => import('../jobs/ScheduledTasksPage').then(namedPage('ScheduledTasksPage')), permissions: SCHEDULED_TASK_VIEW_PERMS },
     ],
 };
 export const DEPLOYMENTS_ADMIN_SECTION: AdminSection = {

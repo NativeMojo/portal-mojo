@@ -72,7 +72,7 @@ try {
     const configuration = packagedMenu.items.find(item => item.id === 'admin:configuration');
     assert.deepEqual(configuration.children.map(item => item.label), ['GeoLocation', 'Settings']);
     assert(packagedMenu.items.some(item => item.id === 'admin:storage'));
-    assert.deepEqual(operations.children.filter(item => !item.searchOnly).map(item => item.label), ['Fleet', 'Maintenance', 'Deployments', 'Jobs Dashboard']);
+    assert.deepEqual(operations.children.filter(item => !item.searchOnly).map(item => item.label), ['Fleet', 'Maintenance', 'Deployments', 'Jobs Dashboard', 'Scheduled Tasks']);
     assert.deepEqual(infrastructure.children.filter(item => !item.searchOnly).map(item => item.label), ['Domains', 'Certificates', 'Serving']);
     assert(operations.children.find(item => item.label === 'Fleet Configuration').requireSuperuser);
     assert(operations.children.find(item => item.label === 'Fleet Configuration').searchOnly);
