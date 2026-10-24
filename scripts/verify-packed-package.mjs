@@ -72,7 +72,12 @@ try {
     // Against main1176451: +59,255 bytes; no generated/dependency payload.
     // Preserve the audited 0.574% source headroom, rounded upward to 5 KB.
     // The 530,000-byte eager-runtime cap is independent and unchanged.
-    assert.ok(artifact.unpackedSize <= 6_585_000, `unpacked package exceeds 6.585 MB budget (${artifact.unpackedSize})`);
+    // Assistant setup/pages and navigation: still 633 intended files; 48,502
+    // additional source, style and documentation bytes since 5c694b3, totaling
+    // 6,591,546 unpacked bytes. No new files or generated/dependency payload.
+    // Preserve the existing 0.574% headroom rounded upward to 5 KB: 6.630 MB.
+    // Package contents, consumer checks and eager-runtime limits stay enforced.
+    assert.ok(artifact.unpackedSize <= 6_630_000, `unpacked package exceeds 6.630 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).
