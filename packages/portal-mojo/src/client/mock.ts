@@ -9769,7 +9769,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
         const caller = userFromBearer(opts.headers);
         if (!caller) return permissionDenied(401);
         const assistantGate = hasGlobalPermission(caller, ['view_admin', 'assistant']);
-        const canInspect = (row: MockAssistantConversation) => row.user === caller.id || assistantGate;
+        const canInspect = (row: MockAssistantConversation) => row.user === caller.id || hasGlobalPermission(caller, ['view_admin']);
         const canDelete = (row: MockAssistantConversation) => row.user === caller.id || hasGlobalPermission(caller, ['view_admin']);
         const assistantUser = (userId: number) => { const row = db.users.find((user) => user.id === userId); return row ? { id: row.id, display_name: row.display_name } : { id: userId, display_name: `User #${userId}` }; };
         const conversationWire = (row: MockAssistantConversation, detail = false) => ({ id: row.id, title: row.title, metadata: { ...row.metadata }, created: row.created, modified: row.modified, user: assistantUser(row.user), ...(detail ? { messages: row.messages.map((message) => ({ ...message, tool_calls: [...message.tool_calls], blocks: message.blocks == null ? null : structuredClone(message.blocks), usage: { ...message.usage } })) } : {}) });
@@ -9828,14 +9828,17 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             const id = conversationMatch[1] ? Number(conversationMatch[1]) : null;
             if (id != null) { const row = db.assistantConversations.find((candidate) => candidate.id === id); if (!row || !canInspect(row)) return { status: false, error: 'Conversation not found', error_code: 404 }; if (method === 'DELETE') { if (!canDelete(row)) return permissionDenied(); db.assistantConversations = db.assistantConversations.filter((candidate) => candidate.id !== id); return { status: 'deleted' }; } if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; return { status: true, data: conversationWire(row, opts.params?.graph === 'detail'), graph: String(opts.params?.graph ?? 'default') }; }
             if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
-            const visible = db.assistantConversations.filter(canInspect).sort((a, b) => b.modified - a.modified); const start = Math.max(0, Number(opts.params?.start ?? 0)); const size = Math.min(100, Math.max(1, Number(opts.params?.size ?? 100))); return { status: true, data: visible.slice(start, start + size).map((row) => conversationWire(row)), count: visible.length, start, size, graph: 'default' };
+            const params = { ...opts.params, start: Math.max(0, Number(opts.params?.start ?? 0)), size: Math.min(100, Math.max(1, Number(opts.params?.size ?? 100))) };
+            return { ...listRows(db.assistantConversations.filter(canInspect).map(row => conversationWire(row)), params, row => row.title, '-modified'), graph: 'default' };
         }
         const skillMatch = path.match(/^\/api\/assistant\/skill(?:\/(\d+))?$/);
         if (skillMatch) {
             if (!assistantGate) return permissionDenied(); const id = skillMatch[1] ? Number(skillMatch[1]) : null;
             const skillWire = (row: MockAssistantSkill, detail = false) => ({ id: row.id, tier: row.tier, name: row.name, description: row.description, auto_execute: row.auto_execute, is_active: row.is_active, created: row.created, modified: row.modified, user: row.user == null ? null : assistantUser(row.user), ...(detail ? { triggers: [...row.triggers], steps: structuredClone(row.steps), metadata: { ...row.metadata } } : {}) });
             if (id != null) { const row = db.assistantSkills.find((candidate) => candidate.id === id); if (!row) return { status: false, error: 'Skill not found', error_code: 404 }; if (method === 'DELETE') { db.assistantSkills = db.assistantSkills.filter((candidate) => candidate.id !== id); return { status: 'deleted' }; } if (method === 'POST') { if (!hasGlobalPermission(caller, ['view_admin'])) return permissionDenied(); if (typeof opts.body?.is_active !== 'boolean') return { status: false, error: 'is_active is required', error_code: 400 }; row.is_active = opts.body.is_active; row.modified = Math.floor(Date.now() / 1000); } else if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; return { status: true, data: skillWire(row, opts.params?.graph === 'detail'), graph: String(opts.params?.graph ?? 'default') }; }
-            if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 }; const rows = [...db.assistantSkills].sort((a, b) => a.name.localeCompare(b.name)); return { status: true, data: rows.map((row) => skillWire(row)), count: rows.length, start: 0, size: rows.length, graph: 'default' };
+            if (method !== 'GET') return { status: false, error: 'Method not allowed', error_code: 405 };
+            const params = { ...opts.params, start: Math.max(0, Number(opts.params?.start ?? 0)), size: Math.min(100, Math.max(1, Number(opts.params?.size ?? 100))) };
+            return { ...listRows(db.assistantSkills.map(row => skillWire(row)), params, row => row.name, 'name'), graph: 'default' };
         }
         const memoryMatch = path.match(/^\/api\/assistant\/memory\/(global|user|group)(?:\/([^/]+))?$/);
         if (memoryMatch) {
@@ -9848,7 +9851,7 @@ async function mockFetchInner(path: string, opts: MockFetchOpts): Promise<unknow
             }
             const store: Record<string, unknown> = tier === 'global' ? db.assistantMemory.global : tier === 'user' ? (db.assistantMemory.users.get(caller.id) ?? {}) : (db.assistantMemory.groups.get(groupId!) ?? {});
             if (method === 'GET' && entryKey == null) return { status: true, data: { ...store } };
-            if (method === 'POST' && entryKey == null) { const key = typeof opts.body?.key === 'string' ? opts.body.key : ''; const value = typeof opts.body?.value === 'string' ? opts.body.value : ''; if (!/^[a-z0-9:_-]{1,64}$/.test(key) || value.length < 1 || value.length > 500) return { status: false, error: 'Invalid memory key or value', error_code: 400 }; store[key] = value; if (tier === 'user') db.assistantMemory.users.set(caller.id, store); if (tier === 'group') db.assistantMemory.groups.set(groupId!, store); return { status: true, data: { key, value } }; }
+            if (method === 'POST' && entryKey == null) { const key = typeof opts.body?.key === 'string' ? opts.body.key : ''; const value = typeof opts.body?.value === 'string' ? opts.body.value : ''; if (!/^[a-z0-9][a-z0-9:_-]{0,63}$/.test(key) || value.length < 1 || value.length > 500) return { status: false, error: 'Invalid memory key or value', error_code: 400 }; store[key] = value; if (tier === 'user') db.assistantMemory.users.set(caller.id, store); if (tier === 'group') db.assistantMemory.groups.set(groupId!, store); return { status: true, data: { key, value } }; }
             if (method === 'DELETE' && entryKey != null) { delete store[entryKey]; return { status: true, data: { deleted: entryKey } }; }
             return { status: false, error: 'Method not allowed', error_code: 405 };
         }

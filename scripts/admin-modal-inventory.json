@@ -10733,104 +10733,19 @@
       ]
     },
     {
-      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:ConversationInspect:DetailView:0",
+      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:Dialog:dialog:0",
       "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "ConversationInspect",
-      "launcher": "DetailView",
+      "owner": "Dialog",
+      "launcher": "dialog",
       "body": [
-        "DetailView",
-        "AssistantFeed"
+        "dialog"
       ],
-      "category": "record",
-      "parent": "ConversationInspect",
+      "category": "editor",
+      "parent": "Dialog",
       "target": null,
-      "fingerprint": "6b2a04f31e7eedaa78d4",
+      "fingerprint": "e944572b5beb1e2e6d96",
       "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:ConversationsPage:modal.detail:0",
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "ConversationsPage",
-      "launcher": "modal.detail",
-      "body": [
-        "ConversationInspect"
-      ],
-      "category": "record",
-      "parent": "ConversationsPage",
-      "target": null,
-      "fingerprint": "1c5ed726f196205a2219",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:SkillInspect:DetailView:0",
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "SkillInspect",
-      "launcher": "DetailView",
-      "body": [
-        "DetailView",
-        "div",
-        "FlatRow",
-        "h3",
-        "ul",
-        "li",
-        "ol",
-        "code",
-        "p"
-      ],
-      "category": "record",
-      "parent": "SkillInspect",
-      "target": null,
-      "fingerprint": "abb68575044a0591c05c",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:SkillsPage:modal.detail:0",
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "SkillsPage",
-      "launcher": "modal.detail",
-      "body": [
-        "SkillInspect"
-      ],
-      "category": "record",
-      "parent": "SkillsPage",
-      "target": null,
-      "fingerprint": "083bd9adda4bacad0269",
-      "categories": [
-        "record"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:remove:modal.confirm:0",
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "remove",
-      "launcher": "modal.confirm",
-      "body": [],
-      "category": "confirmation",
-      "parent": "remove",
-      "target": null,
-      "fingerprint": "b026fc57d0f32123753c",
-      "categories": [
-        "confirmation"
-      ]
-    },
-    {
-      "id": "packages/portal-mojo/src/admin/assistant/pages.tsx:MemoriesPage:remove:0",
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "MemoriesPage",
-      "launcher": "remove",
-      "body": [],
-      "category": "confirmation",
-      "parent": "MemoriesPage",
-      "target": "packages/portal-mojo/src/admin/assistant/pages.tsx:remove",
-      "fingerprint": "2181209a52de43023012",
-      "categories": [
-        "confirmation"
+        "editor"
       ]
     },
     {
@@ -12456,20 +12371,6 @@
       "key": "'connection'",
       "label": "Connection",
       "fingerprint": "8c1a05c86bb3408b20ec"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "ConversationInspect",
-      "key": "'conversation'",
-      "label": "Conversation",
-      "fingerprint": "b1e549531e021161059d"
-    },
-    {
-      "file": "packages/portal-mojo/src/admin/assistant/pages.tsx",
-      "owner": "SkillInspect",
-      "key": "'overview'",
-      "label": "Overview",
-      "fingerprint": "26a58a01c74291533d04"
     }
   ],
   "reviewedMappings": []
