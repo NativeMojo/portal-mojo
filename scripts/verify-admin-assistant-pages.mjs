@@ -21,6 +21,7 @@ let auth;
 try {
  const pages = await server.ssrLoadModule('/packages/portal-mojo/src/admin/assistant/pages.tsx');
  const client = await server.ssrLoadModule('/packages/portal-mojo/src/client/client.ts');
+ const mock = await server.ssrLoadModule('/packages/portal-mojo/src/client/mock.ts');
  const realtime = await server.ssrLoadModule('/packages/portal-mojo/src/client/realtime.ts');
  const api = await server.ssrLoadModule('/packages/portal-mojo/src/admin/assistant/api.ts');
  auth = await server.ssrLoadModule('/packages/portal-mojo/src/client/auth.ts');
@@ -43,6 +44,23 @@ try {
  await click('Edit qa:preference'); await input('Value','Clear answers');await click('Save memory');await wait(()=>!document.querySelector('dialog') && document.body.textContent.includes('Clear answers'),'Edit returns saved value');assert.equal((await memory('user'))['qa:preference'],'Clear answers');
  await click('Add memory');await input('Key','draft');await click('Cancel');await click('Global');await wait(()=>!document.body.textContent.includes('Loading…'),'Global loaded');await click('Add memory');assert.equal(document.querySelector('input[maxlength="64"]').value,'','No draft crosses audiences');await click('Cancel');
  await click('Personal');await wait(()=>document.body.textContent.includes('Clear answers'),'Personal loaded');await click('Remove qa:preference');assert.equal(document.activeElement.textContent,'Cancel','Removal initially focuses Cancel');await click('Cancel');assert.equal((await memory('user'))['qa:preference'],'Clear answers');
+ // Carry modal-lifecycle coverage through the actual auth and transport boundaries.
+ await click('Remove qa:preference');await click('Global');assert(!document.querySelector('dialog'),'Audience change disposes an unconfirmed removal');assert.equal((await memory('user'))['qa:preference'],'Clear answers');
+ await click('Personal');await wait(()=>document.body.textContent.includes('Clear answers'),'Personal scope restored');
+ await click('Remove qa:preference');const removeActor=qc.getQueryData(['me',uid]);
+ await React.act(async()=>qc.setQueryData(['me',uid],{...removeActor,is_superuser:false,permissions:{}}));
+ await wait(()=>!document.querySelector('dialog'),'Permission loss disposes an unconfirmed removal');
+ await React.act(async()=>qc.setQueryData(['me',uid],removeActor));await wait(()=>document.body.textContent.includes('Clear answers'),'Authority restored');assert.equal((await memory('user'))['qa:preference'],'Clear answers');
+ await click('Remove qa:preference');let refuseRemoval;
+ client.installAuthHooks({preRequest:async(path)=>{if(path.startsWith('/api/assistant/memory/user/'))await new Promise((resolve,reject)=>{refuseRemoval=reject;});},authHeader:()=>`Bearer ${auth.getAccessToken()}`});
+ await click('Remove memory');assert(document.querySelector('dialog button[aria-label="Close dialog"]').disabled,'Removal dismissal stays locked while pending');
+ await React.act(async()=>refuseRemoval(new Error('Fixture removal refusal')));await wait(()=>document.body.textContent.includes('Fixture removal refusal'),'Removal refusal visible');
+ client.installAuthHooks(null);auth.initAuth();assert.equal((await memory('user'))['qa:preference'],'Clear answers','Refused removal preserves stored value');await click('Cancel');assert(document.body.textContent.includes('Clear answers'),'Refused removal retains list value');
+ await click('Remove qa:preference');await mount(pages.SkillsPage);assert(!document.querySelector('dialog'),'Unmount disposes unconfirmed removal');assert.equal((await memory('user'))['qa:preference'],'Clear answers');
+ await mount(pages.MemoriesPage);await wait(()=>document.body.textContent.includes('Clear answers'),'Memory reloaded');
+ mock.armMockResponseOnce('GET','/api/assistant/memory/user',{extraDelayMs:400});await click('Refresh');await click('Global');
+ await wait(()=>!document.body.textContent.includes('Loading…'),'Global scope loaded');await React.act(async()=>{await new Promise(resolve=>setTimeout(resolve,450));});
+ assert(!document.body.textContent.includes('Clear answers'),'Late personal read cannot reach global scope');await click('Personal');await wait(()=>document.body.textContent.includes('Clear answers'),'Personal scope returns');
  await click('Remove qa:preference');await click('Remove memory');await wait(()=>!document.querySelector('dialog'),'Removal closes');assert(!Object.hasOwn(await memory('user'),'qa:preference'));
  await mount(pages.SkillsPage);await wait(()=>document.body.textContent.includes('deployment-health'),'Skills loaded');await click('deployment-health');await wait(()=>document.body.textContent.includes('Inspect service metrics.'),'Steps readable');assert(!document.body.textContent.includes('{"tool"'),'No raw JSON');assert(!document.querySelector('.detail-nav'),'No one-item rail');
  await click('Deactivate skill');await wait(()=>document.body.textContent.includes('Reactivate skill'),'Returned inactive state');await click('Reactivate skill');await wait(()=>document.body.textContent.includes('Deactivate skill'),'Returned active state');await click('Close dialog');
@@ -80,5 +98,5 @@ try {
  await mount(pages.ConversationsPage);await wait(()=>document.body.textContent.includes('Review deployment health'),'Conversations return');await click('Review deployment health');await wait(()=>document.querySelector('dialog'),'Dialog open before logout');
  // Session replacement unmounts the dialog and private data immediately.
  await React.act(async()=>auth.logout());await settle();assert(!document.querySelector('dialog'));assert(!document.body.textContent.includes('Review deployment health'));
- console.log('PASS Assistant pages: focused memory add/edit/cancel/delete, audience draft reset, readable skill lifecycle, foreign history attribution/composer, owned continuation, refusal recovery, duplicate submission, permission loss during auth wait, read-only group membership, session teardown.');
+ console.log('PASS Assistant pages: focused memory add/edit/cancel/delete, audience draft reset, removal scope/permission/unmount fences, refusal recovery and stale-read suppression, readable skill lifecycle, foreign history attribution/composer, owned continuation, refusal recovery, duplicate submission, permission loss during auth wait, read-only group membership, session teardown.');
 } finally { await React.act(async()=>root.unmount());qc.clear();auth?.stopAutoRefresh();await server.close();dom.window.close(); }
