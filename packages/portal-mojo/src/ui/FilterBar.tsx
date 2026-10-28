@@ -2,12 +2,15 @@ import { ComboBox } from './ComboBox';
 // FilterBar — web-mojo's filter UX: an "Add filter" menu listing every
 // available filter with a per-type icon and a check on the active ones, each
 // opening a type-appropriate dialog; applied filters become editable pills.
-// Adding a filter to a page is one entry in a `filters` array.
+// Adding a filter to a page is one entry in a `filters` array. Keys owned by
+// the selected preset (`owned`) are the segment's to show: no pill, no count,
+// and Clear all keeps them (see preset-owned.ts).
 import { useEffect, useRef, useState } from 'react';
 import { modal } from './modal';
 import { DateRangePicker } from './date/DateRangePicker';
 import { formatFilterDisplay } from '../client/lookups';
 import type { ActiveFilter, TableParamsApi } from '../client/params';
+import { isPresetOwned } from './preset-owned';
 
 export type FilterType = 'text' | 'select' | 'multiselect' | 'number' | 'boolean' | 'date' | 'daterange';
 
@@ -168,7 +171,7 @@ async function openFilterDialog(def: FilterDef, current: ActiveFilter | undefine
 }
 
 // ── the bar ───────────────────────────────────────────────────────────
-export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TableParamsApi }) {
+export function FilterBar({ defs, params, owned = {} }: { defs: FilterDef[]; params: TableParamsApi; owned?: Readonly<Record<string, string>> }) {
     const [open, setOpen] = useState(false);
     const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -187,11 +190,14 @@ export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TablePa
     }, [open]);
 
     const active = params.activeFilters;
+    // The menu's checks still show owned keys (they ARE filtering, and the
+    // dialog edits them); the count and Clear all are the pills' business.
+    const clearable = active.filter((f) => !isPresetOwned(f, owned));
 
     return (
         <div className="filter-menu-wrap" ref={wrapRef}>
             <button
-                className={`btn btn-compact${active.length ? ' btn-has-filters' : ''}`}
+                className={`btn btn-compact${clearable.length ? ' btn-has-filters' : ''}`}
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
                 title="Filter"
@@ -199,7 +205,7 @@ export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TablePa
                 {/* Label collapses on normal widths (tool-group icon mode);
                     the active-count badge stays visible either way. */}
                 <i className="bi bi-funnel" /> <span className="btn-label">Filter</span>
-                {active.length > 0 && <span className="filter-count">{active.length}</span>}
+                {clearable.length > 0 && <span className="filter-count">{clearable.length}</span>}
             </button>
             {open && (
                 <div className="filter-menu" role="menu">
@@ -221,12 +227,12 @@ export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TablePa
                             </button>
                         );
                     })}
-                    {active.length > 0 && (
+                    {clearable.length > 0 && (
                         <>
                             <div className="filter-menu-sep" />
                             <button
                                 className="filter-menu-item filter-menu-clear"
-                                onClick={() => { setOpen(false); params.clearFilters(); }}
+                                onClick={() => { setOpen(false); params.clearFilters(owned); }}
                             >
                                 <i className="bi bi-x-circle" /> Clear all filters
                             </button>
@@ -238,9 +244,9 @@ export function FilterBar({ defs, params }: { defs: FilterDef[]; params: TablePa
     );
 }
 
-/** Active-filter pills — click to edit, × to remove. */
-export function FilterPills({ defs, params }: { defs: FilterDef[]; params: TableParamsApi }) {
-    const active = params.activeFilters;
+/** Active-filter pills — click to edit, × to remove. Preset-owned keys never pill. */
+export function FilterPills({ defs, params, owned = {} }: { defs: FilterDef[]; params: TableParamsApi; owned?: Readonly<Record<string, string>> }) {
+    const active = params.activeFilters.filter((f) => !isPresetOwned(f, owned));
     if (active.length === 0) return null;
     return (
         <div className="pill-row">
@@ -261,7 +267,7 @@ export function FilterPills({ defs, params }: { defs: FilterDef[]; params: Table
                     </span>
                 );
             })}
-            <button className="pill-clear" onClick={() => params.clearFilters()}>Clear all</button>
+            <button className="pill-clear" onClick={() => params.clearFilters(owned)}>Clear all</button>
         </div>
     );
 }

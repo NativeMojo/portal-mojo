@@ -30,6 +30,7 @@ import { busyWhile } from './loading';
 import { modal } from './modal';
 import { RenderGuard } from './safe-node';
 import { fixedParamKeys, mergeFixedParams } from './fixed-params';
+import { isPresetOwned, presetOwnedFilters } from './preset-owned';
 import { toast } from './toast';
 import * as fmt from './format';
 import { warnOnce } from './warn-once';
@@ -428,6 +429,9 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
     const firstRow = count === 0 ? 0 : (p.page - 1) * p.size + 1;
     const lastRow = Math.min(count, (p.page - 1) * p.size + rows.length);
     const isFiltered = p.activeFilters.length > 0 || (searchable && p.search !== '');
+    // The selected segment owns its keys: no pill, and every Clear keeps them.
+    const owned = presetOwnedFilters(presets, p.presetActive);
+    const clearable = p.activeFilters.some((f) => !isPresetOwned(f, owned)) || (searchable && p.search !== '');
 
     // Save the view on every params/visibility change (post-hydration only,
     // so the restore itself never writes back a half-applied state).
@@ -750,7 +754,7 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
                         toolbar). Icons + tooltips only; text labels appear
                         only on very wide screens via .btn-label. */}
                     <div className="tool-group">
-                        {filters.length > 0 && <FilterBar defs={filters} params={p} />}
+                        {filters.length > 0 && <FilterBar defs={filters} params={p} owned={owned} />}
                         {columnChooser && (
                             <MenuDropdown button={(open, toggle) => (
                                 <button className="btn btn-compact" onClick={toggle} aria-expanded={open} title="Choose columns">
@@ -838,7 +842,7 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
                 </div>
             )}
 
-            <FilterPills defs={filters} params={p} />
+            <FilterPills defs={filters} params={p} owned={owned} />
 
             {selectable && batchActions.length > 0 && selected.size > 0 && (
                 <div className="batch-bar" role="region" aria-label="Batch actions">
@@ -939,7 +943,7 @@ function ModelTableView<T extends { id: RowId }>(props: ModelTableProps<T> & {
                                     {isFiltered ? (
                                         <>
                                             <h3>No results match your filters</h3>
-                                            <button className="btn" onClick={() => p.clearFilters()}>Clear filters</button>
+                                            {clearable && <button className="btn" onClick={() => p.clearFilters(owned)}>Clear filters</button>}
                                         </>
                                     ) : (
                                         <h3>No {title.toLowerCase()} yet</h3>

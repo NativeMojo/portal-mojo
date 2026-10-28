@@ -41,7 +41,8 @@ export interface TableParamsApi extends TableParams {
     removeFilter(f: ActiveFilter): void;
     applyPreset(params: Record<string, string>): void;
     presetActive(params: Record<string, string>): boolean;
-    clearFilters(): void;
+    /** Clears search and filters; `keep` survives (the selected preset's own keys). */
+    clearFilters(keep?: Readonly<Record<string, string>>): void;
     setPage(page: number): void;
     setSize(size: number): void;
     /**
@@ -295,7 +296,7 @@ export function useTableParams(
             if (keys.length === 0) return Object.keys(filters).length === 0;
             return keys.every((k) => filters[k] === params[k]);
         },
-        clearFilters: () => write({ ...state, search: '', page: 1 }, {}),
+        clearFilters: (keep) => write({ ...state, search: '', page: 1 }, { ...keep }),
         setPage: (page) => write({ ...state, page }, filters),
         setSize: (size) => write({ ...state, size, page: 1 }, filters),
         applySaved: (saved) => {

@@ -174,6 +174,17 @@ The table retains native row/cell semantics.
 (`__gte`), `daterange` (the `dr_*` triple). Applied filters render as
 editable pills; presets are param bundles with DERIVED active state.
 
+**The selected preset owns its keys.** While a preset matches, its params
+render no pill and don't count on the Filter button, and every Clear (the
+pill row's Clear all, the Filter menu's, the empty state's) keeps them —
+the segment is the one control for them. So a `defaultParams` default that
+matches a preset (`{ status: 'submitted' }` beside a "Submitted" preset)
+shows as the highlighted segment, never as a removable pill. Filters added
+on top still pill. The Filter menu keeps its check on an owned key's
+definition; editing it there changes the value, the preset stops matching,
+and the pill returns. A default with NO matching preset is still a plain
+removable pill; scope that must never be removable is `fixedParams`.
+
 ## Selection + batch
 
 `selectable` renders checkboxes independently of `batchActions` (decoupled
