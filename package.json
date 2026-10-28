@@ -42,6 +42,7 @@
         "verify:model-table-adapter": "node scripts/verify-model-table-adapter.mjs",
         "verify:account-actor": "node scripts/verify-account-actor.mjs",
         "verify:fixed-params": "node scripts/verify-fixed-params.mjs",
+        "verify:preset-owned": "node scripts/verify-preset-owned.mjs",
         "verify:route-error": "node scripts/verify-route-error.mjs",
         "verify:menu-flatten": "node scripts/verify-menu-flatten.mjs",
         "verify:realtime": "node scripts/verify-realtime.mjs && node scripts/verify-realtime-auth.mjs",

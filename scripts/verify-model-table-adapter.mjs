@@ -188,10 +188,13 @@ try {
     assert.equal(paramsOf('schedule').start, 0);
     await click(inTable('schedule', '.th-sort'));
     assert.equal(paramsOf('schedule').sort, '-name');
-    await click(done('schedule'));
-    assert.equal(paramsOf('schedule').status, 'done');
     await click(inTable('schedule', '[title="Remove filter"]'));
     assert.equal(paramsOf('schedule').status, undefined, 'removing local filter does not resurrect defaults');
+    await click(done('schedule'));
+    assert.equal(paramsOf('schedule').status, 'done');
+    assert.equal(inTable('schedule', '[title="Remove filter"]'), null, 'the selected preset owns status: no pill');
+    await click(done('schedule'));
+    assert.equal(paramsOf('schedule').status, undefined, 'clicking the selected preset again clears it');
     const localSize = inTable('schedule', '.pager [role="combobox"]');
     await choose(localSize, '10');
     assert.equal(paramsOf('schedule').size, 10, 'local size serialization uses caller default');
