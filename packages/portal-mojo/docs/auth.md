@@ -38,6 +38,11 @@ onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issu
   shared flight so a later request or reconnect can try again. RealtimeProvider
   uses this same gate before connecting and before sending authentication;
   applications do not need a second refresh timer for WebSockets.
+- A realtime handshake's exact `Authentication timeout` response reconnects
+  automatically, including when credentials were already sent before a tab
+  slept. It does not emit an authentication denial or close a consumer's
+  workspace. Actual credential rejection and forced disconnect still stop
+  the connection; ordinary renewal cannot override those denials.
 - `useAuthSnapshot()` → `{authenticated, uid, email}` — live, cross-tab.
 - An internal session revision distinguishes same-tab renewal from explicit
   replacement/clearing and cross-tab storage changes. Session-bound realtime

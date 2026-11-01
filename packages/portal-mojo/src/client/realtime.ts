@@ -428,9 +428,10 @@ export class RealtimeClient {
         }
         if (frame.type === 'error') {
             if (this.lifecycle === 'authenticating') {
-                // The server's admission timer can expire while renewal is
-                // pending. No credential was rejected in this specific case.
-                if (frame.message === 'Authentication timeout' && this.authBinding && this.authSent !== socket) {
+                // The server's deadline can expire before it processes our
+                // credentials, even if we already sent them (e.g. tab sleep).
+                // This exact timeout is not a credential rejection.
+                if (frame.message === 'Authentication timeout') {
                     this.retryAuthentication(run, socket);
                 } else this.suspend('auth-failed', 4003, 'Authentication failed');
             } else if (this.topicOperation) {

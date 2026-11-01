@@ -34,8 +34,8 @@ behavior and are responsible for their token lifecycle.
 - An open socket is not ready. The client waits for `auth_required`, then sends
   `{type:'authenticate',token,prefix:'bearer'}` and becomes ready only after
   `auth_success`. An auth error closes and suspends the connection until the
-  token value changes. The exact direct admission-capacity error described
-  below is a transport refusal, not an authentication failure.
+  token value changes. The exact direct handshake-timeout and admission-capacity
+  errors described below enter reconnect backoff instead.
 - Heartbeat is a `ping` every 20 seconds with a 10-second `pong` deadline.
   A server-initiated `{type:'ping'}` (django-mojo 1.32+ sends one every 20
   seconds and culls a socket silent for 90) is answered at once with
@@ -73,9 +73,13 @@ A top-level `{type:'error'}` frame is attributed in order:
 1. **During authentication** — auth failure: the client closes and suspends
    until the token value changes. Surfaces through the lifecycle status only;
    no `error` event is dispatched. Exception: the exact direct
-   `message === 'Authentication timeout'` before credentials were sent on a
-   session-bound socket is a transport timeout and enters bounded retry.
-   The same error after credentials were sent remains an authentication failure.
+   `message === 'Authentication timeout'` is a transport timeout, even after
+   credentials were sent: sending does not prove the server processed them
+   before its deadline. Both session-bound and explicit-token clients reconnect
+   with capped exponential delay. Session-bound retries use the shared auth
+   gate; explicit-token clients retain their supplied token. Retired socket
+   frames are ignored, and application writes are never replayed. Other auth
+   errors and forced disconnect remain terminal.
 2. **While a subscribe/unsubscribe is pending** — that operation's denial
    (acknowledgements are uncorrelated, so denial is a generic `error`); the
    topic reports `denied`. Surfaces through the topic status only; no `error`

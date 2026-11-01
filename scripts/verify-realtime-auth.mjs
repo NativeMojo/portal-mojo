@@ -141,7 +141,7 @@ try {
         r.cleanup();
     }
     // Server handshake timeout before credentials were sent is a transport
-    // timeout. The same text after send and any generic auth error still deny.
+    // timeout. Sending credentials does not prove the server received them.
     for (const outcome of ['success', '503']) {
         const r = rig(7200); await flush();
         const old = r.sockets[0]; old.open(); now += 7_500_000;
@@ -154,7 +154,67 @@ try {
         assert.equal(r.sockets.length, outcome === 'success' ? 2 : 1);
         assert(!r.states.includes('auth-failed')); r.cleanup();
     }
-    for (const message of ['Token expired', 'Authentication timeout']) {
+    // A sleeping tab can queue the challenge and the server's deadline frame.
+    // Retire that socket even if the challenge continuation sent credentials.
+    for (const bound of [true, false]) for (const sent of [true, false]) {
+        const r = rig(7200, bound);
+        if (!bound) r.client.connect(auth.getAccessToken());
+        await flush();
+        r.client.retainTopic('orders');
+        const old = r.sockets[0]; old.open();
+        if (sent) { old.frame({ type: 'auth_required' }); await flush(); }
+        assert.equal(r.sent.filter(f => f.type === 'authenticate').length, sent ? 1 : 0);
+        old.frame({ type: 'error', message: 'Authentication timeout' });
+        assert.equal(r.client.getStatus().status, 'backoff', 'handshake timeout is not credential rejection');
+        const retryAt = r.client.getStatus().retryAt;
+        old.frame({ type: 'auth_success', user_id: 42, user_type: 'user' });
+        old.frame({ type: 'error', message: 'Token expired' });
+        old.onclose?.({ code: 1000 });
+        assert.equal(r.client.getStatus().status, 'backoff', 'retired socket frames have no authority');
+        assert.equal(r.client.getStatus().retryAt, retryAt, 'late close cannot schedule another retry');
+        r.clock.advance(1999); await flush(); assert.equal(r.sockets.length, 1);
+        r.clock.advance(1); await flush(); assert.equal(r.sockets.length, 2);
+        const fresh = await authenticate(r);
+        fresh.frame({ type: 'auth_success', user_id: 42, user_type: 'user' });
+        fresh.frame({ type: 'subscribed', topic: 'orders' });
+        assert.equal(r.client.getStatus().status, 'ready');
+        assert.equal(r.client.topicStatus('orders'), 'subscribed');
+        assert.equal(r.sent.filter(f => f.type === 'subscribe').length, 1);
+        assert.equal(refreshes.length, 0, 'valid or explicit credentials need no shared renewal');
+        assert(!r.states.includes('auth-failed')); r.cleanup();
+    }
+    // Repeated timeouts keep capped exponential delay, reset only by success.
+    {
+        const r = rig(7200); await flush();
+        for (let attempt = 1; attempt <= 10; attempt++) {
+            const socket = await authenticate(r);
+            socket.frame({ type: 'error', message: 'Authentication timeout' });
+            const delay = Math.round(Math.min(2000 * 1.5 ** (attempt - 1), 30000));
+            assert.equal(r.client.getStatus().retryAt - now, delay);
+            assert.equal(r.clock.timers.size, 1, 'one retry timer per failed handshake');
+            r.clock.advance(delay); await flush();
+        }
+        const socket = await authenticate(r); socket.frame({ type: 'auth_success' });
+        r.client.send({ type: 'application-write', id: 'do-not-replay' });
+        socket.close(1001);
+        assert.equal(r.client.getStatus().retryAt - now, 2000, 'successful auth resets retry delay');
+        r.clock.advance(2000); await flush();
+        const fresh = await authenticate(r); fresh.frame({ type: 'auth_success' });
+        assert.equal(r.sent.filter(f => f.type === 'application-write').length, 1, 'reconnect never replays writes');
+        r.cleanup();
+    }
+    // Retry still uses the shared gate; a subsequent confirmed denial is final.
+    {
+        const r = rig(7200); await flush(); const socket = await authenticate(r);
+        socket.frame({ type: 'error', message: 'Authentication timeout' });
+        now += 7_500_000; r.client.nudge(); await flush();
+        assert.equal(refreshes.length, 1);
+        refreshes[0].resolve(response(401, {})); await flush();
+        assert.equal(r.client.getStatus().status, 'auth-failed');
+        r.client.nudge(); r.clock.advance(60_000); await flush();
+        assert.equal(r.sockets.length, 1, 'confirmed refresh denial cannot retry'); r.cleanup();
+    }
+    for (const message of ['Token expired', 'Authentication failed: Invalid token', 'Authentication timeout extra']) {
         const r = rig(7200); await flush(); const socket = await authenticate(r);
         socket.frame({ type: 'error', message });
         assert.equal(r.client.getStatus().status, 'auth-failed'); r.cleanup();
