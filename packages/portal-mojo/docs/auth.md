@@ -143,9 +143,11 @@ url>&signed_out=1&force_reauth=1`. django-mojo clears the hosted page's
 stored session and shows "You're signed out." with the sign-in form.
 `force_reauth=1` keeps an older django-mojo that ignores `signed_out` from
 signing the user back in. Under the mock it only logs out and returns false.
-While that navigation is pending, `redirectToHostedAuth()` returns true without
-navigating, so an app's signed-out guard re-rendering after the logout cannot
-replace the landing with a plain `/auth`.
+Until a new session starts, `redirectToHostedAuth()` (without `forceReauth`)
+also navigates to that signed-out landing, so an app's signed-out guard
+re-rendering after the logout cannot replace it with a plain `/auth`, and a
+sign-out navigation the user canceled (e.g. at a "leave page?" prompt) can
+still be retried with Sign in.
 `AccountModal` and `UserMenu` use it for their default hosted sign-out; an
 app that passes its own `onSignOut` calls it there.
 

@@ -966,11 +966,11 @@ export function hostedSignOutUrl(returnTo?: string): string | null {
  * then navigate to the hosted sign-out landing. Returns false (after the
  * local logout) when there is no hosted page, e.g. under the mock.
  */
-let signOutNavigating = false;
+let signedOutLanding: string | null = null;
 
 export function signOutHosted(): boolean {
     const url = hostedSignOutUrl();
-    signOutNavigating = !!url;
+    signedOutLanding = url;
     logout();
     if (!url) return false;
     window.location.href = url;
@@ -982,9 +982,15 @@ export function signOutHosted(): boolean {
  * (hash) route so the post-exchange boot can put them back where they were.
  */
 export function redirectToHostedAuth(opts: HostedAuthOptions = {}): boolean {
-    // A signed-out guard re-rendering after signOutHosted() must not replace
-    // its navigation with a plain /auth that signs the user back in.
-    if (signOutNavigating) return true;
+    // After signOutHosted(), sign-in goes through the same signed_out landing
+    // until a new session exists: a signed-out guard re-rendering behind the
+    // sign-out cannot turn it into a plain /auth that signs the user back in,
+    // and a canceled sign-out navigation can still be retried.
+    if (signedOutLanding && !opts.forceReauth && !getAuthSnapshot().authenticated) {
+        window.location.href = signedOutLanding;
+        return true;
+    }
+    signedOutLanding = null;
     const url = hostedAuthUrl(undefined, opts);
     if (!url) return false;
     try {

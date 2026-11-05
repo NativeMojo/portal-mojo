@@ -103,6 +103,18 @@ try {
         // and calls redirectToHostedAuth(); it must not replace the landing.
         assert.equal(auth.redirectToHostedAuth(), true);
         assert.equal(location.href, signedOut('https://api.test'), 'a guard redirect after sign-out keeps the signed_out landing');
+        // A canceled sign-out navigation (beforeunload "Stay") leaves the page
+        // here; a later Sign in must still navigate, to the signed_out landing.
+        land(APP);
+        assert.equal(auth.redirectToHostedAuth(), true);
+        assert.equal(location.href, signedOut('https://api.test'), 'Sign in after a canceled sign-out navigates instead of doing nothing');
+        // A new session ends the signed-out state: ordinary hosted links again.
+        land(APP); auth.setTokens(jwt(), jwt(), false);
+        assert.equal(auth.redirectToHostedAuth({ forceReauth: true }), true);
+        assert.equal(location.href, `https://api.test/auth?redirect=${encodeURIComponent(RETURN)}&force_reauth=1`, 'step-up after a new sign-in is unaffected');
+        auth.logout(); land(APP);
+        assert.equal(auth.redirectToHostedAuth(), true);
+        assert.equal(location.href, `https://api.test/auth?redirect=${encodeURIComponent(RETURN)}`, 'after a new session, a plain logout + sign-in uses the ordinary link');
         assert(tokensGone(), 'the app sign-out clears this origin');
     }
 
