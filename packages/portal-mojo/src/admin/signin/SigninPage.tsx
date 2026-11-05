@@ -280,10 +280,25 @@ function CopyButton({ text, label, inputId }: { text: string; label: string; inp
     </button>;
 }
 
+/** The callback URLs to show (#9589): the full list when the server sends one, else the single URL, else none. */
+export function callbackUrls(provider: Pick<SigninProvider, 'callback_url' | 'callback_urls'>): string[] {
+    if (Array.isArray(provider.callback_urls) && provider.callback_urls.length) return provider.callback_urls;
+    return typeof provider.callback_url === 'string' && provider.callback_url ? [provider.callback_url] : [];
+}
+
+/** The server's registration domains, each once, in order. Never derived here, so nothing is made up. */
+export function signinDomains(provider: Pick<SigninProvider, 'domains'>): string[] {
+    return Array.isArray(provider.domains)
+        ? [...new Set(provider.domains.filter((domain) => typeof domain === 'string' && domain))]
+        : [];
+}
+
 function ProviderCard({ provider, onSaved }: { provider: SigninProvider; onSaved: (next: SigninSettings) => void }) {
     const [edits, setEdits] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const urls = callbackUrls(provider);
+    const domains = signinDomains(provider);
     const displayed = (field: SigninProviderField) => field.key in edits ? edits[field.key]! : field.secret ? '' : field.value ?? '';
     const dirty = provider.fields.filter((field) => field.key in edits && edits[field.key] !== (field.secret ? '' : field.value ?? '') && edits[field.key]!.trim() !== '');
 
@@ -341,14 +356,27 @@ function ProviderCard({ provider, onSaved }: { provider: SigninProvider; onSaved
             </div>;
         })}
         {error && <div className="form-alert" role="alert">{error}</div>}
-        <div className="field">
-            <label className="field-label" htmlFor={`signin-${provider.name}-callback`}>Callback URL</label>
-            <div className="signin-inline-row">
-                <input id={`signin-${provider.name}-callback`} className="input signin-code" readOnly value={provider.callback_url} onFocus={(event) => event.target.select()} />
-                <CopyButton text={provider.callback_url} label={`${provider.label} callback URL`} inputId={`signin-${provider.name}-callback`} />
-            </div>
-            <span className="field-help">Paste this into the {provider.label} console as the redirect / callback URL.</span>
-        </div>
+        {urls.length ? <div className="field">
+            <label className="field-label" htmlFor={`signin-${provider.name}-callback-0`}>{urls.length > 1 ? 'Callback URLs' : 'Callback URL'}</label>
+            {urls.map((url, index) => <div className="signin-inline-row" key={index}>
+                <input id={`signin-${provider.name}-callback-${index}`} className="input signin-code" readOnly value={url} onFocus={(event) => event.target.select()} />
+                <CopyButton text={url} label={`${provider.label} callback URL`} inputId={`signin-${provider.name}-callback-${index}`} />
+            </div>)}
+            <span className="field-help">{urls.length > 1
+                ? `Add each of these in the ${provider.label} console as a redirect / callback URL.`
+                : `Paste this into the ${provider.label} console as the redirect / callback URL.`}</span>
+        </div> : <div className="signin-note" role="status">
+            <i className="bi bi-info-circle" />
+            <span>The server sent no callback URL. Check its BASE_URL and ALLOWED_REDIRECT_URLS settings, then reload this page.</span>
+        </div>}
+        {domains.length > 0 && <div className="field">
+            <label className="field-label" htmlFor={`signin-${provider.name}-domain-0`}>Domains</label>
+            {domains.map((domain, index) => <div className="signin-inline-row" key={index}>
+                <input id={`signin-${provider.name}-domain-${index}`} className="input signin-code" readOnly value={domain} onFocus={(event) => event.target.select()} />
+                <CopyButton text={domain} label={`${provider.label} domain`} inputId={`signin-${provider.name}-domain-${index}`} />
+            </div>)}
+            <span className="field-help">Only needed where the provider asks for login domains, such as Apple's Services ID.</span>
+        </div>}
         {provider.fields.map((field) => {
             const id = `signin-${provider.name}-${field.key}`;
             const placeholder = field.secret

@@ -26,7 +26,12 @@ export interface SigninProvider {
     enabled: boolean;
     ready: boolean;
     missing: string[];
-    callback_url: string;
+    /** The first callback URL; null when the server has no login origin. */
+    callback_url: string | null;
+    /** Every callback URL, one per login origin. Absent from older backends; `callback_url` is used then. */
+    callback_urls?: string[];
+    /** The hostname of each callback URL, one per URL. Absent from older backends; nothing renders then. */
+    domains?: string[];
     console_url: string;
     help: string;
     fields: SigninProviderField[];

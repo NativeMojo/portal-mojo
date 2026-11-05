@@ -97,6 +97,52 @@ try {
         ['signin-note', 'bi-info-circle', 'Unknown tones read as info.'],
         ['signin-note', 'bi-info-circle', 'Inherited property names read as info too.'],
     ]);
+
+    // #9589: every callback URL and domain the server sends, the single-URL fallback, and the empty state.
+    const page = await server.ssrLoadModule('/packages/portal-mojo/src/admin/signin/SigninPage.tsx');
+    const mockApple = on.providers.find((provider) => provider.name === 'apple');
+    assert.equal(mockApple.callback_urls.length, 2, 'the mock sends the lists for one provider');
+    assert.deepEqual(mockApple.domains, ['api.example.com', 'app.example.com']);
+    assert(on.providers.filter((provider) => provider.name !== 'apple').every((provider) => !('callback_urls' in provider)), 'the other mock providers stay single-URL');
+    assert.deepEqual(page.callbackUrls({ callback_url: 'https://a/cb', callback_urls: [] }), ['https://a/cb'], 'an empty list falls back to callback_url');
+    assert.deepEqual(page.callbackUrls({ callback_url: null }), []);
+    assert.deepEqual(page.signinDomains({ domains: ['a.example.com', '', 'a.example.com', 'b.example.com'] }), ['a.example.com', 'b.example.com']);
+    assert.deepEqual(page.signinDomains({}), [], 'domains are never derived from the URLs');
+
+    const base = quiet.find((provider) => provider.name === 'google');
+    const card = (markup, name) => markup.slice(markup.indexOf(`id="signin-provider-${name}"`), markup.indexOf('</section>', markup.indexOf(`id="signin-provider-${name}"`)));
+    const inputs = (html, kind) => [...html.matchAll(new RegExp(`<input id="signin-${base.name}-${kind}-(\\d+)" class="input signin-code" readOnly="" value="([^"]*)"/>`, 'g'))].map((match) => [match[1], match[2]]);
+    const variant = (changes) => card(render(quiet.map((provider) => provider.name === base.name ? { ...base, ...changes } : provider)), base.name);
+    const urls = ['https://api.example.com/api/auth/oauth/google/callback', 'https://app.example.com/api/auth/oauth/google/callback', 'https://app.example.com:8443/api/auth/oauth/google/callback'];
+
+    // (a) three URLs, duplicate domains
+    const many = variant({ callback_url: urls[0], callback_urls: urls, domains: ['api.example.com', 'app.example.com', 'app.example.com'] });
+    assert.deepEqual(inputs(many, 'callback'), urls.map((url, index) => [String(index), url]), 'every callback URL renders, in order, with its own id');
+    assert.deepEqual(inputs(many, 'domain'), [['0', 'api.example.com'], ['1', 'app.example.com']], 'domains render once each');
+    assert(many.includes('>Callback URLs</label>') && many.includes('Add each of these in the Google console'), 'several URLs read as a list');
+    assert(many.includes('>Domains</label>') && many.includes('Only needed where the provider asks for login domains'), 'domains are labelled');
+    assert.equal([...many.matchAll(/aria-label="Copy Google callback URL"/g)].length, 3, 'each URL has its own Copy button');
+    assert.equal([...many.matchAll(/aria-label="Copy Google domain"/g)].length, 2, 'each domain has its own Copy button');
+
+    // (b) an older backend: callback_url only
+    const single = variant({ callback_url: urls[0] });
+    assert.deepEqual(inputs(single, 'callback'), [['0', urls[0]]]);
+    assert(single.includes('>Callback URL</label>') && single.includes('Paste this into the Google console as the redirect / callback URL.'), 'one URL keeps the current wording');
+    assert(!single.includes('>Domains</label>'), 'no domains are invented for an older backend');
+
+    // (c) no origin at all
+    const none = variant({ callback_url: null, callback_urls: [], domains: [] });
+    assert.deepEqual(inputs(none, 'callback'), [], 'no empty callback input');
+    assert(!none.includes('>Domains</label>') && !none.includes('>Callback URL'), 'no callback or domain field');
+    assert(none.includes('The server sent no callback URL. Check its BASE_URL and ALLOWED_REDIRECT_URLS settings, then reload this page.'));
+
+    // (d) an empty list but a string callback_url
+    assert.deepEqual(inputs(variant({ callback_url: urls[1], callback_urls: [] }), 'callback'), [['0', urls[1]]], 'an empty list falls back to the single URL');
+
+    // Toggle, secret placeholders and field rows are unchanged by the callback variants.
+    const rest = (html) => html.slice(0, html.indexOf('<p class="signin-provider-help">')) + html.slice(html.indexOf('<div class="signin-field-label-row">'));
+    assert(rest(many).includes('role="switch"'), 'the card keeps its toggle');
+    for (const other of [single, none]) assert.equal(rest(other), rest(many), 'only the callback and domain rows differ between variants');
     console.log('admin sign-in contract verified');
 } finally {
     await server.close();

@@ -5102,6 +5102,7 @@ const SIGNIN_OPTIONS = {
 };
 const SIGNIN_LAYOUT_ALIASES: Record<string, string> = { card: 'compact', fullscreen: 'branded-panel' };
 const SIGNIN_API_ORIGIN = 'https://api.example.com';
+const SIGNIN_LOGIN_ORIGINS = [SIGNIN_API_ORIGIN, 'https://app.example.com'];
 /** Values from the server config file — GitHub is configured there. */
 const SIGNIN_DEPLOYMENT_CREDENTIALS: Record<string, string> = {
     GITHUB_CLIENT_ID: 'Iv1.8a61f9b3a7aba766',
@@ -5165,6 +5166,12 @@ function signinPayload(): Record<string, unknown> {
             enabled: loginMethods.includes(provider.name),
             ready: missing.length === 0, missing,
             callback_url: `${SIGNIN_API_ORIGIN}/api/auth/oauth/${provider.name}/callback`,
+            // One provider sends the lists (#9589): one callback per login origin and its
+            // hostname. The others stay single-URL, as an older backend sends them.
+            ...(provider.name === 'apple' ? {
+                callback_urls: SIGNIN_LOGIN_ORIGINS.map((origin) => `${origin}/api/auth/oauth/${provider.name}/callback`),
+                domains: SIGNIN_LOGIN_ORIGINS.map((origin) => new URL(origin).hostname),
+            } : {}),
             console_url: provider.console_url, help: provider.help, fields,
         };
     });

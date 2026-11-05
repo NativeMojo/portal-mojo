@@ -14,7 +14,8 @@ The page has two parts:
   group **Configure Auth** dialog; a group's own settings still override these.
 - **Providers** — one card per provider the server lists (Google, Apple,
   GitHub and, from django-mojo's Microsoft sign-in, Microsoft): an Enabled
-  switch, a read-only callback URL with a Copy button, the credential fields,
+  switch, every callback URL and registration domain the server sends (each
+  read-only with its own Copy button), the credential fields,
   a Ready / Needs setup badge, any server notices, and a link to the
   provider's console.
 
@@ -40,6 +41,14 @@ One endpoint, both methods, django-mojo envelope.
   multiline, configured, source, value, hint}`. `source` is `admin`,
   `deployment` (shown as "Set in server config") or `none`. Secret fields
   never carry `value`; `hint` (e.g. `…a1b2`) is shown when present.
+- `callback_url` is the first callback URL, or `null` when the server has no
+  login origin. Optional `callback_urls[]` lists one callback per login origin
+  and `domains[]` the hostname of each (django-mojo sends both). The card
+  shows every URL in `callback_urls`, falling back to `callback_url` when the
+  list is absent or empty (older backends), and each distinct non-empty
+  domain once under **Domains**; domains are never derived from the URLs.
+  With no URL at all the card shows a note to check the server's `BASE_URL`
+  and `ALLOWED_REDIRECT_URLS` instead of an empty field.
 - Optional `notices[]` on a provider: `{tone, text}`, `tone` one of `info`,
   `warning` or `danger` (for example a Microsoft client secret nearing or past
   its recorded expiry). Each renders as its own `role="status"` note under
