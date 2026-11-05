@@ -99,6 +99,10 @@ try {
         land(APP); auth.setTokens(jwt(), jwt(), true);
         await source.revokeAdminSourceSession();
         assert.equal(location.href, signedOut('https://api.test'), "the portal app's non-packaged sign-out clears the auth host");
+        // The app's signed-out guard (HostedRedirect) re-renders after logout
+        // and calls redirectToHostedAuth(); it must not replace the landing.
+        assert.equal(auth.redirectToHostedAuth(), true);
+        assert.equal(location.href, signedOut('https://api.test'), 'a guard redirect after sign-out keeps the signed_out landing');
         assert(tokensGone(), 'the app sign-out clears this origin');
     }
 
