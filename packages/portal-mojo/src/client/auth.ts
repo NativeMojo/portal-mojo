@@ -32,7 +32,7 @@
 //     across refreshes by design — only a genuine re-login mints a new one.
 import { AuthRequiredError, MojoError } from './errors';
 import { tokenInfo } from './jwt';
-import { apiOrigin, installAuthHooks, mojoCall } from './client';
+import { apiOrigin, installAuthHooks, isPackagedAdmin, mojoCall } from './client';
 
 const ACCESS_KEY = 'access_token';
 const REFRESH_KEY = 'refresh_token';
@@ -920,10 +920,58 @@ export interface HostedAuthOptions {
  * string concatenation, and a hash in the redirect would swallow it.
  */
 export function hostedAuthUrl(returnTo?: string, opts: HostedAuthOptions = {}): string | null {
-    const origin = apiOrigin();
+    const origin = hostedAuthOrigin();
     if (!origin || typeof window === 'undefined') return null;
     const target = returnTo ?? window.location.origin + window.location.pathname + window.location.search;
     return `${origin}/auth?redirect=${encodeURIComponent(target)}${opts.forceReauth ? '&force_reauth=1' : ''}`;
+}
+
+const AUTH_ORIGIN: string = import.meta.env.VITE_MOJO_AUTH_ORIGIN ?? '';
+let authOriginWarned = false;
+
+/**
+ * The origin serving the hosted /auth pages: VITE_MOJO_AUTH_ORIGIN when it is
+ * a bare https origin (http only on localhost), else the API origin. Used for
+ * the hosted page links only, never for API requests. Packaged Admin is
+ * same-origin and ignores it; the mock transport has no hosted page ('').
+ */
+function hostedAuthOrigin(): string {
+    const api = apiOrigin();
+    if (!api || isPackagedAdmin() || !AUTH_ORIGIN) return api;
+    try {
+        const url = new URL(AUTH_ORIGIN);
+        const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+        if ((url.protocol === 'https:' || url.protocol === 'http:' && local) && !url.username && !url.password
+            && url.pathname === '/' && !url.search && !url.hash) return url.origin;
+    } catch { /* fall through to the warning */ }
+    if (!authOriginWarned) {
+        authOriginWarned = true;
+        console.warn(`Ignoring VITE_MOJO_AUTH_ORIGIN ${JSON.stringify(AUTH_ORIGIN)}: expected an https origin (http only on localhost) — using the API origin`);
+    }
+    return api;
+}
+
+/**
+ * The hosted page's sign-out landing (django-mojo #9568): it forgets the auth
+ * host's stored session and shows the sign-in form. force_reauth=1 keeps an
+ * older django that ignores signed_out from signing the user straight back in.
+ */
+export function hostedSignOutUrl(returnTo?: string): string | null {
+    const url = hostedAuthUrl(returnTo);
+    return url && `${url}&signed_out=1&force_reauth=1`;
+}
+
+/**
+ * Sign out here AND on the hosted auth host: clear this origin's session,
+ * then navigate to the hosted sign-out landing. Returns false (after the
+ * local logout) when there is no hosted page, e.g. under the mock.
+ */
+export function signOutHosted(): boolean {
+    logout();
+    const url = hostedSignOutUrl();
+    if (!url) return false;
+    window.location.href = url;
+    return true;
 }
 
 /**

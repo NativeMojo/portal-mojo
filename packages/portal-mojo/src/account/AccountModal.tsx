@@ -15,7 +15,7 @@
 // styles/components/account.css, shipped in portal-mojo/styles.css (tokens
 // only, both themes).
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { hostedAuthUrl, logout, onAuth, redirectToHostedAuth, useAuthSnapshot, useMe, type Me } from '../client/runtime';
+import { hostedSignOutUrl, logout, onAuth, signOutHosted, useAuthSnapshot, useMe, type Me } from '../client/runtime';
 import { fmt, modal, toast, useAvatarUrl, type UserMenuAuthMode } from '../ui';
 import type { NotificationKind } from './api';
 import {
@@ -162,9 +162,13 @@ export function AccountModal({
             if (onSignOut) {
                 await onSignOut();
             } else {
-                logout();
-                if (authMode === 'hosted' && hostedAuthUrl()) redirectToHostedAuth();
-                else if (authMode === 'inapp' && typeof window !== 'undefined') window.location.hash = '#/auth/login';
+                // Hosted: also clear the auth host's stored session, or its
+                // page signs the same person straight back in (#9564).
+                if (authMode === 'hosted' && hostedSignOutUrl()) signOutHosted();
+                else {
+                    logout();
+                    if (authMode === 'inapp' && typeof window !== 'undefined') window.location.hash = '#/auth/login';
+                }
             }
             onClose();
         } catch (err) {

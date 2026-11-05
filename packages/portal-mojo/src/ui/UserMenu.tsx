@@ -22,7 +22,7 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import { mojoCall } from '../client/client';
-import { hostedAuthUrl, logout, redirectToHostedAuth } from '../client/auth';
+import { hostedAuthUrl, logout, redirectToHostedAuth, signOutHosted } from '../client/auth';
 import { useAuthSnapshot, useMe } from '../client/me';
 import { initials } from './format';
 import { Popover } from './Popover';
@@ -284,6 +284,7 @@ export function UserMenu({
         setSigningOut(true);
         try {
             if (onSignOut) await onSignOut();
+            else if (authMode === 'hosted') signOutHosted();
             else logout();
             if (mounted.current) setOpen(false);
         } catch (error) {
