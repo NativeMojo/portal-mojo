@@ -53,7 +53,7 @@ below except `onClose`.
 | `extraSections?` | `AccountSectionDef[]` | App sections appended to the rail: `{key, label, icon, render({me, close})}`. A key that duplicates one already on the rail warns and drops. |
 | `initialSection?` | `string` | Section open on mount (built-in or extra key). Unknown keys warn and fall back to the first. |
 | `onSignOut?` | `() => void \| Promise<void>` | Replaces the default `logout()` on the rail's Sign out. Pending state ("Signing out…", spinner, `aria-busy`); a rejection toasts `Sign out failed: <message>` and keeps the modal open. Pass the SAME handler as the app's `UserMenu`. |
-| `authMode?` | `'inapp' \| 'hosted'` | With the default sign out only: `'hosted'` → `redirectToHostedAuth()` (when `hostedAuthUrl()` resolves), `'inapp'` → `#/auth/login`, omitted → the app's auth gate routes. |
+| `authMode?` | `'inapp' \| 'hosted'` | With the default sign out only: `'hosted'` → `signOutHosted()` (when `hostedSignOutUrl()` resolves; see auth.md, Sign out), `'inapp'` → `#/auth/login`, omitted → the app's auth gate routes. |
 | `notificationKinds?` | `NotificationKind[]` | The kinds this app sends: `{kind, label, description?, channels?}` (`channels` null/absent = all three). Overrides the server's catalogue. |
 | `onClose` | `() => void` | `AccountModal` only — Close, sign out, or the session ending underneath it. |
 

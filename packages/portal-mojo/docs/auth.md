@@ -49,7 +49,8 @@ onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issu
   retains this fence across unmount/remount, so a late renewal cannot undo a
   terminal server denial. It is an in-memory lifecycle fence, not authorization.
 - `logout()` is client-side (django-mojo has no logout endpoint) and emits
-  `'logout'`.
+  `'logout'`. It clears this origin only; with hosted auth, sign out with
+  `signOutHosted()` (below) so the hosted page forgets its own session too.
 - Every flow that answers with a login grant adopts it only when it carries
   an `access_token` + `refresh_token` pair; anything else (e.g. django-mojo's
   `forced_password_response` after `auth_key` rotated) rejects with
@@ -129,6 +130,38 @@ When storage cannot retain the choice, step-up navigation returns false.
 
 `hostedAuthUrl()` returns null under the mock transport — there is no page
 to host; the UI should fall back to a dev affordance (`__mojo.login(...)`).
+
+### Sign out
+
+The hosted page keeps its own tokens in the auth host's localStorage. After
+a plain `logout()`, the next visit to `/auth` refreshes them and signs the
+same person straight back in — on a shared machine, the previous person.
+
+`signOutHosted()` calls `logout()`, then navigates to
+`hostedSignOutUrl()` = `<auth origin>/auth?redirect=<HASH-FREE current
+url>&signed_out=1&force_reauth=1`. django-mojo clears the hosted page's
+stored session and shows "You're signed out." with the sign-in form.
+`force_reauth=1` keeps an older django-mojo that ignores `signed_out` from
+signing the user back in. Under the mock it only logs out and returns false.
+`AccountModal` and `UserMenu` use it for their default hosted sign-out; an
+app that passes its own `onSignOut` calls it there.
+
+### Separate auth host (`VITE_MOJO_AUTH_ORIGIN`)
+
+The hosted pages default to the API origin (`VITE_MOJO_API`). Set
+`VITE_MOJO_AUTH_ORIGIN` to serve them from another origin that reaches the
+same django-mojo, e.g. `https://auth.example.com`. It must be a bare https
+origin (http only on `localhost`); any other value warns once and falls back
+to the API origin. It changes only `hostedAuthUrl()` / `hostedSignOutUrl()`,
+never API requests, and packaged Admin (same-origin) ignores it. The
+server's handoff allowlist still decides where codes may go.
+
+### Split-host adoption
+
+An app on its own host (e.g. `admin.example.com` against
+`api.example.com`): upgrade django-mojo to the release containing #9568
+(the `signed_out` landing) first, then portal-mojo. Nothing else changes;
+same-origin and packaged deployments behave as before.
 
 ## Direct flows (for in-app auth pages)
 
