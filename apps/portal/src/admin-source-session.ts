@@ -1,7 +1,8 @@
 import {
     getAccessToken, getAuthSnapshot, isPackagedAdmin,
-    logout, mojoCall, onAuth, subscribeAuth,
+    logout, mojoCall, onAuth, signOutHosted, subscribeAuth,
 } from 'portal-mojo/client/runtime';
+import { authMode } from './pages/auth/config';
 
 // Shared verbatim with Django's gate and legacy Admin. No credentials here.
 export const SOURCE_PROTOCOL = Object.freeze({
@@ -213,7 +214,8 @@ export function withAdminSourceSession<T>(load: () => Promise<T>): () => Promise
 
 /** Completes only AFTER the final DELETE response, never merely after clearing JS state. */
 export function revokeAdminSourceSession(): Promise<void> {
-    if (!isPackagedAdmin()) { logout(); return Promise.resolve(); }
+    // Hosted: also clear the auth host's stored session (#9564).
+    if (!isPackagedAdmin()) { if (authMode() === 'hosted') signOutHosted(); else logout(); return Promise.resolve(); }
     if (revocation) return revocation;
     if (!installed) initializeAdminSourceSession();
     if (snapshot.status === 'unsupported') return Promise.reject(new Error('Source revocation requires browser coordination'));

@@ -39,7 +39,7 @@ Live demo: showcase → Components → Overlays → **UserMenu**.
 | `items?` | `UserMenuItem[]` | App entries, rendered between the theme control and Sign out. |
 | `children?` | `ReactNode` | Rendered after `items`, above Sign out. Elements with `role="menuitem"` (and `tabIndex={-1}`, class `user-menu-item` for the look) join arrow-key navigation, and clicking one closes the menu. |
 | `authMode?` | `'inapp' \| 'hosted'` | Signed-out affordance (see matrix). The app knows its mode — the toolkit never imports app config. Unknown values warn once and render the signed-out chip. |
-| `onSignOut?` | `() => void \| Promise<void>` | Replaces the default `logout()`. Sign out shows a pending state ("Signing out…", spinner, `aria-busy`) until it settles; repeat clicks are ignored. A rejection toasts `Sign out failed: <message>` and leaves the menu open for a retry. |
+| `onSignOut?` | `() => void \| Promise<void>` | Replaces the default sign out (`signOutHosted()` when hosted, else `logout()`). Sign out shows a pending state ("Signing out…", spinner, `aria-busy`) until it settles; repeat clicks are ignored. A rejection toasts `Sign out failed: <message>` and leaves the menu open for a retry. |
 | `size?` | `'sm' \| 'md'` | Trigger density: 24px vs 28px avatar. Default `md`; unknown values warn once and fall back. |
 | `className?` | `string` | Appended to the trigger (or the signed-out element). |
 
@@ -79,8 +79,9 @@ interface UserMenuItem {
   silent). The image is `thumbnail ?? url`, each through `safePreviewUrl`
   (`ui/safe-url.ts`, shared with FileField): same-origin `/paths` or
   credential-free `http(s)` only.
-- Sign out: `onSignOut()` or `logout()` (client-side; django-mojo has no
-  logout endpoint).
+- Sign out: `onSignOut()`; otherwise `signOutHosted()` with
+  `authMode="hosted"` (also clears the hosted page's session, see auth.md),
+  else `logout()` (client-side; django-mojo has no logout endpoint).
 
 ## Invariants
 
