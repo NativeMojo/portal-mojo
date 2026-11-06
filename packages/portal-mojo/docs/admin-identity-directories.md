@@ -19,7 +19,8 @@ import {
 
 The registered routes are `/groups` and `/apikeys`; an embedded mount prefixes
 both routes. Group directory and detail access use the system-pinned
-`sys.groups | sys.view_groups` clause. Group mutations use
+`sys.groups | sys.view_groups | sys.manage_groups` clause, so the Groups page
+opens for global `groups`, `view_groups` or `manage_groups`. Group mutations use
 `sys.groups | sys.manage_groups`. Active-group membership cannot satisfy
 these gates. The personal key section uses the system identity-view clause,
 while its API requests remain scoped to the signed-in user's own keys.
