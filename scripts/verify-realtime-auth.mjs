@@ -284,5 +284,47 @@ try {
         auth.setTokens(jwt(7200, 99), jwt(86400, 99), false); await flush();
         assert.equal(r.sockets.length, 1); assert.equal(r.sockets[0].readyState, 3); r.cleanup();
     }
-    console.log('Realtime auth: shared renewal, resume, delayed handshake, transient/terminal errors, deadline, actor fences, admission budget and mounted Provider passed.');
+    // An ambiguous HTTP/socket failure is checked against the current account.
+    // A single denial followed by transport trouble must never require sign-in.
+    {
+        const originalFetch = globalThis.fetch;
+        let attempts = [];
+        globalThis.fetch = async (url, opts) => {
+            assert.equal(new URL(url).pathname, '/api/user/me');
+            assert.equal(opts.method, 'GET');
+            const next = attempts.shift();
+            assert(next !== undefined, 'unexpected additional session probe');
+            if (next instanceof Error) throw next;
+            return response(next, { id: 42 });
+        };
+        try {
+            auth.setTokens(jwt(7200), null, false);
+            auth.initAuth();
+            const credential = auth.getAccessToken();
+            attempts = [new TypeError('Connection reset'), 200];
+            const pending = auth.verifyCurrentSession();
+            assert.equal(auth.verifyCurrentSession(), pending, 'concurrent signals must share the probe');
+            assert.equal(await pending, 'valid');
+            assert.equal(attempts.length, 0);
+            attempts = [401, 503, 401];
+            assert.equal(await auth.verifyCurrentSession(), 'unverified');
+            assert.equal(auth.getAccessToken(), credential);
+            assert.equal(attempts.length, 0);
+            attempts = [401, 403];
+            assert.equal(await auth.verifyCurrentSession(), 'denied');
+            assert.equal(attempts.length, 0);
+
+            let answer;
+            globalThis.fetch = () => new Promise(resolve => { answer = resolve; });
+            const old = auth.verifyCurrentSession();
+            await flush();
+            auth.setTokens(jwt(7200), null, false); // same user, replacement session
+            answer(response(401, {}));
+            assert.equal(await old, 'unverified', 'late denial has no authority over a replacement session');
+        } finally {
+            globalThis.fetch = originalFetch;
+            auth.logout();
+        }
+    }
+    console.log('Realtime auth: shared renewal, resume, delayed handshake, transient/terminal errors, deadline, actor fences, admission budget, mounted Provider and session verification passed.');
 } finally { auth?.stopAutoRefresh(); Date.now = realNow; AbortSignal.timeout = realTimeout; await vite.close(); dom.window.close(); }

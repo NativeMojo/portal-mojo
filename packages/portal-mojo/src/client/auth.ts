@@ -268,6 +268,55 @@ export async function ensureValidToken(): Promise<void> {
     }
 }
 
+export type SessionVerification = 'valid' | 'denied' | 'unverified';
+
+let sessionVerification: { revision: number; uid: string | null; result: Promise<SessionVerification> } | undefined;
+
+/** Verify the selected account after an ambiguous API or realtime auth failure.
+ * Only unusable credentials or two consecutive account denials require sign-in.
+ */
+export function verifyCurrentSession(): Promise<SessionVerification> {
+    if (checkTokenStatus().action === 'logout') return Promise.resolve('denied');
+    const revision = getAuthSessionRevision();
+    const { uid } = getAuthSnapshot();
+    if (sessionVerification?.revision === revision && sessionVerification.uid === uid) {
+        return sessionVerification.result;
+    }
+    const current = () => getAuthSessionRevision() === revision && getAuthSnapshot().uid === uid;
+    const result = Promise.resolve().then(async (): Promise<SessionVerification> => {
+        let consecutiveDenials = 0;
+        for (const delay of [0, 350, 1000]) {
+            if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+            if (!current()) return 'unverified';
+            try {
+                const response = await mojoCall('/api/user/me', {
+                    signal: AbortSignal.timeout(5000),
+                    beforeSend: () => {
+                        if (!current()) throw new DOMException('Session changed', 'AbortError');
+                    },
+                });
+                if (!current()) return 'unverified';
+                const account = response.data as { id?: string | number } | undefined;
+                if (uid !== null && account?.id != null && String(account.id) === uid) {
+                    if (getRefreshToken()) startAutoRefresh();
+                    return 'valid';
+                }
+                consecutiveDenials = 0;
+            } catch (error) {
+                if (!current()) return 'unverified';
+                const denied = error instanceof MojoError && (error.status === 401 || error.status === 403);
+                consecutiveDenials = denied ? consecutiveDenials + 1 : 0;
+                if (consecutiveDenials === 2) return 'denied';
+            }
+        }
+        return 'unverified';
+    }).finally(() => {
+        if (sessionVerification?.result === result) sessionVerification = undefined;
+    });
+    sessionVerification = { revision, uid, result };
+    return result;
+}
+
 // ── Auto-refresh watcher ──────────────────────────────────────────────
 
 let tokenWatcher: ReturnType<typeof setInterval> | null = null;

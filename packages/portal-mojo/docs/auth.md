@@ -43,6 +43,14 @@ onAuth('rotated', () => queryClient.invalidateQueries());  // same user, re-issu
   slept. It does not emit an authentication denial or close a consumer's
   workspace. Actual credential rejection and forced disconnect still stop
   the connection; ordinary renewal cannot override those denials.
+- After an ambiguous API 401 or WebSocket authentication failure,
+  `verifyCurrentSession()` from `portal-mojo/client/runtime` checks the current
+  account with up to three read-only requests. Concurrent callers share one
+  check. It returns `valid` for the same account, `denied` for unusable local
+  credentials or two consecutive 401/403 denials, and `unverified` when the
+  check cannot establish either result. Transport errors interrupt the denial
+  count. Keep the workspace open on `unverified` and check again after the
+  connection returns. The application owns its sign-in UI.
 - `useAuthSnapshot()` → `{authenticated, uid, email}` — live, cross-tab.
 - An internal session revision distinguishes same-tab renewal from explicit
   replacement/clearing and cross-tab storage changes. Session-bound realtime
