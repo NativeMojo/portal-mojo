@@ -144,6 +144,32 @@ try {
     });
     assert.equal(viewerPolicy.error_code, 403);
 
+    // #9127 correction 1: global `manage_groups` alone opens the Groups page.
+    const groupsSection = identityDomain.GROUPS_ADMIN_SECTION;
+    const opensGroups = (who, member = null) => me.hasPermission(who, groupsSection.permissions, member)
+        && me.hasPermission(who, groupsSection.routes[0].permissions, member);
+    const meOf = async (headers) => (await mock.mockFetch('/api/user/me', { headers })).data;
+    const manageOnly = await login('groups.manage_only@nativemojo.com');
+    const manageOnlyMe = await meOf(manageOnly);
+    assert.deepEqual(manageOnlyMe.permissions, { manage_groups: true }, 'precondition: manage_groups is the only grant');
+    assert.equal(manageOnlyMe.is_superuser, false);
+    assert(opensGroups(manageOnlyMe), 'a manage_groups-only admin opens the Groups section and route');
+    assert(opensGroups(await meOf(viewer)), 'a view_groups admin still opens Groups');
+    assert.equal(opensGroups({ id: 1, permissions: {} }, { permissions: { manage_group: true, manage_groups: true, groups: true } }), false,
+        'member-level grants never open the Groups page');
+    assert(models.GROUP_VIEW_PERMS.every((permission) => permission.startsWith('sys.')), 'GROUP_VIEW_PERMS holds no member-level entry');
+    assert.equal(me.hasPermission(await meOf(viewer), models.GROUP_MANAGE_PERMS, null), false, 'a view_groups admin still gets no switch');
+    const manageOnlyRows = await mock.mockFetch('/api/group', { headers: manageOnly, params: { size: 100 } });
+    assert.equal(manageOnlyRows.count, viewerRows.count, 'a manage_groups-only admin lists every group');
+    const manageOnlyOn = await mock.mockFetch(`/api/group/${target.id}`, {
+        method: 'POST', headers: manageOnly, body: { allow_member_subgroups: true },
+    });
+    assert.deepEqual(manageOnlyOn, { status: true, allow_member_subgroups: true });
+    const manageOnlyOff = await mock.mockFetch(`/api/group/${target.id}`, {
+        method: 'POST', headers: manageOnly, body: { allow_member_subgroups: false },
+    });
+    assert.deepEqual(manageOnlyOff, { status: true, allow_member_subgroups: false });
+
     const parentSave = await mock.mockFetch(`/api/group/${target.id}`, {
         method: 'POST', headers: manager, body: { parent: 1 },
     });
