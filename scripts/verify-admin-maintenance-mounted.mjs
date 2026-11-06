@@ -183,16 +183,17 @@ try {
         'bootstrap-denied',
     );
     await ready();
-    await wait(() => document.body.textContent.includes('mode is unconfirmed'), 'bootstrap failure retained');
+    await wait(() => document.body.textContent.includes('managed-mode proof. permission denied'), 'bootstrap failure retained');
     assert(document.body.textContent.includes('orders-db'));
     assert(!button('Upgrade orders-db'));
     checks += 2;
     await unmount();
     await configure({ is_superuser: true }, 'external');
     await ready();
-    assert(document.body.textContent.includes('infrastructure team'));
+    await wait(() => document.body.textContent.includes('infrastructure team'), 'external ownership notice');
     assert(!button('Upgrade orders-db'));
     await click('Django-MOJO');
+    await wait(() => document.body.textContent.includes('Latest published'), 'framework evidence loaded');
     assert(!button('Update to 4.1.0'));
     checks += 3;
     await unmount();
@@ -245,6 +246,7 @@ try {
     await unmount();
     await mount();
     await ready();
+    await wait(() => !document.body.textContent.includes('mode is unconfirmed'), 'managed mode proven');
     assert(!button('Upgrade analytics-cluster'), 'timeout guard survives remount');
     await click('Refresh progress');
     assert.equal(fixture.posts, 1, 'manual status never reapplies');
@@ -287,6 +289,7 @@ try {
     await mount();
     await ready();
     await click('Cache');
+    await wait(() => !document.body.textContent.includes('mode is unconfirmed'), 'managed mode proven');
     assert(
         !button('Upgrade session-cache'),
         'same actor replacement/remount cannot resend unknown operation',
@@ -315,6 +318,7 @@ try {
     await click('Refresh Maintenance');
     await ready();
     await click('Django-MOJO');
+    await wait(() => document.body.textContent.includes('Latest published'), 'framework evidence loaded');
     assert(
         !button('Update to 4.1.0'),
         'same actor renewed session cannot duplicate unknown framework operation',
@@ -348,6 +352,7 @@ try {
     await mount();
     await ready();
     await click('Django-MOJO');
+    await wait(() => document.body.textContent.includes('Latest published'), 'framework evidence loaded');
     assert(!button('Update to 4.1.0'), 'late lost response cannot restore a new confirmation');
     assert.equal(fixture.posts, 1);
     assert(ops.getMaintenanceAttempt('framework'), 'receipt outlives owner unmount');
@@ -367,7 +372,7 @@ try {
     fixture.persona = { is_superuser: true }; fixture.posts = 0;
     mock.setMockMaintenanceScenario('framework-held');
     await login('dns.manager@nativemojo.com'); await mount(); await ready(); await click('Django-MOJO');
-    assert(document.body.textContent.includes('Published version differs · policy paused'));
+    await wait(() => document.body.textContent.includes('Published version differs · policy paused'), 'paused policy status');
     assert(!document.body.textContent.includes('No newer framework version'));
     const choosePolicy = async (label, version) => {
         await click('Update policy');
@@ -399,6 +404,7 @@ try {
     fixture.persona={is_superuser:false,permissions:{manage_platform:true,view_platform:true,manage_settings:true,manage_advanced:true}};
     mock.setMockMaintenanceScenario('findings'); await login('dns.manager@nativemojo.com'); await mount(); await ready();
     assert(!document.querySelector('[role=tablist]'), 'Platform-only reader has no one-item tab bar');
+    await wait(() => !document.body.textContent.includes('mode is unconfirmed'), 'managed mode proven');
     assert(!button('Update policy'),'advanced/platform grants do not bypass literal superuser owner');checks++;
     await unmount();
     // A definite policy refusal requires fresh explicit review; renewal must not replay it.
