@@ -4436,6 +4436,21 @@ const db = {
     ]),
 };
 
+// #9127: `manage_groups` and NOTHING else — the persona that proves the Groups
+// page opens for a global manage-only admin. Appended after every seeded
+// builder so no existing membership, log or fixture row shifts.
+db.users.push({
+    ...users[56]!,
+    id: 58,
+    is_active: true,
+    is_superuser: false,
+    username: 'groups.manage_only',
+    email: 'groups.manage_only@nativemojo.com',
+    display_name: 'Groups Manage Only',
+    permissions: { manage_groups: true },
+    metadata: {},
+});
+
 let messagingManagedFault=false;
 /** Invoked through the synchronously installed DNS adapter only under the mock transport. */
 export function applyMockManagedDnsRecords(domainId: number, records: readonly ManagedDnsRecordInput[]): void {
