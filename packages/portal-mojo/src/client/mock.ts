@@ -4138,6 +4138,7 @@ function buildAssistantState() {
     const conversations: MockAssistantConversation[] = [
         { id: 8101, user: 14, group: null, title: 'Review deployment health', metadata: {}, created: now - 3600, modified: now - 3300, messages: [
             { id: 8201, role: 'user', content: 'Summarize deployment health.', tool_calls: [], blocks: [{ type: 'attachment', files: [{ id: 5104, filename: 'quarterly-report.pdf', content_type: 'application/pdf', category: 'document' }] }], duration_ms: null, usage: {}, created: now - 3600 },
+            { id: 8205, role: 'assistant', content: "I'll check service health and open tickets.", tool_calls: [{ type: 'tool_use', id: 'toolu_mock_8205', name: 'query_model', input: { model: 'incident.Ticket' } }], blocks: null, duration_ms: null, usage: {}, created: now - 3450 },
             { id: 8202, role: 'assistant', content: 'The deployment is healthy; one security ticket needs review.', tool_calls: [], blocks: [{ type: 'stat', items: [{ label: 'Healthy services', value: 12 }, { label: 'Open tickets', value: 1 }] }], duration_ms: 420, usage: {}, created: now - 3300 },
         ] },
         { id: 8102, user: 47, group: null, title: 'Incident review', metadata: { context_model: 'incident.Incident', context_pk: 1 }, created: now - 7200, modified: now - 7100, messages: [

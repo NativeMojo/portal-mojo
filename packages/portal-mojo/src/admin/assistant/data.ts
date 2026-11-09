@@ -6,6 +6,10 @@ const MAX_TEXT = 4_000;
 const MAX_ITEMS = 24;
 const MAX_COLUMNS = 12;
 const MAX_ROWS = 50;
+// Same bounds as the realtime tool projection (streaming.ts MAX_TOOL_NAME / MAX_TOOLS); MAX_TOOL_SCAN caps the entries read.
+const MAX_TOOL_NAME = 160;
+const MAX_TOOLS = 32;
+const MAX_TOOL_SCAN = 128;
 const obj = (value: unknown): Record<string, unknown> | null => value != null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const text = (value: unknown, cap = MAX_TEXT): string => typeof value === 'string' ? value.slice(0, cap) : '';
 const id = (value: unknown): number | string | null => typeof value === 'number' || typeof value === 'string' ? value : null;
@@ -54,9 +58,20 @@ function block(value: unknown, allowAttachment = false): AssistantBlock | null {
     return null;
 }
 
+function toolNames(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    const names: string[] = [];
+    for (const entry of value.slice(0, MAX_TOOL_SCAN)) {
+        const raw = obj(entry); const name = raw && raw.type === 'tool_use' ? text(raw.name, MAX_TOOL_NAME) : '';
+        if (name && !names.includes(name)) names.push(name);
+        if (names.length >= MAX_TOOLS) break;
+    }
+    return names;
+}
+
 export function projectBlocks(value: unknown, allowAttachment = false): AssistantBlock[] { return Array.isArray(value) ? value.slice(0, MAX_BLOCKS).map((entry) => block(entry, allowAttachment)).filter((v): v is AssistantBlock => v != null) : []; }
 function projectUser(value: unknown): AssistantUser | null { const raw = obj(value); const userId = raw && number(raw.id); return raw && userId != null ? { id: userId, display_name: text(raw.display_name, 160) || `User #${userId}` } : null; }
-export function projectMessage(value: unknown): AssistantMessage | null { const raw = obj(value); const messageId = raw && id(raw.id); if (!raw || messageId == null || (raw.role !== 'user' && raw.role !== 'assistant')) return null; const blocks = projectBlocks(raw.blocks, raw.role === 'user'); return { id: messageId, role: raw.role, content: text(raw.content, 20_000), created: typeof raw.created === 'number' || typeof raw.created === 'string' ? raw.created : 0, blocks: raw.role === 'user' ? blocks.filter((entry) => entry.type === 'attachment') : blocks }; }
+export function projectMessage(value: unknown): AssistantMessage | null { const raw = obj(value); const messageId = raw && id(raw.id); if (!raw || messageId == null || (raw.role !== 'user' && raw.role !== 'assistant')) return null; const blocks = projectBlocks(raw.blocks, raw.role === 'user'); return { id: messageId, role: raw.role, content: text(raw.content, 20_000), created: typeof raw.created === 'number' || typeof raw.created === 'string' ? raw.created : 0, blocks: raw.role === 'user' ? blocks.filter((entry) => entry.type === 'attachment') : blocks, tools: raw.role === 'assistant' ? toolNames(raw.tool_calls) : [] }; }
 export function projectConversation(value: unknown): AssistantConversation | null { const raw = obj(value); const conversationId = raw && number(raw.id); const user = raw && projectUser(raw.user); if (!raw || conversationId == null || !user) return null; return { id: conversationId, title: text(raw.title, 255) || `Conversation #${conversationId}`, created: typeof raw.created === 'number' || typeof raw.created === 'string' ? raw.created : 0, modified: typeof raw.modified === 'number' || typeof raw.modified === 'string' ? raw.modified : 0, user, messages: Array.isArray(raw.messages) ? raw.messages.map(projectMessage).filter((v): v is AssistantMessage => v != null) : [] }; }
 export function projectConversationSummary(value: unknown): AssistantConversationSummary | null { const conversation = projectConversation(value); if (!conversation) return null; const { messages: _messages, ...summary } = conversation; return summary; }
 export function projectSkill(value: unknown): AssistantSkill | null { const raw = obj(value); const skillId = raw && number(raw.id); if (!raw || skillId == null || !['global', 'user', 'group'].includes(String(raw.tier))) return null; const steps = Array.isArray(raw.steps) ? raw.steps.slice(0, MAX_ITEMS).map(obj).map((step) => step && text(step.tool, 160) && text(step.description, 500) ? { tool: text(step.tool, 160), description: text(step.description, 500), ...(text(step.condition, 500) ? { condition: text(step.condition, 500) } : {}) } : null).filter((step): step is { tool: string; description: string; condition?: string } => step != null) : []; return { id: skillId, tier: raw.tier as 'global' | 'user' | 'group', name: text(raw.name, 160) || `Skill #${skillId}`, description: text(raw.description, 2_000), auto_execute: raw.auto_execute === true, is_active: raw.is_active === true, created: typeof raw.created === 'number' || typeof raw.created === 'string' ? raw.created : 0, modified: typeof raw.modified === 'number' || typeof raw.modified === 'string' ? raw.modified : 0, user: projectUser(raw.user), triggers: Array.isArray(raw.triggers) ? raw.triggers.slice(0, 10).map((v) => text(v, 200)).filter(Boolean) : [], steps }; }
