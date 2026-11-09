@@ -80,6 +80,31 @@ try {
     assert.equal(streaming.projectAssistantResponse({ type: 'assistant_response', conversation_id: 41, response: 'missing correlation' }), null);
     assert.equal(data.projectReply({ conversation_id: 2, response: 'ok', tool_calls_made: [{ input: 'private' }] }).tool_calls_made, 1);
 
+    // #10469: stored messages carry the bounded, deduplicated tool names their tool_use blocks called.
+    const toolsOf = (role, toolCalls, extra = {}) => data.projectMessage({ id: 1, role, content: 'x', created: 1, ...(toolCalls === undefined ? {} : { tool_calls: toolCalls }), ...extra }).tools;
+    const use = (name, input = {}) => ({ type: 'tool_use', id: `toolu_${String(name).slice(0, 8)}`, name, input });
+    assert.deepEqual(toolsOf('assistant', null), [], 'null tool_calls is no tools');
+    assert.deepEqual(toolsOf('assistant', undefined), [], 'missing tool_calls is no tools');
+    assert.deepEqual(toolsOf('assistant', [{ type: 'text', text: 'Looking' }, use('query_model'), use('add_context')]), ['query_model', 'add_context']);
+    assert.deepEqual(toolsOf('assistant', [use('a'), use('a'), use('b')]), ['a', 'b'], 'duplicates collapse in first-seen order');
+    assert.deepEqual(toolsOf('assistant', 'query_model'), [], 'a string is not a tool list');
+    assert.deepEqual(toolsOf('assistant', use('query_model')), [], 'a single object is not a tool list');
+    assert.deepEqual(toolsOf('assistant', ['query_model', 7, null, [use('nested')]]), [], 'non-object entries are skipped');
+    assert.deepEqual(toolsOf('assistant', [{ type: 'tool_use', input: {} }, use(7), use(''), { type: 'tool_result', name: 'not_a_call', content: 'x' }]), [], 'nameless, non-string, empty and tool_result entries are skipped');
+    assert.equal(toolsOf('assistant', [use('n'.repeat(500))])[0].length, 160, 'tool names are capped at 160 characters');
+    assert.equal(toolsOf('assistant', Array.from({ length: 1000 }, (_, index) => use(`tool_${index}`))).length, 32, 'at most 32 tool names');
+    assert.deepEqual(toolsOf('assistant', [...Array.from({ length: 200 }, () => ({ type: 'text', text: 'pad' })), use('late_tool')]), [], 'only the first 128 entries are scanned');
+    assert.deepEqual(toolsOf('user', [use('query_model')]), [], 'user messages report no tools');
+    assert.equal(data.projectMessage({ id: 3, role: 'tool_result', content: 'x', created: 1, tool_calls: [use('query_model')] }), null, 'tool_result rows are still dropped');
+    assert.equal(JSON.stringify(data.projectMessage({ id: 1, role: 'assistant', content: 'x', created: 1, tool_calls: [use('query_users', { password: 'private-input-canary' })] })).includes('private-input-canary'), false, 'tool inputs are never projected');
+    const turnRead = data.projectConversation({ id: 9, title: 'Turn', created: 1, modified: 1, user: { id: 14, display_name: 'Operator' }, messages: [
+        { id: 1, role: 'user', content: 'How many tickets?', created: 1, tool_calls: [] },
+        { id: 2, role: 'assistant', content: "I'll count them.", created: 2, tool_calls: [{ type: 'text', text: "I'll count them." }, use('query_model', { model: 'incident.Ticket' })] },
+        { id: 3, role: 'tool_result', content: '', created: 3, tool_calls: [{ type: 'tool_result', tool_use_id: 'toolu_query_mo', content: '4' }] },
+        { id: 4, role: 'assistant', content: 'There are 4 tickets.', created: 4, tool_calls: null },
+    ] });
+    assert.deepEqual(turnRead.messages.map((message) => [message.id, message.tools]), [[1, []], [2, ['query_model']], [4, []]], 'a read-back turn separates the interim note from the answer');
+
     const readyClient = () => {
         const wire = realtimeMock.createRealtimeMock({ autoOpen: false, autoAssistant: false });
         const client = new realtime.RealtimeClient({ socketFactory: wire.factory });
@@ -107,6 +132,18 @@ try {
         wire.direct({ type: 'assistant_response', conversation_id: 41, request_id: requestId, message_id: 501, response: 'duplicate', blocks: [] }, 1);
         assert.deepEqual(received.map((message) => [message.id, message.content]), [[501, 'right']]);
         assert(seen.has(501));
+    }
+
+    // #10469: a streamed interim message does not claim to know its tools.
+    {
+        const { client, wire } = readyClient(); const texts = [];
+        const turn = streaming.startAssistantRealtimeTurn(client, { message: 'stream', conversationId: 46, seenMessageIds: new Set() }, callbacks({ onText: (message) => texts.push(message) }));
+        const requestId = observedRequestId(wire);
+        wire.direct({ type: 'assistant_text', conversation_id: 46, request_id: requestId, text: 'checking', blocks: [] }, 1);
+        wire.direct({ type: 'assistant_response', conversation_id: 46, request_id: requestId, message_id: 506, response: 'done', blocks: [] }, 1);
+        await turn.promise;
+        assert.equal(texts.length, 1);
+        assert.equal('tools' in texts[0], false, 'streamed messages carry no tools key');
     }
 
     // Topic-wrapped Assistant-shaped traffic is not a trusted Assistant result.
@@ -179,6 +216,8 @@ try {
     assert.equal((await mock.mockFetch('/api/assistant', { method: 'POST', headers: memberOnly, body: { message: 'hello' } })).error_code, 403);
     assert.equal((await mock.mockFetch('/api/assistant', { method: 'POST', headers: assistantOnly, body: { message: 'REST fallback' } })).status, true, 'sys.assistant-only remains REST-capable');
     assert.equal((await mock.mockFetch('/api/assistant/conversation/8101', { headers: assistantOnly })).error_code, 404, 'Assistant permission alone cannot inspect foreign history');
+    const seeded = data.projectConversation((await mock.mockFetch('/api/assistant/conversation/8101', { headers: operator, params: { graph: 'detail' } })).data);
+    assert.deepEqual(seeded.messages.map((message) => message.tools), [[], ['query_model'], []], 'the seeded conversation exercises an interim tool note');
     const ownedHistory = await mock.mockFetch('/api/assistant/conversation', { headers: assistantOnly });
     const assistantCaller = JSON.parse(Buffer.from(assistantOnly.Authorization.slice(7).split('.')[1], 'base64url').toString());
     assert(ownedHistory.data.every(row => String(row.user.id) === String(assistantCaller.uid)), 'Assistant-only lists remain owned');
