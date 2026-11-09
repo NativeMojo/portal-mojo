@@ -16,6 +16,8 @@ export interface AssistantUser { id: number; display_name: string }
 export interface AssistantMessage {
     id: RecordFeedId; role: 'user' | 'assistant'; content: string; created: number | string;
     blocks: AssistantBlock[];
+    /** Tool names this message called, from the stored record's tool_use blocks. Set on every message read from the server; absent on locally built or streamed messages. */
+    tools?: string[];
 }
 export interface AssistantConversation {
     id: number; title: string; created: number | string; modified: number | string;
