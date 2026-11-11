@@ -12,18 +12,23 @@ import { adminRoutes } from './pages/admin-routes';
 import { ensureAdminSourceSession, initializeAdminSourceSession, revokeAdminSourceSession } from './admin-source-session';
 import { AdminSourceSessionGate } from './AdminSourceSessionGate';
 
-// Wire the auth gate + Authorization/DUID headers into the client and start
-// session upkeep (single-flight refresh watcher) if a session exists.
-initializeAdminSourceSession();
-mojo.initAuth();
+// An in-place identity check's sign-in pop-up lands here only to report back
+// to the window that opened it, then closes (#10670). It never boots the app.
+const stepUpRelay = mojo.relayHostedStepUp();
+if (!stepUpRelay) {
+    // Wire the auth gate + Authorization/DUID headers into the client and start
+    // session upkeep (single-flight refresh watcher) if a session exists.
+    initializeAdminSourceSession();
+    mojo.initAuth();
+}
 // Returning from the hosted /auth pages: exchange ?auth_code= for a session
 // (no-op when the param is absent — i.e. every normal load).
-const authExchange = mojo.handleAuthCodeFromURL();
+const authExchange = stepUpRelay ? Promise.resolve(null) : mojo.handleAuthCodeFromURL();
 // Reset/magic-link emails landing in the REAL search string
 // (?flow=…&token=…): scrub + hash-route to the matching landing page.
 // Synchronous, and MUST run before createHashRouter is constructed
 // (replaceState fires no hashchange).
-handleAuthTokenLanding();
+if (!stepUpRelay) handleAuthTokenLanding();
 // Dev console handle — e.g. __mojo.logout(), __mojo.requestFreshAuth().
 if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__mojo = { ...mojo, logout: revokeAdminSourceSession };
@@ -108,5 +113,9 @@ async function start(): Promise<void> {
     } catch { /* readiness store supplies eager recovery without losing the hash */ }
     render();
 }
-render();
-void start();
+if (stepUpRelay) {
+    root.render(<main className="auth-shell"><section className="auth-card" role="status"><p>Signed in. You can close this window.</p></section></main>);
+} else {
+    render();
+    void start();
+}

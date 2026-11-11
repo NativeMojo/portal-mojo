@@ -94,9 +94,13 @@ loads, confirmations, auth waits and late responses. Leaving the page,
 revocation, logout or explicit session replacement discards drafts and pending
 work. Ordinary same-tab token renewal preserves a draft. Cross-tab auth-storage
 changes conservatively discard it: the shared auth API cannot distinguish
-renewal from same-person replacement across tabs. A 440 uses the existing
-fresh-auth UI after clearing credential drafts; even successful reauthentication
-requires explicit re-entry/retry. No secret is silently replayed. Confirmation
+renewal from same-person replacement across tabs. A 440 opens the in-place
+fresh-auth UI over the open dialog (#10670). A confirmed same-account step-up
+keeps the page, so actions without a key (Acknowledge deployed policy, stops,
+breakers, triage, revocations, model selection) finish once with the
+confirmation already given. Key-carrying saves clear their drafts first and ask
+for the key again: no secret is ever held across the prompt or replayed. A
+dismissed prompt reads "Not confirmed — nothing was changed." Confirmation
 is a page-owned native dialog, focuses Cancel, and ends with the page/session scope.
 
 Protocol helpers are exported from `portal-mojo/admin/assistant`:

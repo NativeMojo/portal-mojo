@@ -86,9 +86,12 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
     async function failure(err: unknown, op: Operation, mutation: boolean) {
         if (!validOwner() || operation.current !== op || op.controller.signal.aborted) return;
         if (isReauthRequired(err)) {
-            clearDrafts(); setConfirmation(null); setNotice('Sign in again, then re-enter any key and explicitly retry. Nothing is automatically replayed.');
-            // Step-up replaces the session. Never close over a secret for retry.
-            await requestFreshAuth(); return;
+            // Reads and key-carrying saves land here; change() finishes every other save.
+            // Never close over a secret for retry: the key is entered again.
+            clearDrafts(); setConfirmation(null);
+            const ok = await requestFreshAuth();
+            if (validOwner() && operation.current === op) setNotice(!ok ? 'Not confirmed — nothing was changed.' : mutation ? 'Confirmed. Paste the key again, then save.' : 'Confirmed. Refresh setup to continue.');
+            return;
         }
         setError(assistantSetupCredentialRefusal(err) ?? (mutation ? 'The operation was refused or its outcome is unknown. Refreshing current configuration; no operation will be retried automatically.' : 'Assistant setup could not be loaded. Try Refresh setup.'));
         if (mutation) {
@@ -117,8 +120,18 @@ function OwnerSetup({ ownerId, revision }: { ownerId: number; revision: number }
             try {
                 guard(op); setConfirmation(null);
                 if (!stateRef.current) throw new Error('Reload setup.');
-                action = make(stateRef.current);
-                const result = await mutateAssistantSetup(action, options(op));
+                const current = make(stateRef.current); action = current;
+                let result;
+                try { result = await mutateAssistantSetup(current, options(op)); }
+                catch (err) {
+                    // A same-account step-up keeps this screen (#10670), so finish what was
+                    // pressed, its confirmation included. A key is never held across the prompt.
+                    if (!isReauthRequired(err) || 'api_key' in current || 'handler_api_key' in current) throw err;
+                    const ok = await requestFreshAuth();
+                    guard(op);
+                    if (!ok) { setNotice('Not confirmed — nothing was changed.'); return; }
+                    result = await mutateAssistantSetup(current, options(op));
+                }
                 guard(op); apply(result.state, op);
                 if (credential === 'assistant') setDraft(''); if (credential === 'handler') setHandlerDraft('');
                 if (result.result) {

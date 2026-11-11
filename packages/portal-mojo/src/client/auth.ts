@@ -94,6 +94,8 @@ export interface AuthSnapshot {
 let snapshotCache: AuthSnapshot = { authenticated: false, uid: null, email: null };
 let snapshotKey = '∅';
 let sessionRevision = 0;
+/** The account an open step-up challenge re-confirms (requestFreshAuth). */
+let stepUpUid: string | null = null;
 const authListeners = new Set<() => void>();
 
 /** @internal Same-tab replacement fence; ordinary renewal does not advance it. */
@@ -117,8 +119,11 @@ function computeSnapshot(): void {
 }
 
 function notifyAuthChanged(source: 'session' | 'refresh' = 'session'): void {
-    if (source === 'session') sessionRevision += 1;
     computeSnapshot();
+    // A same-account re-login answering an open step-up challenge renews
+    // auth_time inside the SAME session (#10670): fenced screens keep their
+    // state and open dialogs. Any other sign-in, switch or sign-out replaces it.
+    if (source === 'session' && !(stepUpUid !== null && snapshotCache.uid === stepUpUid)) sessionRevision += 1;
     for (const cb of authListeners) cb();
 }
 
@@ -775,12 +780,16 @@ export async function revokeOtherSessions(): Promise<AuthUser> {
 // a token refresh carries auth_time forward unchanged and can never satisfy
 // the gate). The only cure is a real re-login (password / MFA / passkey),
 // which the UI presents as a modal OVER the current screen — page state is
-// never thrown away for a redirect.
+// never thrown away for a redirect. Hosted deployments confirm in a pop-up
+// window running their normal sign-in page (openHostedStepUp), so providers
+// such as Google work without the page ever navigating (#10670).
 //
 // Wiring: the app registers ONE UI handler (setFreshAuthHandler → the C3
 // fresh-auth modal). Call sites wrap sensitive operations in
 // `withFreshAuth(fn)` — on a 440 the handler prompts, and a successful
 // re-login (new tokens stored by the normal login flows) retries fn once.
+// While the prompt is open, a re-login of the SAME account keeps the session
+// revision (see notifyAuthChanged); any other account replaces the session.
 
 /** HTTP status + envelope error_code of a step-up challenge. */
 export const REAUTH_STATUS = 440;
@@ -802,11 +811,11 @@ let freshAuthPromise: Promise<boolean> | null = null;
 
 /**
  * Register the UI that answers step-up challenges (one per app — the C3
- * FreshAuthHost). Pass null to unregister. An inline handler re-authenticates via
- * the normal login flows, so the fresh tokens (and their new auth_time) are
- * stored before it resolves true; keep the session's storage by passing
- * `{remember: sessionIsPersistent()}` to the login call. A hosted handler
- * resolves false before leaving, so returning never replays the pending action.
+ * FreshAuthHost). Pass null to unregister. The handler re-authenticates via
+ * the normal login flows (or openHostedStepUp), so the fresh tokens (and their
+ * new auth_time) are stored before it resolves true; keep the session's storage
+ * by passing `{remember: sessionIsPersistent()}` to the login call. It resolves
+ * true only for the challenged account.
  */
 export function setFreshAuthHandler(handler: FreshAuthHandler | null): void {
     freshAuthHandler = handler;
@@ -822,8 +831,12 @@ export function requestFreshAuth(): Promise<boolean> {
         console.warn('requestFreshAuth: no fresh-auth handler registered (setFreshAuthHandler) — challenge cannot be answered');
         return Promise.resolve(false);
     }
+    // Each caller is answered for its OWN account: one that joins an open prompt
+    // after the session changed never retries under the account that confirmed.
+    const caller = getAuthSnapshot().uid;
     if (!freshAuthPromise) {
         const handler = freshAuthHandler;
+        stepUpUid = caller;
         freshAuthPromise = handler()
             .catch((error) => {
                 // A handler bug must not wedge the single-flight forever.
@@ -831,10 +844,11 @@ export function requestFreshAuth(): Promise<boolean> {
                 return false;
             })
             .finally(() => {
+                stepUpUid = null;
                 freshAuthPromise = null;
             });
     }
-    return freshAuthPromise;
+    return freshAuthPromise.then((ok) => ok && caller !== null && getAuthSnapshot().uid === caller);
 }
 
 /**
@@ -852,6 +866,217 @@ export async function withFreshAuth<T>(fn: () => Promise<T>): Promise<T> {
         if (!ok) throw error;
         return fn();
     }
+}
+
+/** What the signed-in account can confirm itself with. */
+export interface FreshAuthMethods {
+    password: boolean;
+    passkey: boolean;
+    /** Active provider links the deployment still offers, in its configured order. */
+    providers: string[];
+}
+
+const OAUTH_PROVIDERS = ['google', 'apple', 'github'];
+
+/**
+ * Offer only what this account has: its own credentials (`has_password` /
+ * `has_passkey` on the me graph) and its active OAuth links that the
+ * deployment still lists in `login.methods`. A failed lookup falls back to
+ * password + passkey — never to an empty prompt.
+ */
+export async function freshAuthMethods(): Promise<FreshAuthMethods> {
+    const uid = getAuthSnapshot().uid;
+    const [me, links, config] = await Promise.allSettled([
+        mojoCall('/api/user/me', { unscoped: true }),
+        // Admins can list everyone's links; ask for this account's only.
+        mojoCall('/api/account/oauth_connection', { unscoped: true, params: { user: uid ?? '', is_active: true, size: 50 } }),
+        mojoCall('/api/auth/config', { unscoped: true }),
+    ]);
+    const user = me.status === 'fulfilled' ? me.value.data as Record<string, unknown> | undefined : undefined;
+    const methods = config.status === 'fulfilled'
+        ? (config.value.data as { login?: { methods?: unknown } } | undefined)?.login?.methods : undefined;
+    const offered = Array.isArray(methods) ? methods.filter((m): m is string => typeof m === 'string') : null;
+    const rows = links.status === 'fulfilled' && Array.isArray(links.value.data) ? links.value.data as Record<string, unknown>[] : [];
+    const linked = new Set(rows.filter(row => row.is_active !== false && typeof row.provider === 'string').map(row => String(row.provider)));
+    return {
+        password: typeof user?.has_password === 'boolean' ? user.has_password : true,
+        passkey: typeof user?.has_passkey === 'boolean' ? user.has_passkey : true,
+        providers: (offered ?? OAUTH_PROVIDERS).filter(m => OAUTH_PROVIDERS.includes(m) && linked.has(m)),
+    };
+}
+
+// ── Pop-up step-up (hosted deployments) ───────────────────────────────
+// The deployment's own sign-in page runs in a pop-up with force_reauth=1 and
+// returns to this app with a one-time `mojo_stepup` marker. That landing
+// relays completion to its opener — the single-use code when cross-origin,
+// nothing when same-origin (the hosted page already stored the new pair) —
+// and closes. The opener alone adopts, in its own storage choice. Tokens
+// never travel by postMessage.
+
+const STEP_UP_PARAM = 'mojo_stepup';
+const STEP_UP_MESSAGE = 'mojo:stepup';
+
+export type HostedStepUpResult = 'confirmed' | 'other-account' | 'failed';
+
+export interface HostedStepUp {
+    /** Settles once the pop-up reports back (never on its own close). */
+    result: Promise<HostedStepUpResult>;
+    /** True once the person closed the pop-up without finishing. */
+    closed(): boolean;
+    /** Bring the pop-up forward, reopening it if it was closed. False when blocked. */
+    focus(): boolean;
+    /** Stop listening and close the pop-up. */
+    cancel(): void;
+}
+
+/**
+ * Open the hosted sign-in in a pop-up to re-confirm the current account.
+ * Call from the click handler (pop-up blockers). Null when there is no hosted
+ * page (mock) or the browser blocked the window.
+ */
+export function openHostedStepUp(opts: { remember?: boolean } = {}): HostedStepUp | null {
+    const uid = getAuthSnapshot().uid;
+    if (!uid || typeof window.open !== 'function' || !crypto?.randomUUID) return null;
+    const nonce = crypto.randomUUID();
+    const back = new URL(window.location.origin + window.location.pathname + window.location.search);
+    back.searchParams.set(STEP_UP_PARAM, nonce);
+    const url = hostedAuthUrl(back.href, { forceReauth: true });
+    if (!url) return null;
+    const remember = opts.remember ?? sessionIsPersistent();
+    // Same-origin hosted sign-in writes the shared keys; keep ours to undo another account.
+    const previous = { access: getAccessToken(), refresh: getRefreshToken() };
+    // A browser that opens the "pop-up" in this tab still comes back to this
+    // exact screen and storage choice, as a full-page hosted return would.
+    // Kept when window.open answers null: some embedded browsers do that and then
+    // navigate this tab anyway. It expires (30 min) and only ever restores this screen.
+    const stashed = stashHostedReturn(remember);
+    const open = () => window.open(url, 'mojo-stepup', 'popup,width=520,height=720');
+    let popup = open();
+    if (!popup) return null;
+    let settle: (result: HostedStepUpResult) => void = () => {};
+    const result = new Promise<HostedStepUpResult>((resolve) => { settle = resolve; });
+    let done = false;
+    let adopting = false;
+    const finish = (outcome: HostedStepUpResult) => {
+        if (done) return;
+        done = true;
+        window.removeEventListener('message', onMessage);
+        window.removeEventListener('storage', onStorage);
+        try { if (stashed) sessionStorage.removeItem(RETURN_ROUTE_KEY); } catch { /* storage denied */ }
+        settle(outcome);
+    };
+    const adopt = (code: string | null) => {
+        if (done || adopting) return;
+        adopting = true;
+        void adoptHostedStepUp(code, uid, remember, previous).then(finish);
+    };
+    const onMessage = (event: MessageEvent) => {
+        const data = event.data as { type?: unknown; nonce?: unknown; code?: unknown } | null;
+        if (event.origin !== window.location.origin || event.source !== popup
+            || data?.type !== STEP_UP_MESSAGE || data.nonce !== nonce) return;
+        adopt(typeof data.code === 'string' ? data.code : null);
+    };
+    // Same-origin safety net: a provider that cuts the pop-up's link back here
+    // (Cross-Origin-Opener-Policy) still lands this account's new pair in the
+    // shared storage. Only a genuinely newer sign-in counts — another tab's
+    // refresh carries auth_time unchanged. Another account is left to the relay.
+    const onStorage = (event: StorageEvent) => {
+        if (event.key !== ACCESS_KEY && event.key !== REFRESH_KEY) return;
+        const access = localStorage.getItem(ACCESS_KEY);
+        const refresh = localStorage.getItem(REFRESH_KEY);
+        if (!access || !refresh || access === previous.access || refresh === previous.refresh
+            || tokenInfo(access)?.uid !== uid || authTime(access) <= authTime(previous.access)) return;
+        adopt(null);
+    };
+    window.addEventListener('message', onMessage);
+    window.addEventListener('storage', onStorage);
+    return {
+        result,
+        closed: () => !done && Boolean(popup?.closed),
+        focus: () => {
+            if (done) return false;
+            if (!popup || popup.closed) popup = open();
+            popup?.focus();
+            return Boolean(popup);
+        },
+        cancel: () => {
+            finish('failed');
+            try { popup?.close(); } catch { /* already gone */ }
+        },
+    };
+}
+
+/** The token's genuine-login time (epoch seconds); 0 when absent. */
+function authTime(token: string | null): number {
+    const value = Number(tokenInfo(token)?.payload.auth_time);
+    return Number.isFinite(value) ? value : 0;
+}
+
+async function adoptHostedStepUp(code: string | null, uid: string, remember: boolean,
+    previous: { access: string | null; refresh: string | null }): Promise<HostedStepUpResult> {
+    if (code) {
+        // Cross-origin: check the grant's account BEFORE it touches storage.
+        try {
+            if (checkTokenStatus().action === 'logout') clearTokens({ silent: true });
+            const body = await mojoCall('/api/auth/exchange', { method: 'POST', body: { code } });
+            const grant = body.data as TokenGrant | undefined;
+            if (tokenInfo(grant?.access_token)?.uid !== uid) return 'other-account';
+            if (authTime(grant?.access_token ?? null) <= authTime(previous.access)) return 'failed';
+            await adoptGrant(grant, remember);
+            return 'confirmed';
+        } catch {
+            return 'failed';
+        }
+    }
+    // Same-origin: the hosted page stored the new pair in localStorage.
+    const access = getAccessToken();
+    const refresh = getRefreshToken();
+    if (!access || !refresh) return 'failed';
+    if (tokenInfo(access)?.uid !== uid) {
+        // Another account signed in: put this tab's session back, never resume.
+        if (previous.access) storeTokens(previous.access, previous.refresh, remember, 'session');
+        return 'other-account';
+    }
+    // Only a genuinely newer sign-in answers the gate (a refresh keeps auth_time).
+    if (authTime(access) <= authTime(previous.access)) return 'failed';
+    if (refreshPromise) await refreshPromise;
+    storeTokens(access, refresh, remember, 'session');
+    startAutoRefresh();
+    emitAuth('login', {});
+    return 'confirmed';
+}
+
+/**
+ * In the sign-in pop-up's landing: relay completion to the opener and close.
+ * Call FIRST at boot, before any session setup; true means this window is
+ * only a relay and must not boot the app. Without an opener (it was closed,
+ * or the browser cut the link) the marker is dropped and the app boots as a
+ * normal hosted return.
+ */
+export function relayHostedStepUp(): boolean {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const params = new URLSearchParams(window.location.search);
+    const nonce = params.get(STEP_UP_PARAM);
+    if (!nonce) return false;
+    params.delete(STEP_UP_PARAM);
+    const opener = window.opener as Window | null;
+    if (!opener || opener === window) {
+        scrubUrl(params, window.location.hash || '');
+        return false;
+    }
+    const code = params.get(AUTH_CODE_PARAM);
+    try {
+        // Only a same-origin opener receives it; any other drops it unread.
+        opener.postMessage({ type: STEP_UP_MESSAGE, nonce, code }, window.location.origin);
+    } catch {
+        // Not relayed: keep the code so the normal boot can still exchange it.
+        scrubUrl(params, window.location.hash || '');
+        return false;
+    }
+    params.delete(AUTH_CODE_PARAM);
+    scrubUrl(params, window.location.hash || '');
+    window.close();
+    return true;
 }
 
 // ── Cross-origin auth handoff ─────────────────────────────────────────
@@ -1042,21 +1267,27 @@ export function redirectToHostedAuth(opts: HostedAuthOptions = {}): boolean {
     signedOutLanding = null;
     const url = hostedAuthUrl(undefined, opts);
     if (!url) return false;
+    // Step-up must retain its storage choice. Ordinary login can still
+    // recover on the default route when session storage is unavailable.
+    if (!stashHostedReturn(opts.forceReauth ? opts.remember ?? sessionIsPersistent() : undefined) && opts.forceReauth) return false;
+    window.location.href = url;
+    return true;
+}
+
+/** Remember this screen (and, for step-up, the storage choice) for a full-page hosted return. */
+function stashHostedReturn(persistent?: boolean): boolean {
     try {
         const returning: HostedReturn = {
             route: window.location.hash,
             returnTo: window.location.origin + window.location.pathname + window.location.search,
             createdAt: Date.now(),
-            ...(opts.forceReauth ? { persistent: opts.remember ?? sessionIsPersistent() } : {}),
+            ...(persistent !== undefined ? { persistent } : {}),
         };
         sessionStorage.setItem(RETURN_ROUTE_KEY, JSON.stringify(returning));
+        return true;
     } catch {
-        // Step-up must retain its storage choice. Ordinary login can still
-        // recover on the default route when session storage is unavailable.
-        if (opts.forceReauth) return false;
+        return false;
     }
-    window.location.href = url;
-    return true;
 }
 
 function takeHostedReturn(): HostedReturn | null {
