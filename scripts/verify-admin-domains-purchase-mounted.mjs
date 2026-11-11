@@ -85,17 +85,25 @@ try {
     assert.equal(helpers.quoteIdentity({ ...ledger(), purchase: 9501, name: 'clean.com', expires: 9999999999, privacy_supported: false }, 1).privacy_supported, false);
     console.log('PASS delayed old-scope contact rejection and post-fetch exact purchase polling fence');
     reset(); let stepUps = 0;
-    globalThis.__purchasePeer = async (path, opts) => {
+    const refusePurchase = async (path, opts) => {
         if (path === '/api/dnsman/registrar/purchase') { posts.push(opts.body); return { status: false, error: 'Fresh authentication required', error_code: 440 }; }
         if (path === '/api/dnsman/purchase/9501') { reads.push(path); return { status: true, data: ledger({ status: 'quoted' }) }; }
         return peer(path, opts);
     };
+    globalThis.__purchasePeer = refusePurchase;
+    // #10670: a same-account step-up keeps the session, so the server's 440 (refused before
+    // anything is charged or the token spent) continues the identical quote exactly once.
     auth.setFreshAuthHandler(async () => { stepUps++; await auth.login('dns.manager@nativemojo.com', 'mojo'); return true; });
-    await search(Wizard); await confirm(); await wait(() => document.body.textContent.includes('session changed. Review this purchase'), 'same-user revision recovery');
-    assert.equal(posts.length, 1, 'fresh login must not replay the purchase in its replacement session'); assert.equal(stepUps, 1); assert(!field('Purchasing group') && !button('Continue'), 'replacement session stays locked to exact purchase recovery');
-    await click('Refresh'); await wait(() => document.body.textContent.includes('quoted'), 'same exact ledger refreshed'); await click('View purchase'); await wait(() => document.querySelector('dialog')?.textContent.includes('Purchase #9501'), 'same exact ledger opened'); assert(reads.every(value => value === '/api/dnsman/purchase/9501')); assert.equal(posts.length, 1); await act(async () => ui.modal.closeAll());
-    await login('dns.platform@nativemojo.com'); await wait(() => field('Purchasing group'), 'new user has fresh form without old user recovery'); assert(!document.body.textContent.includes('Check purchase #9501')); await unmount(); auth.setFreshAuthHandler(null);
-    console.log('PASS changed-session440 blocks purchase replay and retains exact-ID same-user recovery only');
+    await search(Wizard); await confirm(); await wait(() => document.body.textContent.includes('Check purchase status'), 'same-account continuation settles');
+    assert.equal(posts.length, 2, 'a same-account step-up continues the confirmed purchase exactly once'); assert.deepEqual(posts[1], posts[0], 'the continuation reuses the identical single-use quote'); assert.equal(stepUps, 1, 'a second refusal is not prompted again'); assert(!field('Purchasing group') && !button('Continue'), 'an unconfirmed outcome stays locked to the exact purchase');
+    await click('Refresh'); await wait(() => document.body.textContent.includes('quoted'), 'same exact ledger refreshed'); await click('View purchase'); await wait(() => document.querySelector('dialog')?.textContent.includes('Purchase #9501'), 'same exact ledger opened'); assert(reads.every(value => value === '/api/dnsman/purchase/9501')); assert.equal(posts.length, 2, 'no further purchase attempt'); await act(async () => ui.modal.closeAll()); await unmount();
+    // Another account answering the prompt replaces the session: it never inherits the purchase.
+    reset(); stepUps = 0; globalThis.__purchasePeer = refusePurchase;
+    auth.setFreshAuthHandler(async () => { stepUps++; await auth.login('dns.platform@nativemojo.com', 'mojo'); return true; });
+    await login('dns.manager@nativemojo.com'); await search(Wizard); await click('Continue'); await wait(() => field('Type clean.com'), 'exact confirmation'); await input(field('Type clean.com'), 'clean.com'); await click('Confirm purchase');
+    await wait(() => stepUps === 1 && field('Purchasing group'), 'new account has a fresh form');
+    assert.equal(posts.length, 1, 'another account never replays the purchase'); assert(!document.body.textContent.includes('Check purchase #9501'), 'no old-account recovery for the new account'); await unmount(); auth.setFreshAuthHandler(null);
+    console.log('PASS same-account 440 continues the identical purchase once; another account never inherits it');
 
 
 } finally { auth?.stopAutoRefresh(); delete globalThis.__purchasePeer; if (root) await unmount(); await server.close(); dom.window.close(); }
