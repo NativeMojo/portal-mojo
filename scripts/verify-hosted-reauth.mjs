@@ -161,6 +161,18 @@ try {
     assert.equal(sessionStorage.getItem('mojo:auth-return-route'), null, 'The fallback return is dropped once confirmed in place');
     assert.equal(auth.sessionIsPersistent(), false, 'The session stays session-only');
 
+    // A relay without a newer sign-in (an older server ignoring force_reauth) is not a confirmation.
+    auth.setTokens(jwt(), jwt(), false);
+    prompt = await challenge();
+    await waitFor(() => button('Continue with Google'), 'Google offered');
+    await click('Continue with Google');
+    localStorage.setItem('access_token', jwt(4, 1, 'same-time@test.invalid')); localStorage.setItem('refresh_token', jwt(4, 1, 'same-time@test.invalid'));
+    await deliver({ type: 'mojo:stepup', nonce: nonceOf(opened.at(-1)), code: null });
+    await waitFor(() => /did not finish/.test(text()), 'a relay with an unchanged auth_time is refused');
+    assert.equal(prompt.settled(), false, 'The check stays open');
+    await click('Cancel');
+    assert.equal(await prompt.pending, false);
+
     // Another account in the pop-up is refused and this tab's session is put back.
     auth.setTokens(jwt(), jwt(), true);
     prompt = await challenge();
@@ -200,6 +212,17 @@ try {
     const switched = auth.getAuthSessionRevision();
     assert.equal(await auth.requestFreshAuth(), false, 'Only the challenged account answers');
     assert.notEqual(auth.getAuthSessionRevision(), switched, 'Another account replaces the session');
+    auth.setFreshAuthHandler(null);
+
+    // A caller that joins an open prompt after the session changed is answered for its own account.
+    auth.setTokens(jwt(), jwt(), false);
+    let release; auth.setFreshAuthHandler(() => new Promise((resolve) => { release = resolve; }));
+    const first = auth.requestFreshAuth();
+    auth.setTokens(jwt(9), jwt(9), false);
+    const joiner = auth.requestFreshAuth();
+    auth.setTokens(jwt(4, 100), jwt(4, 100), false); release(true);
+    assert.equal(await first, true, 'The account that opened the prompt is confirmed');
+    assert.equal(await joiner, false, 'Another account that joined is never retried under the confirming account');
     auth.setFreshAuthHandler(null);
 
     // The pop-up landing relays and closes; without an opener it boots normally.

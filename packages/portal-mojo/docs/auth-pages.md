@@ -122,8 +122,9 @@ Client surface (`portal-mojo/client`):
 - `setFreshAuthHandler(handler)` — the app registers ONE UI handler;
   `FreshAuthHost` (mounted by `RequireAuth`) does this.
 - `requestFreshAuth()` — single-flight prompt: a burst of gated calls
-  shares one modal. No handler → `console.warn` + resolve false. It resolves
-  true only when the challenged account is still signed in.
+  shares one modal. No handler → `console.warn` + resolve false. Each caller
+  is answered for its own account: true only when the account that asked is
+  still the one signed in, so a call that joins after a switch never retries.
 - `withFreshAuth(fn)` — run fn; on a 440 prompt, then retry **once** after a
   successful re-login; a dismissed prompt rejects with the ORIGINAL error.
 - `freshAuthMethods()` — what this account can confirm with:
@@ -155,7 +156,20 @@ cross-origin it exchanges the relayed code itself, checking the grant's account
 BEFORE storing; same-origin it re-stores the pair the hosted page wrote. Tokens
 never travel by `postMessage`, and origin, source window and nonce are all
 checked. Another account is refused: the cross-origin grant is never stored,
-and a same-origin sign-in is undone by restoring this tab's pair.
+and a same-origin sign-in is undone by restoring this tab's pair. Every path
+also requires a strictly newer `auth_time` than the session had, so a refresh
+(another tab's included) or a server that ignored `force_reauth` never counts.
+
+Known limits:
+- The relay needs `window.opener`, so while the pop-up is on the provider's
+  pages (Google, Apple, GitHub) that provider could navigate this tab. Only
+  configured providers are ever opened.
+- If a provider's Cross-Origin-Opener-Policy severs the link, same-origin
+  deployments still complete from shared storage. Cross-origin ones boot the
+  app in the pop-up instead and the modal keeps waiting; Cancel ends it.
+- A browser that opens the "pop-up" in this tab (some embedded browsers answer
+  `null` and navigate anyway) returns to the exact screen and storage choice,
+  like a full-page hosted return.
 
 **A same-account step-up is not a session replacement.** While a challenge is
 open, a re-login of the challenged account keeps `getAuthSessionRevision()`, so

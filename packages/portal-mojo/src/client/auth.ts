@@ -831,13 +831,13 @@ export function requestFreshAuth(): Promise<boolean> {
         console.warn('requestFreshAuth: no fresh-auth handler registered (setFreshAuthHandler) — challenge cannot be answered');
         return Promise.resolve(false);
     }
+    // Each caller is answered for its OWN account: one that joins an open prompt
+    // after the session changed never retries under the account that confirmed.
+    const caller = getAuthSnapshot().uid;
     if (!freshAuthPromise) {
         const handler = freshAuthHandler;
-        const uid = getAuthSnapshot().uid;
-        stepUpUid = uid;
+        stepUpUid = caller;
         freshAuthPromise = handler()
-            // Only the challenged account answers the challenge.
-            .then((ok) => ok && uid !== null && getAuthSnapshot().uid === uid)
             .catch((error) => {
                 // A handler bug must not wedge the single-flight forever.
                 console.warn('fresh-auth handler threw', error);
@@ -848,7 +848,7 @@ export function requestFreshAuth(): Promise<boolean> {
                 freshAuthPromise = null;
             });
     }
-    return freshAuthPromise;
+    return freshAuthPromise.then((ok) => ok && caller !== null && getAuthSnapshot().uid === caller);
 }
 
 /**
@@ -1021,6 +1021,7 @@ async function adoptHostedStepUp(code: string | null, uid: string, remember: boo
             const body = await mojoCall('/api/auth/exchange', { method: 'POST', body: { code } });
             const grant = body.data as TokenGrant | undefined;
             if (tokenInfo(grant?.access_token)?.uid !== uid) return 'other-account';
+            if (authTime(grant?.access_token ?? null) <= authTime(previous.access)) return 'failed';
             await adoptGrant(grant, remember);
             return 'confirmed';
         } catch {
@@ -1036,7 +1037,8 @@ async function adoptHostedStepUp(code: string | null, uid: string, remember: boo
         if (previous.access) storeTokens(previous.access, previous.refresh, remember, 'session');
         return 'other-account';
     }
-    if (access === previous.access) return 'failed';
+    // Only a genuinely newer sign-in answers the gate (a refresh keeps auth_time).
+    if (authTime(access) <= authTime(previous.access)) return 'failed';
     if (refreshPromise) await refreshPromise;
     storeTokens(access, refresh, remember, 'session');
     startAutoRefresh();
