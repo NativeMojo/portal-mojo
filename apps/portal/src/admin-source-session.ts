@@ -1,5 +1,5 @@
 import {
-    getAccessToken, getAuthSnapshot, isPackagedAdmin,
+    getAccessToken, getAuthSessionRevision, getAuthSnapshot, isPackagedAdmin,
     logout, mojoCall, onAuth, signOutHosted, subscribeAuth,
 } from 'portal-mojo/client/runtime';
 import { authMode } from './pages/auth/config';
@@ -21,7 +21,7 @@ let disposed = false;
 let channel: BroadcastChannel | undefined;
 let acceptedGeneration: Generation;
 let initialGeneration: Generation;
-let grant: { expiresAt: number; renewAt: number; token: string; path: string } | undefined;
+let grant: { expiresAt: number; renewAt: number; token: string; revision: number; path: string } | undefined;
 let flight: Promise<void> | undefined;
 let revocation: Promise<void> | undefined;
 let loginActivation: Promise<void> | undefined;
@@ -143,7 +143,10 @@ export function initializeAdminSourceSession(): void {
         document.addEventListener('visibilitychange', recheck);
         cleanup.push(() => document.removeEventListener('visibilitychange', recheck));
         cleanup.push(subscribeAuth(() => {
-            if (grant && grant.token !== getAccessToken()) { grant = undefined; stopTimers(); }
+            // The same session's new token (a refresh, or a same-account step-up)
+            // re-issues in the background and keeps the mounted Admin and its
+            // open dialogs (#10670). A replaced session drops the grant at once.
+            if (grant && grant.token !== getAccessToken() && grant.revision !== getAuthSessionRevision()) { grant = undefined; stopTimers(); }
             // Queue after auth's refresh promise settles; never recurse from setTokens.
             if (!flight && !revocation) queueMicrotask(recheck);
         }));
@@ -196,7 +199,7 @@ export function ensureAdminSourceSession(): Promise<void> {
         // Hold the lock until Set-Cookie has completed AND the body has been processed.
         assertGeneration();
         if (!token || token !== getAccessToken() || disposed) throw new Error('Session changed during source issuance');
-        grant = { ...validateSourceGrant(response.data), token };
+        grant = { ...validateSourceGrant(response.data), token, revision: getAuthSessionRevision() };
         retryCount = 0; stopTimers();
         timer = setTimeout(() => { void ensureAdminSourceSession().catch(() => {}); }, grant.renewAt - Date.now());
         expiryTimer = setTimeout(() => invalidate('Admin access expired. Retry to renew it.'), grant.expiresAt - Date.now());
