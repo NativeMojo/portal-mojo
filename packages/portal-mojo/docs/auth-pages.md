@@ -12,7 +12,9 @@ import {
     completeMfaTotp, completeMfaRecovery, sendMfaSms, completeMfaSms,
     // Fresh-auth (step-up) challenge surface
     REAUTH_STATUS, isReauthRequired, setFreshAuthHandler, requestFreshAuth,
-    withFreshAuth, sessionIsPersistent,
+    withFreshAuth, sessionIsPersistent, freshAuthMethods,
+    // In-place hosted confirmation (sign-in pop-up + its landing relay)
+    openHostedStepUp, relayHostedStepUp,
     // shared passkey error copy (LoginPage, MfaPanel, FreshAuthHost)
     passkeyErrorMessage,
     type MfaChallenge, type FreshAuthHandler, type MfaCompletionOptions,
@@ -120,22 +122,51 @@ Client surface (`portal-mojo/client`):
 - `setFreshAuthHandler(handler)` — the app registers ONE UI handler;
   `FreshAuthHost` (mounted by `RequireAuth`) does this.
 - `requestFreshAuth()` — single-flight prompt: a burst of gated calls
-  shares one modal. No handler → `console.warn` + resolve false.
+  shares one modal. No handler → `console.warn` + resolve false. It resolves
+  true only when the challenged account is still signed in.
 - `withFreshAuth(fn)` — run fn; on a 440 prompt, then retry **once** after a
   successful re-login; a dismissed prompt rejects with the ORIGINAL error.
+- `freshAuthMethods()` — what this account can confirm with:
+  `{password, passkey, providers}` from the me graph (`has_password`,
+  `has_passkey`), its active `/api/account/oauth_connection` rows (filtered by
+  `user`, since admins can list everyone's) and `/api/auth/config`
+  `login.methods`. A failed lookup falls back to password + passkey.
+- `openHostedStepUp({remember})` — call from a click. Opens the deployment's
+  sign-in page in a pop-up with `force_reauth=1`, returning to the app URL plus
+  a one-time `mojo_stepup` nonce. `result` settles `'confirmed'`,
+  `'other-account'` or `'failed'`; `closed()`, `focus()` (reopens) and
+  `cancel()` drive the waiting UI. Null when blocked or under the mock.
+- `relayHostedStepUp()` — call FIRST at boot. In the pop-up's landing it posts
+  `{type, nonce, code}` to a same-origin opener only, scrubs both params, closes
+  the window and returns true (do not boot the app). Without an opener it
+  drops the marker and the normal return runs.
 
-In hosted mode (including packaged Admin), the native dialog offers Cancel
-and Continue to sign-in. Continue opens the existing configured sign-in page
-with `force_reauth=1`, so Google-only deployments can use Google. It preserves
-the exact return route and original storage choice. The pending challenge
-resolves false before unloading: after returning, re-read and deliberately
-retry the action. Picking another account starts a new session and screen;
-the former account's operation is never carried over.
+**Confirmation never leaves the page (#10670).** In every mode the modal opens
+over the current screen with the account pinned and offers only what the
+account has: Passkey (primary when present), Password, one "Continue with
+Google/Apple/GitHub" per linked and still-enabled provider, and in hosted mode
+"Use the sign-in page" as the fallback (bouncer-gated password login, unknown
+methods). Providers and the fallback use `openHostedStepUp`; the modal waits
+("Finish in the sign-in window", Reopen window, Cancel), explains a blocked
+pop-up inline, and never navigates.
 
-In explicit in-app/mock mode the modal re-prompts credentials over the current
-screen, pins the current email when available, and keeps the existing
-password/passkey/MFA and storage behavior. Dev affordance:
-`__mojo.requestFreshAuth()` exercises the modal without a 440.
+The opener alone adopts the result in its initiating storage choice:
+cross-origin it exchanges the relayed code itself, checking the grant's account
+BEFORE storing; same-origin it re-stores the pair the hosted page wrote. Tokens
+never travel by `postMessage`, and origin, source window and nonce are all
+checked. Another account is refused: the cross-origin grant is never stored,
+and a same-origin sign-in is undone by restoring this tab's pair.
+
+**A same-account step-up is not a session replacement.** While a challenge is
+open, a re-login of the challenged account keeps `getAuthSessionRevision()`, so
+revision-fenced screens keep their state and open dialogs and `withFreshAuth`
+can retry. Any other account, or a sign-out, still advances it. Packaged Admin
+keeps its source grant across the same-session token change and re-issues in
+the background, so the Admin is not swapped for "Checking Admin access…".
+
+Dev affordance: `__mojo.requestFreshAuth()` exercises the modal without a 440.
+`redirectToHostedAuth({forceReauth})` remains for full-page hosted returns; the
+modal no longer uses it.
 
 Call-site pattern:
 

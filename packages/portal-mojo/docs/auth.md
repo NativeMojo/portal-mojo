@@ -136,6 +136,11 @@ minutes, and applies only at the matching origin/path/query. It never carries
 an operation or establishes freshness. The server still enforces `auth_time`.
 When storage cannot retain the choice, step-up navigation returns false.
 
+Step-up challenges do not use that full-page path any more (#10670).
+`openHostedStepUp()` runs the same page in a pop-up and the app's boot calls
+`relayHostedStepUp()` first, so the page under the modal never navigates. See
+[auth-pages.md](auth-pages.md) → Fresh-auth.
+
 `hostedAuthUrl()` returns null under the mock transport — there is no page
 to host; the UI should fall back to a dev affordance (`__mojo.login(...)`).
 
