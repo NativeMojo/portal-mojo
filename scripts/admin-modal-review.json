@@ -331,8 +331,8 @@
       "purpose": "ConfigEditor: collect and save fields"
     },
     {
-      "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:FreshAuthDialog:dialog:0",
-      "fingerprint": "cd50b6e426dffd14387b",
+      "id": "apps/portal/src/pages/auth/FreshAuthDialog.tsx:FreshAuthDialog:dialog:0",
+      "fingerprint": "719362c11960d2784a61",
       "category": "confirmation",
       "purpose": "Reauthenticate before the pending sensitive action"
     },
