@@ -833,7 +833,7 @@ export function requestFreshAuth(): Promise<boolean> {
     }
     // Each caller is answered for its OWN account: one that joins an open prompt
     // after the session changed never retries under the account that confirmed.
-    const caller = getAuthSnapshot().uid;
+    const caller = currentUid();
     if (!freshAuthPromise) {
         const handler = freshAuthHandler;
         stepUpUid = caller;
@@ -848,7 +848,16 @@ export function requestFreshAuth(): Promise<boolean> {
                 freshAuthPromise = null;
             });
     }
-    return freshAuthPromise.then((ok) => ok && caller !== null && getAuthSnapshot().uid === caller);
+    return freshAuthPromise.then((ok) => ok && currentUid() === caller);
+}
+
+/** The signed-in account, or null — also where Web Storage does not exist (SSR, Node tests). */
+function currentUid(): string | null {
+    try {
+        return getAuthSnapshot().uid;
+    } catch {
+        return null;
+    }
 }
 
 /**
