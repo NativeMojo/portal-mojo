@@ -189,6 +189,27 @@ await scenario(async ({ coordinator: c, auth, calls, dispatch }) => {
     assert(calls.length < 8, 'Auth notifications cannot recursively issue');
 });
 
+// #10670: a same-account step-up re-issues in the background and never unmounts
+// the Admin (losing open dialogs); another account still replaces the grant.
+await scenario(async ({ coordinator: c, auth, calls }) => {
+    c.initializeAdminSourceSession(); auth.initAuth(); auth.setTokens(jwt(3600, 4), jwt(7200, 4));
+    await c.ensureAdminSourceSession();
+    const statuses = []; const off = c.subscribeAdminSourceSession(() => statuses.push(c.getAdminSourceSnapshot().status));
+    const issued = () => calls.filter(({ url }) => url.endsWith('/admin/session')).length;
+    const before = issued();
+    auth.setFreshAuthHandler(async () => { auth.setTokens(jwt(3500, 4), jwt(7100, 4)); return true; });
+    try {
+        assert.equal(await auth.requestFreshAuth(), true, 'The challenged account answers its own step-up');
+        await turn(); await c.ensureAdminSourceSession();
+        assert.equal(issued(), before + 1, 'Step-up re-issues source access for the new token');
+        assert(!statuses.includes('checking'), 'A same-account step-up never swaps the Admin for the access check');
+        assert.equal(c.getAdminSourceSnapshot().status, 'ready');
+        auth.setTokens(jwt(3600, 9), jwt(7200, 9));
+        await turn(); await c.ensureAdminSourceSession();
+        assert(statuses.includes('checking'), 'Another account replaces the session and its grant');
+    } finally { off(); auth.setFreshAuthHandler(null); }
+});
+
 for (const data of [null, {}, { ...fixture.response.data, path: '//evil.test/' },
     { ...fixture.response.data, path: '/other/' }, { ...fixture.response.data, path: '/admin/../other/' },
     { ...fixture.response.data, source_session_expires_in: '300' },

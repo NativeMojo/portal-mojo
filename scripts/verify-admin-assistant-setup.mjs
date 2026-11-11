@@ -235,9 +235,33 @@ try {
     let releaseAuth; auth.setFreshAuthHandler(() => new Promise((resolve) => { releaseAuth = resolve; }));
     await input('assistant-replacement-key', SENTINEL); mock.armMockReauth('POST', path); await click('Check and save key', false);
     await waitFor(() => typeof releaseAuth === 'function', '440 opens the registered fresh-auth UI');
-    assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', '', '440 clears draft before fresh-auth UI'); assert.match(document.body.textContent, /re-enter any key/);
+    assert.equal(document.getElementById('assistant-replacement-key')?.value ?? '', '', '440 clears draft before fresh-auth UI');
     const challengedCount = postCount(); await React.act(async () => qc.setQueryData(['me', auth.getAuthSnapshot().uid], { ...owner.user, is_superuser: false })); await React.act(async () => releaseAuth(true)); await settle();
     assert.equal(postCount(), challengedCount, 'Fresh-auth completion cannot replay old credentials after revocation');
+    // #10670: a confirmed key save keeps its dialog but never replays the key.
+    await signIn(); mock.setMockAssistantSetupScenario('ready'); await render(9); releaseAuth = undefined;
+    await input('assistant-replacement-key', SENTINEL); mock.armMockReauth('POST', path); await click('Check and save key', false);
+    await waitFor(() => typeof releaseAuth === 'function', 'Key 440 opens fresh auth');
+    const keyChallenged = postCount(); await React.act(async () => releaseAuth(true)); await waitFor(ready, 'Key fresh auth settles');
+    assert.equal(postCount(), keyChallenged, 'A confirmed key save is never replayed');
+    assert.match(document.body.textContent, /Paste the key again, then save/); assert(document.getElementById('assistant-replacement-key'), 'Key dialog stays open, ready to save again');
+    assert.equal(document.getElementById('assistant-replacement-key').value, '', 'The key is entered again, never held across the prompt');
+    // #10670: Acknowledge deployed policy completes in place after confirmation.
+    await openTask('Review safety'); releaseAuth = undefined; mock.armMockReauth('POST', path);
+    await click('Acknowledge deployed policy', false); await click('Confirm operation', false);
+    await waitFor(() => typeof releaseAuth === 'function', 'Acknowledge 440 opens fresh auth over the Safety dialog');
+    const safetyOpen = () => Boolean(document.querySelector('dialog.assistant-setup-dialog[open]')) && document.body.textContent.includes('Policy & stops');
+    assert(safetyOpen(), 'The Safety dialog stays open under the identity check');
+    const ackChallenged = postCount(); await React.act(async () => releaseAuth(true)); await waitFor(ready, 'Acknowledge settles after confirmation');
+    assert.equal(postCount(), ackChallenged + 1, 'The pressed action completes once after confirmation');
+    assert.match(document.body.textContent, /Deployed policy acknowledged on this node/); assert(safetyOpen(), 'Completion lands in the same open dialog');
+    assert(!button('Confirm operation'), 'The confirmation already given is not asked again');
+    releaseAuth = undefined; mock.armMockReauth('POST', path);
+    await click('Acknowledge deployed policy', false); await click('Confirm operation', false);
+    await waitFor(() => typeof releaseAuth === 'function', 'Second acknowledge prompts again');
+    const ackDismissed = postCount(); await React.act(async () => releaseAuth(false)); await waitFor(ready, 'Dismissed confirmation settles');
+    assert.equal(postCount(), ackDismissed, 'A dismissed confirmation sends nothing more');
+    assert.match(document.body.textContent, /Not confirmed — nothing was changed/); assert(safetyOpen(), 'Cancel leaves the dialog as it was');
     await signIn(); mock.setMockAssistantSetupScenario('ready'); await render(7); await input('assistant-replacement-key', SENTINEL);
     mock.armMockResponseOnce('POST', path, { extraDelayMs: 450 }); await click('Check and save key', false);
     let written; await React.act(async () => { written = await api.getAssistantSetup(); });
@@ -292,8 +316,9 @@ try {
     const beforeModelGate = postCount(); await click('Save model selection', false); await React.act(async () => auth.setTokens(auth.getAccessToken(), auth.getRefreshToken())); await React.act(async () => releaseGate()); await waitFor(ready, 'Replacement read finishes'); assert.equal(postCount(), beforeModelGate, 'Held auth preflight cannot transmit an obsolete model action');
     auth.initAuth(); auth.stopAutoRefresh(); mock.setMockAssistantSetupScenario('ready'); await render(52); await input('assistant-replacement-key', SENTINEL); await select('pinned'); await input('assistant-model-pin', 'fixture-reauth-pin');
     releaseAuth = undefined; auth.setFreshAuthHandler(() => new Promise((resolve) => { releaseAuth = resolve; })); mock.armMockReauth('POST', path); await click('Save model selection', false); await waitFor(() => typeof releaseAuth === 'function', 'Model 440 opens fresh auth');
-    assert.equal(document.querySelector('input[type=password]'), null); assert.equal(document.getElementById('assistant-model-mode').value, '');
-    const beforeModelAuth = postCount(); await React.act(async () => releaseAuth(true)); await waitFor(ready, 'Model fresh auth settles'); assert.equal(postCount(), beforeModelAuth, 'A challenged model action is never replayed'); cacheSafe();
+    assert.equal(document.querySelector('input[type=password]'), null); assert.equal(document.getElementById('assistant-model-mode').value, 'pinned', 'The model draft survives the in-place confirmation');
+    const beforeModelAuth = postCount(); await React.act(async () => releaseAuth(true)); await waitFor(ready, 'Model fresh auth settles'); assert.equal(postCount(), beforeModelAuth + 1, 'The confirmed model action completes once');
+    state = await api.getAssistantSetup(); assert.equal(state.model.selected, 'fixture-reauth-pin', 'The confirmed model selection is saved'); cacheSafe();
 
     mock.setMockAssistantSetupScenario('ready'); await render(53); await select('pinned'); await input('assistant-model-pin', 'fixture-unmounted-pin');
     mock.armMockResponseOnce('POST', path, { extraDelayMs: 450 }); await click('Save model selection', false);
