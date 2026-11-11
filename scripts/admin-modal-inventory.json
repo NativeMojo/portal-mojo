@@ -10805,8 +10805,8 @@
       ]
     },
     {
-      "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:<module>:import:0",
-      "file": "apps/portal/src/pages/auth/FreshAuthHost.tsx",
+      "id": "apps/portal/src/pages/auth/FreshAuthDialog.tsx:<module>:import:0",
+      "file": "apps/portal/src/pages/auth/FreshAuthDialog.tsx",
       "owner": "<module>",
       "launcher": "import",
       "body": [],
@@ -10819,8 +10819,8 @@
       ]
     },
     {
-      "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:FreshAuthDialog:dialog:0",
-      "file": "apps/portal/src/pages/auth/FreshAuthHost.tsx",
+      "id": "apps/portal/src/pages/auth/FreshAuthDialog.tsx:FreshAuthDialog:dialog:0",
+      "file": "apps/portal/src/pages/auth/FreshAuthDialog.tsx",
       "owner": "FreshAuthDialog",
       "launcher": "dialog",
       "body": [
@@ -10829,9 +10829,23 @@
       "category": "confirmation",
       "parent": "FreshAuthDialog",
       "target": null,
-      "fingerprint": "cd50b6e426dffd14387b",
+      "fingerprint": "719362c11960d2784a61",
       "categories": [
         "confirmation"
+      ]
+    },
+    {
+      "id": "apps/portal/src/pages/auth/FreshAuthHost.tsx:<module>:import:0",
+      "file": "apps/portal/src/pages/auth/FreshAuthHost.tsx",
+      "owner": "<module>",
+      "launcher": "import",
+      "body": [],
+      "category": "dependency",
+      "parent": "<module>",
+      "target": null,
+      "fingerprint": "037a99b8c56d68eaf2ef",
+      "categories": [
+        "dependency"
       ]
     },
     {

@@ -58,6 +58,10 @@ read still says Platform; a read cannot prove an older write has finished.
 All onboarding writes check their owner at the transport's `beforeSend` boundary,
 after any asynchronous auth refresh. Credential/purchase step-up continuations
 perform that same check. A replacement session never inherits old consent.
+A same-account step-up is not a replacement (#10670): the server's 440 refuses
+before anything is charged or the confirmation token is spent, so the identical
+quote continues exactly once. Another account answering the prompt replaces the
+session and never inherits the purchase.
 
 ## Registration
 
