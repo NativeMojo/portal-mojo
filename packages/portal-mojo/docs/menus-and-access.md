@@ -153,13 +153,57 @@ converging it onto flat sections is a named follow-up.
   The client is deliberately more permissive; the server re-checks).
 - category → granular rollup (`users` grants `view_users`… — one-way);
   apps extend via `registerPermissionCategories({cat: [perms]})`.
-- `sys.`-prefixed checks never consult the group member.
+- `sys.X` is the user-only form of `X`: it resolves the user's own `X`
+  (direct or category rollup) and never consults the group member.
 - Otherwise the ACTIVE GROUP MEMBER's permissions fold in (member `admin`
   grants within the group only).
 
-`useCan(permission | permissions[]) → {can, loading}`;
+`useCan(permission | permissions[]) → {can, isLoading, me}`;
 `<Guarded permission="view_admin" fallback?>…</Guarded>` renders nothing
 (or fallback) without the grant — fail-closed.
+
+### Which check do I use
+
+Every gate (`useCan`, `<Guarded>`, menu `permissions`/`permissionClauses`,
+DetailView and FormView tab gates) calls `hasPermission`, so the key you
+write picks the mode. There is no separate user-only hook.
+
+| What the gate protects | Key to use | Example |
+|---|---|---|
+| A group page or action (the active member may grant it) | unprefixed key | `useCan('manage_group')` |
+| Something that belongs to the user, or to the whole platform | `sys.`-prefixed key | `useCan('sys.manage_billing')` |
+| Both (either grant is enough) | an array mixing the two | `['sys.manage_billing', 'manage_group']` |
+
+An unprefixed key on a user-level or platform control is a bug: a member
+`admin`, or a member holding that key, shows the control and the server
+then refuses the request. If your app has a local "check the user only"
+helper, replace it with `sys.`-prefixed keys through the same APIs.
+
+Semantics (`npm run verify:permissions` pins the rows marked yes):
+
+| Case | `X` with a member | `sys.X` with a member | Pinned |
+|---|---|---|---|
+| `me` null (loading or anonymous) | false | false | yes |
+| `is_superuser` | true | true | yes |
+| User holds `X` or its category | true | true | yes |
+| Only the member holds `X` | **true** | **false** | yes |
+| Only the member holds `admin` | true on the client, see below | **false** | `sys.X` column only |
+| Only the member holds `X`'s category | false on the client, see below | false | `sys.X` column only |
+| User holds `admin` | true on the client, see below | true on the client, see below | no |
+| Array | any-of, per element | any-of, per element | yes |
+
+Outside a `GroupProvider` the two forms agree. Categories added with
+`registerPermissionCategories` roll up under `sys.` too, for the user only.
+
+**Known differences from the server — don't rely on these.** The server is
+authoritative. No gate may depend on either `admin` wildcard, and these rows
+may change when the client is brought in line:
+
+| Case | Client today | Server |
+|---|---|---|
+| User holds `admin` | passes every key, including `sys.*` | no wildcard, so the request is refused |
+| Only the member holds `admin` | passes every unprefixed key | no wildcard, so the request is refused |
+| Only the member holds `X`'s category | fails the unprefixed key | passes for a domain category's `view_`/`manage_` forms |
 
 ## Group context (A3)
 
