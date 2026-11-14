@@ -132,7 +132,8 @@ those rules until the copies go.
   or Assistant surface; individual permission-gated consumers own topic/event
   lifetimes, not the shared connection. Product portals additionally install
   `GroupProvider` so their group-scoped pages and menus can fold active-member
-  permissions into `useCan`/`Guarded`. The standalone Admin shell deliberately
+  permissions into `useCan`/`Guarded`; user-level and platform gates use
+  `sys.`-prefixed keys, which never read the member. The standalone Admin shell deliberately
   does not install group context; it does install one
   `RightPanelProvider`/`RightPanelSlot` for the globally gated Assistant panel.
 - **`VITE_MOJO_API`.** Unset → the in-package mock transport (dev default);
