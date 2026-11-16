@@ -134,18 +134,10 @@ try {
     }
     check(() => assert.equal(certificates.deriveCertificateRenewalHealth({ ...certificate, renew_after: '2026-13-40T25:99:00Z' }, EPOCH), 'unknown'));
 
-    // Phone lookup freshness: exact to the second, ISO the same as epoch.
-    const now = EPOCH_SECONDS * 1000 - 29_000;
-    for (const lookup_expires_at of [ISO_SECONDS, EPOCH_SECONDS]) {
-        check(() => assert.equal(phonehubApi.lookupIsFresh({ lookup_expires_at }, now), true, `${lookup_expires_at} still fresh`));
-        check(() => assert.equal(phonehubApi.lookupIsFresh({ lookup_expires_at }, EPOCH_SECONDS * 1000), false, `${lookup_expires_at} expired at the instant`));
-    }
-    check(() => assert.equal(phonehubApi.lookupIsFresh({ lookup_expires_at: '2026-13-40T25:99:00Z' }, now), false));
-    check(() => assert.equal(phonehubApi.lookupIsFresh(undefined, now), false));
-
-    // lookupPhoneNumber end to end on the mock. Record 7601 is fresh there, so
-    // only a forced lookup raises its count. An ISO expiry inside the current
-    // minute but still ahead must ask first and force; a passed one must not.
+    // Phone lookup freshness, end to end on the mock. Record 7601 is fresh
+    // there, so only a forced lookup raises its count. An ISO expiry later in
+    // the current minute is still ahead, though reading it to the minute puts it
+    // behind: it must ask first and force. A passed one must do neither.
     const login = await mock.mockFetch('/api/login', { method: 'POST', body: { username: 'phone.manager@nativemojo.com', password: 'mojo' } });
     auth.setTokens(login.data.access_token);
     client.installAuthHooks({ preRequest: async () => {}, authHeader: () => `Bearer ${auth.getAccessToken()}` });

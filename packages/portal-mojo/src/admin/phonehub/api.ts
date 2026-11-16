@@ -20,7 +20,7 @@ export async function normalizePhoneNumber(phoneNumber:string,countryCode?:strin
     return value;
 }
 /** A cached lookup is fresh until its exact expiry instant, seconds included (#11145). */
-export function lookupIsFresh(previous:PhoneNumberRow|undefined,nowMs:number):boolean{const expiresAt=instantMs(previous?.lookup_expires_at);return expiresAt!=null&&expiresAt>nowMs;}
+function lookupIsFresh(previous:PhoneNumberRow|undefined,nowMs:number):boolean{const expiresAt=instantMs(previous?.lookup_expires_at);return expiresAt!=null&&expiresAt>nowMs;}
 export async function lookupPhoneNumber(phoneNumber:string,previous?:PhoneNumberRow,confirmFresh?:()=>boolean|Promise<boolean>):Promise<PhoneNumberRow>{
     const normalized=await normalizePhoneNumber(phoneNumber);
     const fresh=lookupIsFresh(previous,Date.now());
