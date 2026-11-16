@@ -662,22 +662,65 @@ export function toDateSmart(raw: unknown): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** An ISO 8601 date or date-time as django-mojo writes it: seconds and a
+ *  fraction optional, zone 'Z', '±HH:MM' or '±HHMM', or none (local). */
+const STRICT_ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(\.\d{1,9})?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** A strict ISO string with every component in range, rewritten for
+ *  Date.parse ('T', 3-digit fraction, '±HH:MM'); null for anything else.
+ *  The shared parser rolls '2026-13-40T25:99' into a real later date, so a
+ *  cleaner must check the fields itself. */
+function strictIsoForParse(str: string): string | null {
+    const m = str.match(STRICT_ISO_RE);
+    if (!m) return null;
+    const [, yy, mo, dd, hh, mi, ss, frac, zone] = m;
+    const y = Number(yy), month = Number(mo), day = Number(dd);
+    if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(y, month, 0)).getUTCDate()) return null;
+    if (hh === undefined) return `${yy}-${mo}-${dd}`;
+    if (Number(hh) > 23 || Number(mi) > 59 || (ss !== undefined && Number(ss) > 59)) return null;
+    let offset = '';
+    if (zone) {
+        offset = zone === 'Z' ? 'Z' : zone.includes(':') ? zone : `${zone.slice(0, 3)}:${zone.slice(3)}`;
+        if (offset !== 'Z' && (Number(offset.slice(1, 3)) > 23 || Number(offset.slice(4, 6)) > 59)) return null;
+    }
+    const fraction = frac ? frac.slice(0, 4).padEnd(4, '0') : '';
+    return `${yy}-${mo}-${dd}T${hh}:${mi}:${ss ?? '00'}${fraction}${offset}`;
+}
+
+/**
+ * A wire date's exact instant in epoch milliseconds, seconds and fraction
+ * kept, or null. Accepts a finite epoch number (seconds below 1e11, else
+ * milliseconds), a numeric string of 5+ integer digits, or a strict ISO
+ * string with valid fields. Use it to compare instants (expiry, renewal):
+ * `toDateSmart` reads ISO to the minute only.
+ */
+export function instantMs(raw: unknown): number | null {
+    const epoch = (n: number) => Number.isFinite(n) ? (Math.abs(n) < SECONDS_CEILING ? n * 1000 : n) : null;
+    if (typeof raw === 'number') return epoch(raw);
+    if (typeof raw !== 'string') return null;
+    const str = raw.trim();
+    if (!str || str.length > 64) return null;
+    if (ALL_NUMERIC_RE.test(str)) return str.replace(/^[+-]/, '').split('.')[0]!.length >= 5 ? epoch(Number(str)) : null;
+    const iso = strictIsoForParse(str);
+    if (!iso) return null;
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? ms : null;
+}
+
 /** A row's date field as the server sent it: ISO 8601 string or epoch number. */
 export type TemporalValue = string | number | null;
 
 /**
- * Clean a wire date for a sanitized row: keep a finite number or a string the
- * shared sniffer reads (as sent, length-capped), else null. Never 0, so a date
- * the cleaner cannot read shows as unavailable instead of 1970. django-mojo
- * sends ISO strings when SERIALIZE_DATETIME_TO_ISO is on, epoch seconds when
- * it is off; both pass.
+ * Clean a wire date for a sanitized row: keep a finite epoch number, or an
+ * ISO string whose every field is in range (as sent, trimmed, length-capped),
+ * else null. Never 0, so a date the cleaner cannot read shows as unavailable
+ * instead of 1970, and never a rolled-over invalid date. django-mojo sends
+ * ISO strings when SERIALIZE_DATETIME_TO_ISO is on, epoch seconds when it is
+ * off; both pass.
  */
 export function temporal(raw: unknown): TemporalValue {
-    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
-    if (typeof raw !== 'string') return null;
-    const str = raw.trim();
-    if (!str || str.length > 64) return null;
-    return detectTemporal(str) ? str : null;
+    if (instantMs(raw) == null) return null;
+    return typeof raw === 'number' ? raw : String(raw).trim();
 }
 
 /** A value's calendar fields. `precision` is the date-only string's own

@@ -19,12 +19,16 @@ read as a **year**, never an epoch. Anything unrecognizable degrades to the
 fallback — a formatter never throws.
 
 A row cleaner (`sanitizeRow`) must keep a date field as it came off the wire
-with `temporal(raw)` from `ui/date/fns`: it keeps a finite number or a string
-the sniffer reads, and returns `null` for anything else. Never coerce a date
+with `temporal(raw)` from `ui/date/fns`: it keeps a finite epoch number or an
+ISO 8601 string whose every field is in range, and returns `null` for
+anything else, including an impossible date like `2026-13-40T25:99` that the
+lenient sniffer would roll into a real one. Never coerce a date
 with `Number()`: an ISO string becomes `NaN` or `0`, and `0` renders as
 Dec 31 1969 (#11145). django-mojo sends ISO strings when
 `SERIALIZE_DATETIME_TO_ISO` is on, epoch seconds when it is off. Compare
-instants through `toDateSmart`, never with `<` on the raw value.
+instants (expiry, renewal) with `instantMs(raw)`, which keeps seconds and
+fractions; `toDateSmart` reads ISO to the minute only. Never use `<` on the
+raw value.
 
 | Helper | Buckets |
 |---|---|

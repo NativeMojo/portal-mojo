@@ -1,5 +1,5 @@
 import type { CertificateRow, DnsCapabilities, DnsCredentialRow, DomainRow } from './models';
-import { temporal, toDateSmart } from '../../ui/date/fns';
+import { instantMs, temporal } from '../../ui/date/fns';
 
 export const CERTIFICATE_STATUSES = ['pending', 'issuing', 'active', 'failed', 'revoked'] as const;
 export type CertificateStatus = (typeof CERTIFICATE_STATUSES)[number];
@@ -170,9 +170,9 @@ export function deriveCertificateRenewalHealth(row: CertificateRow, nowSeconds =
     if (row.status === 'revoked') return 'revoked';
     if (row.status !== 'active') return 'unknown';
     if (row.last_error) return 'renewal-error';
-    const renewAfter = toDateSmart(row.renew_after);
-    if (!renewAfter) return 'unknown';
-    return renewAfter.getTime() / 1000 <= nowSeconds ? 'due' : 'healthy';
+    const renewAfter = instantMs(row.renew_after);
+    if (renewAfter == null) return 'unknown';
+    return renewAfter / 1000 <= nowSeconds ? 'due' : 'healthy';
 }
 
 export function isHouseDomain(domain: Pick<DomainRow, 'group'>): boolean {
