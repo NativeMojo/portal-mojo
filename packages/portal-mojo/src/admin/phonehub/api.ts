@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { mojoCall, mojoList } from '../../client/runtime';
+import { instantMs } from '../../ui/date/fns';
 import { PhoneConfigModel, sanitizePhoneConfigRow, sanitizePhoneNumberRow, type PhoneConfigRow, type PhoneNumberRow, type PhoneRelation } from './models';
 
 export const PHONE_GROUP_CHOICE_LIMIT=100;
@@ -18,9 +19,11 @@ export async function normalizePhoneNumber(phoneNumber:string,countryCode?:strin
     if(typeof value!=='string'||!/^\+[1-9]\d{7,14}$/.test(value))throw new Error('The server did not return a valid E.164 phone number.');
     return value;
 }
+/** A cached lookup is fresh until its exact expiry instant, seconds included (#11145). */
+function lookupIsFresh(previous:PhoneNumberRow|undefined,nowMs:number):boolean{const expiresAt=instantMs(previous?.lookup_expires_at);return expiresAt!=null&&expiresAt>nowMs;}
 export async function lookupPhoneNumber(phoneNumber:string,previous?:PhoneNumberRow,confirmFresh?:()=>boolean|Promise<boolean>):Promise<PhoneNumberRow>{
     const normalized=await normalizePhoneNumber(phoneNumber);
-    const fresh=Boolean(previous?.lookup_expires_at&&previous.lookup_expires_at>Date.now()/1000);
+    const fresh=lookupIsFresh(previous,Date.now());
     if(fresh&&!(await confirmFresh?.()))throw new Error('Fresh lookup cancelled.');
     const body=await mojoCall('/api/phonehub/number/lookup',{method:'POST',body:{phone_number:normalized,...(fresh?{force_refresh:true}:{})}});
     const row=sanitizePhoneNumberRow(body.data as PhoneNumberRow);

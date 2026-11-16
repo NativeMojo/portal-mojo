@@ -77,7 +77,11 @@ try {
     // 6,591,546 unpacked bytes. No new files or generated/dependency payload.
     // Preserve the existing 0.574% headroom rounded upward to 5 KB: 6.630 MB.
     // Package contents, consumer checks and eager-runtime limits stay enforced.
-    assert.ok(artifact.unpackedSize <= 6_630_000, `unpacked package exceeds 6.630 MB budget (${artifact.unpackedSize})`);
+    // Admin dates #11145: still 633 intended files; 5,246 additional source and
+    // documentation bytes against main 30e8280 (6,629,166 bytes), totaling
+    // 6,634,412. No new files or generated/dependency payload. Preserve the
+    // 0.574% headroom rounded upward to 5 KB: 6.675 MB.
+    assert.ok(artifact.unpackedSize <= 6_675_000, `unpacked package exceeds 6.675 MB budget (${artifact.unpackedSize})`);
 
     const files = new Set(artifact.files.map((entry) => entry.path));
     // Every stylesheet the source entry imports must be in the tarball (#5921).

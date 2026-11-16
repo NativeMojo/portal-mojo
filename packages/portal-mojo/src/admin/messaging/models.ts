@@ -3,6 +3,7 @@ import {
     sanitizeEmailDomainRow, sanitizeMailboxRow, sanitizePublicMessageRow,
     sanitizeSentMessageRow, sanitizeTemplateRow,
 } from './sanitize';
+import type { TemporalValue } from '../../ui/date/fns';
 
 export const EMAIL_ADMIN_PERMISSIONS = ['sys.manage_aws', 'sys.comms'];
 export const PUBLIC_MESSAGE_VIEW_PERMISSIONS = ['sys.view_support', 'sys.security', 'sys.support'];
@@ -15,26 +16,26 @@ export type EmailDnsMode = 'manual' | 'route53' | 'godaddy' | 'unknown';
 export type SentMessageStatus = 'queued' | 'sending' | 'delivered' | 'bounced' | 'complained' | 'failed' | 'unknown';
 
 export interface EmailDomainRow {
-    id: number; created: number | null; modified: number | null; name: string; region: string; status: EmailDomainStatus;
+    id: number; created: TemporalValue; modified: TemporalValue; name: string; region: string; status: EmailDomainStatus;
     receiving_enabled: boolean; s3_inbound_bucket: string | null; s3_inbound_prefix: string; dns_mode: EmailDnsMode;
     aws_key_masked?: string | null; aws_secret_masked?: string | null;
     sns_topic_bounce_arn?: string | null; sns_topic_complaint_arn?: string | null; sns_topic_delivery_arn?: string | null; sns_topic_inbound_arn?: string | null;
 }
 export interface MailboxRow {
-    id: number; created: number | null; modified: number | null; email: string; domain: MessagingRelation | number | null;
+    id: number; created: TemporalValue; modified: TemporalValue; email: string; domain: MessagingRelation | number | null;
     allow_inbound: boolean; allow_outbound: boolean; async_handler: string | null;
     is_system_default: boolean; is_domain_default: boolean;
 }
 export interface SentMessageRow {
-    id: number; created: number; modified: number; mailbox: MessagingRelation | number | null;
+    id: number; created: TemporalValue; modified: TemporalValue; mailbox: MessagingRelation | number | null;
     to_addresses: string[]; cc_addresses: string[]; bcc_addresses?: string[]; subject: string; status: SentMessageStatus;
     ses_message_id: string | null; status_reason?: string | null; body_text?: string | null; body_html?: string | null;
 }
 export interface EmailTemplateRow {
-    id: number; created: number | null; modified: number | null; name: string; subject_template?: string; html_template?: string | null; text_template?: string | null;
+    id: number; created: TemporalValue; modified: TemporalValue; name: string; subject_template?: string; html_template?: string | null; text_template?: string | null;
 }
 export interface PublicMessageRow {
-    id: number; created: number; modified: number; kind: 'contact_us' | 'support' | string; status: 'open' | 'closed' | string;
+    id: number; created: TemporalValue; modified: TemporalValue; kind: 'contact_us' | 'support' | string; status: 'open' | 'closed' | string;
     name: string; email: string; subject: string; group: MessagingRelation | number | null;
     message?: string; metadata?: Record<string, string>; metadata_withheld?: boolean; ip_address?: string | null; user_agent?: string | null;
 }

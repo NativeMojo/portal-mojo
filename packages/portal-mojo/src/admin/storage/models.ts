@@ -4,6 +4,7 @@ import {
     type Envelope, type Params,
 } from '../../client/runtime';
 import { createSafeExporter } from '../../client/safe-export';
+import { temporal, type TemporalValue } from '../../ui/date/fns';
 import { USER_VIEW_PERMISSIONS } from '../identity/users/models';
 import { BUCKET_MANAGE_PERMS, STORAGE_MANAGE_PERMS, STORAGE_VIEW_PERMS } from './permissions';
 
@@ -32,7 +33,7 @@ export interface CdnFinding { step: string; status: string; code: string; messag
 
 export interface FileManagerRow {
     id: number;
-    created: number;
+    created: TemporalValue;
     name: string;
     use: string | null;
     backend_type: string;
@@ -65,8 +66,8 @@ export interface FileManagerUploadPolicyRow {
 
 export interface FileRenditionRow {
     id: number;
-    created: number;
-    modified: number;
+    created: TemporalValue;
+    modified: TemporalValue;
     filename: string;
     file_size: number | null;
     content_type: string;
@@ -80,8 +81,8 @@ export interface FileRenditionRow {
 
 export interface FileRow {
     id: number;
-    created: number;
-    modified: number;
+    created: TemporalValue;
+    modified: TemporalValue;
     filename: string;
     file_size: number | null;
     content_type: string;
@@ -109,8 +110,8 @@ export interface ShortLinkShareRow {
     track_clicks?: boolean;
     metadata?: Record<string, unknown>;
     note?: string | null;
-    created: number;
-    modified?: number;
+    created: TemporalValue;
+    modified?: TemporalValue;
     user?: RelationRow | number | null;
     group?: RelationRow | number | null;
 }
@@ -185,7 +186,7 @@ export function sanitizeFileManagerRow(input: FileManagerRow): FileManagerRow {
     const raw = input as unknown as Record<string, unknown>;
     return {
         id: Number(raw.id),
-        created: Number(raw.created ?? 0),
+        created: temporal(raw.created),
         name: String(raw.name ?? ''),
         use: raw.use == null ? null : String(raw.use),
         backend_type: String(raw.backend_type ?? 'unknown'),
@@ -261,7 +262,7 @@ export function sanitizeFileRow(input: FileRow): FileRow {
             if (!value || typeof value !== 'object') continue;
             const row = value as Record<string, unknown>;
             renditions[role] = {
-                id: Number(row.id), created: Number(row.created ?? 0), modified: Number(row.modified ?? 0),
+                id: Number(row.id), created: temporal(row.created), modified: temporal(row.modified),
                 filename: String(row.filename ?? ''), file_size: row.file_size == null ? null : Number(row.file_size),
                 content_type: String(row.content_type ?? 'application/octet-stream'), category: row.category == null ? null : String(row.category),
                 role, upload_status: String(row.upload_status ?? 'pending'),
@@ -271,7 +272,7 @@ export function sanitizeFileRow(input: FileRow): FileRow {
         }
     }
     return {
-        id: Number(raw.id), created: Number(raw.created ?? 0), modified: Number(raw.modified ?? 0),
+        id: Number(raw.id), created: temporal(raw.created), modified: temporal(raw.modified),
         filename: String(raw.filename ?? ''), file_size: raw.file_size == null ? null : Number(raw.file_size),
         content_type: String(raw.content_type ?? 'application/octet-stream'), category: raw.category == null ? null : String(raw.category),
         upload_status: String(raw.upload_status ?? 'pending'), is_active: Boolean(raw.is_active), is_public: Boolean(raw.is_public),
@@ -330,7 +331,7 @@ export const ShortLinkShareModel = defineModel<ShortLinkShareRow>({
             expires_at: typeof row.expires_at === 'number' || typeof row.expires_at === 'string' ? row.expires_at : null,
             is_active: Boolean(row.is_active), track_clicks: Boolean(row.track_clicks),
             note: typeof metadata.note === 'string' ? metadata.note.slice(0, 512) : null,
-            created: Number(row.created ?? 0), modified: Number(row.modified ?? 0), user: relation(row.user), group: relation(row.group),
+            created: temporal(row.created), modified: temporal(row.modified), user: relation(row.user), group: relation(row.group),
         };
     },
 });

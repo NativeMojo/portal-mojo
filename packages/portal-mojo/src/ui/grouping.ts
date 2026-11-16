@@ -67,14 +67,19 @@ export interface GroupSpec<T> {
     groupHeaderLabel: (key: string) => string;
 }
 
-/** Day buckets for chronological feeds: Today / Yesterday / Apr 25 / Dec 19, 2025. */
-export function groupByDay<T extends Row>(fieldOrAccessor: string | Accessor<T>): GroupSpec<T> {
+/** Day buckets for chronological feeds: Today / Yesterday / Apr 25 / Dec 19, 2025.
+ *  `fallback` names the bucket for a row with no readable date (default:
+ *  ungrouped tail). It can never collide with a YYYY-MM-DD day key. */
+export function groupByDay<T extends Row>(
+    fieldOrAccessor: string | Accessor<T>,
+    opts: { fallback?: string } = {},
+): GroupSpec<T> {
     const access = resolveAccessor(fieldOrAccessor);
     return {
         groupBy: (row) => {
-            return dayOf(access(row))?.key ?? null;
+            return dayOf(access(row))?.key ?? opts.fallback ?? null;
         },
-        groupHeaderLabel: formatDayLabel,
+        groupHeaderLabel: (key) => opts.fallback != null && key === opts.fallback ? opts.fallback : formatDayLabel(key),
     };
 }
 
