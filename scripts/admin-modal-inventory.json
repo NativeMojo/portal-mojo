@@ -9937,7 +9937,7 @@
       "category": "record",
       "parent": "SentDetail",
       "target": null,
-      "fingerprint": "ce654a9799b07be0a87a",
+      "fingerprint": "6a9dd195c4fc96a5f512",
       "categories": [
         "record"
       ]
@@ -12258,7 +12258,7 @@
       "owner": "SentDetail",
       "key": "'overview'",
       "label": "Delivery",
-      "fingerprint": "e14bfafdd55d00723de4"
+      "fingerprint": "c0ce895361cc85e41df5"
     },
     {
       "file": "packages/portal-mojo/src/admin/messaging/SentMessagesPage.tsx",
@@ -12279,7 +12279,7 @@
       "owner": "PublicMessageDetail",
       "key": "'message'",
       "label": "Message",
-      "fingerprint": "d291dcb07d62e8c889e2"
+      "fingerprint": "593d89bf76531ca3fe1b"
     },
     {
       "file": "packages/portal-mojo/src/admin/messaging/PublicMessagesPage.tsx",

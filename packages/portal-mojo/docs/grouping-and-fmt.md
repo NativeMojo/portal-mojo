@@ -18,9 +18,17 @@ an offset, IANA-tailed wall times, and `Date`. A 4-digit numeric string is
 read as a **year**, never an epoch. Anything unrecognizable degrades to the
 fallback — a formatter never throws.
 
+A row cleaner (`sanitizeRow`) must keep a date field as it came off the wire
+with `temporal(raw)` from `ui/date/fns`: it keeps a finite number or a string
+the sniffer reads, and returns `null` for anything else. Never coerce a date
+with `Number()`: an ISO string becomes `NaN` or `0`, and `0` renders as
+Dec 31 1969 (#11145). django-mojo sends ISO strings when
+`SERIALIZE_DATETIME_TO_ISO` is on, epoch seconds when it is off. Compare
+instants through `toDateSmart`, never with `<` on the raw value.
+
 | Helper | Buckets |
 |---|---|
-| `groupByDay(field \| accessor)` | local `YYYY-MM-DD`; labels Today / Yesterday / Apr 25 / Dec 19, 2025 |
+| `groupByDay(field \| accessor, {fallback?})` | local `YYYY-MM-DD`; labels Today / Yesterday / Apr 25 / Dec 19, 2025; `fallback` names the bucket for a row with no readable date, e.g. `'Unavailable'` (default: tail) |
 | `groupByRecency(field)` | Today / Yesterday / This week / This month / Earlier this year / Older — keys sort so `-date` order reads top-down |
 | `groupByField(field, {labels?, format?, fallback?})` | categorical on `String(raw)`; `labels` wins over `format`; `fallback` names the empty bucket (default: tail). `0`/`false` DO bucket |
 | `groupByBoolean(field, {trueLabel?, falseLabel?})` | binary; string-false forms (`'false','0','no','off'`) coerce false; missing → tail |

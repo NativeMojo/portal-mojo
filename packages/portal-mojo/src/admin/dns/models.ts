@@ -1,5 +1,6 @@
 import { defineModel, type Params } from '../../client/runtime';
 import { sanitizeCertificateRow } from './certificate-data';
+import { temporal, type TemporalValue } from '../../ui/date/fns';
 
 export { sanitizeCertificateRow } from './certificate-data';
 
@@ -68,16 +69,16 @@ export interface DnsCredentialRow {
 export interface DomainRow {
     id: number;
     created: number;
-    modified?: number;
+    modified?: TemporalValue;
     name: string;
     provider: string;
     status: string;
-    expires: number | null;
+    expires: TemporalValue;
     hosted_zone_id?: string | null;
     auto_renew?: boolean;
     privacy?: boolean;
     verified?: boolean;
-    registered_on?: number | null;
+    registered_on?: TemporalValue;
     last_error?: string | null;
     group: DnsGroupBasic | number | null;
     user?: DnsUserBasic | null;
@@ -104,16 +105,16 @@ export interface DomainPurchaseRow {
 
 export interface CertificateRow {
     id: number;
-    created: number;
-    modified: number;
+    created: TemporalValue;
+    modified: TemporalValue;
     common_name: string;
     sans: string[];
     status: string;
     issuer: string | null;
     serial: string | null;
-    not_before: number | null;
-    not_after: number | null;
-    renew_after: number | null;
+    not_before: TemporalValue;
+    not_after: TemporalValue;
+    renew_after: TemporalValue;
     last_error: string | null;
     attempts: number;
     days_remaining: number | null;
@@ -288,14 +289,14 @@ export function sanitizeDomainRow(row: unknown): DomainRow {
     const raw = rowObject(row);
     return {
         id: raw.id as number, created: raw.created as number,
-        ...(typeof raw.modified === 'number' ? { modified: raw.modified } : {}),
+        ...(temporal(raw.modified) != null ? { modified: temporal(raw.modified) } : {}),
         name: raw.name as string, provider: raw.provider as string, status: raw.status as string,
-        expires: raw.expires as number | null, group: projectGroup(raw.group),
+        expires: temporal(raw.expires), group: projectGroup(raw.group),
         ...(typeof raw.hosted_zone_id === 'string' || raw.hosted_zone_id === null ? { hosted_zone_id: raw.hosted_zone_id } : {}),
         ...(typeof raw.auto_renew === 'boolean' ? { auto_renew: raw.auto_renew } : {}),
         ...(typeof raw.privacy === 'boolean' ? { privacy: raw.privacy } : {}),
         ...(typeof raw.verified === 'boolean' ? { verified: raw.verified } : {}),
-        ...(typeof raw.registered_on === 'number' || raw.registered_on === null ? { registered_on: raw.registered_on } : {}),
+        ...(temporal(raw.registered_on) != null || raw.registered_on === null ? { registered_on: temporal(raw.registered_on) } : {}),
         ...(typeof raw.last_error === 'string' || raw.last_error === null ? { last_error: raw.last_error } : {}),
         ...('user' in raw ? { user: projectUser(raw.user) } : {}),
         ...('credential' in raw ? { credential: projectCredentialRelation(raw.credential) } : {}),

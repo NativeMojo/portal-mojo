@@ -662,6 +662,24 @@ export function toDateSmart(raw: unknown): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** A row's date field as the server sent it: ISO 8601 string or epoch number. */
+export type TemporalValue = string | number | null;
+
+/**
+ * Clean a wire date for a sanitized row: keep a finite number or a string the
+ * shared sniffer reads (as sent, length-capped), else null. Never 0, so a date
+ * the cleaner cannot read shows as unavailable instead of 1970. django-mojo
+ * sends ISO strings when SERIALIZE_DATETIME_TO_ISO is on, epoch seconds when
+ * it is off; both pass.
+ */
+export function temporal(raw: unknown): TemporalValue {
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+    if (typeof raw !== 'string') return null;
+    const str = raw.trim();
+    if (!str || str.length > 64) return null;
+    return detectTemporal(str) ? str : null;
+}
+
 /** A value's calendar fields. `precision` is the date-only string's own
  *  ('year' | 'month' | 'day'), or 'instant' for anything with a time. */
 export interface CalendarParts {

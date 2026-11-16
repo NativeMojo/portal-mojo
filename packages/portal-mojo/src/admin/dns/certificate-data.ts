@@ -1,4 +1,5 @@
 import type { CertificateRow, DnsCapabilities, DnsCredentialRow, DomainRow } from './models';
+import { temporal, toDateSmart } from '../../ui/date/fns';
 
 export const CERTIFICATE_STATUSES = ['pending', 'issuing', 'active', 'failed', 'revoked'] as const;
 export type CertificateStatus = (typeof CERTIFICATE_STATUSES)[number];
@@ -119,16 +120,16 @@ export function sanitizeCertificateRow(row: unknown): CertificateRow {
     const commonName = normalizeCertificateName(raw.common_name);
     return {
         id: finite(raw.id) ?? 0,
-        created: finite(raw.created) ?? 0,
-        modified: finite(raw.modified) ?? 0,
+        created: temporal(raw.created),
+        modified: temporal(raw.modified),
         common_name: commonName,
         sans: normalizeCertificateSans(raw.sans),
         status,
         issuer: nullableText(raw.issuer, 255),
         serial: nullableText(raw.serial, 128),
-        not_before: finite(raw.not_before),
-        not_after: finite(raw.not_after),
-        renew_after: finite(raw.renew_after),
+        not_before: temporal(raw.not_before),
+        not_after: temporal(raw.not_after),
+        renew_after: temporal(raw.renew_after),
         last_error: sanitizeCertificateLastError(raw.last_error),
         attempts: Math.max(0, Math.trunc(finite(raw.attempts) ?? 0)),
         days_remaining: finite(raw.days_remaining),
@@ -137,7 +138,7 @@ export function sanitizeCertificateRow(row: unknown): CertificateRow {
             name: normalizeCertificateName(domainRaw.name),
             provider: nullableText(domainRaw.provider, 32) ?? 'unknown',
             status: nullableText(domainRaw.status, 32) ?? 'unknown',
-            expires: finite(domainRaw.expires),
+            expires: temporal(domainRaw.expires),
         },
     };
 }
@@ -169,8 +170,9 @@ export function deriveCertificateRenewalHealth(row: CertificateRow, nowSeconds =
     if (row.status === 'revoked') return 'revoked';
     if (row.status !== 'active') return 'unknown';
     if (row.last_error) return 'renewal-error';
-    if (row.renew_after == null) return 'unknown';
-    return row.renew_after <= nowSeconds ? 'due' : 'healthy';
+    const renewAfter = toDateSmart(row.renew_after);
+    if (!renewAfter) return 'unknown';
+    return renewAfter.getTime() / 1000 <= nowSeconds ? 'due' : 'healthy';
 }
 
 export function isHouseDomain(domain: Pick<DomainRow, 'group'>): boolean {
