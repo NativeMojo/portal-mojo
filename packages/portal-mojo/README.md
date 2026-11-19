@@ -158,3 +158,7 @@ and actions stay page-local and cache-free. Fresh-auth requires key re-entry,
 and deployment owns the runtime route. See [Admin Assistant](docs/admin-assistant.md)
 for exact schema-2 actions, lifecycle guarantees, mock showcase and verification;
 [Admin credentials](docs/admin-credentials.md) documents the shared core gate.
+
+### Interactive maps (optional)
+
+`portal-mojo/maps` exports `MapLibreMap` for street tiles, clustered pins and live marker updates. Install the optional `maplibre-gl` peer, import `portal-mojo/maps.css`, and supply your provider's map style. Existing `WorldMap` stays dependency-free. See [MapLibre reference](docs/maplibre.md) and the Showcase MapLibre demo.

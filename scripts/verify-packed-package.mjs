@@ -93,6 +93,7 @@ try {
         'src/client/index.ts', 'src/client/runtime.ts',
         'src/ui/index.ts', 'src/ui/shell.ts',
         'src/charts/index.ts', 'src/admin/index.ts',
+        'src/maps/index.ts', 'src/maps/MapLibreMap.tsx', 'src/maps/maps.css', 'docs/maplibre.md',
         'src/admin/core/index.ts', 'src/admin/registry.ts',
         'src/admin/public/identity.ts', 'src/admin/public/assistant-launcher.ts',
         'src/styles/index.css', 'src/styles/required-tokens.json', ...styleFiles,
@@ -184,7 +185,7 @@ try {
     const installed = JSON.parse(await readFile(join(consumerDir, 'node_modules/portal-mojo/package.json'), 'utf8'));
     assert.equal(installed.private, undefined, 'installed package must not be private');
     assert.equal(installed.license, 'Apache-2.0', 'installed package must declare Apache-2.0');
-    assert.deepEqual(Object.keys(installed.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './styles.css', './ui', './ui/shell']);
+    assert.deepEqual(Object.keys(installed.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './maps', './maps.css', './personas', './styles.css', './ui', './ui/shell']);
     // The installed stylesheets meet the same contract as the source: every
     // file imported in layer(portal-mojo), no orphan, and the token list exact.
     assert.equal(installed.exports['./styles.css'], './src/styles/index.css', 'installed portal-mojo/styles.css must resolve to src/styles/index.css');
@@ -226,6 +227,21 @@ try {
     const packedExports = checker.getExportsOfModule(adminSymbol).map((symbol) => symbol.name).sort();
     const exportContract = JSON.parse(await readFile(resolve(root, 'scripts/admin-export-contract.json'), 'utf8'));
     assert.deepEqual(packedExports, exportContract, 'packed admin TypeScript export map must match source exactly');
+    assert.equal(installed.peerDependenciesMeta['maplibre-gl'].optional, true);
+    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', 'maplibre-gl@^6.19.0'], consumerDir);
+    await writeFile(join(consumerDir, 'src/maps.tsx'), [
+        "import { MapLibreMap, type MapMarker } from 'portal-mojo/maps';",
+        "import 'portal-mojo/maps.css';",
+        "import { setWorkerUrl } from 'maplibre-gl';",
+        "import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';",
+        "setWorkerUrl(workerUrl);",
+        "const markers: MapMarker[] = [{ id: 'zero', label: 'Zero', longitude: 0, latitude: 0 }];",
+        "export const map = <MapLibreMap mapStyle={{ version: 8, sources: {}, layers: [] }} markers={markers} />;",
+    ].join('\n'));
+    await writeFile(join(consumerDir, 'src/main.ts'), "import { map } from './maps';\nconsole.log(map);\n");
+    run('npm', ['run', 'typecheck'], consumerDir);
+    run('npm', ['run', 'build'], consumerDir);
+    console.log('Optional maps entry and CSS verified from packed package');
     console.log(`portal-mojo@${artifact.version} tarball verified in a clean consumer (${artifact.files.length} files)`);
 } finally {
     await rm(tempRoot, { recursive: true, force: true });

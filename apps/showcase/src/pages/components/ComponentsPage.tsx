@@ -115,6 +115,7 @@ const ChartsMetricsC2Demo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsM
 const ChartsMiniWidgetDemo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsMiniWidgetDemo');
 const ChartsKpiDemo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsKpiDemo');
 const ChartsPieDemo = lazyDemo(() => import('./demos-charts-c2'), 'ChartsPieDemo');
+const MapLibreDemo = lazyDemo(() => import('./demos-maplibre'), 'MapLibreDemo');
 const WorldMapDemo = lazyDemo(() => import('./demos-worldmap'), 'WorldMapDemo');
 const WorldMapRoutesDemo = lazyDemo(() => import('./demos-worldmap'), 'WorldMapRoutesDemo');
 const FormWizardDemo = lazyDemo(() => import('./demos-form-wizard'), 'FormWizardDemo');
@@ -390,6 +391,11 @@ const GROUPS: DemoGroup[] = [
                 key: 'charts-pie', title: 'PieChart', icon: 'bi-pie-chart',
                 blurb: 'Native SVG pie/doughnut: all three input shapes, golden-angle colors, center labels, label-keyed arc tween, slice click, PNG export.',
                 render: () => <ChartsPieDemo />,
+            },
+            {
+                key: 'maplibre', title: 'MapLibre', icon: 'bi-geo-alt',
+                blurb: 'Interactive street maps with clustered pins, safe React popups and live updates that preserve your view.',
+                render: () => <MapLibreDemo />,
             },
             {
                 key: 'worldmap', title: 'WorldMap', icon: 'bi-globe-americas',

@@ -43,7 +43,8 @@ try {
     assert.equal(manifest.publishConfig?.access, 'public');
     assert.equal(manifest.publishConfig?.registry, 'https://registry.npmjs.org/');
     assert.equal(manifest.peerDependencies?.['react-dom'], '^19');
-    assert.deepEqual(Object.keys(manifest.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './personas', './styles.css', './ui', './ui/shell']);
+    assert.deepEqual(Object.keys(manifest.exports).sort(), ['./account', './admin', './admin/assistant', './admin/assistant/launcher', './admin/communications', './admin/core', './admin/identity', './admin/infrastructure', './admin/observability', './admin/operations', './admin/registry', './admin/security', './charts', './client', './client/runtime', './maps', './maps.css', './personas', './styles.css', './ui', './ui/shell']);
+    assert.equal(manifest.peerDependenciesMeta?.['maplibre-gl']?.optional, true);
     await verifyStyles(manifest);
     // The rules must also reject what they promise to (#5921 review 67137).
     await import('./verify-style-contract.mjs');
