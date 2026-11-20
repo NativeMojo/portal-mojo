@@ -185,7 +185,38 @@ export function MapLibreMap<T>({
         setPopupHost(node);
         const close = () => select(null);
         popup.on('close', close);
-        return () => { popup.off('close', close); popup.remove(); };
+        // React fills the portal after MapLibre's initial empty measurement.
+        // Re-anchor and pan only the amount needed to keep its actions in view.
+        let pending = 0;
+        let disposed = false;
+        const fitPopup = () => {
+            cancelAnimationFrame(pending);
+            const frame = map.getContainer().getBoundingClientRect();
+            if (frame.height > 0) {
+                node.style.maxHeight = `${Math.max(72, frame.height - 64)}px`;
+                node.style.overflowY = 'auto';
+            }
+            popup.setLngLat([active.longitude, active.latitude]);
+            pending = requestAnimationFrame(() => {
+                if (disposed) return;
+                const box = node.closest('.maplibregl-popup')?.getBoundingClientRect();
+                if (!box || !frame.width || !frame.height) return;
+                const dx = box.left < frame.left + 4 ? box.left - frame.left - 12
+                    : box.right > frame.right - 4 ? box.right - frame.right + 12 : 0;
+                const dy = box.top < frame.top + 4 ? box.top - frame.top - 12
+                    : box.bottom > frame.bottom - 4 ? box.bottom - frame.bottom + 12 : 0;
+                if (dx || dy) map.panBy([dx, dy], { duration: 0 });
+            });
+        };
+        const size = new ResizeObserver(fitPopup);
+        size.observe(node);
+        map.on('resize', fitPopup);
+        map.on('moveend', fitPopup);
+        return () => {
+            disposed = true; cancelAnimationFrame(pending); size.disconnect();
+            map.off('resize', fitPopup); map.off('moveend', fitPopup);
+            popup.off('close', close); popup.remove();
+        };
     }, [active?.id, active?.longitude, active?.latitude, ready, attempt]);
 
     return <section className={`mojo-map ${className}`} aria-label={label}>

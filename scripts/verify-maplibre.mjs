@@ -16,7 +16,7 @@ export class Map {
  on(name, fn) { (this.events[name] ??= new Set()).add(fn); return this; }
  off(name, fn) { this.events[name]?.delete(fn); return this; }
  emit(name, event = {}) { for (const fn of this.events[name] ?? []) fn(event); }
- addControl() {} getCanvas() { return this.container; }
+ addControl() {} getCanvas() { return this.container; } getContainer() { return this.container; } panBy(offset) { this.panned = offset; }
  addSource(id, spec) { this.sources[id] = { spec, updates: [], setData: async (data) => { this.sources[id].updates.push(data); }, setClusterOptions: async () => {}, getClusterExpansionZoom: () => this.expansion ?? Promise.resolve(12) }; }
  getSource(id) { return this.sources[id]; } addLayer(layer) { this.layers[layer.id] = layer; }
  getLayer(id) { return this.layers[id]; } setPaintProperty() {}
@@ -28,7 +28,7 @@ export class Map {
 export class NavigationControl {}
 export class Marker { constructor(options) { this.el = options.element; } setLngLat(coordinates) { this.coordinates = coordinates; return this; } addTo(map) { map.container.append(this.el); return this; } remove() { this.el.remove(); } getElement() { return this.el; } }
 export class Popup {
- constructor() { this.events = {}; popups.push(this); } setLngLat(point) { this.point = point; return this; }
+ constructor() { this.events = {}; popups.push(this); } setLngLat(point) { this.point = point; this.repositions = (this.repositions ?? 0) + 1; return this; }
  setDOMContent(node) { this.node = node; return this; } addTo(map) { map.container.append(this.node); return this; }
  on(name, fn) { this.events[name] = fn; return this; } off(name) { delete this.events[name]; return this; }
  remove() { this.node.remove(); this.events.close?.(); }
@@ -39,6 +39,8 @@ for (const name of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'Eve
 globalThis.getComputedStyle = dom.window.getComputedStyle;
 const observers = [];
 globalThis.ResizeObserver = class { constructor(fn) { this.fn = fn; observers.push(this); } observe() {} disconnect() { this.disconnected = true; } };
+globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+globalThis.cancelAnimationFrame = clearTimeout;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const React = await import('react');
 const { createRoot } = await import('react-dom/client');
@@ -73,6 +75,10 @@ try {
     assert(document.body.textContent.includes(zero.label));
     assert.equal(document.querySelector('img'), null, 'popup labels are React-escaped');
     const popup = engine.popups.at(-1);
+    const popupSize = observers.at(-1);
+    const beforeSize = popup.repositions;
+    await React.act(async () => popupSize.fn());
+    assert.equal(popup.repositions, beforeSize + 1, 'portal content growth re-evaluates the popup anchor');
     props = { ...props, markers: [{ ...zero, label: 'Updated', tone: 'ok' }, far] };
     await render();
     assert(document.body.textContent.includes('Updated'));
@@ -82,6 +88,7 @@ try {
     assert.equal(map.getSource('mojo-markers').updates.at(-1).features[0].properties.tone, 'ok');
     props = { ...props, markers: [far] }; await render();
     assert.equal(choices.at(-1), null); assert(!document.body.contains(popup.node));
+    assert.equal(popupSize.disconnected, true, 'removed popup disconnects its size observer');
     console.log('PASS live source updates preserve camera and selection; safe popup updates/closes on removal');
     map.features = [{ layer: 'mojo-clusters', geometry: { type: 'Point', coordinates: [100, 20] }, properties: { cluster_id: 1, point_count: 4 } }];
     await emit(map, 'render');
